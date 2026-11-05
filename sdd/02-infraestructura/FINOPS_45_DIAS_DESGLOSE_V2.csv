@@ -1,0 +1,32 @@
+partida,volumen,cantidad,precio_unitario_usd,unidad,total_45d_usd,nivel_evidencia,supuestos_y_limitaciones
+EC2 Go,2 x t4g.micro x 1080 h,2160,0.0084,hora-instancia,18.1440,evidencia Price List previa,2 vCPU/host ARM64; burst en modo standard
+ALB fijo,1 ALB x 1080 h,1080,0.0225,hora-ALB,24.3000,evidencia Price List previa,"2 AZ, internet-facing"
+ALB LCU,1 LCU promedio x 1080 h,1080,0.008,LCU-h,8.6400,evidencia Price List previa,variable; no es limite automatico
+ElastiCache Redis OSS,1 cache.t4g.micro x 1080 h,1080,0.016,nodo-h,17.2800,referencia terciaria Ohio; revalidar Price List API,"motor Redis OSS, ON-demand sin serverless ni replicas"
+IPv4 ALB,2 IPv4 x 1080 h,2160,0.005,IP-h,10.8000,AWS VPC pricing,piso 2 IP; el ALB puede ampliar asignaciones
+IPv4 Go,2 IPv4 x 1080 h,2160,0.005,IP-h,10.8000,AWS VPC pricing,"public subnet; inbound solo SG ALB, sin SSH"
+EBS gp3,20 GB x 1.5 meses,30,0.08,GB-mes,2.4000,evidencia Price List previa,2 volumenes 10 GB; sin IOPS extra
+DynamoDB storage,2 GB x 1.5 meses,3,0.25,GB-mes,0.7500,"hipotesis de tarifa, verificar Ohio",sin aplicar gratis 25GB para prudencia
+DynamoDB reads,2 M RRU,2,0.125,M-RRU,0.2500,ejemplo AWS DynamoDB,incluye GSI y lecturas transaccionales modeladas
+DynamoDB writes,0.6 M WRU,0.6,0.625,M-WRU,0.3750,ejemplo AWS DynamoDB,incluye GSIs y transacciones como WRUs facturables
+DynamoDB PITR,2 GB x 1.5 meses,3,0.2,GB-mes,0.6000,AWS Disaster Recovery Strategy,retencion 35 d; si distintas tablas sumar todas
+DynamoDB backup,2 GB x 1.5 meses,3,0.1,GB-mes,0.3000,AWS Disaster Recovery Strategy,on-demand backup + retencion
+DynamoDB restore,2 GB una restauracion,2,0.15,GB-restaurado,0.3000,AWS Disaster Recovery Strategy,prueba futura; no ejecutada
+CloudWatch log ingestion,3 GB ingesta,3,0.5,GB,1.5000,referencia AWS CloudWatch,precios regionales pendientes de cierre
+CloudWatch log retention,3 GB x 1.5 meses,4.5,0.03,GB-mes,0.1350,"hipotesis, verificar Ohio","retencion 7 dias, gasto estimado conservador"
+CloudWatch custom metrics,3 metricas x 1.5 meses,4.5,0.3,metrica-mes,1.3500,referencia AWS CloudWatch,no consumir metricas/series ilimitadas
+CloudWatch alarms,2 alarmas x 1.5 meses,3,0.1,alarma-mes,0.3000,referencia AWS CloudWatch,alarmas y budget no bloquean automaticamente
+Secrets Manager,2 secretos x 1.5 meses,3,0.4,secreto-mes,1.2000,AWS Secrets Manager,requests supuestos bajos; revisar exceso
+S3 Terraform-state,2 GB x 1.5 meses,3,0.023,GB-mes,0.0690,referencia AWS S3,versioning con lifecycle; no eliminar state
+S3 requests,3000 PUT y GET aprox,1,0.015,lote,0.0150,supuesto de workload,reconciliar con consumo real
+Route53 zone,1 zona x 1.5 meses,1.5,0.5,zona-mes,0.7500,AWS Route53,dominio propio EXISTENTE; compra/renovacion EXCLUIDA
+Internet egress,10 GB,10,0.09,GB,0.9000,supuesto alto vs free allowance,revalidar región y allowance 100GB
+Inter-AZ Redis,10 GB,10,0.01,GB,0.1000,AWS ElastiCache regional transfer,"cross-AZ, sujeto a trafico"
+EBS snapshots,2 GB x 1.5 meses,3,0.05,GB-mes,0.1500,hipotesis EBS snapshot,incremental y retencion controlada
+CI/CD artifacts y ejecucion,reserva $2 para 45 dias,1,2,lote,2.0000,supuesto de presupuesto,GitHub Actions privado sujeto a minutos disponibles
+ACM publico no exportable,1 certificado solo ALB,1,0,certificado,0.0000,AWS ACM FAQs,costo 0 SOLO emision/uso con ALB
+Gateway endpoints S3+Dynamo,2 endpoints gateway,2,0,endpoint,0.0000,AWS VPC Gateway endpoints,0 adicional por opcion elegida
+NAT Gateway,0 gateways por diseno,0,0,gateway-h,0.0000,no creado por diseno,prohibir creacion sin nueva cotizacion
+Interface endpoints,0 endpoints privados por diseno,0,0,endpoint-h,0.0000,no creado por diseno,backend con egress restringido por IP+443
+Dominio nuevo/renovacion,NO incluido,0,0,EXCLUIDO,0.0000,pendiente de proveedor y pago,no puede considerarse cero si no existe dominio
+IVA Mexico,NO incluido; sensibilidad 16%,0,0,EXCLUIDO,0.0000,AWS Mexico y Terminos AWS Credits,puede no estar cubierto por creditos; requiere estado cuenta

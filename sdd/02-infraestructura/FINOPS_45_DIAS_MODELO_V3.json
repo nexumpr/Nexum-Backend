@@ -1,0 +1,357 @@
+{
+  "version": "3.0.0-DRAFT",
+  "fecha_corte": "2026-11-05",
+  "gate": "H05_BLOCKED_NO_APROBADO",
+  "escenario_seleccionable": "C_CLOUDFRONT_VPC_ORIGIN_PRIVATE_ALB_2_EC2_24x7_REDIS_MANAGED_DDB_ON_DEMAND",
+  "region_backend": "us-east-2",
+  "cloudfront": "global",
+  "horas": "1080",
+  "creditos_declarados_usd": "120",
+  "moneda": "USD",
+  "base_legacy_24x7_usd": "103.408",
+  "base_calculada_sin_ipv4_sin_route53_usd": "81.058",
+  "reserva_adicional_CF_no_tarifaria_usd": "3.00",
+  "estimado_total_45d_usd": "84.0580",
+  "credito_restante_teorico_usd": "35.9420",
+  "disponibilidad_objetivo": "API+DB+Redis+ALB+CloudFront 24x7; sin interrupciones programadas de core",
+  "restriccion_pagos": "0 MXN de fondos propios; AWS Free obligatorio; no Paid ni renovacion dominio",
+  "no_garantiza": [
+    "habilitacion de CloudFront VPC origins por SCP en la cuenta",
+    "aprovisionamiento de instancias en dos AZ",
+    "precio directo SKU Redis en Price List",
+    "recuento real ALB LCU",
+    "tráfico real, transferencias, backups y cambios de tarifas",
+    "capacidad 45 dias si creditos se consumen antes",
+    "TLS extremo a extremo CloudFront->ALB: en propuesta es HTTP privado"
+  ],
+  "item_count": 32,
+  "items": [
+    {
+      "partida": "EC2 Go",
+      "volumen": "2 x t4g.micro x 1080 h",
+      "cantidad": "2160",
+      "precio_unitario_usd": "0.0084",
+      "unidad": "hora-instancia",
+      "total_45d_usd": "18.1440",
+      "nivel_evidencia": "evidencia Price List previa",
+      "supuestos_y_limitaciones": "2 vCPU/host ARM64; burst en modo standard"
+    },
+    {
+      "partida": "ALB fijo",
+      "volumen": "1 ALB x 1080 h",
+      "cantidad": "1080",
+      "precio_unitario_usd": "0.0225",
+      "unidad": "hora-ALB",
+      "total_45d_usd": "24.3000",
+      "nivel_evidencia": "evidencia Price List previa",
+      "supuestos_y_limitaciones": "2 AZ, internet-facing"
+    },
+    {
+      "partida": "ALB LCU",
+      "volumen": "1 LCU promedio x 1080 h",
+      "cantidad": "1080",
+      "precio_unitario_usd": "0.008",
+      "unidad": "LCU-h",
+      "total_45d_usd": "8.640",
+      "nivel_evidencia": "evidencia Price List previa",
+      "supuestos_y_limitaciones": "variable; no es limite automatico"
+    },
+    {
+      "partida": "ElastiCache Redis OSS",
+      "volumen": "1 cache.t4g.micro x 1080 h",
+      "cantidad": "1080",
+      "precio_unitario_usd": "0.016",
+      "unidad": "nodo-h",
+      "total_45d_usd": "17.280",
+      "nivel_evidencia": "referencia terciaria Ohio; revalidar Price List API",
+      "supuestos_y_limitaciones": "motor Redis OSS, ON-demand sin serverless ni replicas"
+    },
+    {
+      "partida": "IPv4 ALB",
+      "volumen": "0 IPv4 públicas: ALB interno en subred privada, condicionado a VPC origins",
+      "cantidad": "0",
+      "precio_unitario_usd": "0.005",
+      "unidad": "IP-h",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "AWS VPC pricing",
+      "supuestos_y_limitaciones": "VPC Origins permitidos; ALB interno sin IP pública; test de despliegue H08"
+    },
+    {
+      "partida": "IPv4 Go",
+      "volumen": "0 IPv4 públicas: EC2 Go privadas x2",
+      "cantidad": "0",
+      "precio_unitario_usd": "0.005",
+      "unidad": "IP-h",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "AWS VPC pricing",
+      "supuestos_y_limitaciones": "Sin internet/nat; distribución por S3 gateway y diseño de parches de AMI; si se requiere NAT cambia presupuesto"
+    },
+    {
+      "partida": "EBS gp3",
+      "volumen": "20 GB x 1.5 meses",
+      "cantidad": "30",
+      "precio_unitario_usd": "0.08",
+      "unidad": "GB-mes",
+      "total_45d_usd": "2.40",
+      "nivel_evidencia": "evidencia Price List previa",
+      "supuestos_y_limitaciones": "2 volumenes 10 GB; sin IOPS extra"
+    },
+    {
+      "partida": "DynamoDB storage",
+      "volumen": "2 GB x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.25",
+      "unidad": "GB-mes",
+      "total_45d_usd": "0.75",
+      "nivel_evidencia": "hipotesis de tarifa, verificar Ohio",
+      "supuestos_y_limitaciones": "sin aplicar gratis 25GB para prudencia"
+    },
+    {
+      "partida": "DynamoDB reads",
+      "volumen": "2 M RRU",
+      "cantidad": "2",
+      "precio_unitario_usd": "0.125",
+      "unidad": "M-RRU",
+      "total_45d_usd": "0.250",
+      "nivel_evidencia": "ejemplo AWS DynamoDB",
+      "supuestos_y_limitaciones": "incluye GSI y lecturas transaccionales modeladas"
+    },
+    {
+      "partida": "DynamoDB writes",
+      "volumen": "0.6 M WRU",
+      "cantidad": "0.6",
+      "precio_unitario_usd": "0.625",
+      "unidad": "M-WRU",
+      "total_45d_usd": "0.3750",
+      "nivel_evidencia": "ejemplo AWS DynamoDB",
+      "supuestos_y_limitaciones": "incluye GSIs y transacciones como WRUs facturables"
+    },
+    {
+      "partida": "DynamoDB PITR",
+      "volumen": "2 GB x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.2",
+      "unidad": "GB-mes",
+      "total_45d_usd": "0.6",
+      "nivel_evidencia": "AWS Disaster Recovery Strategy",
+      "supuestos_y_limitaciones": "retencion 35 d; si distintas tablas sumar todas"
+    },
+    {
+      "partida": "DynamoDB backup",
+      "volumen": "2 GB x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.1",
+      "unidad": "GB-mes",
+      "total_45d_usd": "0.3",
+      "nivel_evidencia": "AWS Disaster Recovery Strategy",
+      "supuestos_y_limitaciones": "on-demand backup + retencion"
+    },
+    {
+      "partida": "DynamoDB restore",
+      "volumen": "2 GB una restauracion",
+      "cantidad": "2",
+      "precio_unitario_usd": "0.15",
+      "unidad": "GB-restaurado",
+      "total_45d_usd": "0.30",
+      "nivel_evidencia": "AWS Disaster Recovery Strategy",
+      "supuestos_y_limitaciones": "prueba futura; no ejecutada"
+    },
+    {
+      "partida": "CloudWatch log ingestion",
+      "volumen": "3 GB ingesta",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.5",
+      "unidad": "GB",
+      "total_45d_usd": "1.5",
+      "nivel_evidencia": "referencia AWS CloudWatch",
+      "supuestos_y_limitaciones": "precios regionales pendientes de cierre"
+    },
+    {
+      "partida": "CloudWatch log retention",
+      "volumen": "3 GB x 1.5 meses",
+      "cantidad": "4.5",
+      "precio_unitario_usd": "0.03",
+      "unidad": "GB-mes",
+      "total_45d_usd": "0.135",
+      "nivel_evidencia": "hipotesis, verificar Ohio",
+      "supuestos_y_limitaciones": "retencion 7 dias, gasto estimado conservador"
+    },
+    {
+      "partida": "CloudWatch custom metrics",
+      "volumen": "3 metricas x 1.5 meses",
+      "cantidad": "4.5",
+      "precio_unitario_usd": "0.3",
+      "unidad": "metrica-mes",
+      "total_45d_usd": "1.35",
+      "nivel_evidencia": "referencia AWS CloudWatch",
+      "supuestos_y_limitaciones": "no consumir metricas/series ilimitadas"
+    },
+    {
+      "partida": "CloudWatch alarms",
+      "volumen": "2 alarmas x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.1",
+      "unidad": "alarma-mes",
+      "total_45d_usd": "0.3",
+      "nivel_evidencia": "referencia AWS CloudWatch",
+      "supuestos_y_limitaciones": "alarmas y budget no bloquean automaticamente"
+    },
+    {
+      "partida": "Secrets Manager",
+      "volumen": "2 secretos x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.4",
+      "unidad": "secreto-mes",
+      "total_45d_usd": "1.2",
+      "nivel_evidencia": "AWS Secrets Manager",
+      "supuestos_y_limitaciones": "requests supuestos bajos; revisar exceso"
+    },
+    {
+      "partida": "S3 Terraform-state",
+      "volumen": "2 GB x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.023",
+      "unidad": "GB-mes",
+      "total_45d_usd": "0.069",
+      "nivel_evidencia": "referencia AWS S3",
+      "supuestos_y_limitaciones": "versioning con lifecycle; no eliminar state"
+    },
+    {
+      "partida": "S3 requests",
+      "volumen": "3000 PUT y GET aprox",
+      "cantidad": "1",
+      "precio_unitario_usd": "0.015",
+      "unidad": "lote",
+      "total_45d_usd": "0.015",
+      "nivel_evidencia": "supuesto de workload",
+      "supuestos_y_limitaciones": "reconciliar con consumo real"
+    },
+    {
+      "partida": "Route53 zone",
+      "volumen": "0 zonas Route53; DNS HTTPS por defecto de CloudFront",
+      "cantidad": "0",
+      "precio_unitario_usd": "0.5",
+      "unidad": "zona-mes",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "AWS Route53",
+      "supuestos_y_limitaciones": "Se usa dxxxx.cloudfront.net; no comprar dominio, no usar dominio propio hasta ADR futuro"
+    },
+    {
+      "partida": "Internet egress",
+      "volumen": "10 GB",
+      "cantidad": "10",
+      "precio_unitario_usd": "0.09",
+      "unidad": "GB",
+      "total_45d_usd": "0.90",
+      "nivel_evidencia": "supuesto alto vs free allowance",
+      "supuestos_y_limitaciones": "revalidar región y allowance 100GB"
+    },
+    {
+      "partida": "Inter-AZ Redis",
+      "volumen": "10 GB",
+      "cantidad": "10",
+      "precio_unitario_usd": "0.01",
+      "unidad": "GB",
+      "total_45d_usd": "0.10",
+      "nivel_evidencia": "AWS ElastiCache regional transfer",
+      "supuestos_y_limitaciones": "cross-AZ, sujeto a trafico"
+    },
+    {
+      "partida": "EBS snapshots",
+      "volumen": "2 GB x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.05",
+      "unidad": "GB-mes",
+      "total_45d_usd": "0.15",
+      "nivel_evidencia": "hipotesis EBS snapshot",
+      "supuestos_y_limitaciones": "incremental y retencion controlada"
+    },
+    {
+      "partida": "CI/CD artifacts y ejecucion",
+      "volumen": "reserva $2 para 45 dias",
+      "cantidad": "1",
+      "precio_unitario_usd": "2",
+      "unidad": "lote",
+      "total_45d_usd": "2",
+      "nivel_evidencia": "supuesto de presupuesto",
+      "supuestos_y_limitaciones": "GitHub Actions privado sujeto a minutos disponibles"
+    },
+    {
+      "partida": "Certificado CloudFront por defecto",
+      "volumen": "TLS para *.cloudfront.net (sin ACM propio)",
+      "cantidad": "1",
+      "precio_unitario_usd": "0",
+      "unidad": "certificado",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "AWS ACM FAQs",
+      "supuestos_y_limitaciones": "HTTPS navegador->CloudFront; origen ALB privado HTTP no es TLS extremo a extremo; aceptación formal pendiente"
+    },
+    {
+      "partida": "Gateway endpoints S3+Dynamo",
+      "volumen": "2 endpoints gateway",
+      "cantidad": "2",
+      "precio_unitario_usd": "0",
+      "unidad": "endpoint",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "AWS VPC Gateway endpoints",
+      "supuestos_y_limitaciones": "0 adicional por opcion elegida"
+    },
+    {
+      "partida": "NAT Gateway",
+      "volumen": "0 gateways por diseno",
+      "cantidad": "0",
+      "precio_unitario_usd": "0",
+      "unidad": "gateway-h",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "no creado por diseno",
+      "supuestos_y_limitaciones": "prohibir creacion sin nueva cotizacion"
+    },
+    {
+      "partida": "Interface endpoints",
+      "volumen": "0 endpoints privados por diseno",
+      "cantidad": "0",
+      "precio_unitario_usd": "0",
+      "unidad": "endpoint-h",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "no creado por diseno",
+      "supuestos_y_limitaciones": "backend con egress restringido por IP+443"
+    },
+    {
+      "partida": "Dominio nuevo/renovacion",
+      "volumen": "NO se adquiere ni renueva dominio",
+      "cantidad": "0",
+      "precio_unitario_usd": "0",
+      "unidad": "EXCLUIDO",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "pendiente de proveedor y pago",
+      "supuestos_y_limitaciones": "API consume nombre cloudfront.net; si DNS custom se exige, reabrir ADR y presupuesto, sin pagos personales"
+    },
+    {
+      "partida": "IVA Mexico",
+      "volumen": "No imputado como pago externo: cuenta AWS Free activa no genera cargos hasta upgrade",
+      "cantidad": "0",
+      "precio_unitario_usd": "0",
+      "unidad": "EXCLUIDO",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "AWS Mexico y Terminos AWS Credits",
+      "supuestos_y_limitaciones": "No transferir a Paid; ver AWS docs planes Free. Esto NO amplía créditos ni garantiza 45d si se agotan"
+    },
+    {
+      "partida": "Reserva prudencial CloudFront variables",
+      "volumen": "Techo de modelado para solicitudes/transferencia si hay consumo no cubierto",
+      "cantidad": "1",
+      "precio_unitario_usd": "3.00",
+      "unidad": "reserva no tarifaria",
+      "total_45d_usd": "3.00",
+      "nivel_evidencia": "hipótesis, no precio oficial ni cargo observado",
+      "supuestos_y_limitaciones": "Confirmar límites de AWS Free, traffic y facturación real; no asumir que CloudFront=gratuito ilimitado"
+    }
+  ],
+  "fuentes_oficiales": [
+    "https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-plans.html",
+    "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-vpc-origins.html",
+    "https://aws.amazon.com/about-aws/whats-new/2024/11/amazon-cloudfront-vpc-origins/",
+    "https://docs.aws.amazon.com/vpc/latest/privatelink/gateway-endpoints.html",
+    "https://docs.aws.amazon.com/accounts/latest/reference/supported-services-sign-up-new.html"
+  ]
+}

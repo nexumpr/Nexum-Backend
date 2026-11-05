@@ -1,0 +1,9 @@
+# Secuencia sugerida de implementación H08+ (no autoriza ningún despliegue)
+
+Después de H07 APROBADO: 1) implementar/validar IaC 100% reproducible para estado remoto, roles OIDC, presupuestos/cupo Free y entorno de pruebas autorizado; 2) backend Go base/health real; 3) conectar DynamoDB/Redis real en dos EC2 detrás de CloudFront + ALB privado; 4) por cada endpoint **uno por release**, crear branch, implementar con tests del `E###`, PR/CI/DevSecOps, plan Terraform, aprobación humana de mutación, deploy automatizado, HTTP real vía HTTPS, comparar ambos nodos e invalidación, snapshot evidencia, rollback y regresión acumulativa.
+
+**Orden funcional recomendado de releases** (uno por release, sin desplegar todos juntos): E072/E073 salud; E015 aviso; E001/E002/E003/E004; E012/E013/E014; categorías E022; ingreso E024/E025; movimientos E027/E028/E029/E030/E031; resumen E026/dashboard E051; después recurrentes, metas/aportes, presupuestos, demás identidad, notificaciones y analítica/ML real según prioridades aprobadas. Idempotencia multiinstancia y concurrencia se verifican antes de servicios financieros.
+
+**IaC automatizada**: workflow `plan`→revisión→`apply` con respaldo de estado y versiones, `status`, `suspend-aux`, `resume-aux`, `reconcile`, `rollback`, `destroy-aux` con controles, cron solo dentro de disponibilidad permitida y validación de gastos + créditos; no apagar jamás API/DynamoDB/Redis/balanceador para ahorro salvo nueva autorización explícita. Toda acción AWS requiere aprobación contextual incluso si OpenCode construye comandos automáticamente. Nunca convertir Free en Paid.
+
+**Condiciones del gate AWS real:** plan FREE/ACTIVE actual, coste/45 días con colchón, IAM permisos Create verificados en prueba autorizada, Redis SKU correcto, pruebas TLS, backups, resiliencia, límites y salud. Si la cuenta se queda sin créditos no es posible garantizar 45 días; informar riesgo, no inducir pago.

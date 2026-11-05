@@ -1,0 +1,332 @@
+{
+  "version": "H05_v2_2026-11-05",
+  "estado": "ESTIMACION_CONDICIONAL_NO_COTIZACION_CERTIFICADA",
+  "región": "us-east-2",
+  "horas_total": 1080,
+  "saldo_documentado_usd": 120,
+  "scenario_24x7_usd": "103.4080",
+  "scenario_8h_diarias_usd": "84.1120",
+  "reserva_24x7_usd": "16.5920",
+  "reserva_8h_usd": "35.8880",
+  "sensitivity_vat_16_pct_24x7_usd": "16.5453",
+  "sensitivity_all_in_24x7_usd": "119.9533",
+  "observaciones": [
+    "IVA hipotetico, no confirmado por cuenta: no asumir que creditos pagan impuestos",
+    "ElastiCache Redis $0.016 es contraste no lectura directa autenticada",
+    "LCU es variable; valores por SKU no acreditan derechos de despliegue",
+    "No incluye dominio nuevo ni renovacion",
+    "Los 45 dias son desde la habilitacion real y el credito puede disminuir antes"
+  ],
+  "items": [
+    {
+      "partida": "EC2 Go",
+      "volumen": "2 x t4g.micro x 1080 h",
+      "cantidad": "2160",
+      "precio_unitario_usd": "0.0084",
+      "unidad": "hora-instancia",
+      "total_45d_usd": "18.1440",
+      "nivel_evidencia": "evidencia Price List previa",
+      "supuestos_y_limitaciones": "2 vCPU/host ARM64; burst en modo standard"
+    },
+    {
+      "partida": "ALB fijo",
+      "volumen": "1 ALB x 1080 h",
+      "cantidad": "1080",
+      "precio_unitario_usd": "0.0225",
+      "unidad": "hora-ALB",
+      "total_45d_usd": "24.3000",
+      "nivel_evidencia": "evidencia Price List previa",
+      "supuestos_y_limitaciones": "2 AZ, internet-facing"
+    },
+    {
+      "partida": "ALB LCU",
+      "volumen": "1 LCU promedio x 1080 h",
+      "cantidad": "1080",
+      "precio_unitario_usd": "0.008",
+      "unidad": "LCU-h",
+      "total_45d_usd": "8.640",
+      "nivel_evidencia": "evidencia Price List previa",
+      "supuestos_y_limitaciones": "variable; no es limite automatico"
+    },
+    {
+      "partida": "ElastiCache Redis OSS",
+      "volumen": "1 cache.t4g.micro x 1080 h",
+      "cantidad": "1080",
+      "precio_unitario_usd": "0.016",
+      "unidad": "nodo-h",
+      "total_45d_usd": "17.280",
+      "nivel_evidencia": "referencia terciaria Ohio; revalidar Price List API",
+      "supuestos_y_limitaciones": "motor Redis OSS, ON-demand sin serverless ni replicas"
+    },
+    {
+      "partida": "IPv4 ALB",
+      "volumen": "2 IPv4 x 1080 h",
+      "cantidad": "2160",
+      "precio_unitario_usd": "0.005",
+      "unidad": "IP-h",
+      "total_45d_usd": "10.800",
+      "nivel_evidencia": "AWS VPC pricing",
+      "supuestos_y_limitaciones": "piso 2 IP; el ALB puede ampliar asignaciones"
+    },
+    {
+      "partida": "IPv4 Go",
+      "volumen": "2 IPv4 x 1080 h",
+      "cantidad": "2160",
+      "precio_unitario_usd": "0.005",
+      "unidad": "IP-h",
+      "total_45d_usd": "10.800",
+      "nivel_evidencia": "AWS VPC pricing",
+      "supuestos_y_limitaciones": "public subnet; inbound solo SG ALB, sin SSH"
+    },
+    {
+      "partida": "EBS gp3",
+      "volumen": "20 GB x 1.5 meses",
+      "cantidad": "30",
+      "precio_unitario_usd": "0.08",
+      "unidad": "GB-mes",
+      "total_45d_usd": "2.40",
+      "nivel_evidencia": "evidencia Price List previa",
+      "supuestos_y_limitaciones": "2 volumenes 10 GB; sin IOPS extra"
+    },
+    {
+      "partida": "DynamoDB storage",
+      "volumen": "2 GB x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.25",
+      "unidad": "GB-mes",
+      "total_45d_usd": "0.75",
+      "nivel_evidencia": "hipotesis de tarifa, verificar Ohio",
+      "supuestos_y_limitaciones": "sin aplicar gratis 25GB para prudencia"
+    },
+    {
+      "partida": "DynamoDB reads",
+      "volumen": "2 M RRU",
+      "cantidad": "2",
+      "precio_unitario_usd": "0.125",
+      "unidad": "M-RRU",
+      "total_45d_usd": "0.250",
+      "nivel_evidencia": "ejemplo AWS DynamoDB",
+      "supuestos_y_limitaciones": "incluye GSI y lecturas transaccionales modeladas"
+    },
+    {
+      "partida": "DynamoDB writes",
+      "volumen": "0.6 M WRU",
+      "cantidad": "0.6",
+      "precio_unitario_usd": "0.625",
+      "unidad": "M-WRU",
+      "total_45d_usd": "0.3750",
+      "nivel_evidencia": "ejemplo AWS DynamoDB",
+      "supuestos_y_limitaciones": "incluye GSIs y transacciones como WRUs facturables"
+    },
+    {
+      "partida": "DynamoDB PITR",
+      "volumen": "2 GB x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.2",
+      "unidad": "GB-mes",
+      "total_45d_usd": "0.6",
+      "nivel_evidencia": "AWS Disaster Recovery Strategy",
+      "supuestos_y_limitaciones": "retencion 35 d; si distintas tablas sumar todas"
+    },
+    {
+      "partida": "DynamoDB backup",
+      "volumen": "2 GB x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.1",
+      "unidad": "GB-mes",
+      "total_45d_usd": "0.3",
+      "nivel_evidencia": "AWS Disaster Recovery Strategy",
+      "supuestos_y_limitaciones": "on-demand backup + retencion"
+    },
+    {
+      "partida": "DynamoDB restore",
+      "volumen": "2 GB una restauracion",
+      "cantidad": "2",
+      "precio_unitario_usd": "0.15",
+      "unidad": "GB-restaurado",
+      "total_45d_usd": "0.30",
+      "nivel_evidencia": "AWS Disaster Recovery Strategy",
+      "supuestos_y_limitaciones": "prueba futura; no ejecutada"
+    },
+    {
+      "partida": "CloudWatch log ingestion",
+      "volumen": "3 GB ingesta",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.5",
+      "unidad": "GB",
+      "total_45d_usd": "1.5",
+      "nivel_evidencia": "referencia AWS CloudWatch",
+      "supuestos_y_limitaciones": "precios regionales pendientes de cierre"
+    },
+    {
+      "partida": "CloudWatch log retention",
+      "volumen": "3 GB x 1.5 meses",
+      "cantidad": "4.5",
+      "precio_unitario_usd": "0.03",
+      "unidad": "GB-mes",
+      "total_45d_usd": "0.135",
+      "nivel_evidencia": "hipotesis, verificar Ohio",
+      "supuestos_y_limitaciones": "retencion 7 dias, gasto estimado conservador"
+    },
+    {
+      "partida": "CloudWatch custom metrics",
+      "volumen": "3 metricas x 1.5 meses",
+      "cantidad": "4.5",
+      "precio_unitario_usd": "0.3",
+      "unidad": "metrica-mes",
+      "total_45d_usd": "1.35",
+      "nivel_evidencia": "referencia AWS CloudWatch",
+      "supuestos_y_limitaciones": "no consumir metricas/series ilimitadas"
+    },
+    {
+      "partida": "CloudWatch alarms",
+      "volumen": "2 alarmas x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.1",
+      "unidad": "alarma-mes",
+      "total_45d_usd": "0.3",
+      "nivel_evidencia": "referencia AWS CloudWatch",
+      "supuestos_y_limitaciones": "alarmas y budget no bloquean automaticamente"
+    },
+    {
+      "partida": "Secrets Manager",
+      "volumen": "2 secretos x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.4",
+      "unidad": "secreto-mes",
+      "total_45d_usd": "1.2",
+      "nivel_evidencia": "AWS Secrets Manager",
+      "supuestos_y_limitaciones": "requests supuestos bajos; revisar exceso"
+    },
+    {
+      "partida": "S3 Terraform-state",
+      "volumen": "2 GB x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.023",
+      "unidad": "GB-mes",
+      "total_45d_usd": "0.069",
+      "nivel_evidencia": "referencia AWS S3",
+      "supuestos_y_limitaciones": "versioning con lifecycle; no eliminar state"
+    },
+    {
+      "partida": "S3 requests",
+      "volumen": "3000 PUT y GET aprox",
+      "cantidad": "1",
+      "precio_unitario_usd": "0.015",
+      "unidad": "lote",
+      "total_45d_usd": "0.015",
+      "nivel_evidencia": "supuesto de workload",
+      "supuestos_y_limitaciones": "reconciliar con consumo real"
+    },
+    {
+      "partida": "Route53 zone",
+      "volumen": "1 zona x 1.5 meses",
+      "cantidad": "1.5",
+      "precio_unitario_usd": "0.5",
+      "unidad": "zona-mes",
+      "total_45d_usd": "0.75",
+      "nivel_evidencia": "AWS Route53",
+      "supuestos_y_limitaciones": "dominio propio EXISTENTE; compra/renovacion EXCLUIDA"
+    },
+    {
+      "partida": "Internet egress",
+      "volumen": "10 GB",
+      "cantidad": "10",
+      "precio_unitario_usd": "0.09",
+      "unidad": "GB",
+      "total_45d_usd": "0.90",
+      "nivel_evidencia": "supuesto alto vs free allowance",
+      "supuestos_y_limitaciones": "revalidar región y allowance 100GB"
+    },
+    {
+      "partida": "Inter-AZ Redis",
+      "volumen": "10 GB",
+      "cantidad": "10",
+      "precio_unitario_usd": "0.01",
+      "unidad": "GB",
+      "total_45d_usd": "0.10",
+      "nivel_evidencia": "AWS ElastiCache regional transfer",
+      "supuestos_y_limitaciones": "cross-AZ, sujeto a trafico"
+    },
+    {
+      "partida": "EBS snapshots",
+      "volumen": "2 GB x 1.5 meses",
+      "cantidad": "3",
+      "precio_unitario_usd": "0.05",
+      "unidad": "GB-mes",
+      "total_45d_usd": "0.15",
+      "nivel_evidencia": "hipotesis EBS snapshot",
+      "supuestos_y_limitaciones": "incremental y retencion controlada"
+    },
+    {
+      "partida": "CI/CD artifacts y ejecucion",
+      "volumen": "reserva $2 para 45 dias",
+      "cantidad": "1",
+      "precio_unitario_usd": "2",
+      "unidad": "lote",
+      "total_45d_usd": "2",
+      "nivel_evidencia": "supuesto de presupuesto",
+      "supuestos_y_limitaciones": "GitHub Actions privado sujeto a minutos disponibles"
+    },
+    {
+      "partida": "ACM publico no exportable",
+      "volumen": "1 certificado solo ALB",
+      "cantidad": "1",
+      "precio_unitario_usd": "0",
+      "unidad": "certificado",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "AWS ACM FAQs",
+      "supuestos_y_limitaciones": "costo 0 SOLO emision/uso con ALB"
+    },
+    {
+      "partida": "Gateway endpoints S3+Dynamo",
+      "volumen": "2 endpoints gateway",
+      "cantidad": "2",
+      "precio_unitario_usd": "0",
+      "unidad": "endpoint",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "AWS VPC Gateway endpoints",
+      "supuestos_y_limitaciones": "0 adicional por opcion elegida"
+    },
+    {
+      "partida": "NAT Gateway",
+      "volumen": "0 gateways por diseno",
+      "cantidad": "0",
+      "precio_unitario_usd": "0",
+      "unidad": "gateway-h",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "no creado por diseno",
+      "supuestos_y_limitaciones": "prohibir creacion sin nueva cotizacion"
+    },
+    {
+      "partida": "Interface endpoints",
+      "volumen": "0 endpoints privados por diseno",
+      "cantidad": "0",
+      "precio_unitario_usd": "0",
+      "unidad": "endpoint-h",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "no creado por diseno",
+      "supuestos_y_limitaciones": "backend con egress restringido por IP+443"
+    },
+    {
+      "partida": "Dominio nuevo/renovacion",
+      "volumen": "NO incluido",
+      "cantidad": "0",
+      "precio_unitario_usd": "0",
+      "unidad": "EXCLUIDO",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "pendiente de proveedor y pago",
+      "supuestos_y_limitaciones": "no puede considerarse cero si no existe dominio"
+    },
+    {
+      "partida": "IVA Mexico",
+      "volumen": "NO incluido; sensibilidad 16%",
+      "cantidad": "0",
+      "precio_unitario_usd": "0",
+      "unidad": "EXCLUIDO",
+      "total_45d_usd": "0",
+      "nivel_evidencia": "AWS Mexico y Terminos AWS Credits",
+      "supuestos_y_limitaciones": "puede no estar cubierto por creditos; requiere estado cuenta"
+    }
+  ]
+}

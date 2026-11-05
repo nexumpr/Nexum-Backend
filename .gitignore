@@ -1,0 +1,84 @@
+# Nexum-Backend · H03-B · defensa en profundidad (no equivale a auditoría de staging)
+# Archivos de entorno, secretos y credenciales
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.kubeconfig
+*.kdbx
+*secrets*.json
+*credentials*.json
+*credential*.json
+*.tfvars
+*.auto.tfvars
+*.tfvars.json
+*.auto.tfvars.json
+.aws/
+.ssh/
+.secrets/
+secrets/
+credentials/
+
+# Estado, planes, locks transitorios e inventarios sensibles Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+*.tfbackup
+crash.log
+crash.*.log
+*.tfvars
+*.auto.tfvars
+# NOTA: los .terraform.lock.hcl futuros son artefactos técnicos; no excluir globalmente.
+
+# Archivos de respaldo, auditorías privadas, logs y evidencias sensibles
+Respaldos/
+Auditoria/
+**/backups/
+**/backup/
+**/private/
+**/privado/
+*.bundle
+*.bak
+*.backup
+*.dump
+*.sql.gz
+*.zip
+*.rar
+*.7z
+*.log
+*.trace
+*.har
+*.pcap
+*.pcapng
+coverage.out
+coverage.html
+
+# Build/caches Go y editores
+*.exe
+*.test
+*.out
+*.prof
+*.pprof
+bin/
+dist/
+build/
+.cache/
+__pycache__/
+*.pyc
+node_modules/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Archivos temporales de operación H03
+.h03b_*/
+*.tmp
+*.temp

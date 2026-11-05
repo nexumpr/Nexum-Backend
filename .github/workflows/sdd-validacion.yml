@@ -1,0 +1,21 @@
+name: SDD documental (sin AWS ni despliegue)
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sdd-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar baseline SDD sin dependencias adicionales
+        run: python3 herramientas/validar_sdd_integral.py
+      - name: Verificar contrato H06
+        run: python3 sdd/03-endpoints/herramientas/validar_h06.py

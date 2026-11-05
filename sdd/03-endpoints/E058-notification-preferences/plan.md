@@ -1,0 +1,25 @@
+# Plan H06 — E058: Actualizar preferencias de notificación
+
+**Estado:** diseño listo para revisión humana; implementación futura H08+ con Gate H07 aprobado. **Ruta:** `PUT /api/v1/notification-preferences`.
+
+## Arquitectura y secuencia de implementación futura
+
+1. Definir caso de uso Go en capa `application` y entidades/errores en `domain`; transportar DTO `NotificationPreferencesUpdate` → `NotificationPreferences` sin exponer SDK AWS a controladores.
+2. HTTP Router/middleware valida JWT, cuerpo, límites y parámetros: auth `bearer`, idempotencia no específica, If-Match no obligatorio.
+3. Adaptador DynamoDB: USER#<sub> / DEVICE#<id>, NOTIFICATION#<UTC>#<id>, REMINDER#<id>, PREFERENCES; GSI2 solo worker due. Integrar condiciones, `Query`/`GetItem`, cero `Scan`, transacciones cuando aplique.
+4. Redis: política por usuario, TTL/invalidation, revocación multiinstancia y fallo seguro. Un cache hit no puede saltarse autorización.
+5. Responder HTTP 200 con esquema OpenAPI, errores uniformes y cabeceras; `Location` en 201 si corresponde.
+6. Publicar un único endpoint nuevo por release con PR, CI SAST/DAST permitido, contratos y pruebas unitarias/de integración/HTTP de dos nodos, rollback y aprobación humana.
+
+## Decisiones específicas
+
+- Desactivación debe prevalecer antes de enviar; consentimiento explícito por canal.
+- Modelo de request: `NotificationPreferencesUpdate`. Modelo de response: `NotificationPreferences`.
+- Patrón de persistencia: USER#<sub> / DEVICE#<id>, NOTIFICATION#<UTC>#<id>, REMINDER#<id>, PREFERENCES; GSI2 solo worker due.
+- Obligación: `REQUIRED_DESIGN`. Requerido por el catálogo o soporte vigente; no rebajarlo a demo.
+
+## Dependencias y riesgos
+
+- No crear recursos ni ejecutar despliegues en H06. AWS Free/45 días/cero pesos y ciclo IaC cerrado son condiciones de H08, no tareas manuales de Mobile.
+- Errores de concurrencia 409/412, reglas de negocio 422, disponibilidad 503 y seguridad de recursos ajenos.
+- Prueba real HTTP/HTTPS y DynamoDB/Redis: **NOT_RUN**; solo el contrato/documento es verificable ahora.

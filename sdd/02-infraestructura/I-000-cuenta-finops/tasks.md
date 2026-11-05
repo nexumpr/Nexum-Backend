@@ -1,0 +1,98 @@
+# I-000-cuenta-finops — Cuenta AWS, plan Free y estudio de costo cero
+
+| Campo | Valor |
+|---|---|
+| Etapa | H05 — Infraestructura AWS |
+| Versión | 0.1.0 |
+| Estado | **DRAFT / REVIEW — NO APROBADO** |
+| Trazabilidad | GOV-07, GOV-15, A-000, A-110, R-001..060 |
+| Implementación | H08+, tras H07 aprobado y autorización humana por release |
+
+## Gestión de tareas H05 (solo especificación y aceptación de diseño)
+
+Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integridad H04 documentada por el responsable. No marcar como completado por generar archivos.
+
+### T-000-01 — Cerrar plan y contexto
+
+- **Estado:** TODO / validación pendiente.
+- **Responsable:** Arquitectura Backend + agente especializado de la materia, aprobación humana.
+- **Entrada:** H04 aprobado y GOV-07, GOV-15, A-000, A-110, R-001..060.
+- **Trabajo:** Región de evaluación us-east-2 (Ohio); tomar tipo de cuenta (Free/Paid), fecha de alta, expiración y créditos desde consola o APIs de lectura con evidencia fechada. No cambiar el plan. La cuenta y región reales se seleccionan por entorno, nunca se codifican como secretos.
+- **Salida verificable:** decisión documental con evidencia y costo/seguridad aplicables.
+- **Criterio DoD:** responsable revisa trazabilidad, no hay decisión supuesta ni requisito sustituido.
+
+### T-000-02 — Cerrar matriz por recurso
+
+- **Estado:** TODO / validación pendiente.
+- **Responsable:** Arquitectura Backend + agente especializado de la materia, aprobación humana.
+- **Entrada:** H04 aprobado y GOV-07, GOV-15, A-000, A-110, R-001..060.
+- **Trabajo:** Registrar EC2 x2 simultáneos, volúmenes EBS, ALB/LCU, TLS/ACM, dirección IPv4 pública, transferencia, tablas DynamoDB (lectura/escritura/storage/indexes/transacciones), Redis, CloudWatch, logs, S3/state/backup, Route53/DNS, endpoints/NAT, Secrets, SNS y egress. Cada fila: SKU, modalidad, región, cuota, tarifa actual, crédito aplicable, restricción SCP, horas y suma.
+- **Salida verificable:** decisión documental con evidencia y costo/seguridad aplicables.
+- **Criterio DoD:** responsable revisa trazabilidad, no hay decisión supuesta ni requisito sustituido.
+
+### T-000-03 — Cerrar dos escenarios
+
+- **Estado:** TODO / validación pendiente.
+- **Responsable:** Arquitectura Backend + agente especializado de la materia, aprobación humana.
+- **Entrada:** H04 aprobado y GOV-07, GOV-15, A-000, A-110, R-001..060.
+- **Trabajo:** A) dos instancias encendidas simultáneamente 24×7 durante 45 días; B) 2 encendidas simultáneamente únicamente durante ventanas de prueba y apagadas fuera. Ambos preservan el cumplimiento de dos instancias durante el despliegue. No presentar escenario B como 24×7.
+- **Salida verificable:** decisión documental con evidencia y costo/seguridad aplicables.
+- **Criterio DoD:** responsable revisa trazabilidad, no hay decisión supuesta ni requisito sustituido.
+
+### T-000-04 — Cerrar costeo
+
+- **Estado:** TODO / validación pendiente.
+- **Responsable:** Arquitectura Backend + agente especializado de la materia, aprobación humana.
+- **Entrada:** H04 aprobado y GOV-07, GOV-15, A-000, A-110, R-001..060.
+- **Trabajo:** USD estimado = Σ (horas×precio-hora + unidades×precio-unidad + almacenamiento GB-mes×tarifa + transferencias), antes de créditos; cobro neto = max(0, USD antes de créditos − créditos aplicables), considerando tarifas variables e impuestos. Cero neto por créditos NO es costo base cero.
+- **Salida verificable:** decisión documental con evidencia y costo/seguridad aplicables.
+- **Criterio DoD:** responsable revisa trazabilidad, no hay decisión supuesta ni requisito sustituido.
+
+### T-000-05 — Cerrar bloqueo de decisión
+
+- **Estado:** TODO / validación pendiente.
+- **Responsable:** Arquitectura Backend + agente especializado de la materia, aprobación humana.
+- **Entrada:** H04 aprobado y GOV-07, GOV-15, A-000, A-110, R-001..060.
+- **Trabajo:** Si cualquier servicio necesario no está permitido en plan Free/SCP, o el costo no cumple el criterio literal del profesor, marcar `BLOCKED_FINOPS`; documentar ADR y pedir aprobación del responsable y, si cambia un requisito docente, aclaración formal del profesor. No pasar a Paid automáticamente ni sustituir por un mock.
+- **Salida verificable:** decisión documental con evidencia y costo/seguridad aplicables.
+- **Criterio DoD:** responsable revisa trazabilidad, no hay decisión supuesta ni requisito sustituido.
+
+### T-000-06 — Cerrar controles
+
+- **Estado:** TODO / validación pendiente.
+- **Responsable:** Arquitectura Backend + agente especializado de la materia, aprobación humana.
+- **Entrada:** H04 aprobado y GOV-07, GOV-15, A-000, A-110, R-001..060.
+- **Trabajo:** Presupuesto zero-spend, avisos Free Tier, umbrales preventivos y reporte diario; alarmas avisan, NO garantizan impedir un cargo ni destruyen recursos. Ausencia de reporte de costos no equivale a USD 0.
+- **Salida verificable:** decisión documental con evidencia y costo/seguridad aplicables.
+- **Criterio DoD:** responsable revisa trazabilidad, no hay decisión supuesta ni requisito sustituido.
+
+### T-000-07 — Cerrar investigación con fecha
+
+- **Estado:** TODO / validación pendiente.
+- **Responsable:** Arquitectura Backend + agente especializado de la materia, aprobación humana.
+- **Entrada:** H04 aprobado y GOV-07, GOV-15, A-000, A-110, R-001..060.
+- **Trabajo:** Fuente oficial vigente: Free plan máximo seis meses o agotamiento de créditos; ALB cobra por hora/LCU; IPv4 pública tiene cargo por hora; Redis administrado debe cotizarse. Precios de otras regiones NO son evidencia de Ohio.
+- **Salida verificable:** decisión documental con evidencia y costo/seguridad aplicables.
+- **Criterio DoD:** responsable revisa trazabilidad, no hay decisión supuesta ni requisito sustituido.
+
+### T-000-08 — Cerrar separación de responsabilidades
+
+- **Estado:** TODO / validación pendiente.
+- **Responsable:** Arquitectura Backend + agente especializado de la materia, aprobación humana.
+- **Entrada:** H04 aprobado y GOV-07, GOV-15, A-000, A-110, R-001..060.
+- **Trabajo:** La aprobación I-GO exige diseño demostrablemente viable, pero no requiere ni autoriza aprovisionar servicios reales durante H05. La comprobación completa de uso/cargos será en releases H08 tras autorización.
+- **Salida verificable:** decisión documental con evidencia y costo/seguridad aplicables.
+- **Criterio DoD:** responsable revisa trazabilidad, no hay decisión supuesta ni requisito sustituido.
+
+### T-000-90 — Revisión de riesgos y dependencias
+
+- **Estado:** TODO.
+- **Trabajo:** resolver o escalar: Servicios limitados por Free/SCP, Tarifas que cambian por región/fecha y consumo, Créditos agotados o vencidos antes de evaluación, ALB, IP, Redis y observabilidad con facturación incremental.
+- **Criterio DoD:** cada riesgo clasificado RESOLVED/BLOCKED/ACCEPTED con firma/fecha; no usar ACCEPTED para incumplir requisito docente sin aclaración.
+
+### T-000-99 — Ratificación de la especificación
+
+- **Estado:** REVIEW pendiente.
+- **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
+- **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
+- **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
