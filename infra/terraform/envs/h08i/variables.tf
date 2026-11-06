@@ -45,3 +45,29 @@ variable "etiquetas" {
   type        = map(string)
   default     = {}
 }
+
+# --- I-020: cómputo ---------------------------------------------------------
+
+variable "iam_instance_profile_name" {
+  description = "Instance profile real definido por I-060 (no se crea aquí)"
+  type        = string
+  default     = "PENDIENTE-I-060"
+}
+
+variable "root_volume_gb" {
+  description = "Volumen raíz por instancia (presupuesto: 15 GB x2)"
+  type        = number
+  default     = 15
+}
+
+variable "artefacto_s3_uri" {
+  description = "URI S3 del binario linux/arm64"
+  type        = string
+  default     = "s3://PENDIENTE-I080/nexum-backend"
+}
+
+variable "artefacto_sha256" {
+  description = "SHA-256 del binario (lo emite scripts/build-backend.ps1)"
+  type        = string
+  default     = ""
+}

@@ -47,3 +47,19 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+### Verificacion H08-I — 2026-11-06
+
+- [x] Launch Template con AMI oficial por parametro SSM y sin id fijado.
+- [x] `t4g.micro` ARM64 y `cpu_credits = standard` explicito.
+- [x] IMDSv2 obligatorio (`http_tokens = required`, hop limit 1).
+- [x] EBS cifrado, gp3, 15 GB por instancia.
+- [x] Sin clave SSH y sin IPv4 publica.
+- [x] SG del backend proveniente de I-010; instance profile por variable (I-060).
+- [x] ASG min=desired=max=2, dos subredes/2 AZ, balanced-only, instance refresh 50 %.
+- [x] user-data sin secretos, descarga de S3 con SHA-256 e instalacion atomica.
+- [x] Unidad systemd endurecida (usuario no root, ProtectSystem=strict, MemoryMax=512M).
+- [x] Compilacion real linux/arm64 con manifiesto y SHA-256.
+- [ ] Garantia estricta de una instancia por AZ — depende de capacidad AWS (NOT_RUN_AWS).
+- [ ] Endpoint ELB / target group — corresponde a I-030.
+- [ ] **BLOQUEO DE DESPLIEGUE**: RFC-004 (secretos en reemplazo automatico de instancias).

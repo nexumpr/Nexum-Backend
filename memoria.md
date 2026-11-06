@@ -279,3 +279,12 @@
 - `.terraform.lock.hcl` versionado (aws 5.100.0); `.terraform/` y tfstate excluidos.
 - 43 pruebas Terraform + 18 permisos + 167 FinOps; fmt/init/validate PASS. Sin AWS.
 - Dependencia bloqueante de despliegue: demostrar el mecanismo de secretos (I-020/I-060).
+
+### I-020 computo Go — implementacion local (2026-11-06)
+
+- Modulo `infra/terraform/modules/computo`: Launch Template + ASG min=desired=max=2 en 2 AZ, AMI por parametro publico SSM, IMDSv2, EBS cifrado, sin SSH ni IPv4 publica.
+- Correccion critica: `cpu_credits = standard` explicito; T4g usa unlimited por defecto y consumiria creditos facturables.
+- `scripts/build-backend.ps1`: cross-compile real linux/arm64 (2,752,672 bytes, SHA-256 ff2cc54f...), manifiesto JSON y preflight anti-sobrescritura.
+- systemd endurecido (`MemoryMax=512M`, ProtectSystem=strict, NoNewPrivileges, TimeoutStopSec=20).
+- 65 pruebas Terraform + 11 systemd + 167 FinOps; fmt/init/validate PASS. Sin AWS.
+- Bloqueo de despliegue registrado en `RFC-004-SECRETOS_BOOTSTRAP.md`: la cache EBS no sobrevive al reemplazo del ASG; se propone bundle en S3 (coste 0).
