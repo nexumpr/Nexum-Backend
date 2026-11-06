@@ -92,6 +92,19 @@
 - **Estado de Tareas:** A-050-T01..A-050-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
 - **Resultado:** 100% PASS en `go test ./...` y 0 errores en `go vet ./...`.
 
+### Spec A-060 (`A-060-modelo-dynamodb`):
+- **Alcance implementado:**
+  1. Single-Table Design canónico para la tabla `NEXUM_CORE` en `internal/domain/dynamo/`:
+     - Claves primarias compuestas `PK` y `SK`, con índice global secundario sparse `GSI1PK` y `GSI1SK` para consultas filtradas por tipo de movimiento y fecha.
+     - Partición de usuario (`PK=USER#<id>`): perfil, metas de ahorro, movimientos financieros con importes exactos en centavos `int64`, gastos recurrentes y presupuestos.
+  2. Prohibición estricta de Scan (`AC-A-060-01`): el motor de persistencia bloquea llamadas a Scan mediante `ErrScanProhibited`, obligando a resolver todos los accesos mediante `GetItem` o `Query` sobre particiones.
+  3. Transacciones atómicas atadas a condiciones (`AC-A-060-02`): implementación de `TransactWriteItems` con comprobación previa de condiciones (optimistic locking `version = :expectedVersion` y `attribute_not_exists`). Si alguna condición falla, la transacción se aborta con `ErrTransactionCanceled` y ningún saldo ni movimiento es modificado de forma parcial.
+  4. Reserva de unicidad de email transaccional (`EMAIL#<sha256(email)>`): garantiza unicidad sin exponer PII en claves primarias (`A-060 §2.2`).
+  5. Cobertura de patrones de acceso de los 75 endpoints sin Scan (`AC-A-060-03`): consultas particionadas validadas para movimientos por fecha/tipo, metas, presupuestos y borrado completo de cuenta.
+- **Archivos creados:** `internal/domain/dynamo/keys.go`, `internal/domain/dynamo/item.go`, `internal/infrastructure/dynamo/table.go`, `internal/adapters/dynamo/repository.go`, `tests/unit/dynamo/dynamodb_model_test.go`.
+- **Estado de Tareas:** A-060-T01..A-060-T14 completadas y marcadas en `tasks.md` y `checklist.md`.
+- **Resultado:** 100% PASS en `go test ./...` y 0 errores en `go vet ./...`.
+
 ## Registro de Incidentes y Resoluciones H08-A
 
 ### Incidente 1 (CI GitHub Actions: Falso Positivo `UNDECLARED_FILE` / `GIT_UNDECLARED`):

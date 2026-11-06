@@ -89,3 +89,4 @@ func SessionIDFromContext(ctx context.Context) (string, bool) {
 	val, ok := ctx.Value(SessionIDKey).(string)
 	return val, ok
 }
+
