@@ -217,3 +217,4 @@ func TestEndpointAccessPatternsCoverage(t *testing.T) {
 
 	t.Logf("AC-A-060-03 Verificado: Patrones de acceso resueltos con Single-Table Design sin Scan.")
 }
+

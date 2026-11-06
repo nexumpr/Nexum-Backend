@@ -130,3 +130,4 @@ func (r *DynamoRepository) QueryAllUserItems(ctx context.Context, userID string)
 	pk := domainDynamo.PrefixUser + userID
 	return r.table.QueryPartition(ctx, pk, "", true, 0)
 }
+

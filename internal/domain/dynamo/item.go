@@ -47,3 +47,4 @@ func (item DynamoItem) WithTTL(ttlEpochSeconds int64) DynamoItem {
 	item.TTL = ttlEpochSeconds
 	return item
 }
+
