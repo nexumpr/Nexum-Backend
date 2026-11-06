@@ -2,7 +2,7 @@
   "project": "Nexum-Backend",
   "baseline": "H08-A apertura local; 103 specs inmutables; Gates por ratificación humana; sin AWS",
   "algorithm": "SHA256",
-  "note": "SHA exacto de archivos, convertido LF según .gitattributes; manifest no se auto-hashea; H08-A local | Transicion H08-I: RFC-002/003, Gate I-000, permisos operativos y pruebas; cada entrada nueva cuenta con SHA. | I-000 FinOps: infra/finops declarado con SHA; tasks/checklist I-000 actualizados con evidencia. | I-000 rev2: precios AWS verificados, bruto verificado vs calculado, service-quotas y rutas temporales corregidas. | I-000 rev4: cobertura verificada/modelada, plan Free sin cargos, matriz de Gate. | I-000 rev5: conectividad privada recotizada (interface endpoints 0.01 USD/h/AZ). | I-000 rev6: diseno E (logs permanente, auxiliares por ventana), cierre aprobado. | I-010 Gate propuesto (sin implementacion). | I-010: modulo red Terraform validado local (fmt/validate) y permiso init -backend=false. | I-010 auditoria: egress S3/DynamoDB por prefix list, NACL completa, CIDR derivado. | I-010 final: subredes /20-/27, preconditions 1.4+, lock versionado.",
+  "note": "SHA exacto de archivos, convertido LF según .gitattributes; manifest no se auto-hashea; H08-A local | Transicion H08-I: RFC-002/003, Gate I-000, permisos operativos y pruebas; cada entrada nueva cuenta con SHA. | I-000 FinOps: infra/finops declarado con SHA; tasks/checklist I-000 actualizados con evidencia. | I-000 rev2: precios AWS verificados, bruto verificado vs calculado, service-quotas y rutas temporales corregidas. | I-000 rev4: cobertura verificada/modelada, plan Free sin cargos, matriz de Gate. | I-000 rev5: conectividad privada recotizada (interface endpoints 0.01 USD/h/AZ). | I-000 rev6: diseno E (logs permanente, auxiliares por ventana), cierre aprobado. | I-010 Gate propuesto (sin implementacion). | I-010: modulo red Terraform validado local (fmt/validate) y permiso init -backend=false. | I-010 auditoria: egress S3/DynamoDB por prefix list, NACL completa, CIDR derivado. | I-010 final: subredes /20-/27, preconditions 1.4+, lock versionado. | I-020 Gate propuesto (sin implementacion).",
   "files": {
     ".gitattributes": "07c480d98a473a097187584526ad4d5ed40e023808d2f1b82697487fe769ac1b",
     ".github/workflows/sdd-validacion.yml": "089ad88dfe79c7d46fbc2ba8984aece5271b84b47eee452c4cf15626664543fb",
@@ -558,6 +558,7 @@
     "sdd/_control/H08/GATE_H06_H07_H08A_RATIFICACION.md": "fda7158c11a931fad0d14edd89f6eaeb3b3563e5dbcf93b46016fc2ad13354df",
     "sdd/_control/H08/GATE_H08I_I000.md": "8c7ea584940b8653fb78e965c416d7ac13977d46b51186255404b8746542b191",
     "sdd/_control/H08/GATE_H08I_I010.md": "19912f18ceaa4f7e7268f2181e427b9d53ed310a169dd7da791205b3b3f06cab",
+    "sdd/_control/H08/GATE_H08I_I020.md": "0fcb30fbcf88ec691f5c822f2b01c88934a94dc9190f409f7baedcf73fa3e1b2",
     "sdd/_control/H08/ORDEN_I000_OPENCODE.md": "1347a0d7738e84940604fda6f6d75377d8c72191fd64fd63f783710f8e2ed2eb",
     "sdd/_control/H08/PRIMERA_TAREA_OPENCODE_A000.md": "82bfa67818ba043b72c8ddb4545897a4a0548ea8d7cdaabdb7f3bc5568fc2dde",
     "sdd/_control/H08/RFC-001-PERMISOS_OPENCODE_H08A.md": "7964cf95025587fdcbee8421b2b3443b67c1bee00e1f10020178b42280cdc0d1",
