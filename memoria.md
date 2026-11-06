@@ -77,6 +77,21 @@
 - **Estado de Tareas:** A-040-T01..A-040-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
 - **Resultado:** 100% PASS en `go test -v ./...`, `go vet ./...` con 0 errores y validación SDD integral intacta.
 
+### Spec A-050 (`A-050-seguridad-identidad`):
+- **Alcance implementado:**
+  1. Hashing seguro Argon2id en `internal/infrastructure/security/hasher.go`: implementación del puerto `PasswordHasher` con parámetros oficiales (m=64MiB, t=3, p=2, sal aleatoria per-user de 16 bytes) y verificación en tiempo constante (`A-050 §2.1`, `GOV-09`).
+  2. Proveedor de tokens asimétricos RS256 en `internal/infrastructure/security/token.go`: implementación del puerto `TokenProvider` con pares de claves RSA, rechazo estricto de algoritmo `none` o algoritmos no autorizados (`A-050 §2.2`), generación de Refresh Tokens de 256 bits y control de expiración.
+  3. Servicio de sesiones y rotación segura de refresh tokens en `internal/application/identity/session_service.go`:
+     - Detección estricta de replay: la reutilización de un refresh token previo invalida automáticamente toda la familia de tokens asociada (`AC-A-050-01`).
+     - Almacenamiento compartido abstracto `SessionStore` con persistencia exclusiva del hash SHA-256 del token (nunca el token en texto plano).
+  4. Logout distribuido y coherencia entre instancias: verificación de que el cierre de sesión ejecutado en el Nodo A invalida de inmediato la sesión en el Nodo B compartiendo persistencia (`AC-A-050-02`, `GOV-02`).
+  5. Respuestas homogéneas y no-enumeración (`AC-A-050-03`): mensajes idénticos de error para usuarios inexistentes o contraseñas inválidas ("credenciales invalidas").
+  6. Middleware de autenticación Bearer JWT en `internal/transport/http/middleware/auth.go`: extracción segura de `sub` (UserID) y `sid` (SessionID) e inyección en `context.Context`.
+  7. Suite de pruebas unitarias en `tests/unit/security/auth_service_test.go` con cobertura completa de todos los flujos de seguridad.
+- **Archivos creados:** `internal/infrastructure/security/hasher.go`, `internal/infrastructure/security/token.go`, `internal/application/identity/session_service.go`, `internal/transport/http/middleware/auth.go`, `tests/unit/security/auth_service_test.go`, `go.mod`, `go.sum`.
+- **Estado de Tareas:** A-050-T01..A-050-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
+- **Resultado:** 100% PASS en `go test ./...` y 0 errores en `go vet ./...`.
+
 ## Registro de Incidentes y Resoluciones H08-A
 
 ### Incidente 1 (CI GitHub Actions: Falso Positivo `UNDECLARED_FILE` / `GIT_UNDECLARED`):
@@ -90,3 +105,9 @@
 - **Causa raíz:** `GenerateCursor` evaluaba `if ttl <= 0 { ttl = DefaultCursorTTL }`, reemplazando cualquier duración negativa de prueba por el valor por defecto de 2 horas.
 - **Solución aplicada:** Se ajustó la condición a `if ttl == 0 { ttl = DefaultCursorTTL }`, permitiendo simular marcas de tiempo vencidas para verificación determinista de expiración.
 - **Verificación:** `go test -v ./tests/unit/transport/...` 100% PASS.
+
+### Incidente 3 (A-050: Dependencia transitiva faltante en go.sum para Argon2id):
+- **Error observado:** Al compilar `golang.org/x/crypto/argon2`, Go arrojó error `missing go.sum entry for module providing package golang.org/x/sys/cpu`.
+- **Causa raíz:** La instalación inicial de `golang.org/x/crypto` no descargó la dependencia transitiva `golang.org/x/sys` en `go.sum`.
+- **Solución aplicada:** Se ejecutó `go mod tidy` fuera del sandbox (`BypassSandbox: true`) para descargar `golang.org/x/sys v0.49.0` y actualizar `go.sum`. Posteriormente, todos los comandos de prueba y verificación se ejecutaron en el sandbox estándar.
+- **Verificación:** `go test -v ./tests/unit/security/...` y `go test ./...` 100% PASS.
