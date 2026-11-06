@@ -188,3 +188,10 @@
 - **Causa raíz:** En DynamoDB el modelo de cursores requiere evaluar `SK > startSK` ordenado ascendentemente para iterar secuencialmente los elementos de una partición sin saltos ni dependencias de offset/Scan.
 - **Solución aplicada:** Se actualizó `QueryPartition` en `internal/infrastructure/dynamo/table.go` para recibir el parámetro `startSK string` como `ExclusiveStartKey`, filtrando `item.SK > startSK`.
 - **Verificación:** Paginación de 10,000 movimientos completada en 100 páginas exactas con 0 operaciones Scan (`AC-A-080-03` PASS).
+
+
+## Actualización del operador — 2026-11-06 — apertura limitada H08-I
+- Arquitectura A-000..A-110 integrada en `main` commit `76ae14c` vía PR #3..#13; `go build ./...`, `go vet ./...`, `go test ./... -count=1` PASS reportado mediante salida real del operador. GitHub Actions documental SUCCESS; **no prueba HTTP AWS ni Go CI en pipeline**.
+- Se detectaron 24 modificaciones de `tasks.md` y `checklist.md` en specs A. El validador integral sigue PASS; RFC-003 preserva evidencias y separa reportes de firmas humanas no aportadas. No interpretar casillas como aprobación humana automática.
+- RFC-002 y Gate H08-I/I-000 abren control FinOps local y AWS únicamente lectura tras frase humana explícita; I-010+ y H08-E siguen denegados. OpenCode puede manejar escritura/Git/PR automáticamente mediante herramientas de la propia sesión y permisos ASK, sin obligación de que el operador pegue comandos.
+- Implementación futura sigue UNA SPEC → PRUEBAS → PR/CI → APROBACIÓN → SIGUIENTE; ningún terraform apply/despliegue pagado se autoaprueba.
