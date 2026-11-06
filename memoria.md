@@ -18,7 +18,8 @@
 ### Spec A-000 (`A-000-contexto-sistema`):
 - **Alcance implementado:** Tipos de actores del sistema (`ActorUser`, `ActorMobileClient`, `ActorSystemOperator`, `ActorInfrastructure`), validación de frontera de autoridad financiera (rechazo programático de balance declarado por el cliente móvil, `R-031`, `CTX-005`), e invariantes de topología (mínimo 2 nodos en producción, TLS obligatorio, DynamoDB NoSQL y Redis distribuido).
 - **Archivos creados:** `pkg/types/system.go`, `internal/system/boundary.go`, `internal/system/context.go`, `internal/system/errors.go`, `cmd/server/main.go`, `tests/unit/system/context_test.go`.
-- **Resultado:** 100% PASS en `go test -v ./tests/unit/system/...` y `go vet ./...`.
+- **Estado de Tareas:** A000-T001..A000-T011 completadas y marcadas en `tasks.md` y `checklist.md`.
+- **Resultado:** 100% PASS en `go test -v ./tests/unit/system/...` y `go vet ./...`. PR #3 mergeado a `main`.
 
 ### Spec A-010 (`A-010-stack-go`):
 - **Alcance implementado:**
@@ -29,7 +30,20 @@
   5. Telemetría y observabilidad: Logger estructurado `log/slog` en formato JSON con filtro de sanitización automática que redacta credenciales, tokens, secretos y datos sensibles (`pkg/telemetry/logger.go`).
   6. Construcción nativa: Totalmente funcional sin contenedores Docker locales (`AC-A-010-03`).
 - **Archivos creados:** `pkg/httputil/json.go`, `pkg/telemetry/logger.go`, `internal/ports/repository.go`, `internal/ports/cache.go`, `internal/ports/auth.go`, `tests/unit/platform/telemetry_test.go`, `tests/unit/platform/httputil_test.go`, `tests/unit/platform/auth_port_test.go`, `tests/unit/platform/repository_port_test.go`, `tests/unit/platform/runtime_test.go`.
-- **Resultado:** 100% PASS en suite completa de tests de plataforma (`tests/unit/platform/...`), 0 errores en `go vet ./...` y ejecución limpia de `cmd/server/main.go`.
+- **Estado de Tareas:** A-010-T01..A-010-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
+- **Resultado:** 100% PASS en suite de tests de plataforma (`tests/unit/platform/...`), 0 errores en `go vet ./...`. PR #4 mergeado a `main`.
+
+### Spec A-020 (`A-020-clean-architecture`):
+- **Alcance implementado:**
+  1. Forma del sistema y statelessness (A-020 §2.1, §2.7): Backend stateless verificado mediante dos instancias del caso de uso (`nodeA` y `nodeB`) compartiendo persistencia y caché sin almacenar sesiones en memoria local (`AC-A-020-02`, `GOV-02`).
+  2. Value Object inmutable `Money` (`internal/domain/money/money.go`): importe exacto en enteros `int64` centavos, validación de divisa alfabética ISO 4217, suma, resta, multiplicación y formato decimal determinista sin errores de float (`R-030`, `GOV-08`, `CTX-005`).
+  3. Entidad de dominio `User` (`internal/domain/identity/user.go`): reglas de validación de email RFC, ciclo de vida (`StatusActive`, `StatusDeleted`) y borrado lógico conforme a `GOV-07`.
+  4. Caso de uso desacoplado `IdentityService` (`internal/application/identity/usecase.go`): orquestación de registro y autenticación con contraseñas Argon2id y tokens JWT, dependiendo exclusivamente de abstracciones de puertos.
+  5. Adaptadores locales en memoria (`internal/adapters/memory/repository.go` y `internal/adapters/memory/cache.go`): soporte concurrente para pruebas unitarias sin nube (`AC-A-020-03`).
+  6. Auditoría automatizada de Clean Architecture (`tests/unit/architecture/layer_dependency_test.go`): validación programática con parser AST que certifica que `internal/domain` tiene cero dependencias hacia adaptadores, transporte o SDKs externos (`AC-A-020-01`).
+- **Archivos creados:** `internal/domain/money/money.go`, `internal/domain/identity/user.go`, `internal/application/identity/usecase.go`, `internal/adapters/memory/repository.go`, `internal/adapters/memory/cache.go`, `tests/unit/domain/money_test.go`, `tests/unit/domain/user_test.go`, `tests/unit/architecture/layer_dependency_test.go`, `tests/unit/application/identity_test.go`.
+- **Estado de Tareas:** A-020-T01..A-020-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
+- **Resultado:** 100% PASS en suite completa (`application`, `architecture`, `domain`, `platform`, `system`), `go vet` con 0 errores y validación SDD integral intacta.
 
 ## Registro de Incidentes y Resoluciones H08-A
 

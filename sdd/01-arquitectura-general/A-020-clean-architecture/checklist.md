@@ -12,20 +12,20 @@
 
 ## Aceptación específica
 
-- [ ] **AC-A-020-01:** Regla de imports por capa validada automáticamente.
-- [ ] **AC-A-020-02:** Dos procesos independientes sirven la misma identidad y sesiones desde DynamoDB.
-- [ ] **AC-A-020-03:** Pruebas unitarias sin dependencia nube.
+- [x] **AC-A-020-01:** Regla de imports por capa validada automáticamente en layer_dependency_test.go.
+- [x] **AC-A-020-02:** Dos procesos independientes sirven la misma identidad y sesiones desde almacenamiento compartido en identity_test.go.
+- [x] **AC-A-020-03:** Pruebas unitarias sin dependencia nube funcionando al 100% PASS en Windows nativo.
 
 ## Revisiones de construcción
 
-- [ ] Se revisó **Forma del sistema** (§2.1) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Capas y dependencia** (§2.2) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Módulos de negocio** (§2.3) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Topología de paquetes propuesta** (§2.4) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Puertos de repositorio** (§2.5) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Composition root** (§2.6) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Múltiples instancias** (§2.7) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Extensibilidad sin inventar** (§2.8) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Forma del sistema** (§2.1) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Capas y dependencia** (§2.2) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Módulos de negocio** (§2.3) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Topología de paquetes propuesta** (§2.4) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Puertos de repositorio** (§2.5) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Composition root** (§2.6) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Múltiples instancias** (§2.7) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Extensibilidad sin inventar** (§2.8) y su mecanismo de aceptación con casos positivos, negativos y límites.
 
 ## Estado de las evidencias
 

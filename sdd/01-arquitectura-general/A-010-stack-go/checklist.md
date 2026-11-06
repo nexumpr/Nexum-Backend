@@ -12,20 +12,20 @@
 
 ## Aceptación específica
 
-- [ ] **AC-A-010-01:** go version objetivo y matriz Windows/Linux 64 bits definida.
-- [ ] **AC-A-010-02:** Toda dependencia de infraestructura detrás de puertos y sometida a SCA.
-- [ ] **AC-A-010-03:** Build de implementación debe funcionar sin Docker local.
+- [x] **AC-A-010-01:** go version objetivo y matriz Windows/Linux 64 bits definida y probada en runtime_test.go.
+- [x] **AC-A-010-02:** Toda dependencia de infraestructura detrás de puertos y sometida a SCA (repository, cache, auth).
+- [x] **AC-A-010-03:** Build de implementación probado y funcionando sin Docker local.
 
 ## Revisiones de construcción
 
-- [ ] Se revisó **Runtime Go** (§2.1) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **HTTP y JSON** (§2.2) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **DynamoDB** (§2.3) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Redis** (§2.4) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Autenticación** (§2.5) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Telemetría** (§2.6) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Tests/seguridad** (§2.7) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Construcción sin contenedores locales** (§2.8) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Runtime Go** (§2.1) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **HTTP y JSON** (§2.2) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **DynamoDB** (§2.3) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Redis** (§2.4) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Autenticación** (§2.5) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Telemetría** (§2.6) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Tests/seguridad** (§2.7) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Construcción sin contenedores locales** (§2.8) y su mecanismo de aceptación con casos positivos, negativos y límites.
 
 ## Estado de las evidencias
 
