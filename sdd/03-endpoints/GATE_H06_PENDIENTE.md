@@ -1,3 +1,7 @@
+# Gate H06 — Registro histórico previo a ratificación
+
+**Este archivo conserva la checklist original anterior a la decisión humana H08-A; no representa el estado vigente.** Estado ratificado y reservas: `sdd/_control/H08/GATE_H06_H07_H08A_RATIFICACION.md`.
+
 # Gate H06 — Paquete de contratos para revisión y aprobación humana
 
 **Estado:** REVIEW_READY (NO APPROVED). **Fecha de preparación:** 2026-11-05. **Quién decide:** responsable de Nexum-Backend.
