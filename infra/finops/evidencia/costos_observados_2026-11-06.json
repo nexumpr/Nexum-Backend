@@ -1,0 +1,16 @@
+{
+  "id": "costos_observados",
+  "fecha": "2026-11-06",
+  "estado": "NOT_RUN",
+  "fuente": "aws ce get-cost-and-usage (NO ejecutado)",
+  "clasificacion_costo": "FACTURABLE_POR_SOLICITUD",
+  "costo_estimado_usd": "0.01",
+  "datos": {
+    "periodo": null,
+    "unblended_cost_usd": null,
+    "servicios_con_cargo": null
+  },
+  "motivo": "Cost Explorer cobra por solicitud de API; requiere aprobacion humana especifica y no se ejecuto",
+  "alternativa_sin_costo": "Revision manual en consola de facturacion y Free Tier (accion humana, no automatizada)",
+  "sanitizado": true
+}

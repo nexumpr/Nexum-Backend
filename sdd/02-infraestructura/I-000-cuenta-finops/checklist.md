@@ -49,3 +49,27 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+## Registro de verificación H08-I — 2026-11-06
+
+- [x] Herramienta reproducible de comprobación AWS Free: `infra/finops/consultas_readonly.py` (16 consultas, sólo lectura).
+- [x] Modelo de precios con fuente y fecha por SKU: `infra/finops/precios_us-east-2.json`.
+- [x] Cálculo determinista a 45 días con importes exactos: `infra/finops/modelo_costos.py` (84.0580 USD, residual 6.8440 USD).
+- [x] Escenarios de disponibilidad A/B/C con distinción 24×7: `infra/finops/escenarios.py`.
+- [x] Validación de dos instancias simultáneas y red privada sin NAT (diseño): `infra/finops/requisitos.py`.
+- [x] Cotización de EC2, EBS, ALB, CloudFront, DynamoDB, Redis OSS, S3 y CloudWatch en el catálogo (estado `DOC_ONLY`/`HIPOTESIS`/`SUPUESTO`).
+- [x] Separación de costo bruto, créditos verificados, impuestos y desembolso personal: `resultados/costos_45d.json` → `financiero`.
+- [x] Matriz de viabilidad financiera: `infra/finops/MATRIZ_VIABILIDAD_AWS_I000.md`.
+- [x] ADR de costo cero: `infra/finops/ADR_COSTO_CERO_I000.md` (estado `BLOCKED_FINOPS`).
+- [x] Evidencias sanitizadas y reproducibles: `infra/finops/evidencia/`, `infra/finops/EVIDENCIA_I000.md`.
+- [x] Pruebas unitarias del cálculo financiero: 63 pruebas OK (`tests/infra/finops`).
+- [ ] Plan Free, vigencia y créditos verificados en AWS — **NOT_VERIFIED**: sesión expirada.
+- [ ] Precios revalidados contra Price List API — **NOT_VERIFIED**.
+- [ ] SKU Redis OSS, VPC Origins, cuota de vCPU y `t4g.micro` confirmados — **NOT_VERIFIED**.
+- [ ] Costo observado (0.00 USD) comprobado — **NOT_RUN**: Cost Explorer cuesta 0.01 USD por solicitud.
+- [ ] Costo residual aceptado formalmente por el responsable — **PENDIENTE**.
+- [ ] IVA y TLS extremo a extremo decididos — **PENDIENTE**.
+- [ ] Gate I-GO con resolución expresa — **PENDIENTE**.
+
+**Estado de la spec:** `BLOCKED_FINOPS`. No se marca ningún punto no ejecutado como PASS.
+

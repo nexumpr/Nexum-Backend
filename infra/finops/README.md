@@ -1,0 +1,50 @@
+# infra/finops — Implementación I-000 (cuenta AWS, plan Free y costo cero)
+
+**Spec:** `sdd/02-infraestructura/I-000-cuenta-finops/` · **Fase:** H08-I · **Rama:** `feat/h08i-i000-finops`
+**Estado de la evidencia AWS:** `NOT_VERIFIED` (sesión AWS expirada) · **Decisión vigente:** `BLOCKED_FINOPS`
+
+Este directorio contiene la implementación reproducible y auditable de I-000. No crea, modifica
+ni destruye recursos AWS; no ejecuta Terraform; no cambia el plan Free a Paid.
+
+## Componentes
+
+| Archivo | Función |
+|---|---|
+| `dinero.py` | Aritmética monetaria exacta con `Decimal`; rechaza `float` |
+| `precios_us-east-2.json` | Catálogo de precios con estado de evidencia por SKU y fecha de fuente |
+| `escenarios.py` | Escenarios A (24×7 ALB público), B (ventanas 8 h) y C (CloudFront + VPC Origin) |
+| `modelo_costos.py` | Cálculo determinista a 45 días, costo residual, créditos y desembolso |
+| `viabilidad.py` | Regla de decisión `VIABLE` / `BLOCKED_FINOPS` con motivos y evidencia faltante |
+| `requisitos.py` | Valida dos instancias reales simultáneas y red privada sin NAT |
+| `consultas_readonly.py` | Catálogo de 16 consultas AWS de solo lectura, con clasificación de costo |
+| `sanitizar.py` | Enmascara cuenta, ARN, correos, claves, IPv4 y tokens antes de versionar |
+| `evidencia/` | Instantáneas sanitizadas con estado honesto (`VERIFIED_AWS`, `NOT_RUN`, `NOT_VERIFIED`) |
+| `resultados/` | Salidas deterministas del modelo y de la decisión de viabilidad |
+
+## Uso
+
+```powershell
+py -3.13 infra/finops/consultas_readonly.py --validar     # ninguna consulta mutante
+py -3.13 infra/finops/consultas_readonly.py --listar      # catálogo con costo por consulta
+py -3.13 infra/finops/modelo_costos.py --texto            # totales por escenario
+py -3.13 infra/finops/requisitos.py                       # invariantes de topología
+py -3.13 infra/finops/viabilidad.py                       # decisión VIABLE/BLOCKED_FINOPS
+py -3.13 -m unittest discover -s tests/infra/finops       # pruebas
+```
+
+Para ejecutar una consulta concreta:
+
+```powershell
+py -3.13 infra/finops/consultas_readonly.py --ejecutar plan_free
+```
+
+La salida cruda se escribe en `%TEMP%\nexum_finops_crudo` (fuera del repositorio); sólo la versión
+sanitizada se guarda en `evidencia/`.
+
+## Reglas de evidencia
+
+- Un precio `null` o con estado `UNKNOWN` **nunca** es 0 USD y bloquea el total bruto.
+- `DOC_ONLY`, `HIPOTESIS` y `SUPUESTO` son evidencia histórica o de modelado: **no** habilitan `VIABLE`.
+- Los créditos declarados (120 USD del contexto H05) **no** son créditos verificados.
+- Cost Explorer cobra USD 0.01 por solicitud: no se ejecuta sin aprobación humana específica.
+- La comprobación de dos instancias y red privada valida el **diseño**; el runtime sigue `NOT_RUN`.

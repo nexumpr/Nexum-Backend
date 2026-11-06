@@ -1,0 +1,58 @@
+{
+  "id": "topologia_c",
+  "fecha": "2026-11-06",
+  "estado": "DISENO_NO_DESPLEGADO",
+  "fuente": "spec I-000 seccion 9 (topologia C) y H05 ADR_H05_CERO_PESOS_45_DIAS_V3.md",
+  "region": "us-east-2",
+  "instancias": [
+    {
+      "id": "backend-a",
+      "tipo": "proceso_servidor",
+      "az": "us-east-2a",
+      "simulado": false,
+      "misma_maquina": false,
+      "activa_simultanea": true,
+      "detras_de_balanceador": true,
+      "ipv4_publica": false
+    },
+    {
+      "id": "backend-b",
+      "tipo": "proceso_servidor",
+      "az": "us-east-2b",
+      "simulado": false,
+      "misma_maquina": false,
+      "activa_simultanea": true,
+      "detras_de_balanceador": true,
+      "ipv4_publica": false
+    }
+  ],
+  "balanceador": {
+    "tipo": "cloudfront+alb",
+    "real": true,
+    "alb_esquema": "internal",
+    "cloudfront_vpc_origin": true
+  },
+  "red": {
+    "nat_gateways": 0,
+    "gateway_endpoints": ["s3", "dynamodb"],
+    "interface_endpoints": 0,
+    "ipv4_publicas": 0,
+    "egress_restringido": true,
+    "nota": "Sin NAT ni IPv4 publica; salida de parches no resuelta por diseno y pendiente de decision"
+  },
+  "tls": {
+    "navegador_a_cloudfront": "https_tls12+",
+    "cloudfront_a_origen": "http_privado",
+    "origen_extremo_a_extremo": false
+  },
+  "persistencia": {
+    "dynamodb": "tabla unica on-demand con GSI",
+    "redis": "ElastiCache Redis OSS administrado, una instancia, subred privada"
+  },
+  "estado_verificacion": {
+    "disenio": "COMPLETO",
+    "recursos_creados": false,
+    "runtime": "NOT_RUN",
+    "nota": "Ningun recurso AWS ha sido creado; esta evidencia documenta diseno, no despliegue"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "free_tier",
+  "fecha": "2026-11-06",
+  "estado": "NOT_RUN",
+  "fuente": "aws freetier get-free-tier-usage",
+  "datos": {
+    "servicios_consultados": 0,
+    "franquicias_consumidas": null,
+    "cobertura_60_dias": null
+  },
+  "motivo": "No ejecutado: la sesion AWS expuesta por la CLI no permite autenticar",
+  "sanitizado": true
+}

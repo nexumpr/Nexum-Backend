@@ -96,3 +96,30 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+## Registro de implementación H08-I — 2026-11-06 (rama `feat/h08i-i000-finops`)
+
+Estado global: `IMPLEMENTED_LOCAL` + `BLOCKED_FINOPS`. Ningún recurso AWS fue creado. La sesión AWS
+del perfil `nexum` estaba expirada, por lo que toda evidencia de cuenta, precios y costo observado
+permanece `NOT_VERIFIED`/`NOT_RUN`.
+
+| Tarea | Estado real | Evidencia |
+|---|---|---|
+| T-000-01 Plan y contexto | `IMPLEMENTED_LOCAL` / evidencia `NOT_VERIFIED` | `infra/finops/consultas_readonly.py`; `infra/finops/evidencia/cuenta_2026-11-06.json` |
+| T-000-02 Matriz por recurso | `PASS` documental (precios sin revalidar) | `infra/finops/MATRIZ_COSTOS_SERVICIOS_I000.md`; `precios_us-east-2.json` |
+| T-000-03 Dos escenarios | `PASS` (modelo A/B/C) | `infra/finops/escenarios.py`; 63 pruebas OK |
+| T-000-04 Costeo | `PASS` cálculo (bruto 84.0580; residual 6.8440) | `infra/finops/resultados/costos_45d.json` |
+| T-000-05 Bloqueo de decisión | `PASS` regla aplicada → `BLOCKED_FINOPS` | `infra/finops/resultados/viabilidad_i000.json` |
+| T-000-06 Controles | `NOT_RUN` (prohibido crear presupuestos/alarmas en I-000) | catálogo `presupuestos` en `consultas_readonly.py` |
+| T-000-07 Investigación con fecha | `PASS` parcial (fuentes fechadas; sin Price List API) | `precios_us-east-2.json` campo `fecha_fuente` |
+| T-000-08 Separación de responsabilidades | `PASS` | `MATRIZ_VIABILIDAD_AWS_I000.md` secciones 1 y 4 |
+| T-000-90 Riesgos y dependencias | `BLOCKED` (4 riesgos abiertos) | `infra/finops/ADR_COSTO_CERO_I000.md` sección 5 |
+| T-000-99 Ratificación | `PENDIENTE` de decisión humana | este registro + PR de I-000 |
+
+**Pruebas ejecutadas:** `py -3.13 -m unittest discover -s tests/infra/finops` → 63 pruebas OK;
+`consultas_readonly.py --validar` → 16 consultas, ninguna mutante; `requisitos.py` → diseño válido,
+runtime `NOT_RUN`; `viabilidad.py` → `BLOCKED_FINOPS`.
+
+**No ejecutado:** Terraform init/plan/apply/destroy, creación de recursos, presupuestos, alarmas,
+Cost Explorer (0.01 USD por solicitud), cualquier verificación HTTP pública.
+

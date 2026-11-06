@@ -1,0 +1,95 @@
+{
+  "condiciones": [
+    "Limites de DynamoDB no verificados; no impiden el diseño actual",
+    "Cost Explorer tiene costo por solicitud (USD 0.01); su uso requiere aprobacion humana concreta",
+    "Partidas de reserva/supuesto no tarifarias incluidas: S3_SOLICITUDES, EGRESO, CI_CD, RESERVA_CF",
+    "IVA/impuestos no determinados: no se imputa 0% ni un monto sin evidencia",
+    "Cero desembolso personal: el modelo no contempla pago con fondos propios ni cambio a plan Paid",
+    "Uso del plan Free Tier no verificado (aws freetier get-free-tier-usage)",
+    "Instancias y balanceo reales: verificacion runtime NOT_RUN hasta H08-I/H08-E autorizado"
+  ],
+  "escenario_evaluado": "C_CLOUDFRONT_VPC_ORIGIN_PRIVADO",
+  "estado": "BLOCKED_FINOPS",
+  "fecha_evaluacion": "2026-11-06",
+  "motivos": [
+    {
+      "codigo": "EVIDENCIA_CUENTA_NO_VERIFICADA",
+      "detalle": "estado de evidencia de cuenta: NOT_VERIFIED (Sesion AWS expirada; no se puede verificar plan, vigencia ni creditos)",
+      "evidencia_requerida": "reejecutar consultas read-only con sesion AWS valida"
+    },
+    {
+      "codigo": "PLAN_NO_DETERMINADO",
+      "detalle": "tipo de plan (FREE/PAID) desconocido",
+      "evidencia_requerida": "aws freetier get-account-plan-state"
+    },
+    {
+      "codigo": "VIGENCIA_NO_DETERMINADA",
+      "detalle": "fecha de expiracion del plan desconocida",
+      "evidencia_requerida": "aws freetier get-account-plan-state"
+    },
+    {
+      "codigo": "CREDITOS_NO_VERIFICADOS",
+      "detalle": "creditos verificados: 0; los creditos declarados no son evidencia",
+      "evidencia_requerida": "saldo real de creditos y fecha de expiracion"
+    },
+    {
+      "codigo": "EVIDENCIA_SERVICIOS_NO_VERIFICADA",
+      "detalle": "estado de evidencia de servicios: NOT_RUN",
+      "evidencia_requerida": "reejecutar consultas read-only con sesion AWS valida"
+    },
+    {
+      "codigo": "REDIS_OSS_NO_CONFIRMADO",
+      "detalle": "SKU/version de ElastiCache Redis OSS no confirmado en la cuenta",
+      "evidencia_requerida": "aws elasticache describe-cache-engine-versions y Price List API"
+    },
+    {
+      "codigo": "VPC_ORIGIN_NO_CONFIRMADO",
+      "detalle": "disponibilidad de CloudFront VPC Origins no confirmada",
+      "evidencia_requerida": "aws cloudfront list-vpc-origins y prueba en cuenta"
+    },
+    {
+      "codigo": "CUOTA_EC2_INSUFICIENTE",
+      "detalle": "cuota de vCPU On-Demand observada: None",
+      "evidencia_requerida": "aws servicequotas get-service-quota (L-1216C47A)"
+    },
+    {
+      "codigo": "TIPO_INSTANCIA_NO_CONFIRMADO",
+      "detalle": "disponibilidad de t4g.micro por zona no confirmada",
+      "evidencia_requerida": "aws ec2 describe-instance-type-offerings"
+    },
+    {
+      "codigo": "COSTO_OBSERVADO_NO_VERIFICADO",
+      "detalle": "costo observado no verificado: Cost Explorer cobra por solicitud de API; requiere aprobacion humana especifica y no se ejecuto",
+      "evidencia_requerida": "consola de facturacion (accion humana) o autorizacion especifica de Cost Explorer"
+    },
+    {
+      "codigo": "PRECIOS_NO_VERIFICADOS",
+      "detalle": "24 partidas requeridas sin precio verificado en AWS: EC2_GO, ALB_FIJO, ALB_LCU, REDIS_OSS, EBS_GP3, EBS_SNAPSHOTS, DDB_STORAGE, DDB_LECTURAS, DDB_ESCRITURAS, DDB_PITR, DDB_BACKUP, DDB_RESTORE, CW_INGESTA, CW_RETENCION, CW_METRICAS, CW_ALARMAS, SECRETS, S3_STATE, S3_SOLICITUDES, EGRESO, REDIS_INTERAZ, CERT_CF, VPC_ORIGIN, GW_ENDPOINTS",
+      "evidencia_requerida": "aws pricing get-products por SKU en us-east-2 y actualizacion del catalogo"
+    },
+    {
+      "codigo": "CREDITOS_INSUFICIENTES",
+      "detalle": "bruto 84.0580 USD supera creditos verificados 0 USD",
+      "evidencia_requerida": "verificar saldo real de creditos y reoptimizar topologia"
+    }
+  ],
+  "nota": "VIABLE exige evidencia AWS verificada y precios VERIFIED_AWS; la ausencia de errores o la existencia de creditos no eleva el estado",
+  "resumen_financiero": {
+    "cobro_neto_usd": "84.0580",
+    "creditos_verificados_usd": "0.0000",
+    "desembolso_personal_usd": "0.0000",
+    "impuestos": "UNKNOWN",
+    "total_bruto_45d_usd": "84.0580",
+    "total_conocido_usd": "84.0580"
+  },
+  "revision_topologia": {
+    "conectividad_privada": [],
+    "diseno_valido": true,
+    "dos_instancias": [],
+    "nota": "Estas comprobaciones validan el DISEÑO; no acreditan instancias ni tráfico reales",
+    "tls": [],
+    "verificacion_runtime": "NOT_RUN"
+  },
+  "spec": "I-000-cuenta-finops",
+  "version": "1.0.0"
+}
