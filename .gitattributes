@@ -13,3 +13,5 @@
 *.hcl text eol=lf
 *.service text eol=lf
 *.ps1 text eol=lf
+*.tftpl text eol=lf
+*.sh text eol=lf

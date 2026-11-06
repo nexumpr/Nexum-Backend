@@ -4,7 +4,7 @@
   "algorithm": "SHA256",
   "note": "SHA exacto de archivos, convertido LF según .gitattributes; manifest no se auto-hashea; H08-A local | Transicion H08-I: RFC-002/003, Gate I-000, permisos operativos y pruebas; cada entrada nueva cuenta con SHA. | I-000 FinOps: infra/finops declarado con SHA; tasks/checklist I-000 actualizados con evidencia. | I-000 rev2: precios AWS verificados, bruto verificado vs calculado, service-quotas y rutas temporales corregidas. | I-000 rev4: cobertura verificada/modelada, plan Free sin cargos, matriz de Gate. | I-000 rev5: conectividad privada recotizada (interface endpoints 0.01 USD/h/AZ). | I-000 rev6: diseno E (logs permanente, auxiliares por ventana), cierre aprobado. | I-010 Gate propuesto (sin implementacion). | I-010: modulo red Terraform validado local (fmt/validate) y permiso init -backend=false. | I-010 auditoria: egress S3/DynamoDB por prefix list, NACL completa, CIDR derivado. | I-010 final: subredes /20-/27, preconditions 1.4+, lock versionado. | I-020 Gate propuesto (sin implementacion). | I-020 computo: LT/ASG, systemd, build ARM64 y RFC-004. | I-020 cierre: bootstrap completo, ASG 100% y D-01 registrado. | I-030 Gate propuesto (conflicto D2 vs DRAFT documentado).",
   "files": {
-    ".gitattributes": "7662f697d8b77702b41a6b6e5f123f15ea77aa5e29cfaced576689f0143d09dd",
+    ".gitattributes": "c4ac0a3dddb651fee7f8d0187e849920a3ab252556abe90da68eacb838f3a2fc",
     ".github/workflows/sdd-validacion.yml": "089ad88dfe79c7d46fbc2ba8984aece5271b84b47eee452c4cf15626664543fb",
     ".gitignore": "bc4cd77a6423f9e72ee3521cfa30de8c32e8b6413bcde37a2c617ab91b37b262",
     ".opencode/agents/api-contract-guardian.md": "385ef21da9692eff5f3e9ec22efd25a52134403beb1fa0ff06dc6ee86bb2a1ea",
