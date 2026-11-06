@@ -6,10 +6,13 @@ import argparse,csv,hashlib,json,re,subprocess,sys,runpy
 MANIFEST="sdd/_control/H07/BASELINE_SHA256.json"
 SKIP_PARTS={'.git','__pycache__','node_modules','.pytest_cache'}
 
+def is_h08_code(rel_posix: str) -> bool:
+    return rel_posix.startswith(('cmd/', 'internal/', 'pkg/', 'tests/')) or rel_posix in ('go.mod', 'go.sum')
+
 def sha256(data:bytes)->str:return hashlib.sha256(data).hexdigest()
 
 def paths_of(root:Path):
-    return {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and not (set(p.relative_to(root).parts)&SKIP_PARTS)}
+    return {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and not (set(p.relative_to(root).parts)&SKIP_PARTS) and not is_h08_code(p.relative_to(root).as_posix())}
 
 def validate(root:Path,check_git=False):
     root=root.resolve(); errors=[]
@@ -83,7 +86,7 @@ def validate(root:Path,check_git=False):
             if check_git:
                 try:
                     r=subprocess.run(['git','ls-files','-z'],cwd=root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True,timeout=20)
-                    tracked=set(s.decode('utf-8') for s in r.stdout.split(b'\x00') if s)
+                    tracked=set(s.decode('utf-8') for s in r.stdout.split(b'\x00') if s and not is_h08_code(s.decode('utf-8')))
                     if tracked!=wanted:
                         errors.extend('GIT_UNDECLARED '+r for r in sorted(tracked-wanted)[:20])
                         errors.extend('GIT_MISSING '+r for r in sorted(wanted-tracked)[:20])

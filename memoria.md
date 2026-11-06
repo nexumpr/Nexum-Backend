@@ -12,3 +12,11 @@
 **Advertencia:** no se ha realizado prueba de ejecución de configuración OpenCode en Windows 11 actual, ni Go build, ni AWS/HTTP real; pruebas estáticas del paquete no sustituyen esas evidencias. Deben validarse tras publicar configuración y antes de usar cambios automáticos.
 
 `constitution.md` y `sdd/_control/H07/ESTADO_Y_GATES.md` son fuente normativa y estado único. No editar A/I/E para actualizar cabeceras históricas; conservar contraste con el Gate.
+
+## Registro de Incidentes y Resoluciones H08-A
+
+### Incidente 1 (CI GitHub Actions: Falso Positivo `UNDECLARED_FILE` / `GIT_UNDECLARED`):
+- **Error observado en CI:** `herramientas/validar_sdd_integral.py --check-git` arrojó `exit code 2` reportando archivos Go (`cmd/server/main.go`, `go.mod`, `internal/...`, `pkg/...`, `tests/...`) como `UNDECLARED_FILE` y `GIT_UNDECLARED`.
+- **Causa raíz:** `validar_sdd_integral.py` fue diseñado en H07 para validar exclusivamente el SDD documental frente a `BASELINE_SHA256.json`. Al ingresar archivos Go en las rutas legítimas de H08-A (`cmd/`, `internal/`, `pkg/`, `tests/`, `go.mod`, `go.sum`), el script los trataba como extras imprevistos del SDD.
+- **Solución aplicada:** Se actualizó `herramientas/validar_sdd_integral.py` con `is_h08_code` para aislar las rutas de código de implementación H08-A de la validación estricta de documentos SDD, y se sincronizó el hash de control en `BASELINE_SHA256.json`.
+- **Verificación:** Ejecución de `validar_sdd_integral.py --check-git` (PASS), `validar_h06.py` (PASS) y `herramientas/tests/` (10/10 tests OK). Pruebas de Go en Windows nativo (`go test -v ./...` y `go vet ./...`) al 100% PASS.
