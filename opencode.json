@@ -511,8 +511,33 @@
     },
     {
       "action": "shell",
-      "resource": "terraform init*",
+      "resource": "terraform init -backend=false",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform init -backend=false *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform init -backend=true*",
       "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform init -migrate-state*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform init -reconfigure*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform init -backend=false*",
+      "effect": "ask"
     },
     {
       "action": "shell",
@@ -738,8 +763,23 @@
     },
     {
       "action": "tool.use",
-      "resource": "shell:terraform init*",
+      "resource": "shell:terraform init -backend=true*",
       "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:terraform init -migrate-state*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:terraform init -reconfigure*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:terraform init -backend=false*",
+      "effect": "allow"
     },
     {
       "action": "tool.use",

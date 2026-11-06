@@ -89,7 +89,26 @@ sdd/02-infraestructura/I-010-red-vpc/checklist.md
 2. Terraform con backend remoto exigiría S3 + DynamoDB de estado (ya presupuestados vía gateway endpoints).
 3. Cualquier `init` real contra la cuenta requiere autorización AWS específica, no cubierta por este Gate.
 
-## 9. Aprobación solicitada (una sola)
+## 10. Corrección de trazabilidad antes de implementar
+
+El Gate propuesto decía “SG de entrada ALB:443”. Eso **contradice D2**, aprobada por el responsable
+(`ACEPTO_TLS_CLOUDFRONT_ALB_HTTP_PRIVADO`). Corrección aplicada y registrada:
+
+| Elemento | Valor efectivo | Base |
+|---|---|---|
+| Cliente → CloudFront | HTTPS 443 | D2, spec §9 |
+| CloudFront → ALB | **HTTP 80** (privado, VPC Origins) | D2 |
+| ALB → backend Go | **HTTP 8080** (subred privada) | A-030/A-090 (puerto interno) |
+| Health check | HTTP `GET /api/v1/health/live` en 8080 | A-090 |
+| Certificados | sólo el de CloudFront (`*.cloudfront.net`) | D2 |
+| ALB público | **no**; ALB `internal` | D2 + spec §9 |
+
+El texto “443” de `spec.md` (estado `DRAFT / REVIEW — NO APROBADO`) queda superado por D2 sin editar la
+spec: la decisión humana tiene precedencia y la discrepancia se documenta aquí.
+
+
+
+## 11. Aprobación solicitada (una sola)
 
 Para implementar I-010 en local hace falta una de estas respuestas:
 

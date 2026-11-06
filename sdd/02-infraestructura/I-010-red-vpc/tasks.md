@@ -78,3 +78,12 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+## Registro de implementacion H08-I — 2026-11-06
+
+- `infra/terraform/modules/red`: VPC, 2 subredes privadas en 2 AZ, IGW (requisito VPC Origins), tabla de rutas privada sin ruta por defecto, gateway endpoints S3/DynamoDB, 4 SG de minimo privilegio, NACL con puertos efimeros, interface endpoints (logs permanente; secretsmanager/ssm/ssmmessages por ventana).
+- `infra/terraform/envs/h08i`: composicion, provider AWS ~> 5.60, sin backend remoto.
+- `terraform fmt -check -recursive`: PASS. `terraform init -backend=false`: ejecutado (proveedor 5.100.0). `terraform validate`: Success.
+- `tests/infra/terraform/test_red_contrato.py`: 24 pruebas (estructura, red, endpoints, seguridad, presupuesto).
+- Correccion D2: ALB en HTTP 80 desde prefix list; backend 8080. Sin 443 en el ALB.
+- Sin recursos AWS creados; sin plan/apply/destroy; sin backend remoto.

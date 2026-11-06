@@ -46,3 +46,15 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+### Verificacion H08-I — 2026-11-06
+
+- [x] INF-010-01 topologia: 2 subredes privadas en 2 AZ, sin NAT, IGW para VPC Origins.
+- [x] INF-010-02 flujos: matriz origen-destino en `infra/terraform/README.md`.
+- [x] INF-010-03 NAT/IP: sin NAT, `map_public_ip_on_launch=false`, sin IPv4 publicas.
+- [x] INF-010-05 seguridad: SG minimos, sin SSH, sin ingress 0.0.0.0/0, NACL con efimeros.
+- [x] `terraform fmt -check` y `terraform validate` PASS; init solo `-backend=false`.
+- [x] Interfaces: logs permanente; secretsmanager/ssm/ssmmessages por ventana; monitoring y ec2messages no requeridos.
+- [ ] Recursos AWS creados — NOT_RUN por Gate.
+- [ ] `terraform plan` contra AWS — NO AUTORIZADO.
+- [ ] Verificacion runtime de red — corresponde a I-020/I-030.

@@ -33,7 +33,7 @@ class PermisosH08I(unittest.TestCase):
   self.assertEqual(self.eff('shell','go test ./...'),'allow')
   self.assertEqual(self.eff('shell','git status -sb'),'allow')
  def test_cloud_deny_readonly_ask(self):
-  for cmd in ['aws ec2 run-instances --x','aws ec2 create-vpc --x','aws budgets create-budget --x','terraform apply -auto-approve','terraform init','terraform plan','terraform destroy','git push origin main','git reset --hard HEAD','docker build .']:
+  for cmd in ['aws ec2 run-instances --x','aws ec2 create-vpc --x','aws budgets create-budget --x','terraform apply -auto-approve','terraform init -backend=true','terraform plan','terraform destroy','git push origin main','git reset --hard HEAD','docker build .']:
    self.assertEqual(self.eff('shell',cmd),'deny',cmd)
   for cmd in ['aws sts get-caller-identity --profile nexum','aws freetier get-account-plan-state --region us-east-2','aws pricing get-products --service-code AmazonEC2','terraform fmt -check']:
    self.assertEqual(self.eff('shell',cmd),'ask',cmd)
