@@ -119,6 +119,17 @@
 - **Estado de Tareas:** A-070-T01..A-070-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
 - **Resultado:** 100% PASS en `go test ./...` y 0 errores en `go vet ./...`.
 
+### Spec A-080 (`A-080-cache-paginacion`):
+- **Alcance implementado:**
+  1. Espacio canónico de claves Redis y aislamiento de usuarios (`internal/domain/cache/keys.go`): formato canónico `nexum:v1:<env>:<user-hash>:<resource>:<params-hash>:<version>` con hashing HMAC-SHA256 de ID de usuario para prevenir colisiones o fugas de identidad (`A-080 §2.2`, `AC-A-080-02`).
+  2. Cliente de caché distribuido concurrente (`internal/infrastructure/cache/distributed_cache.go`): soporte multi-instancia, TTL dinámico, incrementos atómicos (`INCR`), invalidación atómica por prefijos (`DeletePrefix`) y telemetría de aciertos/fallos (`HitCount`, `MissCount`) conforme a `A-080 §2.8`.
+  3. Rate limiter distribuido por cuenta e IP (`internal/infrastructure/cache/rate_limiter.go`): políticas diferenciadas con fail-closed estricto (503 Service Unavailable) en endpoints de autenticación para mitigar fuerza bruta, y fail-open tolerante a fallos en lecturas ordinarias (`A-080 §2.5`, `AC-A-080-01`).
+  4. Servicio de agregados financieros cacheados (`internal/application/financial/dashboard_cached_service.go`): patrón Read-Through con TTL de 30 segundos, aislamiento estricto por usuario e invalidación inmediata post-escritura (`A-080 §2.3`, `§2.4`, `§2.7`).
+  5. Paginación determinista a escala sin Scan (`internal/infrastructure/dynamo/table.go`, `tests/unit/cache/cache_pagination_test.go`): extensión de `QueryPartition` con soporte de `ExclusiveStartKey.SK` evaluando `SK > startSK`. Verificación determinista de paginación de 10,000 movimientos en 100 páginas de tamaño 100 con 0 llamadas a Scan (`AC-A-080-03`).
+- **Archivos creados/modificados:** `internal/domain/cache/keys.go`, `internal/infrastructure/cache/distributed_cache.go`, `internal/infrastructure/cache/rate_limiter.go`, `internal/application/financial/dashboard_cached_service.go`, `internal/infrastructure/dynamo/table.go`, `internal/adapters/dynamo/repository.go`, `tests/unit/cache/cache_pagination_test.go`, `tests/unit/dynamo/dynamodb_model_test.go`.
+- **Estado de Tareas:** A-080-T01..A-080-T14 completadas y marcadas en `tasks.md` y `checklist.md`.
+- **Resultado:** 100% PASS en suite completa de Go y 0 errores en `go vet ./...`.
+
 ## Registro de Incidentes y Resoluciones H08-A
 
 ### Incidente 1 (CI GitHub Actions: Falso Positivo `UNDECLARED_FILE` / `GIT_UNDECLARED`):
@@ -138,3 +149,9 @@
 - **Causa raíz:** La instalación inicial de `golang.org/x/crypto` no descargó la dependencia transitiva `golang.org/x/sys` en `go.sum`.
 - **Solución aplicada:** Se ejecutó `go mod tidy` fuera del sandbox (`BypassSandbox: true`) para descargar `golang.org/x/sys v0.49.0` y actualizar `go.sum`. Posteriormente, todos los comandos de prueba y verificación se ejecutaron en el sandbox estándar.
 - **Verificación:** `go test -v ./tests/unit/security/...` y `go test ./...` 100% PASS.
+
+### Incidente 4 (A-080: Paginación de DynamoDB sin Scan en 10,000 elementos mediante `ExclusiveStartKey.SK`):
+- **Error observado:** Al ejecutar `TestCursorPaginationTenThousandItemsNoScan`, la consulta se detenía en la primera página de 100 ítems porque el filtro solo buscaba igualdad de prefijo (`HasPrefix`) sin desplazar el cursor de ordenamiento (`ExclusiveStartKey`).
+- **Causa raíz:** En DynamoDB el modelo de cursores requiere evaluar `SK > startSK` ordenado ascendentemente para iterar secuencialmente los elementos de una partición sin saltos ni dependencias de offset/Scan.
+- **Solución aplicada:** Se actualizó `QueryPartition` en `internal/infrastructure/dynamo/table.go` para recibir el parámetro `startSK string` como `ExclusiveStartKey`, filtrando `item.SK > startSK`.
+- **Verificación:** Paginación de 10,000 movimientos completada en 100 páginas exactas con 0 operaciones Scan (`AC-A-080-03` PASS).

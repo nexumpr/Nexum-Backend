@@ -25,7 +25,7 @@ func TestProhibitionOfScan(t *testing.T) {
 	}
 
 	// 2. Query sin Partition Key debe ser rechazado
-	_, err = table.QueryPartition(ctx, "", "", true, 10)
+	_, err = table.QueryPartition(ctx, "", "", "", true, 10)
 	if err == nil {
 		t.Fatalf("AC-A-060-01 Violado: Query sin clave de partición debió fallar")
 	}

@@ -128,6 +128,6 @@ func (r *DynamoRepository) QueryMovementsByType(ctx context.Context, userID, mov
 // QueryAllUserItems recupera todos los datos del usuario en su partición (E014 borrado de cuenta o exportación sin Scan).
 func (r *DynamoRepository) QueryAllUserItems(ctx context.Context, userID string) ([]domainDynamo.DynamoItem, error) {
 	pk := domainDynamo.PrefixUser + userID
-	return r.table.QueryPartition(ctx, pk, "", true, 0)
+	return r.table.QueryPartition(ctx, pk, "", "", true, 0)
 }
 
