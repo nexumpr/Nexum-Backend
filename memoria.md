@@ -45,6 +45,22 @@
 - **Estado de Tareas:** A-020-T01..A-020-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
 - **Resultado:** 100% PASS en suite completa (`application`, `architecture`, `domain`, `platform`, `system`), `go vet` con 0 errores y validación SDD integral intacta.
 
+### Spec A-030 (`A-030-servidor-http`):
+- **Alcance implementado:**
+  1. Enrutador versionado `/api/v1` en `internal/transport/http/router.go`: resolución explícita de rutas, 404 estructurado no enumerable, y 405 Method Not Allowed con cabecera `Allow` conteniendo los métodos permitidos (`AC-A-030-01`).
+  2. Servidor HTTP parametrizado en `internal/transport/http/server.go`: timeouts estrictos (ReadHeaderTimeout 5s, ReadTimeout 10s, WriteTimeout 15s, IdleTimeout 60s) y soporte de Graceful Shutdown (`AC-A-030-03`).
+  3. Cadena middleware componible en `internal/transport/http/middleware/`:
+     - `Recovery`: captura panics y responde 500 JSON sin fugar stack traces ni secretos (`AC-A-030-02`).
+     - `SecurityHeaders`: cabeceras `nosniff`, `DENY`, HSTS y `no-store`.
+     - `CORS`: allowlist explícita, resolución preflight `OPTIONS` 204 y rechazo de comodín con credenciales.
+     - `RateLimiter`: limitación de tasa por IP con respuesta 429 Too Many Requests y cabecera `Retry-After`.
+     - `Chain`: encadenamiento ordenado de middlewares.
+  4. Probes de salud de plataforma: `/health` (liveness 200 UP) y `/ready` (readiness 200 READY / 503 DRAINING durante shutdown).
+  5. Suite de pruebas de transporte en `tests/unit/transport/http_server_test.go`: cobertura 100% PASS de todos los códigos HTTP (200, 204, 400, 404, 405, 413, 415, 429, 500, /health, /ready y shutdown).
+- **Archivos creados:** `internal/transport/http/server.go`, `internal/transport/http/router.go`, `internal/transport/http/middleware/chain.go`, `internal/transport/http/middleware/recovery.go`, `internal/transport/http/middleware/security.go`, `internal/transport/http/middleware/cors.go`, `internal/transport/http/middleware/ratelimit.go`, `tests/unit/transport/http_server_test.go`.
+- **Estado de Tareas:** A-030-T01..A-030-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
+- **Resultado:** 100% PASS en suite completa, `go vet` con 0 errores y validación SDD integral intacta.
+
 ## Registro de Incidentes y Resoluciones H08-A
 
 ### Incidente 1 (CI GitHub Actions: Falso Positivo `UNDECLARED_FILE` / `GIT_UNDECLARED`):
