@@ -76,4 +76,3 @@ func TestContextTracingAttributes(t *testing.T) {
 		t.Error("el log no contiene el correlation_id del contexto")
 	}
 }
-

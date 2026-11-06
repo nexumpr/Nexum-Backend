@@ -123,4 +123,3 @@ func (m Money) Formatted() string {
 	remainder := cents % 100
 	return fmt.Sprintf("%s%d.%02d %s", sign, units, remainder, m.currency)
 }
-

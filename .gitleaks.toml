@@ -1,0 +1,20 @@
+# Configuración de gitleaks para Nexum-Backend (A-100).
+# Se extiende el conjunto de reglas por defecto y se excluyen falsos positivos
+# verificados, cada uno con alcance mínimo (ruta y, cuando aplica, regla).
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Manifiestos de integridad: contienen hashes SHA-256, no credenciales"
+paths = ['''..*BASELINE_SHA256\.json''']
+
+[[allowlists]]
+description = "JWT ficticio usado por la prueba del redactor de logs (sin clave real)"
+paths = ['''tests/unit/telemetry/observability_health_test\.go''']
+rules = ["jwt"]
+
+[[allowlists]]
+description = "Fixtures de telemetria con cadenas de ejemplo (no son credenciales reales)"
+paths = ['''tests/unit/platform/telemetry_test\.go''']
+rules = ["generic-api-key"]

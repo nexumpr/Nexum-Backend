@@ -77,12 +77,12 @@ func (dl *DecisionLog) GetDecisionsBySpec(specID string) []DecisionRecord {
 
 // PRValidationRequest encapsula las condiciones para validar la integración de un Pull Request.
 type PRValidationRequest struct {
-	TargetBranch       string
-	SourceBranch       string
-	CIGreen            bool
-	HumanApprovals     int
-	DirectPushAttempt  bool
-	HasUnsavedSecrets  bool
+	TargetBranch      string
+	SourceBranch      string
+	CIGreen           bool
+	HumanApprovals    int
+	DirectPushAttempt bool
+	HasUnsavedSecrets bool
 }
 
 // ValidatePRMerge certifica las políticas de gates para ramas protegidas (A-110 §2.2, AC-A-110-02).
@@ -104,10 +104,10 @@ func ValidatePRMerge(req PRValidationRequest) error {
 
 // DeployAuthorization encapsula la autorización humana expresa desacoplada para despliegues.
 type DeployAuthorization struct {
-	Environment        string
-	AuthorizedBy       string
-	SeparateFromPR     bool
-	AuthorizationDate  time.Time
+	Environment       string
+	AuthorizedBy      string
+	SeparateFromPR    bool
+	AuthorizationDate time.Time
 }
 
 // ValidateDeployAuthorization certifica que el despliegue requiere una aprobación humana separada (AC-A-110-02).

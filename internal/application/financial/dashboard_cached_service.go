@@ -12,11 +12,11 @@ import (
 
 // UserDashboardData representa el resumen financiero agregado presentado al usuario (A-080 §2.3, E051).
 type UserDashboardData struct {
-	UserID         string    `json:"userId"`
-	AvailableCents int64     `json:"availableCents"`
-	TotalSavedCents int64    `json:"totalSavedCents"`
-	ActiveGoals    int       `json:"activeGoals"`
-	UpdatedAt      time.Time `json:"updatedAt"`
+	UserID          string    `json:"userId"`
+	AvailableCents  int64     `json:"availableCents"`
+	TotalSavedCents int64     `json:"totalSavedCents"`
+	ActiveGoals     int       `json:"activeGoals"`
+	UpdatedAt       time.Time `json:"updatedAt"`
 }
 
 // DataFetcher función abstracta que recupera los datos desde la fuente de verdad (DynamoDB).
@@ -76,4 +76,3 @@ func (s *DashboardCachedService) InvalidateUserCache(ctx context.Context, userID
 	prefix := domainCache.UserCachePrefix(s.env, userID)
 	return s.cache.DeletePrefix(ctx, prefix)
 }
-

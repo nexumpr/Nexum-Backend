@@ -70,4 +70,3 @@ func BudgetKeys(userID, period, category string) (pk, sk string) {
 func SessionKeys(tokenHash string) (pk, sk string) {
 	return PrefixSession + tokenHash, "METADATA"
 }
-

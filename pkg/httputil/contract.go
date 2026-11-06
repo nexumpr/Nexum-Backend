@@ -170,4 +170,3 @@ func (ym YearMonth) Validate() error {
 	}
 	return nil
 }
-

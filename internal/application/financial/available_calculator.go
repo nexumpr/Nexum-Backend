@@ -6,12 +6,12 @@ import (
 
 // MonthlyFinancialSummary contiene los componentes del cálculo de disponible del mes (A-070 §2.3).
 type MonthlyFinancialSummary struct {
-	IncomeEquivalentCents      int64 // Total de ingresos mensuales equivalentes
+	IncomeEquivalentCents       int64 // Total de ingresos mensuales equivalentes
 	RecurringFixedEstimateCents int64 // Estimación mensual de gastos fijos recurrentes programados
-	PaidRecurringFixedCents    int64 // Gastos fijos recurrentes que YA fueron pagados y registrados este mes
-	OneTimeFixedCents          int64 // Gastos fijos no recurrentes (puntuales del mes)
-	AntExpensesCents           int64 // Gastos variables u hormiga efectuados en el mes
-	GoalReservationsCents      int64 // Total aportado o reservado a metas en el mes
+	PaidRecurringFixedCents     int64 // Gastos fijos recurrentes que YA fueron pagados y registrados este mes
+	OneTimeFixedCents           int64 // Gastos fijos no recurrentes (puntuales del mes)
+	AntExpensesCents            int64 // Gastos variables u hormiga efectuados en el mes
+	GoalReservationsCents       int64 // Total aportado o reservado a metas en el mes
 }
 
 // CalculateAvailableV6 calcula el disponible financiero mensual según la especificación V6 (A-070 §2.3, AC-A-070-02).

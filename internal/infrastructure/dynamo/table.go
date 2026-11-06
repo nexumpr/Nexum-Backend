@@ -290,4 +290,3 @@ func (t *DynamoTable) TransactWriteItems(ctx context.Context, actions []Transact
 
 	return nil
 }
-

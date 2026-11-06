@@ -12,16 +12,16 @@ import (
 
 // ServerConfig encapsula la parametrización de red y timeouts del servidor HTTP (A-030 §2.2).
 type ServerConfig struct {
-	Port               int
-	ReadHeaderTimeout  time.Duration
-	ReadTimeout        time.Duration
-	WriteTimeout       time.Duration
-	IdleTimeout        time.Duration
-	MaxBodyBytes       int64
-	EnableTLS          bool
-	CORSOptions        middleware.CORSOptions
-	RateLimitMaxReq    int
-	RateLimitWindow    time.Duration
+	Port              int
+	ReadHeaderTimeout time.Duration
+	ReadTimeout       time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
+	MaxBodyBytes      int64
+	EnableTLS         bool
+	CORSOptions       middleware.CORSOptions
+	RateLimitMaxReq   int
+	RateLimitWindow   time.Duration
 }
 
 // DefaultServerConfig genera los valores iniciales auditados de A-030 §2.2.
@@ -101,4 +101,3 @@ func (s *HTTPServer) Shutdown(ctx context.Context) error {
 	// 2. Drenar conexiones in-flight
 	return s.httpServer.Shutdown(ctx)
 }
-

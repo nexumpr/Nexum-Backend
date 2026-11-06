@@ -29,12 +29,12 @@ type SplitResult struct {
 
 // DistributeEquitably divide un monto en centavos de forma equitativa entre las metas provistas (A-070 §2.5, AC-A-070-01).
 // Reglas:
-// 1. Ordenamiento determinista estable por GoalID para evitar diferencias entre nodos.
-// 2. Manejo de fracciones indivisibles de centavos: los centavos sobrantes (ej: 2 centavos entre 3 metas)
-//    se asignan de a 1 centavo a las primeras metas según el orden estable.
-// 3. Saturación de metas: ninguna meta recibe más de su RemainingCents. El excedente se redistribuye
-//    entre las metas restantes que aún tengan capacidad.
-// 4. Si todas las metas alcanzan su target y aún sobra monto, el sobrante se reporta en UndistributedCents.
+//  1. Ordenamiento determinista estable por GoalID para evitar diferencias entre nodos.
+//  2. Manejo de fracciones indivisibles de centavos: los centavos sobrantes (ej: 2 centavos entre 3 metas)
+//     se asignan de a 1 centavo a las primeras metas según el orden estable.
+//  3. Saturación de metas: ninguna meta recibe más de su RemainingCents. El excedente se redistribuye
+//     entre las metas restantes que aún tengan capacidad.
+//  4. Si todas las metas alcanzan su target y aún sobra monto, el sobrante se reporta en UndistributedCents.
 func DistributeEquitably(totalCents int64, goals []GoalTarget) (*SplitResult, error) {
 	if totalCents < 0 {
 		return nil, errors.New("el monto a distribuir no puede ser negativo")

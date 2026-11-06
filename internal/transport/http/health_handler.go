@@ -118,4 +118,3 @@ func (hr *HealthRegistry) ReadyHandler() http.HandlerFunc {
 		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
-

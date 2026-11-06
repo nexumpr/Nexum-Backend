@@ -132,4 +132,3 @@ func (h *Argon2Hasher) VerifyPassword(password, encodedHash string) (bool, error
 
 	return false, ports.ErrInvalidPassword
 }
-
