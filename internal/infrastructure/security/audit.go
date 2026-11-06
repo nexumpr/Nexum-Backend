@@ -71,3 +71,4 @@ func ValidateReleaseGate(manifest ReleaseManifest) error {
 	}
 	return nil
 }
+
