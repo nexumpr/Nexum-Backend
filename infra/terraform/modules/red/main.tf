@@ -20,10 +20,11 @@
 locals {
   nombre = "${var.proyecto}-${var.entorno}"
 
-  # Subredes derivadas: mismas bits para todas, índices distintos -> nunca se
-  # solapan y siempre están contenidas en la VPC.
+  # Subredes derivadas con índices 0 y 1: mismas bits para ambas, contenidas en
+  # la VPC y nunca solapadas. El prefijo final se acota a /20../27 (ver
+  # validacion_red): el ALB exige /27 como mínimo y AWS reserva 5 direcciones.
   subredes = { for indice, az in var.zonas : az => {
-    cidr = cidrsubnet(var.cidr_vpc, var.bits_subredes, 10 + indice)
+    cidr = cidrsubnet(var.cidr_vpc, var.bits_subredes, indice)
     az   = az
   } }
 
@@ -35,6 +36,35 @@ locals {
     secretsmanager = "com.amazonaws.${var.region}.secretsmanager"
     ssm            = "com.amazonaws.${var.region}.ssm"
     ssmmessages    = "com.amazonaws.${var.region}.ssmmessages"
+  }
+}
+
+# Validaciones cruzadas entre variables. Se usan preconditions (compatibles con
+# Terraform 1.4+) en lugar de referencias entre `validation` blocks, que exigirían
+# Terraform 1.9.
+resource "terraform_data" "validacion_red" {
+  input = "${var.cidr_vpc}|${var.bits_subredes}|${join(",", var.zonas)}"
+
+  lifecycle {
+    precondition {
+      condition     = tonumber(split("/", var.cidr_vpc)[1]) + var.bits_subredes <= 27
+      error_message = "El ALB exige subredes de al menos /27 (8 direcciones libres; AWS reserva 5)."
+    }
+
+    precondition {
+      condition     = tonumber(split("/", var.cidr_vpc)[1]) + var.bits_subredes >= 20
+      error_message = "Subredes mayores de /20 desperdician espacio; reduce bits_subredes."
+    }
+
+    precondition {
+      condition     = alltrue([for az in var.zonas : startswith(az, var.region)])
+      error_message = "Cada zona debe pertenecer a var.region."
+    }
+
+    precondition {
+      condition     = length(distinct(var.zonas)) == 2
+      error_message = "Se exigen 2 zonas distintas."
+    }
   }
 }
 

@@ -271,3 +271,11 @@
 - Subredes derivadas con `cidrsubnet`; validacion RFC1918 real; zonas coherentes con la region.
 - Pruebas: 33 estaticas Terraform + 18 de permisos; fmt/init/validate PASS. Sin AWS.
 - Dependencia obligatoria registrada: el mecanismo de secretos (cache EBS + ventanas) debe demostrarse en I-020/I-060 antes de desplegar.
+
+### I-010 cierre final (2026-11-06)
+
+- Subredes derivadas con indices 0 y 1; prefijo final /20../27 (ALB exige 8 libres; AWS reserva 5). `/28` rechazado.
+- Validaciones cruzadas en `terraform_data` preconditions; `required_version` >= 1.4.0, < 2.0.0 (no se declara compatibilidad con 1.6 si se usan preconditions de 1.4: si, es compatible).
+- `.terraform.lock.hcl` versionado (aws 5.100.0); `.terraform/` y tfstate excluidos.
+- 43 pruebas Terraform + 18 permisos + 167 FinOps; fmt/init/validate PASS. Sin AWS.
+- Dependencia bloqueante de despliegue: demostrar el mecanismo de secretos (I-020/I-060).

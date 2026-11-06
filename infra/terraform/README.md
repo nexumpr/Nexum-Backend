@@ -121,3 +121,21 @@ terraform validate
 
 `.terraform/`, `*.tfstate*` y `*.tfvars` reales están excluidos por `.gitignore`. El módulo no crea
 recursos hasta que exista un Gate de despliegue con autorización específica.
+
+
+## 10. Capacidad de subredes y versiones (auditoría final)
+
+- Subredes **derivadas** con `cidrsubnet(var.cidr_vpc, var.bits_subredes, indice)` usando índices
+  **0 y 1**: contención y ausencia de solape por construcción (antes 10 y 11, que limitaban los bits
+  útiles).
+- Política de tamaño: prefijo final entre **/20 y /27**. `/27` es el mínimo adoptado porque el ALB
+  exige 8 direcciones libres y AWS reserva 5 por subred (32 − 5 = 27 utilizables); `/28` se rechaza
+  por política de escalado. Con la VPC `/16` por defecto, `bits_subredes` 4..11 produce de `/20` a `/27`.
+- Las validaciones cruzadas entre variables (prefijo final y coherencia AZ/región) se implementan con
+  `terraform_data` + `lifecycle.precondition`, compatibles con Terraform **1.4+**; no se usan
+  referencias entre bloques `validation` (requerirían 1.9). `required_version = ">= 1.4.0, < 2.0.0"`.
+- `.terraform.lock.hcl` se versiona para reproducibilidad (aws ~> 5.60, resuelto 5.100.0). `.terraform/`
+  y los estados siguen excluidos.
+- Capacidad: /24 por AZ (251 utilizables) cubre ALB (1 IP por AZ y escalado), 1 EC2, 4 ENI de interface
+  endpoints y la ENI que crea CloudFront para el VPC Origin. Las direcciones realmente libres sólo se
+  confirman en el despliegue autorizado (`NOT_RUN_AWS`).

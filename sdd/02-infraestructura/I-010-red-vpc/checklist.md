@@ -68,3 +68,12 @@
 - [x] Pruebas negativas de permisos Terraform.
 - [ ] Conectividad AWS real — NOT_RUN_AWS (sin despliegue).
 - [ ] Mecanismo de secretos demostrado (arranque, rotacion, recuperacion) — dependencia obligatoria de I-020/I-060.
+
+### Correccion final — capacidad y versionado
+
+- [x] Subredes derivadas con indices 0/1 y prefijo final acotado a /27.
+- [x] `/28` rechazado por politica; `/27` aceptado; `/24` por defecto.
+- [x] Validaciones cruzadas compatibles con Terraform >= 1.4 (preconditions).
+- [x] Lock file versionado para reproducibilidad.
+- [x] 43 pruebas estaticas OK; fmt/init/validate PASS.
+- [ ] Direcciones libres reales y conectividad — NOT_RUN_AWS.

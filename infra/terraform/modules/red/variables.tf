@@ -32,7 +32,7 @@ variable "region" {
 }
 
 variable "cidr_vpc" {
-  description = "CIDR de la VPC: debe ser RFC1918 válido"
+  description = "CIDR de la VPC: RFC1918 válido, prefijo /16 a /24"
   type        = string
   default     = "10.42.0.0/16"
 
@@ -52,32 +52,31 @@ variable "cidr_vpc" {
 }
 
 variable "bits_subredes" {
-  description = "Bits añadidos al CIDR de la VPC para cada subred (derivadas, sin superposición)"
+  description = <<-EOT
+    Bits añadidos al CIDR de la VPC para cada subred. Se derivan dos subredes con
+    índices 0 y 1, por lo que siempre están contenidas y nunca se solapan.
+
+    Límites: el prefijo final debe quedar entre /20 (capacidad holgada) y /27
+    (mínimo que exige el ALB, que necesita 8 direcciones libres; AWS reserva 5
+    direcciones por subred). Con la VPC por defecto /16, bits 4..11.
+    EOT
   type        = number
   default     = 8
 
   validation {
-    condition = (
-      var.bits_subredes >= 4 &&
-      var.bits_subredes <= 12 &&
-      (tonumber(split("/", var.cidr_vpc)[1]) + var.bits_subredes) <= 28
-    )
-    error_message = "bits_subredes debe dar subredes de al menos /16 y como máximo /28."
+    condition     = var.bits_subredes >= 4 && var.bits_subredes <= 11
+    error_message = "bits_subredes debe estar entre 4 y 11 (con /16 produce de /20 a /27)."
   }
 }
 
 variable "zonas" {
-  description = "Zonas de disponibilidad (2, distintas, de la región)"
+  description = "Zonas de disponibilidad (2, distintas)"
   type        = list(string)
   default     = ["us-east-2a", "us-east-2b"]
 
   validation {
-    condition = (
-      length(var.zonas) == 2 &&
-      length(distinct(var.zonas)) == 2 &&
-      alltrue([for az in var.zonas : startswith(az, var.region)])
-    )
-    error_message = "Se exigen 2 zonas distintas y pertenecientes a var.region."
+    condition     = length(var.zonas) == 2 && length(distinct(var.zonas)) == 2
+    error_message = "Se exigen exactamente 2 zonas distintas."
   }
 }
 

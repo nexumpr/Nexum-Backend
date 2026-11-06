@@ -6,6 +6,7 @@ Complementa —no sustituye— `terraform validate`.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import re
 import sys
@@ -78,10 +79,6 @@ class Red(unittest.TestCase):
         self.assertIn('"^192', variables)
         self.assertIn(">= 16", variables)
         self.assertIn("<= 24", variables)
-
-    def test_cidr_validado_original_reemplazado(self) -> None:
-        # Test heredado: ya no aplica la comprobación por prefijo simple.
-        self.assertTrue(True)
 
     def test_internet_gateway_para_vpc_origins(self) -> None:
         self.assertIn('resource "aws_internet_gateway" "principal"', self.main)
@@ -258,6 +255,82 @@ class ConectividadAWS(unittest.TestCase):
 
     def test_iam_no_se_define_aqui(self) -> None:
         self.assertNotIn('resource "aws_iam_', self.main)
+
+
+class CapacidadSubredes(unittest.TestCase):
+    """Reproduce `cidrsubnet` y las cotas reales de tamaño exigidas por el ALB."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.main = _leer(MODULO / "main.tf")
+        cls.variables = _leer(MODULO / "variables.tf")
+
+    def _subred(self, vpc: str, bits: int, indice: int) -> ipaddress.IPv4Network:
+        red = ipaddress.ip_network(vpc, strict=True)
+        nueva = red.prefixlen + bits
+        tamano = 1 << (32 - nueva)
+        base = int(red.network_address) + indice * tamano
+        return ipaddress.ip_network((base, nueva), strict=False)
+
+    def test_vpc_por_defecto_da_dos_barrios_24(self) -> None:
+        a = self._subred("10.42.0.0/16", 8, 0)
+        b = self._subred("10.42.0.0/16", 8, 1)
+        self.assertEqual(str(a), "10.42.0.0/24")
+        self.assertEqual(str(b), "10.42.1.0/24")
+        self.assertFalse(a.overlaps(b))
+        self.assertTrue(a.subnet_of(ipaddress.ip_network("10.42.0.0/16")))
+
+    def test_barrio_27_es_minimo_aceptado(self) -> None:
+        red = self._subred("10.42.0.0/16", 11, 1)
+        self.assertEqual(red.prefixlen, 27)
+        self.assertGreaterEqual(red.num_addresses - 5, 8, "AWS reserva 5 direcciones")
+
+    def test_barrio_28_rechazado_por_politica_de_escalado(self) -> None:
+        # AWS exige 8 IP libres; /27 es el minimo recomendado para que el ALB
+        # pueda escalar. El modulo adopta /27 como politica explicita.
+        red28 = self._subred("10.42.0.0/16", 12, 0)
+        red27 = self._subred("10.42.0.0/16", 11, 0)
+        self.assertEqual(red28.prefixlen, 28)
+        self.assertEqual(red27.prefixlen, 27)
+        self.assertGreaterEqual(red27.num_addresses - 5, 8)
+        self.assertGreater(red27.num_addresses, red28.num_addresses)
+        self.assertIn("<= 27", self.main)
+
+    def test_hcl_rechaza_barrio_28(self) -> None:
+        self.assertIn("<= 27", self.main)
+        self.assertIn("de al menos /27", self.main)
+        self.assertRegex(self.variables, r"bits_subredes <= 11")
+
+    def test_hcl_rechaza_barrios_gigantes(self) -> None:
+        self.assertIn(">= 20", self.main)
+        self.assertRegex(self.variables, r"bits_subredes >= 4")
+
+    def test_hcl_usa_indices_cero_y_uno(self) -> None:
+        self.assertIn("cidrsubnet(var.cidr_vpc, var.bits_subredes, indice)", self.main)
+        self.assertNotIn("10 + indice", self.main)
+
+    def test_zonas_coherentes_con_region_en_precondition(self) -> None:
+        self.assertIn("startswith(az, var.region)", self.main)
+
+    def test_rfc1918_obligatorio(self) -> None:
+        for prefijo in ("^10", "^172", "^192"):
+            self.assertIn(prefijo, self.variables)
+
+    def test_rangos_no_privados_se_rechazan(self) -> None:
+        patrones = [r"^10\.", r"^172\.(1[6-9]|2[0-9]|3[01])\.", r"^192\.168\."]
+        for cidr in ("8.8.0.0/16", "172.15.0.0/16", "172.32.0.0/16", "192.169.0.0/16"):
+            self.assertFalse(any(re.match(patron, cidr) for patron in patrones), cidr)
+
+    def test_zonas_duplicadas_rechazadas(self) -> None:
+        self.assertIn("length(distinct(var.zonas)) == 2", self.variables)
+        self.assertIn("length(distinct(var.zonas)) == 2", self.main)
+
+    def test_indices_siempre_validos_y_sin_solape(self) -> None:
+        for bits in range(4, 12):
+            a = self._subred("10.42.0.0/16", bits, 0)
+            b = self._subred("10.42.0.0/16", bits, 1)
+            self.assertFalse(a.overlaps(b), bits)
+            self.assertEqual(a.prefixlen, 16 + bits)
 
 
 if __name__ == "__main__":

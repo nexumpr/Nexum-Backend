@@ -96,3 +96,12 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - D) Permisos: `terraform init -backend=false` permitido; denies especificos y pruebas negativas (plan/apply/destroy/import/state y variantes de init).
 - `terraform fmt` PASS, `terraform init -backend=false` OK, `terraform validate` Success, 33 pruebas estaticas OK.
 - Sin recursos AWS, sin plan, sin apply.
+
+### Correccion final — capacidad, version y lock (2026-11-06)
+
+- Subredes con indices 0 y 1; politica /20../27 (ALB exige 8 libres, AWS reserva 5).
+- Validaciones cruzadas movidas a `terraform_data` preconditions (Terraform >= 1.4); `required_version` = >= 1.4.0, < 2.0.0.
+- `.terraform.lock.hcl` versionado (aws 5.100.0); `.terraform/` y estado excluidos.
+- Pruebas: 43 estaticas (incluye /24, /27, /28 rechazado, RFC1918, solape, AZ duplicadas).
+- `terraform fmt` PASS, `terraform init -backend=false` OK, `terraform validate` Success.
+- NOT_RUN_AWS: direcciones libres y conectividad real solo se comprueban al desplegar.
