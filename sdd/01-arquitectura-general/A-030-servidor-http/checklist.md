@@ -36,3 +36,13 @@
 | Pruebas Go / HTTP reales | NOT_RUN | Solo tras implementación H08 |
 | AWS/Redis/2 instancias/despliegue real | NOT_RUN | Se concretan H05, se ejecutan H08 |
 | Costo cero y permisos de cuenta AWS | PENDIENTE H05 | Bloquea H05 si no viable |
+
+### Hotfix D-01 — verificacion
+
+- [x] El ejecutable abre un listener real y permanece activo.
+- [x] `GET /health` 200; `/api/v1/desconocida` 404; metodo no permitido 405.
+- [x] Puerto ocupado devuelve error explicito (no exito falso).
+- [x] Apagado controlado con `Shutdown` y liberacion del puerto.
+- [x] `gofmt`, `go build`, `go vet`, `go test ./...` PASS.
+- [ ] Senales SIGTERM reales en Linux — NOT_RUN_LINUX.
+- [ ] Rutas normativas `/api/v1/health/live|ready` — fuera de alcance (A-090).

@@ -297,3 +297,10 @@
 - Defecto D-01 detectado y documentado (no corregido por alcance): `/api/v1/health/live` y `/ready` no estan registrados en el router Go; solo existe el handler. Bloquea I-030 y el despliegue.
 - RFC-004 ampliado (IAM, rotacion, auditoria, SSE-S3, costes, compromiso) y sigue PROPUESTO. Bloqueo de despliegue vigente.
 - Pruebas: 76 Terraform, 11 systemd, 167 FinOps, 18 permisos; fmt/init/validate PASS.
+
+### Hotfix H08-A/A-030 — runtime HTTP (2026-11-06)
+
+- Gate `GATE_H08A_HOTFIX_A030_RUNTIME` aprobado por frase humana; base `main` 10f6327; rama `fix/h08a-a030-runtime-http`.
+- `cmd/server/main.go` ahora compone Router+HTTPServer, arranca `Start()` en goroutine, escucha SIGINT/SIGTERM y ejecuta `Shutdown` con 15 s; exit 1 en fallo de escucha o de apagado.
+- Prueba de regresion real: socket efimero, /health 200, /api/v1/unknown 404, POST 405, puerto ocupado con error, shutdown libera el puerto.
+- A-090 sigue pendiente (rutas normativas y HealthRegistry); I-020 bootstrap dependera de ese hotfix para su curl de liveness.
