@@ -1,0 +1,11 @@
+# Todos los documentos de SDD usan finales LF, incluso desde Windows con core.autocrlf=true.
+# El SHA-256 mide los bytes desplegados realmente en GitHub Actions.
+*.md text eol=lf
+*.py text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.csv text eol=lf
+*.txt text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf

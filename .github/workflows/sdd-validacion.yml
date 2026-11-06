@@ -15,7 +15,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Verificar baseline SDD sin dependencias adicionales
-        run: python3 herramientas/validar_sdd_integral.py
-      - name: Verificar contrato H06
+      - name: Integridad integral y rutas rastreadas en Git
+        run: python3 herramientas/validar_sdd_integral.py --check-git
+      - name: Contratos OpenAPI H06
         run: python3 sdd/03-endpoints/herramientas/validar_h06.py
+      - name: Pruebas de integridad negativas y de estructura
+        run: python3 -m unittest discover -s herramientas/tests -v
