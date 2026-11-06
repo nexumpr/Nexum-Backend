@@ -199,6 +199,26 @@ class PreciosDesconocidos(unittest.TestCase):
             ruta.unlink(missing_ok=True)
 
 
+class CoberturaModelada(unittest.TestCase):
+    def test_ambas_coberturas_se_informan(self) -> None:
+        catalogo = modelo_costos.cargar_precios(RUTA_PRECIOS)
+        resumen = modelo_costos.calcular_todo(catalogo, "120", "0.10", False, True)
+        self.assertEqual(resumen["financiero"]["creditos_requeridos_usd"], "86.9473")
+        self.assertEqual(resumen["financiero"]["costo_bruto_verificado_usd"], "79.0430")
+        self.assertEqual(resumen["financiero_modelado"]["creditos_requeridos_usd"], "92.4473")
+        self.assertEqual(resumen["financiero_modelado"]["costo_bruto_calculado_usd"], "84.0430")
+        self.assertEqual(resumen["financiero_modelado"]["cobertura_creditos"], "TOTAL")
+
+    def test_plan_free_verificado_elimina_riesgo_de_cobro(self) -> None:
+        catalogo = modelo_costos.cargar_precios(RUTA_PRECIOS)
+        con_plan = modelo_costos.calcular_todo(catalogo, "120", "0.10", False, True)
+        sin_plan = modelo_costos.calcular_todo(catalogo, "120", "0.10", False, False)
+        self.assertFalse(con_plan["financiero"]["riesgo_cobro_personal"])
+        self.assertTrue(sin_plan["financiero"]["riesgo_cobro_personal"])
+        for resumen in (con_plan, sin_plan):
+            self.assertTrue(resumen["financiero"]["riesgo_interrupcion_servicio"])
+
+
 class CoberturaDeCreditos(unittest.TestCase):
     def test_cobertura_total(self) -> None:
         fin = modelo_costos.calcular_cobertura("84.0000", "84.0000", "120")
@@ -237,7 +257,8 @@ class CoberturaDeCreditos(unittest.TestCase):
         self.assertEqual(fin["politica_gasto_personal"], "CERO")
         self.assertEqual(fin["desembolso_personal_autorizado_usd"], "0.0000")
         self.assertTrue(fin["riesgo_cobro_personal"])
-        self.assertIn("no elimina", fin["nota_riesgo"])
+        self.assertTrue(fin["riesgo_interrupcion_servicio"])
+        self.assertIn("riesgo de cobro se declara presente", fin["nota_riesgo"])
 
     def test_declarados_y_verificados_se_informan_por_separado(self) -> None:
         fin = modelo_costos.calcular_cobertura("84.0000", "84.0000", "120", "120")

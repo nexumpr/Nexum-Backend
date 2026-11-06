@@ -104,11 +104,13 @@ class EvidenciaReal(unittest.TestCase):
         for esperado in (
             "IMPUESTOS_NO_DETERMINADOS",
             "VPC_ORIGIN_NO_CONFIRMADO",
-            "COSTO_OBSERVADO_NO_VERIFICADO",
-            "RIESGO_COBRO_PERSONAL",
             "TLS_NO_RESUELTO",
         ):
             self.assertIn(esperado, codigos, decision["motivos"])
+        # El plan Free verificado elimina el riesgo de cobro y el costo
+        # observado pasa a control recurrente segun el Gate.
+        self.assertNotIn("RIESGO_COBRO_PERSONAL", codigos)
+        self.assertNotIn("COSTO_OBSERVADO_NO_VERIFICADO", codigos)
         # Con 22 precios verificados y 3 partidas sin cargo documentadas, los
         # precios ya no bloquean: el bruto verificado es calculable.
         self.assertNotIn("PRECIOS_NO_VERIFICADOS", codigos, decision["motivos"])
@@ -121,9 +123,45 @@ class EvidenciaReal(unittest.TestCase):
         self.assertEqual(fin["partidas_sin_verificar"], [])
         self.assertEqual(fin["cobertura_creditos"], "TOTAL")
         self.assertEqual(fin["impuestos"], "UNKNOWN")
-        self.assertTrue(fin["riesgo_cobro_personal"])
+        self.assertFalse(fin["riesgo_cobro_personal"])
+        self.assertTrue(fin["riesgo_interrupcion_servicio"])
         self.assertEqual(fin["politica_gasto_personal"], "CERO")
         self.assertLess(float(fin["creditos_requeridos_usd"]), 120.0)
+
+    def test_cobertura_modelada_con_margen(self) -> None:
+        decision = viabilidad.evaluar(EVIDENCIA_REAL, PRECIOS, TOPOLOGIA, hoy=HOY)
+        modelada = decision["cobertura_modelada"]
+        self.assertEqual(modelada["costo_bruto_modelado_usd"], "84.0430")
+        self.assertEqual(modelada["creditos_requeridos_usd"], "92.4473")
+        self.assertEqual(modelada["cobertura_creditos"], "TOTAL")
+        self.assertEqual(modelada["importe_sin_cobertura_usd"], "0.0000")
+
+    def test_matriz_gate_clasifica_condiciones(self) -> None:
+        decision = viabilidad.evaluar(EVIDENCIA_REAL, PRECIOS, TOPOLOGIA, hoy=HOY)
+        por_condicion = {m["condicion"]: m for m in decision["matriz_gate"]}
+        self.assertEqual(por_condicion["Impuestos / IVA"]["clasificacion"], "BLOQUEO_REAL")
+        self.assertEqual(
+            por_condicion["Elegibilidad de CloudFront VPC Origins"]["clasificacion"],
+            "VERIFICACION_DIFERIDA_A_FASE_POSTERIOR",
+        )
+        self.assertEqual(
+            por_condicion["TLS extremo a extremo CloudFront->ALB"]["clasificacion"],
+            "CUMPLIDA_CONDICIONADA_A_APROBACION",
+        )
+        self.assertEqual(
+            por_condicion["Riesgo de cobro personal"]["clasificacion"], "CUMPLIDA_CON_EVIDENCIA"
+        )
+        self.assertEqual(
+            por_condicion["Costo observado facturado"]["clasificacion"],
+            "VERIFICACION_DIFERIDA_A_FASE_POSTERIOR",
+        )
+        self.assertEqual(
+            por_condicion["Reservas de modelado no facturables (5.0000 USD)"]["clasificacion"],
+            "NO_APLICA_JUSTIFICADO",
+        )
+        self.assertEqual(decision["bloqueos_reales"], ["Impuestos / IVA"])
+        for entrada in decision["matriz_gate"]:
+            self.assertTrue(entrada["clausula"], entrada["condicion"])
 
     def test_creditos_verificados_vienen_de_aws(self) -> None:
         decision = viabilidad.evaluar(EVIDENCIA_REAL, PRECIOS, TOPOLOGIA, hoy=HOY)
@@ -196,7 +234,12 @@ class RequisitosBloqueantes(unittest.TestCase):
             )
         codigos = _codigos(decision)
         self.assertIn("CREDITOS_INSUFICIENTES", codigos)
-        self.assertIn("RIESGO_COBRO_PERSONAL", codigos)
+        # El plan sigue siendo FREE/ACTIVE: no hay cobro personal posible,
+        # pero el presupuesto no esta cubierto.
+        self.assertNotIn("RIESGO_COBRO_PERSONAL", codigos)
+        self.assertEqual(
+            decision["resumen_financiero"]["cobertura_creditos"], "PARCIAL"
+        )
 
     def test_creditos_cero_bloquean(self) -> None:
         datos = _evidencia_verificada()

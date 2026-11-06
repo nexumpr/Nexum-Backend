@@ -101,3 +101,31 @@ aprueba la excepción por decisión del agente: queda `TLS_NO_RESUELTO` hasta la
 I-000 no cierra e I-010 no inicia hasta que el responsable: (1) determine IVA, (2) acepte la opción
 TLS A o aporte dominio para B, (3) autorice la comprobación de elegibilidad de VPC Origins en fase de
 despliegue, (4) aporte evidencia de facturación o autorice Cost Explorer, y (5) firme el cierre.
+
+## 9. Garantía del plan Free (evidencia oficial, 2026-11-06)
+
+`docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-plans.html` establece:
+
+- El plan Free **"ensures you won't incur any charges"** durante su vigencia.
+- Termina a los **seis meses** o al **agotar los créditos**, lo que ocurra primero.
+- Al expirar, **la cuenta se cierra automáticamente** y se pierde acceso; AWS retiene el contenido
+  **90 días** antes de borrarlo.
+- Se actualiza a Paid **automáticamente** si se une AWS Organizations, se crea un landing zone de
+  Control Tower, se ingresa a AWS Partner Network, se firma un Professional Services o Enterprise
+  Agreement, se compra Skill Builder Team o se designa la cuenta HIPAA/SOC.
+- El plan Free **no da acceso** a servicios que podrían consumir créditos (Savings Plans, Reserved
+  Instances, ciertas ofertas de Marketplace).
+
+Consecuencias para I-000:
+
+1. Con plan `FREE/ACTIVE` verificado el **desembolso personal es nulo por diseño**: no hay cobro
+   posible, sólo consumo de créditos.
+2. El riesgo relevante es de **continuidad**: si el consumo real supera los 120 USD antes de 45 días,
+   la cuenta se cierra y el servicio se interrumpe.
+3. Ninguna configuración prevista (VPC, ALB, CloudFront, DynamoDB, Redis, Terraform) requiere
+   Organizations, Control Tower, APN, EA, Marketplace ni designación HIPAA/SOC; el diseño **no** debe
+   introducirlos y el Gate de despliegue debe verificarlo.
+4. IVA: no hay base gravable mientras no exista cargo; aun así no se imputa 0 % sin declaración fiscal
+   responsable (spec §8).
+5. Las cifras de cobertura se informan en dos escenarios: verificado 86.9473 y modelado 92.4473, ambos
+   por debajo de los 120 USD verificados.

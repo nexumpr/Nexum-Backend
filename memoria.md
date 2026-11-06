@@ -228,3 +228,11 @@
 - **Evidencia de despliegue:** ya no se autocertifica con `verificado_por_humano: true`; exige huella SHA-256 de la respuesta cruda, dos IDs con formato real de instancia en `running` y AZ distintas, y un documento de control con la frase `APRUEBO_DESPLIEGUE_VERIFICADO_AWS` que cite el archivo. Sigue `NOT_RUN`.
 - **TLS:** ADR con opciones A (HTTP privado CloudFront→ALB, gratis) y B (HTTPS hasta ALB, requiere dominio propio de pago); se recomienda A con aceptación formal. Pendiente de firma humana.
 - **Decisión:** `BLOCKED_FINOPS` con **5 motivos** (IVA, elegibilidad VPC Origins, costo observado, riesgo de cobro derivado y TLS). Pruebas FinOps: **149 OK**.
+
+### I-000 revisión 4 — cierre técnico (2026-11-06)
+
+- **Cobertura en dos escenarios:** A verificado 86.9473 USD y B modelado **92.4473** USD con 120 USD verificados; ambos `TOTAL`, sin importe sin cobertura.
+- **Plan Free (evidencia oficial):** AWS no admite cargos durante la vigencia; el riesgo de cobro personal pasa a `False` y el riesgo real es el **cierre automático de la cuenta** al agotar créditos o caducar (retención 90 días). Prohibido introducir Organizations, Control Tower, APN, EA, Marketplace o HIPAA/SOC.
+- **Reclasificaciones:** costo observado → control recurrente (no figura en la lista de cierre del Gate); VPC Origins y runtime → verificación diferida a I-020/I-030 por cláusula del Gate; TLS → condicionado a aceptación humana (spec §9).
+- **Matriz `matriz_gate`:** 15 condiciones con cláusula; **1 bloqueo real (IVA)**, 1 condicionada (TLS), 4 diferidas, 7 cumplidas, 1 no aplica.
+- **Documento único de decisión:** `sdd/_control/H08/DECISION_CIERRE_I000.md` (no declara el Gate aprobado). Pruebas FinOps: **153 OK**.

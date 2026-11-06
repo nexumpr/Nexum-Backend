@@ -238,6 +238,7 @@ def calcular_cobertura(
     creditos_declarados_usd: str | None = None,
     margen_seguridad: str = "0",
     impuestos_determinados: bool = False,
+    plan_free_verificado: bool = False,
 ) -> dict:
     """Separa bruto calculado/verificado, créditos y riesgo de cobro personal.
 
@@ -283,11 +284,17 @@ def calcular_cobertura(
         "impuestos": "DETERMINADO" if impuestos_determinados else "UNKNOWN",
         "politica_gasto_personal": POLITICA_GASTO_PERSONAL,
         "desembolso_personal_autorizado_usd": "0.0000",
-        "riesgo_cobro_personal": not (cobertura == "TOTAL" and impuestos_determinados),
+        # El plan Free de AWS no permite cargos durante su vigencia
+        # (docs.aws.amazon.com/.../free-tier-plans.html). Con el plan verificado
+        # FREE/ACTIVE el riesgo de cobro personal es estructuralmente nulo; el
+        # riesgo real pasa a ser el cierre de cuenta por agotamiento o caducidad.
+        "riesgo_cobro_personal": not plan_free_verificado,
+        "plan_free_verificado": plan_free_verificado,
+        "riesgo_interrupcion_servicio": True,
         "nota_riesgo": (
-            "La politica de gasto personal es cero; eso no elimina un importe pendiente. "
-            "riesgo_cobro_personal es True mientras la cobertura no sea TOTAL o los impuestos "
-            "no esten determinados."
+            "Con plan Free verificado no se generan cargos: el riesgo es el cierre automatico de "
+            "la cuenta al agotar creditos o caducar el plan, con perdida de acceso y retencion de "
+            "90 dias. Sin esa verificacion, el riesgo de cobro se declara presente."
         ),
     }
 
@@ -309,6 +316,7 @@ def calcular_todo(
     creditos_verificados_usd: str = "0",
     margen_seguridad: str = "0",
     impuestos_determinados: bool = False,
+    plan_free_verificado: bool = False,
 ) -> dict:
     """Calcula todos los escenarios y agrega la separación financiera."""
 
@@ -324,6 +332,19 @@ def calcular_todo(
         catalogo.get("creditos_declarados_usd"),
         margen_seguridad,
         impuestos_determinados,
+        plan_free_verificado,
+    )
+    # Escenario conservador: presupuesto modelado completo (incluye reservas de
+    # modelado no facturables). Se informa aparte para no mezclarlo con el
+    # bruto verificado.
+    financiero_modelado = calcular_cobertura(
+        seleccionado["total_bruto_45d_usd"],
+        seleccionado["total_bruto_45d_usd"],
+        creditos_verificados_usd,
+        catalogo.get("creditos_declarados_usd"),
+        margen_seguridad,
+        impuestos_determinados,
+        plan_free_verificado,
     )
     return {
         "version": "2.0.0",
@@ -332,6 +353,7 @@ def calcular_todo(
         "escenario_seleccionado": seleccionado["escenario"],
         "escenarios": resultados,
         "financiero": financiero,
+        "financiero_modelado": financiero_modelado,
         "nota": (
             "total_bruto_45d_usd es null cuando falta precio de una partida requerida; "
             "total_bruto_verificado_45d_usd es null cuando alguna partida requerida no es "
@@ -366,6 +388,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--creditos-verificados", default="0")
     parser.add_argument("--margen-seguridad", default="0")
     parser.add_argument("--impuestos-determinados", action="store_true")
+    parser.add_argument("--plan-free-verificado", action="store_true")
     parser.add_argument("--salida", type=Path, default=None, help="ruta JSON de salida")
     parser.add_argument("--texto", action="store_true", help="resumen legible en consola")
     args = parser.parse_args(argv)
@@ -376,6 +399,7 @@ def main(argv: list[str] | None = None) -> int:
         args.creditos_verificados,
         args.margen_seguridad,
         args.impuestos_determinados,
+        args.plan_free_verificado,
     )
     texto = json.dumps(resumen, indent=2, ensure_ascii=False, sort_keys=True)
     if args.salida:

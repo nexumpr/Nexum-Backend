@@ -37,6 +37,34 @@ ESTADO_IMPUESTOS_DETERMINADOS = "DETERMINADO"
 MARGEN_SEGURIDAD = "0.10"
 DIAS_REQUERIDOS = 45
 
+# Clasificaciones admitidas por el Gate H08-I para la matriz de cierre.
+CUMPLIDA_CON_EVIDENCIA = "CUMPLIDA_CON_EVIDENCIA"
+CUMPLIDA_CONDICIONADA = "CUMPLIDA_CONDICIONADA_A_APROBACION"
+VERIFICACION_DIFERIDA = "VERIFICACION_DIFERIDA_A_FASE_POSTERIOR"
+BLOQUEO_REAL = "BLOQUEO_REAL"
+NO_APLICA = "NO_APLICA_JUSTIFICADO"
+
+CLAUSULA_GATE_CIERRE = (
+    "Gate H08-I, 'Cierre de I-000': saldo, vigencia, precios exactos, SKU Redis, cuentas, "
+    "cuotas, impuestos/IVA, riesgos y presupuesto"
+)
+CLAUSULA_GATE_DIFERIDO = (
+    "Gate H08-I, 'NO autoriza': 2 EC2 reales, Redis OSS, DynamoDB, ALB/CloudFront HTTPS, IaC y "
+    "45 dias son obligaciones de Gates posteriores, no estados PASS"
+)
+CLAUSULA_SPEC_TLS = (
+    "spec I-000 seccion 9: I-030 plantea TLS de cliente en CloudFront con tramo HTTP privado ALB, "
+    "pendiente de aceptacion de seguridad; TLS extremo a extremo exige nombre/certificado y recotizar"
+)
+CLAUSULA_SPEC_VPC = (
+    "spec I-000 seccion 9: VPC Origins es compatible con Ohio y sin cargo adicional, pero "
+    "'aun debe confirmarse disponibilidad/permisos para el perfil Free particular'"
+)
+CLAUSULA_FREE = (
+    "docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-plans.html: el plan Free no "
+    "genera cargos durante su vigencia y la cuenta se cierra al agotar creditos o caducar"
+)
+
 
 def _cargar_evidencia(dir_evidencia: Path, identificador: str) -> dict | None:
     archivos = sorted(Path(dir_evidencia).glob(f"{identificador}_*.json"))
@@ -231,13 +259,12 @@ def _evaluar_costos(costos: dict | None) -> tuple[list[dict], list[str]]:
             )
         ], condiciones
     if costos.get("estado") != ESTADO_VERIFICADO:
-        motivos.append(
-            _motivo(
-                "COSTO_OBSERVADO_NO_VERIFICADO",
-                f"costo observado no verificado: {costos.get('motivo', costos.get('estado'))}",
-                "consola de facturacion (accion humana) o autorizacion especifica de "
-                "Cost Explorer",
-            )
+        condiciones.append(
+            "Costo observado no verificado "
+            f"({costos.get('motivo', costos.get('estado'))}): el Gate H08-I no lo incluye en la "
+            "lista de cierre (saldo, vigencia, precios, SKU Redis, cuentas, cuotas, IVA, riesgos y "
+            "presupuesto) y el plan Free no admite cargos; se trata como control recurrente de "
+            "operacion con verificacion diferida"
         )
     condiciones.append(
         "Cost Explorer tiene costo por solicitud (USD 0.01); su uso requiere aprobacion "
@@ -374,16 +401,143 @@ def _evaluar_financiero(
         motivos.append(
             _motivo(
                 "RIESGO_COBRO_PERSONAL",
-                "existe importe potencialmente sin cobertura o impuestos indeterminados; "
-                "la politica de gasto personal es cero, pero cero desembolso no es prueba "
-                "de que no haya cobro",
-                "cobertura TOTAL verificada e impuestos determinados",
+                "no se ha verificado un plan Free activo; con otro estado si puede haber cobro",
+                "verificar plan FREE/ACTIVE (aws freetier get-account-plan-state)",
             )
+        )
+    else:
+        condiciones.append(
+            "Plan Free verificado: AWS no permite cargos durante su vigencia "
+            "(docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-plans.html). "
+            "El riesgo vigente es el cierre automatico de la cuenta al agotar creditos o caducar "
+            "el plan (interrupcion de servicio y retencion de 90 dias), no un cobro."
         )
     condiciones.append(
         "Politica de gasto personal: CERO. No se contempla pago con fondos propios ni plan Paid"
     )
     return motivos, condiciones
+
+
+def construir_matriz_gate(
+    cuenta: dict | None,
+    servicios: dict | None,
+    costos: dict | None,
+    financiero: dict,
+    financiero_modelado: dict,
+    revision: dict,
+    resumen_costos: dict,
+) -> list[dict]:
+    """Clasifica cada condici?n de cierre con su cl?usula de respaldo.
+
+    No aprueba nada: s?lo ordena la evidencia para la decisi?n humana.
+    """
+
+    datos = (cuenta or {}).get("datos") or {}
+    matriz: list[dict] = []
+
+    def agregar(condicion: str, clasificacion: str, clausula: str, evidencia: str) -> None:
+        matriz.append(
+            {
+                "condicion": condicion,
+                "clasificacion": clasificacion,
+                "clausula": clausula,
+                "evidencia": evidencia,
+            }
+        )
+
+    agregar(
+        "Saldo de creditos",
+        CUMPLIDA_CON_EVIDENCIA if financiero["creditos_verificados_usd"] != "0.0000" else BLOQUEO_REAL,
+        CLAUSULA_GATE_CIERRE,
+        f"creditos verificados {financiero['creditos_verificados_usd']} USD via accountPlanRemainingCredits",
+    )
+    agregar(
+        "Vigencia del plan >= 45 dias",
+        CUMPLIDA_CON_EVIDENCIA if datos.get("fecha_expiracion") else BLOQUEO_REAL,
+        CLAUSULA_GATE_CIERRE,
+        f"expiracion {datos.get('fecha_expiracion')}",
+    )
+    agregar(
+        "Precios exactos de las partidas requeridas",
+        CUMPLIDA_CON_EVIDENCIA if not resumen_costos["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]["partidas_sin_verificar"] else BLOQUEO_REAL,
+        CLAUSULA_GATE_CIERRE,
+        "22 SKU VERIFIED_AWS + 3 partidas DOC_OFICIAL con precio 0 y fuente oficial",
+    )
+    agregar(
+        "SKU de Redis OSS",
+        CUMPLIDA_CON_EVIDENCIA if (servicios or {}).get("datos", {}).get("redis_oss_sku") else BLOQUEO_REAL,
+        CLAUSULA_GATE_CIERRE,
+        str((servicios or {}).get("datos", {}).get("redis_oss_sku")),
+    )
+    agregar(
+        "Cuotas de computo (2 instancias x 2 vCPU = 4)",
+        CUMPLIDA_CON_EVIDENCIA if ((servicios or {}).get("datos", {}).get("cuota_vcpu_on_demand") or 0) >= 4 else BLOQUEO_REAL,
+        CLAUSULA_GATE_CIERRE,
+        f"cuota observada {((servicios or {}).get('datos', {}) or {}).get('cuota_vcpu_on_demand')} vCPU",
+    )
+    agregar(
+        "Presupuesto con margen 10 %",
+        CUMPLIDA_CON_EVIDENCIA if financiero["cobertura_creditos"] == "TOTAL" else BLOQUEO_REAL,
+        CLAUSULA_GATE_CIERRE,
+        f"verificado {financiero['creditos_requeridos_usd']} <= {financiero['creditos_verificados_usd']}; "
+        f"modelado {financiero_modelado['creditos_requeridos_usd']}",
+    )
+    agregar(
+        "Reservas de modelado no facturables (5.0000 USD)",
+        NO_APLICA,
+        CLAUSULA_GATE_CIERRE,
+        "excluidas del bruto verificado e informadas por separado; no son cargo AWS",
+    )
+    agregar(
+        "Impuestos / IVA",
+        BLOQUEO_REAL if financiero["impuestos"] != "DETERMINADO" else CUMPLIDA_CON_EVIDENCIA,
+        CLAUSULA_GATE_CIERRE + "; spec I-000 seccion 8 (no asumir ni 0 ni cobro sin evidencia)",
+        "IVA no imputado; requiere declaracion fiscal responsable",
+    )
+    agregar(
+        "Riesgo de cobro personal",
+        CUMPLIDA_CON_EVIDENCIA if not financiero["riesgo_cobro_personal"] else BLOQUEO_REAL,
+        CLAUSULA_FREE,
+        "plan FREE/ACTIVE verificado: sin cargos durante la vigencia",
+    )
+    agregar(
+        "Riesgo de interrupcion por agotamiento o caducidad",
+        VERIFICACION_DIFERIDA,
+        CLAUSULA_FREE,
+        "vigilancia de creditos y respaldo antes del despliegue; no es cobro",
+    )
+    agregar(
+        "Elegibilidad de CloudFront VPC Origins",
+        VERIFICACION_DIFERIDA,
+        CLAUSULA_SPEC_VPC + "; " + CLAUSULA_GATE_DIFERIDO,
+        "requiere crear un VPC origin (mutante) en fase de despliegue",
+    )
+    agregar(
+        "TLS extremo a extremo CloudFront->ALB",
+        CUMPLIDA_CONDICIONADA,
+        CLAUSULA_SPEC_TLS,
+        "opcion A (HTTP privado) pendiente de aceptacion de seguridad; opcion B exige dominio",
+    )
+    agregar(
+        "Dos instancias reales simultaneas (runtime)",
+        VERIFICACION_DIFERIDA,
+        CLAUSULA_GATE_DIFERIDO,
+        f"diseno {revision['estado_diseno']}; runtime {revision['estado_despliegue']}",
+    )
+    agregar(
+        "Costo observado facturado",
+        VERIFICACION_DIFERIDA,
+        CLAUSULA_FREE + "; no figura en la lista de cierre del Gate",
+        str((costos or {}).get("motivo") or (costos or {}).get("estado")),
+    )
+    agregar(
+        "Actualizacion automatica a Paid por servicios no admitidos",
+        CUMPLIDA_CON_EVIDENCIA,
+        CLAUSULA_FREE,
+        "no se planea AWS Organizations, Control Tower, APN, EA, HIPAA/SOC ni Marketplace; "
+        "el plan Free bloquea Savings Plans y Reserved Instances",
+    )
+    return matriz
 
 
 def evaluar(
@@ -413,10 +567,21 @@ def evaluar(
         and str((cuenta.get("datos") or {}).get("impuestos", "UNKNOWN")).upper()
         == ESTADO_IMPUESTOS_DETERMINADOS
     )
+    plan_free_verificado = bool(
+        cuenta is not None
+        and cuenta.get("estado") == ESTADO_VERIFICADO
+        and str((cuenta.get("datos") or {}).get("plan", "")).upper() == "FREE"
+        and str((cuenta.get("datos") or {}).get("estado_plan", "")).upper() == "ACTIVE"
+    )
     resumen_costos = modelo_costos.calcular_todo(
-        catalogo, creditos_verificados, margen_seguridad, impuestos_determinados
+        catalogo,
+        creditos_verificados,
+        margen_seguridad,
+        impuestos_determinados,
+        plan_free_verificado,
     )
     financiero = resumen_costos["financiero"]
+    financiero_modelado = resumen_costos["financiero_modelado"]
 
     motivos: list[dict] = []
     condiciones: list[str] = []
@@ -473,6 +638,11 @@ def evaluar(
         f"{revision['estado_despliegue']} hasta que exista autorizacion de despliegue"
     )
 
+    matriz_gate = construir_matriz_gate(
+        cuenta, servicios, costos, financiero, financiero_modelado, revision, resumen_costos
+    )
+    bloqueos_reales = [m for m in matriz_gate if m["clasificacion"] == BLOQUEO_REAL]
+
     bloques_bloqueantes = len(motivos)
     estado = "VIABLE" if bloques_bloqueantes == 0 else "BLOCKED_FINOPS"
     escenario = resumen_costos["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
@@ -499,9 +669,18 @@ def evaluar(
             "politica_gasto_personal": financiero["politica_gasto_personal"],
             "desembolso_personal_autorizado_usd": financiero["desembolso_personal_autorizado_usd"],
             "riesgo_cobro_personal": financiero["riesgo_cobro_personal"],
+            "riesgo_interrupcion_servicio": financiero["riesgo_interrupcion_servicio"],
             "residual_apagado_usd": escenario["residual_apagado_usd"],
         },
         "revision_topologia": revision,
+        "matriz_gate": matriz_gate,
+        "bloqueos_reales": [m["condicion"] for m in bloqueos_reales],
+        "cobertura_modelada": {
+            "costo_bruto_modelado_usd": financiero_modelado["costo_bruto_calculado_usd"],
+            "creditos_requeridos_usd": financiero_modelado["creditos_requeridos_usd"],
+            "cobertura_creditos": financiero_modelado["cobertura_creditos"],
+            "importe_sin_cobertura_usd": financiero_modelado["importe_sin_cobertura_usd"],
+        },
         "nota": (
             "VIABLE exige cuenta Free verificada, vigencia de 45 dias, precios VERIFIED_AWS, "
             "cobertura TOTAL con margen, impuestos determinados y TLS resuelto; la ausencia "

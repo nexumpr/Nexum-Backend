@@ -1,9 +1,20 @@
 {
+  "bloqueos_reales": [
+    "Impuestos / IVA"
+  ],
+  "cobertura_modelada": {
+    "cobertura_creditos": "TOTAL",
+    "costo_bruto_modelado_usd": "84.0430",
+    "creditos_requeridos_usd": "92.4473",
+    "importe_sin_cobertura_usd": "0.0000"
+  },
   "condiciones": [
     "Vigencia declarada hasta 2027-05-04: cubre la ventana de 45 dias; no garantiza que los creditos no se agoten antes",
+    "Costo observado no verificado (Cost Explorer cobra por solicitud de API; requiere aprobacion humana especifica y no se ejecuto): el Gate H08-I no lo incluye en la lista de cierre (saldo, vigencia, precios, SKU Redis, cuentas, cuotas, IVA, riesgos y presupuesto) y el plan Free no admite cargos; se trata como control recurrente de operacion con verificacion diferida",
     "Cost Explorer tiene costo por solicitud (USD 0.01); su uso requiere aprobacion humana concreta",
     "El bruto verificado excluye reservas de modelado no facturables (CI_CD, RESERVA_CF): 5.0000 USD",
     "Partidas de reserva/supuesto no tarifarias incluidas: CI_CD, RESERVA_CF",
+    "Plan Free verificado: AWS no permite cargos durante su vigencia (docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-plans.html). El riesgo vigente es el cierre automatico de la cuenta al agotar creditos o caducar el plan (interrupcion de servicio y retencion de 90 dias), no un cobro.",
     "Politica de gasto personal: CERO. No se contempla pago con fondos propios ni plan Paid",
     "Uso del plan Free Tier no verificado (aws freetier get-free-tier-usage)",
     "Instancias y balanceo reales: verificacion runtime NOT_RUN hasta que exista autorizacion de despliegue"
@@ -11,6 +22,98 @@
   "escenario_evaluado": "C_CLOUDFRONT_VPC_ORIGIN_PRIVADO",
   "estado": "BLOCKED_FINOPS",
   "fecha_evaluacion": "2026-11-06",
+  "matriz_gate": [
+    {
+      "clasificacion": "CUMPLIDA_CON_EVIDENCIA",
+      "clausula": "Gate H08-I, 'Cierre de I-000': saldo, vigencia, precios exactos, SKU Redis, cuentas, cuotas, impuestos/IVA, riesgos y presupuesto",
+      "condicion": "Saldo de creditos",
+      "evidencia": "creditos verificados 120.0000 USD via accountPlanRemainingCredits"
+    },
+    {
+      "clasificacion": "CUMPLIDA_CON_EVIDENCIA",
+      "clausula": "Gate H08-I, 'Cierre de I-000': saldo, vigencia, precios exactos, SKU Redis, cuentas, cuotas, impuestos/IVA, riesgos y presupuesto",
+      "condicion": "Vigencia del plan >= 45 dias",
+      "evidencia": "expiracion 2027-05-04T01:22:26.960000+00:00"
+    },
+    {
+      "clasificacion": "CUMPLIDA_CON_EVIDENCIA",
+      "clausula": "Gate H08-I, 'Cierre de I-000': saldo, vigencia, precios exactos, SKU Redis, cuentas, cuotas, impuestos/IVA, riesgos y presupuesto",
+      "condicion": "Precios exactos de las partidas requeridas",
+      "evidencia": "22 SKU VERIFIED_AWS + 3 partidas DOC_OFICIAL con precio 0 y fuente oficial"
+    },
+    {
+      "clasificacion": "CUMPLIDA_CON_EVIDENCIA",
+      "clausula": "Gate H08-I, 'Cierre de I-000': saldo, vigencia, precios exactos, SKU Redis, cuentas, cuotas, impuestos/IVA, riesgos y presupuesto",
+      "condicion": "SKU de Redis OSS",
+      "evidencia": "cache.t4g.micro redis 7.1 (redis7)"
+    },
+    {
+      "clasificacion": "CUMPLIDA_CON_EVIDENCIA",
+      "clausula": "Gate H08-I, 'Cierre de I-000': saldo, vigencia, precios exactos, SKU Redis, cuentas, cuotas, impuestos/IVA, riesgos y presupuesto",
+      "condicion": "Cuotas de computo (2 instancias x 2 vCPU = 4)",
+      "evidencia": "cuota observada 16 vCPU"
+    },
+    {
+      "clasificacion": "CUMPLIDA_CON_EVIDENCIA",
+      "clausula": "Gate H08-I, 'Cierre de I-000': saldo, vigencia, precios exactos, SKU Redis, cuentas, cuotas, impuestos/IVA, riesgos y presupuesto",
+      "condicion": "Presupuesto con margen 10 %",
+      "evidencia": "verificado 86.9473 <= 120.0000; modelado 92.4473"
+    },
+    {
+      "clasificacion": "NO_APLICA_JUSTIFICADO",
+      "clausula": "Gate H08-I, 'Cierre de I-000': saldo, vigencia, precios exactos, SKU Redis, cuentas, cuotas, impuestos/IVA, riesgos y presupuesto",
+      "condicion": "Reservas de modelado no facturables (5.0000 USD)",
+      "evidencia": "excluidas del bruto verificado e informadas por separado; no son cargo AWS"
+    },
+    {
+      "clasificacion": "BLOQUEO_REAL",
+      "clausula": "Gate H08-I, 'Cierre de I-000': saldo, vigencia, precios exactos, SKU Redis, cuentas, cuotas, impuestos/IVA, riesgos y presupuesto; spec I-000 seccion 8 (no asumir ni 0 ni cobro sin evidencia)",
+      "condicion": "Impuestos / IVA",
+      "evidencia": "IVA no imputado; requiere declaracion fiscal responsable"
+    },
+    {
+      "clasificacion": "CUMPLIDA_CON_EVIDENCIA",
+      "clausula": "docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-plans.html: el plan Free no genera cargos durante su vigencia y la cuenta se cierra al agotar creditos o caducar",
+      "condicion": "Riesgo de cobro personal",
+      "evidencia": "plan FREE/ACTIVE verificado: sin cargos durante la vigencia"
+    },
+    {
+      "clasificacion": "VERIFICACION_DIFERIDA_A_FASE_POSTERIOR",
+      "clausula": "docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-plans.html: el plan Free no genera cargos durante su vigencia y la cuenta se cierra al agotar creditos o caducar",
+      "condicion": "Riesgo de interrupcion por agotamiento o caducidad",
+      "evidencia": "vigilancia de creditos y respaldo antes del despliegue; no es cobro"
+    },
+    {
+      "clasificacion": "VERIFICACION_DIFERIDA_A_FASE_POSTERIOR",
+      "clausula": "spec I-000 seccion 9: VPC Origins es compatible con Ohio y sin cargo adicional, pero 'aun debe confirmarse disponibilidad/permisos para el perfil Free particular'; Gate H08-I, 'NO autoriza': 2 EC2 reales, Redis OSS, DynamoDB, ALB/CloudFront HTTPS, IaC y 45 dias son obligaciones de Gates posteriores, no estados PASS",
+      "condicion": "Elegibilidad de CloudFront VPC Origins",
+      "evidencia": "requiere crear un VPC origin (mutante) en fase de despliegue"
+    },
+    {
+      "clasificacion": "CUMPLIDA_CONDICIONADA_A_APROBACION",
+      "clausula": "spec I-000 seccion 9: I-030 plantea TLS de cliente en CloudFront con tramo HTTP privado ALB, pendiente de aceptacion de seguridad; TLS extremo a extremo exige nombre/certificado y recotizar",
+      "condicion": "TLS extremo a extremo CloudFront->ALB",
+      "evidencia": "opcion A (HTTP privado) pendiente de aceptacion de seguridad; opcion B exige dominio"
+    },
+    {
+      "clasificacion": "VERIFICACION_DIFERIDA_A_FASE_POSTERIOR",
+      "clausula": "Gate H08-I, 'NO autoriza': 2 EC2 reales, Redis OSS, DynamoDB, ALB/CloudFront HTTPS, IaC y 45 dias son obligaciones de Gates posteriores, no estados PASS",
+      "condicion": "Dos instancias reales simultaneas (runtime)",
+      "evidencia": "diseno DESIGN_VALIDATED; runtime NOT_RUN"
+    },
+    {
+      "clasificacion": "VERIFICACION_DIFERIDA_A_FASE_POSTERIOR",
+      "clausula": "docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-plans.html: el plan Free no genera cargos durante su vigencia y la cuenta se cierra al agotar creditos o caducar; no figura en la lista de cierre del Gate",
+      "condicion": "Costo observado facturado",
+      "evidencia": "Cost Explorer cobra por solicitud de API; requiere aprobacion humana especifica y no se ejecuto"
+    },
+    {
+      "clasificacion": "CUMPLIDA_CON_EVIDENCIA",
+      "clausula": "docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-plans.html: el plan Free no genera cargos durante su vigencia y la cuenta se cierra al agotar creditos o caducar",
+      "condicion": "Actualizacion automatica a Paid por servicios no admitidos",
+      "evidencia": "no se planea AWS Organizations, Control Tower, APN, EA, HIPAA/SOC ni Marketplace; el plan Free bloquea Savings Plans y Reserved Instances"
+    }
+  ],
   "motivos": [
     {
       "codigo": "IMPUESTOS_NO_DETERMINADOS",
@@ -23,22 +126,12 @@
       "evidencia_requerida": "confirmacion en cuenta y prueba en fase autorizada"
     },
     {
-      "codigo": "COSTO_OBSERVADO_NO_VERIFICADO",
-      "detalle": "costo observado no verificado: Cost Explorer cobra por solicitud de API; requiere aprobacion humana especifica y no se ejecuto",
-      "evidencia_requerida": "consola de facturacion (accion humana) o autorizacion especifica de Cost Explorer"
-    },
-    {
-      "codigo": "RIESGO_COBRO_PERSONAL",
-      "detalle": "existe importe potencialmente sin cobertura o impuestos indeterminados; la politica de gasto personal es cero, pero cero desembolso no es prueba de que no haya cobro",
-      "evidencia_requerida": "cobertura TOTAL verificada e impuestos determinados"
-    },
-    {
       "codigo": "TLS_NO_RESUELTO",
       "detalle": "el tramo CloudFront->ALB es HTTP privado y no existe decision humana que lo acepte ni certificado extremo a extremo",
       "evidencia_requerida": "aceptacion documentada o recotizacion con ACM y nombre valido"
     }
   ],
-  "motivos_bloqueantes": 5,
+  "motivos_bloqueantes": 3,
   "nota": "VIABLE exige cuenta Free verificada, vigencia de 45 dias, precios VERIFIED_AWS, cobertura TOTAL con margen, impuestos determinados y TLS resuelto; la ausencia de errores o la existencia de creditos no eleva el estado",
   "resumen_financiero": {
     "cobertura_creditos": "TOTAL",
@@ -54,7 +147,8 @@
     "partidas_sin_verificar": [],
     "politica_gasto_personal": "CERO",
     "residual_apagado_usd": "6.8790",
-    "riesgo_cobro_personal": true
+    "riesgo_cobro_personal": false,
+    "riesgo_interrupcion_servicio": true
   },
   "revision_topologia": {
     "autocertificacion": [],

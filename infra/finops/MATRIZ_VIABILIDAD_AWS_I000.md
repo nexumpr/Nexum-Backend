@@ -1,7 +1,7 @@
 # Matriz de viabilidad AWS y Free Tier — I-000
 
 **Fecha:** 2026-11-06 (revisión 3) · **Región:** us-east-2 · **Pricing:** us-east-1
-**Decisión:** `BLOCKED_FINOPS` (5 motivos) · **Salida:** `infra/finops/resultados/viabilidad_i000.json`
+**Decisión:** `BLOCKED_FINOPS` (3 motivos; 1 bloqueo real) · **Salida:** `infra/finops/resultados/viabilidad_i000.json`
 **Recursos AWS creados:** ninguno · **Terraform ejecutado:** ninguno
 
 ## 1. Evidencia AWS obtenida (sólo lectura)
@@ -49,13 +49,28 @@
 | 16 | Red privada sin NAT + IGW para VPC Origins | `DESIGN_VALIDATED` |
 | 17 | HTTPS navegador→CloudFront | `DESIGN_VALIDATED` |
 
-## 3. Motivos del bloqueo (5)
+## 3. Motivos automáticos (3) y clasificación de Gate
 
-1. `IMPUESTOS_NO_DETERMINADOS` — no se asume IVA 0 %.
-2. `VPC_ORIGIN_NO_CONFIRMADO` — elegibilidad no acreditada por un listado; requiere operación mutante autorizada.
-3. `COSTO_OBSERVADO_NO_VERIFICADO` — Cost Explorer no ejecutado por su costo por solicitud.
-4. `RIESGO_COBRO_PERSONAL` — consecuencia de (1): cobertura `TOTAL` no elimina el riesgo mientras el impuesto sea desconocido.
-5. `TLS_NO_RESUELTO` — tramo CloudFront→ALB en HTTP privado sin aceptación humana documentada.
+| Motivo | Clasificación (`matriz_gate`) | Base |
+|---|---|---|
+| `IMPUESTOS_NO_DETERMINADOS` | **BLOQUEO_REAL** | Gate "Cierre de I-000" incluye impuestos/IVA |
+| `VPC_ORIGIN_NO_CONFIRMADO` | VERIFICACION_DIFERIDA_A_FASE_POSTERIOR | Gate: ALB/CloudFront HTTPS son obligaciones de Gates posteriores; spec §9 exige confirmarlo al desplegar |
+| `TLS_NO_RESUELTO` | CUMPLIDA_CONDICIONADA_A_APROBACION | spec §9: opción A pendiente de aceptación de seguridad |
+
+Reclasificados por evidencia oficial del plan Free: el **riesgo de cobro personal desaparece** con
+plan `FREE/ACTIVE` verificado (AWS no admite cargos durante la vigencia) y el **costo observado** pasa
+a control recurrente porque no figura en la lista de cierre del Gate. El riesgo vigente es el
+**cierre automático de la cuenta** al agotar créditos o caducar (retención de 90 días).
+
+### 3.b Cobertura en dos escenarios
+
+| Escenario | Bruto | Margen 10 % | Cobertura con 120 USD |
+|---|---|---|---|
+| A — sólo tarifas verificadas | 79.0430 | **86.9473** | TOTAL |
+| B — presupuesto modelado completo | 84.0430 | **92.4473** | TOTAL |
+
+Las reservas de modelado (5.0000 USD) se informan aparte y **no** se eliminan para mejorar la
+cobertura; sólo se excluyen del bruto verificado porque no son cargo AWS.
 
 ## 4. Acciones que resuelven cada bloqueo
 
