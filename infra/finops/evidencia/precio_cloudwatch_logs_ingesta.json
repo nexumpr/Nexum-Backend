@@ -1,0 +1,6 @@
+{
+  "FormatVersion": "aws_v1",
+  "PriceList": [
+    "{\"product\":{\"productFamily\":\"Data Payload\",\"attributes\":{\"regionCode\":\"us-east-2\",\"servicecode\":\"AmazonCloudWatch\",\"groupDescription\":\"Existing system, application, and custom log files\",\"usagetype\":\"USE2-DataProcessing-Bytes\",\"locationType\":\"AWS Region\",\"location\":\"US East (Ohio)\",\"servicename\":\"AmazonCloudWatch\",\"operation\":\"PutLogEvents\",\"version\":\"Current\",\"group\":\"Ingested Logs\",\"logsDestination\":\"Amazon CloudWatch Logs\"},\"sku\":\"5T6Z6V26DSR7SZ49\"},\"serviceCode\":\"AmazonCloudWatch\",\"terms\":{\"OnDemand\":{\"5T6Z6V26DSR7SZ49.JRTCKXETXF\":{\"priceDimensions\":{\"5T6Z6V26DSR7SZ49.JRTCKXETXF.6YS6EN2CT7\":{\"unit\":\"GB\",\"endRange\":\"Inf\",\"description\":\"$0.50 per GB custom log data ingested in Standard log class - US East (Ohio)\",\"appliesTo\":[],\"rateCode\":\"5T6Z6V26DSR7SZ49.JRTCKXETXF.6YS6EN2CT7\",\"beginRange\":\"0\",\"pricePerUnit\":{\"USD\":\"0.5000000000\"}}},\"sku\":\"5T6Z6V26DSR7SZ49\",\"effectiveDate\":\"2026-11-01T00:00:00Z\",\"offerTermCode\":\"JRTCKXETXF\",\"termAttributes\":{}}}},\"version\":\"20261104213532\",\"publicationDate\":\"2026-11-04T21:35:32Z\"}"
+  ]
+}

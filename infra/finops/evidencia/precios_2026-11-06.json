@@ -1,0 +1,230 @@
+{
+  "catalogo_actualizado": [
+    "ELASTICACHE_INTERAZ_GB"
+  ],
+  "consultados_ahora": [
+    "ELASTICACHE_INTERAZ_GB"
+  ],
+  "estado": "VERIFIED_AWS",
+  "fecha": "2026-11-06",
+  "fuente": "aws pricing get-products (Price List Query API, endpoint us-east-1)",
+  "id": "precios",
+  "no_verificados": [],
+  "region_datos": "us-east-2",
+  "reutilizados": [
+    "ALB_HORA",
+    "ALB_LCU_HORA",
+    "CW_ALARMA_MES",
+    "CW_LOGS_ALMACEN_GB_MES",
+    "CW_LOGS_INGESTA_GB",
+    "CW_METRICA_MES",
+    "DDB_BACKUP_GB_MES",
+    "DDB_PITR_GB_MES",
+    "DDB_RESTORE_GB",
+    "DDB_RRU_MILLON",
+    "DDB_STORAGE_GB_MES",
+    "DDB_WRU_MILLON",
+    "EBS_GP3_GB_MES",
+    "EBS_SNAPSHOT_GB_MES",
+    "EC2_T4G_MICRO_HORA",
+    "EGRESO_INTERNET_GB",
+    "ELASTICACHE_REDIS_T4G_MICRO_HORA",
+    "IPV4_HORA",
+    "S3_SOLICITUDES_LOTE",
+    "S3_STANDARD_GB_MES",
+    "SECRETS_SECRETO_MES"
+  ],
+  "sanitizado": true,
+  "skus": {
+    "ALB_HORA": {
+      "consulta": "precio_alb_hora",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_alb_hora (serviceCode=AWSELB, usagetype=USE2-LoadBalancerUsage)",
+      "precio_catalogo_usd": "0.0225",
+      "reutilizado": true,
+      "sku": "ALB_HORA"
+    },
+    "ALB_LCU_HORA": {
+      "consulta": "precio_alb_lcu",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_alb_lcu (serviceCode=AWSELB, usagetype=USE2-LCUUsage)",
+      "precio_catalogo_usd": "0.008",
+      "reutilizado": true,
+      "sku": "ALB_LCU_HORA"
+    },
+    "CW_ALARMA_MES": {
+      "consulta": "precio_cw_alarma",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_cw_alarma (serviceCode=AmazonCloudWatch, usagetype=USE2-CW:AlarmMonitorUsage)",
+      "precio_catalogo_usd": "0.1",
+      "reutilizado": true,
+      "sku": "CW_ALARMA_MES"
+    },
+    "CW_LOGS_ALMACEN_GB_MES": {
+      "consulta": "precio_cw_logs_storage",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_cw_logs_storage (serviceCode=AmazonCloudWatch, usagetype=USE2-TimedStorage-ByteHrs)",
+      "precio_catalogo_usd": "0.03",
+      "reutilizado": true,
+      "sku": "CW_LOGS_ALMACEN_GB_MES"
+    },
+    "CW_LOGS_INGESTA_GB": {
+      "consulta": "precio_cloudwatch_logs_ingesta",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_cloudwatch_logs_ingesta (serviceCode=AmazonCloudWatch, usagetype=USE2-DataProcessing-Bytes)",
+      "precio_catalogo_usd": "0.5",
+      "reutilizado": true,
+      "sku": "CW_LOGS_INGESTA_GB"
+    },
+    "CW_METRICA_MES": {
+      "consulta": "precio_cw_metrica",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_cw_metrica (serviceCode=AmazonCloudWatch, usagetype=USE2-CW:MetricMonitorUsage)",
+      "precio_catalogo_usd": "0.3",
+      "reutilizado": true,
+      "sku": "CW_METRICA_MES"
+    },
+    "DDB_BACKUP_GB_MES": {
+      "consulta": "precio_ddb_backup",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ddb_backup (serviceCode=AmazonDynamoDB, usagetype=USE2-TimedBackupStorage-ByteHrs)",
+      "precio_catalogo_usd": "0.1",
+      "reutilizado": true,
+      "sku": "DDB_BACKUP_GB_MES"
+    },
+    "DDB_PITR_GB_MES": {
+      "consulta": "precio_ddb_pitr",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ddb_pitr (serviceCode=AmazonDynamoDB, usagetype=USE2-TimedPITRStorage-ByteHrs)",
+      "precio_catalogo_usd": "0.2",
+      "reutilizado": true,
+      "sku": "DDB_PITR_GB_MES"
+    },
+    "DDB_RESTORE_GB": {
+      "consulta": "precio_ddb_restore",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ddb_restore (serviceCode=AmazonDynamoDB, usagetype=USE2-RestoreDataSize-Bytes)",
+      "precio_catalogo_usd": "0.15",
+      "reutilizado": true,
+      "sku": "DDB_RESTORE_GB"
+    },
+    "DDB_RRU_MILLON": {
+      "consulta": "precio_ddb_rru",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ddb_rru (serviceCode=AmazonDynamoDB, usagetype=USE2-ReadRequestUnits)",
+      "precio_catalogo_usd": "0.125",
+      "reutilizado": true,
+      "sku": "DDB_RRU_MILLON"
+    },
+    "DDB_STORAGE_GB_MES": {
+      "consulta": "precio_ddb_storage",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ddb_storage (serviceCode=AmazonDynamoDB, usagetype=USE2-TimedStorage-ByteHrs)",
+      "precio_catalogo_usd": "0.25",
+      "reutilizado": true,
+      "sku": "DDB_STORAGE_GB_MES"
+    },
+    "DDB_WRU_MILLON": {
+      "consulta": "precio_ddb_wru",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ddb_wru (serviceCode=AmazonDynamoDB, usagetype=USE2-WriteRequestUnits)",
+      "precio_catalogo_usd": "0.625",
+      "reutilizado": true,
+      "sku": "DDB_WRU_MILLON"
+    },
+    "EBS_GP3_GB_MES": {
+      "consulta": "precio_ebs_gp3",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ebs_gp3 (serviceCode=AmazonEC2, usagetype=USE2-EBS:VolumeUsage.gp3)",
+      "precio_catalogo_usd": "0.08",
+      "reutilizado": true,
+      "sku": "EBS_GP3_GB_MES"
+    },
+    "EBS_SNAPSHOT_GB_MES": {
+      "consulta": "precio_ebs_snapshot",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ebs_snapshot (serviceCode=AmazonEC2, usagetype=USE2-EBS:SnapshotUsage)",
+      "precio_catalogo_usd": "0.05",
+      "reutilizado": true,
+      "sku": "EBS_SNAPSHOT_GB_MES"
+    },
+    "EC2_T4G_MICRO_HORA": {
+      "consulta": "precio_ec2_t4g_micro",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ec2_t4g_micro (serviceCode=AmazonEC2, usagetype=USE2-BoxUsage:t4g.micro)",
+      "precio_catalogo_usd": "0.0084",
+      "reutilizado": true,
+      "sku": "EC2_T4G_MICRO_HORA"
+    },
+    "EGRESO_INTERNET_GB": {
+      "consulta": "precio_cloudfront_egreso",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_cloudfront_egreso (serviceCode=AmazonCloudFront, usagetype=US-DataTransfer-Out-Bytes)",
+      "precio_catalogo_usd": "0.085",
+      "reutilizado": true,
+      "sku": "EGRESO_INTERNET_GB"
+    },
+    "ELASTICACHE_INTERAZ_GB": {
+      "comando": "aws pricing get-products --service-code AWSDataTransfer --filters Type=TERM_MATCH,Field=usagetype,Value=USE2-DataTransfer-Regional-Bytes --profile nexum --region us-east-1 --output json",
+      "consulta": "precio_interaz",
+      "descripcion": "Precio de transferencia regional (inter-AZ) en us-east-2",
+      "descripcion_aws": "$0.010 per GB - regional data transfer - in/out/between EC2 AZs or using elastic IPs or ELB",
+      "effective_date": "2026-06-01T00:00:00Z",
+      "escalon_fin": "Inf",
+      "escalon_inicio": "0",
+      "escalones_observados": 1,
+      "estado": "VERIFIED_AWS",
+      "factor_escala": "1",
+      "items_examinados": 1,
+      "precio_catalogo_usd": "0.01",
+      "precio_publicado_usd": "0.01",
+      "region_datos": "us-east-2",
+      "sku": "ELASTICACHE_INTERAZ_GB",
+      "unidad_esperada": "GB",
+      "unidad_origen": "GB",
+      "usagetype": "USE2-DataTransfer-Regional-Bytes"
+    },
+    "ELASTICACHE_REDIS_T4G_MICRO_HORA": {
+      "consulta": "precio_elasticache_redis",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_elasticache_redis (serviceCode=AmazonElastiCache, usagetype=USE2-NodeUsage:cache.t4g.micro)",
+      "precio_catalogo_usd": "0.016",
+      "reutilizado": true,
+      "sku": "ELASTICACHE_REDIS_T4G_MICRO_HORA"
+    },
+    "IPV4_HORA": {
+      "consulta": "precio_ipv4_publica",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ipv4_publica (serviceCode=AmazonVPC, usagetype=USE2-PublicIPv4:InUseAddress)",
+      "precio_catalogo_usd": "0.005",
+      "reutilizado": true,
+      "sku": "IPV4_HORA"
+    },
+    "S3_SOLICITUDES_LOTE": {
+      "consulta": "precio_s3_solicitudes",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_s3_solicitudes (serviceCode=AmazonS3, usagetype=USE2-Requests-Tier1)",
+      "precio_catalogo_usd": "0.005",
+      "reutilizado": true,
+      "sku": "S3_SOLICITUDES_LOTE"
+    },
+    "S3_STANDARD_GB_MES": {
+      "consulta": "precio_s3_standard",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_s3_standard (serviceCode=AmazonS3, usagetype=USE2-TimedStorage-ByteHrs)",
+      "precio_catalogo_usd": "0.023",
+      "reutilizado": true,
+      "sku": "S3_STANDARD_GB_MES"
+    },
+    "SECRETS_SECRETO_MES": {
+      "consulta": "precio_secrets",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_secrets (serviceCode=AWSSecretsManager, usagetype=USE2-AWSSecretsManager-Secrets)",
+      "precio_catalogo_usd": "0.4",
+      "reutilizado": true,
+      "sku": "SECRETS_SECRETO_MES"
+    }
+  },
+  "total_skus": 22,
+  "verificados": 22
+}

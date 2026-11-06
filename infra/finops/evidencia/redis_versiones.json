@@ -1,0 +1,46 @@
+{
+  "CacheEngineVersions": [
+    {
+      "CacheEngineDescription": "Redis",
+      "CacheEngineVersionDescription": "redis version 4.0.10",
+      "CacheParameterGroupFamily": "redis4.0",
+      "Engine": "redis",
+      "EngineVersion": "4.0.10"
+    },
+    {
+      "CacheEngineDescription": "Redis",
+      "CacheEngineVersionDescription": "redis version 5.0.6",
+      "CacheParameterGroupFamily": "redis5.0",
+      "Engine": "redis",
+      "EngineVersion": "5.0.6"
+    },
+    {
+      "CacheEngineDescription": "Redis",
+      "CacheEngineVersionDescription": "redis version 6.0.5",
+      "CacheParameterGroupFamily": "redis6.x",
+      "Engine": "redis",
+      "EngineVersion": "6.0"
+    },
+    {
+      "CacheEngineDescription": "Redis",
+      "CacheEngineVersionDescription": "redis version 6.2.6",
+      "CacheParameterGroupFamily": "redis6.x",
+      "Engine": "redis",
+      "EngineVersion": "6.2"
+    },
+    {
+      "CacheEngineDescription": "Redis",
+      "CacheEngineVersionDescription": "redis version 7.0.7",
+      "CacheParameterGroupFamily": "redis7",
+      "Engine": "redis",
+      "EngineVersion": "7.0"
+    },
+    {
+      "CacheEngineDescription": "Redis",
+      "CacheEngineVersionDescription": "redis version 7.1.0",
+      "CacheParameterGroupFamily": "redis7",
+      "Engine": "redis",
+      "EngineVersion": "7.1"
+    }
+  ]
+}

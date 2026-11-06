@@ -1,0 +1,6 @@
+{
+  "FormatVersion": "aws_v1",
+  "PriceList": [
+    "{\"product\":{\"productFamily\":\"Data Transfer\",\"attributes\":{\"fromLocationType\":\"AWS Region\",\"toRegionCode\":\"us-east-2\",\"servicecode\":\"AWSDataTransfer\",\"usagetype\":\"USE2-DataTransfer-Regional-Bytes\",\"fromRegionCode\":\"us-east-2\",\"transferType\":\"IntraRegion\",\"servicename\":\"AWS Data Transfer\",\"fromLocation\":\"US East (Ohio)\",\"toLocationType\":\"AWS Region\",\"toLocation\":\"US East (Ohio)\",\"operation\":\"\"},\"sku\":\"KF338J7FCKZPUBD9\"},\"serviceCode\":\"AWSDataTransfer\",\"terms\":{\"OnDemand\":{\"KF338J7FCKZPUBD9.JRTCKXETXF\":{\"priceDimensions\":{\"KF338J7FCKZPUBD9.JRTCKXETXF.6YS6EN2CT7\":{\"unit\":\"GB\",\"endRange\":\"Inf\",\"description\":\"$0.010 per GB - regional data transfer - in/out/between EC2 AZs or using elastic IPs or ELB\",\"appliesTo\":[],\"rateCode\":\"KF338J7FCKZPUBD9.JRTCKXETXF.6YS6EN2CT7\",\"beginRange\":\"0\",\"pricePerUnit\":{\"USD\":\"0.0100000000\"}}},\"sku\":\"KF338J7FCKZPUBD9\",\"effectiveDate\":\"2026-06-01T00:00:00Z\",\"offerTermCode\":\"JRTCKXETXF\",\"termAttributes\":{}}}},\"version\":\"20261103133147\",\"publicationDate\":\"2026-11-03T13:31:47Z\"}"
+  ]
+}

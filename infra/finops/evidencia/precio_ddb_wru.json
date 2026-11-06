@@ -1,0 +1,6 @@
+{
+  "FormatVersion": "aws_v1",
+  "PriceList": [
+    "{\"product\":{\"productFamily\":\"Amazon DynamoDB PayPerRequest Throughput\",\"attributes\":{\"regionCode\":\"us-east-2\",\"servicecode\":\"AmazonDynamoDB\",\"groupDescription\":\"DynamoDB PayPerRequest Write Request Units\",\"usagetype\":\"USE2-WriteRequestUnits\",\"locationType\":\"AWS Region\",\"location\":\"US East (Ohio)\",\"servicename\":\"Amazon DynamoDB\",\"operation\":\"PayPerRequestThroughput\",\"group\":\"DDB-WriteUnits\"},\"sku\":\"GGQSXTNTRBHRVS56\"},\"serviceCode\":\"AmazonDynamoDB\",\"terms\":{\"OnDemand\":{\"GGQSXTNTRBHRVS56.JRTCKXETXF\":{\"priceDimensions\":{\"GGQSXTNTRBHRVS56.JRTCKXETXF.6YS6EN2CT7\":{\"unit\":\"WriteRequestUnits\",\"endRange\":\"Inf\",\"description\":\"$0.625 per million write request units (Ohio)\",\"appliesTo\":[],\"rateCode\":\"GGQSXTNTRBHRVS56.JRTCKXETXF.6YS6EN2CT7\",\"beginRange\":\"0\",\"pricePerUnit\":{\"USD\":\"0.0000006250\"}}},\"sku\":\"GGQSXTNTRBHRVS56\",\"effectiveDate\":\"2026-11-01T00:00:00Z\",\"offerTermCode\":\"JRTCKXETXF\",\"termAttributes\":{}}}},\"version\":\"20261105164016\",\"publicationDate\":\"2026-11-05T16:40:16Z\"}"
+  ]
+}

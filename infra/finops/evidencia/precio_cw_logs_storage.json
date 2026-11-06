@@ -1,0 +1,6 @@
+{
+  "FormatVersion": "aws_v1",
+  "PriceList": [
+    "{\"product\":{\"productFamily\":\"Storage Snapshot\",\"attributes\":{\"storageMedia\":\"Amazon S3\",\"regionCode\":\"us-east-2\",\"servicecode\":\"AmazonCloudWatch\",\"groupDescription\":\"Amazon CloudWatch Logs Storage Current version\",\"usagetype\":\"USE2-TimedStorage-ByteHrs\",\"locationType\":\"AWS Region\",\"location\":\"US East (Ohio)\",\"servicename\":\"AmazonCloudWatch\",\"operation\":\"\",\"version\":\"Current\",\"group\":\"Amazon CloudWatch Standard Storage pricing current\"},\"sku\":\"X7X4WD4A95NDR9U5\"},\"serviceCode\":\"AmazonCloudWatch\",\"terms\":{\"OnDemand\":{\"X7X4WD4A95NDR9U5.JRTCKXETXF\":{\"priceDimensions\":{\"X7X4WD4A95NDR9U5.JRTCKXETXF.6YS6EN2CT7\":{\"unit\":\"GB-Mo\",\"endRange\":\"Inf\",\"description\":\"$0.03 per GB-mo of log storage - US East (Ohio)\",\"appliesTo\":[],\"rateCode\":\"X7X4WD4A95NDR9U5.JRTCKXETXF.6YS6EN2CT7\",\"beginRange\":\"0\",\"pricePerUnit\":{\"USD\":\"0.0300000000\"}}},\"sku\":\"X7X4WD4A95NDR9U5\",\"effectiveDate\":\"2026-11-01T00:00:00Z\",\"offerTermCode\":\"JRTCKXETXF\",\"termAttributes\":{}}}},\"version\":\"20261104213532\",\"publicationDate\":\"2026-11-04T21:35:32Z\"}"
+  ]
+}

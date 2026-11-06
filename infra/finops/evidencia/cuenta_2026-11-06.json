@@ -1,0 +1,22 @@
+{
+  "id": "cuenta",
+  "fecha": "2026-11-06",
+  "estado": "VERIFIED_AWS",
+  "fuente": "aws sts get-caller-identity; aws freetier get-account-plan-state",
+  "consulta_ejecutada": true,
+  "motivo": null,
+  "datos": {
+    "plan": "FREE",
+    "estado_plan": "ACTIVE",
+    "fecha_alta": null,
+    "fecha_expiracion": "2027-05-04T01:22:26.960000+00:00",
+    "cuenta_enmascarada": "<ACCOUNT_ID>",
+    "creditos_declarados_usd": "120",
+    "creditos_verificados_usd": "120.0",
+    "creditos_unidad": "USD",
+    "fuente_creditos": "aws freetier get-account-plan-state (accountPlanRemainingCredits)",
+    "impuestos": "UNKNOWN"
+  },
+  "sanitizado": true,
+  "nota": "creditos_declarados_usd es el dato historico del operador; creditos_verificados_usd procede de accountPlanRemainingCredits cuando la respuesta de plan fue valida. El saldo liquidado sigue en Billing"
+}

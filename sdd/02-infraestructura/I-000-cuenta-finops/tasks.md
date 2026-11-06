@@ -96,3 +96,69 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+## Registro de implementación H08-I — 2026-11-06 (rama `feat/h08i-i000-finops`)
+
+Estado global: `IMPLEMENTED_LOCAL` + `BLOCKED_FINOPS`. Ningún recurso AWS fue creado. La sesión AWS
+del perfil `nexum` estaba expirada, por lo que toda evidencia de cuenta, precios y costo observado
+permanece `NOT_VERIFIED`/`NOT_RUN`.
+
+| Tarea | Estado real | Evidencia |
+|---|---|---|
+| T-000-01 Plan y contexto | `IMPLEMENTED_LOCAL` / evidencia `NOT_VERIFIED` | `infra/finops/consultas_readonly.py`; `infra/finops/evidencia/cuenta_2026-11-06.json` |
+| T-000-02 Matriz por recurso | `PASS` documental (precios sin revalidar) | `infra/finops/MATRIZ_COSTOS_SERVICIOS_I000.md`; `precios_us-east-2.json` |
+| T-000-03 Dos escenarios | `PASS` (modelo A/B/C) | `infra/finops/escenarios.py`; 63 pruebas OK |
+| T-000-04 Costeo | `PASS` cálculo (bruto 84.0580; residual 6.8440) | `infra/finops/resultados/costos_45d.json` |
+| T-000-05 Bloqueo de decisión | `PASS` regla aplicada → `BLOCKED_FINOPS` | `infra/finops/resultados/viabilidad_i000.json` |
+| T-000-06 Controles | `NOT_RUN` (prohibido crear presupuestos/alarmas en I-000) | catálogo `presupuestos` en `consultas_readonly.py` |
+| T-000-07 Investigación con fecha | `PASS` parcial (fuentes fechadas; sin Price List API) | `precios_us-east-2.json` campo `fecha_fuente` |
+| T-000-08 Separación de responsabilidades | `PASS` | `MATRIZ_VIABILIDAD_AWS_I000.md` secciones 1 y 4 |
+| T-000-90 Riesgos y dependencias | `BLOCKED` (4 riesgos abiertos) | `infra/finops/ADR_COSTO_CERO_I000.md` sección 5 |
+| T-000-99 Ratificación | `PENDIENTE` de decisión humana | este registro + PR de I-000 |
+
+**Pruebas ejecutadas:** `py -3.13 -m unittest discover -s tests/infra/finops` → 63 pruebas OK;
+`consultas_readonly.py --validar` → 16 consultas, ninguna mutante; `requisitos.py` → diseño válido,
+runtime `NOT_RUN`; `viabilidad.py` → `BLOCKED_FINOPS`.
+
+**No ejecutado:** Terraform init/plan/apply/destroy, creación de recursos, presupuestos, alarmas,
+Cost Explorer (0.01 USD por solicitud), cualquier verificación HTTP pública.
+
+### Corrección H08-I — revisión 2 (2026-11-06, sesión AWS válida)
+
+| Tarea | Estado real | Evidencia |
+|---|---|---|
+| T-000-01 Plan y contexto | `PASS` (AWS real) | `evidencia/cuenta_2026-11-06.json`: FREE/ACTIVE, expira 2027-05-04, 120.0 USD |
+| T-000-02 Matriz por recurso | `PASS` parcial | 14 SKU `VERIFIED_AWS`; 11 partidas requeridas pendientes |
+| T-000-03 Escenarios | `PASS` | A 91.8080 · B 28.9820 (no 24×7) · C 84.0080 |
+| T-000-04 Costeo | `PASS` cálculo; bruto verificado `UNKNOWN` | `resultados/costos_45d.json` |
+| T-000-05 Bloqueo de decisión | `PASS` regla aplicada → `BLOCKED_FINOPS` (7 motivos) | `resultados/viabilidad_i000.json` |
+| T-000-06 Controles | `NOT_RUN` (crear presupuestos/alarmas prohibido en I-000) | catálogo `presupuestos` |
+| T-000-07 Investigación con fecha | `PASS` parcial | `usagetype` y `fecha_fuente` por SKU verificado |
+| T-000-08 Separación de responsabilidades | `PASS` | `MATRIZ_VIABILIDAD_AWS_I000.md` §1 |
+| T-000-90 Riesgos y dependencias | `BLOCKED` (7 riesgos abiertos) | `ADR_COSTO_CERO_I000.md` §5 |
+| T-000-99 Ratificación | `PENDIENTE` de decisión humana | PR #15 |
+
+**Defectos corregidos:** `servicequotas` → `service-quotas`; `$env:TEMP` → `tempfile.gettempdir()`;
+`--region` duplicado; `--filters` repetido; `ElasticLoadBalancing` → `AWSELB`; ElastiCache con
+tarifa de soporte extendido; DynamoDB con tramo gratuito; lectura de evidencia desde el directorio
+equivocado.
+
+**Pruebas:** `py -3.13 -m unittest discover -s tests/infra/finops` → 140 pruebas OK.
+
+**No ejecutado:** Cost Explorer (0.01 USD por solicitud), Terraform, creación de recursos,
+presupuestos, alarmas, despliegue y verificación HTTP.
+
+### Revisión 3 — resolución de precios y blindaje (2026-11-06)
+
+| Tarea | Estado real | Evidencia |
+|---|---|---|
+| T-000-02 Matriz por recurso | `PASS` | 22 SKU `VERIFIED_AWS` + 3 partidas `DOC_OFICIAL` con fuente |
+| T-000-04 Costeo | `PASS` | bruto C 84.0430, verificado 79.0430, residual 6.8790 |
+| T-000-05 Bloqueo de decisión | `PASS` regla aplicada → `BLOCKED_FINOPS` (5 motivos) | `resultados/viabilidad_i000.json` |
+| T-000-90 Riesgos y dependencias | `PASS` documentado; riesgos abiertos en ADR §7 | `ADR_COSTO_CERO_I000.md` |
+
+- Cuota EC2 corregida: 2 instancias × 2 vCPU = **4 vCPU** (cuota 16).
+- Internet Gateway agregado al diseño por requisito oficial de VPC Origins (`rutas_publicas: false`).
+- Evidencia de despliegue endurecida: huella SHA-256 + IDs reales + documento de control con frase.
+- Pruebas FinOps: **149 OK**.
+

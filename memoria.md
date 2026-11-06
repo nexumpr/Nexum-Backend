@@ -195,3 +195,60 @@
 - Se detectaron 24 modificaciones de `tasks.md` y `checklist.md` en specs A. El validador integral sigue PASS; RFC-003 preserva evidencias y separa reportes de firmas humanas no aportadas. No interpretar casillas como aprobación humana automática.
 - RFC-002 y Gate H08-I/I-000 abren control FinOps local y AWS únicamente lectura tras frase humana explícita; I-010+ y H08-E siguen denegados. OpenCode puede manejar escritura/Git/PR automáticamente mediante herramientas de la propia sesión y permisos ASK, sin obligación de que el operador pegue comandos.
 - Implementación futura sigue UNA SPEC → PRUEBAS → PR/CI → APROBACIÓN → SIGUIENTE; ningún terraform apply/despliegue pagado se autoaprueba.
+
+## H08-I / I-000 — cuenta Free y FinOps (estado `BLOCKED_FINOPS`)
+
+- **Transición H08-I:** PR #14 `MERGED` con merge commit `e4c4167`; CI `validar` SUCCESS (run 42258192807). `main` local actualizado por fast-forward. Incluye RFC-002, RFC-003, Gate `sdd/_control/H08/GATE_H08I_I000.md` y permisos operativos ASK.
+- **Rama de implementación:** `feat/h08i-i000-finops`, creada desde `main` limpio. Implementa **exclusivamente** I-000; I-010..I-150 y H08-E siguen `NOT_AUTHORIZED`.
+- **Artefactos nuevos:** `infra/finops/` (motor de costos con `Decimal`, catálogo de 32 SKU con estado y fecha de fuente, escenarios A/B/C, viabilidad, requisitos de topología, 16 consultas AWS read-only con clasificación de costo, sanitizador, evidencia y resultados) y `tests/infra/finops/` (63 pruebas OK).
+- **Resultados del modelo (precios `DOC_ONLY`/`HIPOTESIS`/`SUPUESTO`, no revalidados):** escenario C (CloudFront + VPC Origin + ALB privado + 2 EC2 privadas, 24×7) = 84.0580 USD/45 d, residual con runtime apagado 6.8440 USD; A (ALB público con IPv4) = 91.8580 USD (piso, no techo); B (8 h/día) = 29.0320 USD y **no** cumple 24×7.
+- **Evidencia AWS:** `NOT_VERIFIED`. `aws sts get-caller-identity --profile nexum --region us-east-2` devolvió *Your session has expired. Please reauthenticate using 'aws login'*; por tanto plan, vigencia, créditos, SKU Redis OSS, VPC Origins, cuota de vCPU, disponibilidad de `t4g.micro`, precios y costo observado permanecen sin verificar.
+- **Cost Explorer no ejecutado:** cobra USD 0.01 por solicitud y no hubo aprobación humana específica. Créditos verificados = 0.00 USD; los 120 USD son dato histórico no verificado. Impuestos/IVA = `UNKNOWN`; desembolso personal declarado 0.0000 USD.
+- **Decisión:** `BLOCKED_FINOPS` por evidencia insuficiente (cuenta no verificada, servicios no confirmados, precios sin revalidar, costo observado no comprobado). No se creó ningún recurso, presupuesto, alarma ni certificado; no se ejecutó Terraform; no se cambió el plan Free.
+- **Verificaciones locales PASS:** 63 pruebas FinOps, `validar_sdd_integral.py --check-git` (516 archivos, SHA256 exacto), `validar_h06.py` (75 operaciones), 12 pruebas de herramientas, `go build`, `go vet`, `go test ./... -count=1`.
+- **Pendiente de decisión humana:** reautenticación `aws login` (acción de UI), autorización o rechazo del costo de Cost Explorer, aceptación del residual de 6.8440 USD, determinación de IVA y decisión sobre TLS extremo a extremo. El cierre de I-000 y el inicio de I-010 requieren aprobación explícita posterior al PR.
+
+### I-000 revisión 2 — sesión AWS válida (2026-11-06)
+
+- **Sesión AWS:** válida en esta corrida con el perfil `nexum`. Se ejecutaron 8 consultas de servicios y 14 consultas de precios, todas de solo lectura y sin Cost Explorer. Las salidas crudas quedaron en `%TEMP%` y solo se versionó la versión sanitizada.
+- **Datos verificados:** plan `FREE`/`ACTIVE`, expiración `2027-05-04`, créditos restantes `120.0 USD` (`accountPlanRemainingCredits`), cuota de vCPU On-Demand `16`, `t4g.micro` en `us-east-2a/2b/2c`, Redis OSS hasta `7.1` (`redis7`), límites DynamoDB 80 000/80 000. `list-vpc-origins` devolvió 0 orígenes existentes y **no** acredita elegibilidad.
+- **Precios:** 14 SKU `VERIFIED_AWS` con `usagetype` y `fecha_fuente`. Bruto calculado C = 84.0080 USD, A = 91.8080 USD, B = 28.9820 USD (no 24×7), residual 6.8440 USD. Bruto **verificado** = `UNKNOWN` porque 11 partidas requeridas siguen sin precio verificado.
+- **Defectos corregidos:** `servicequotas` → `service-quotas`; `$env:TEMP` → `tempfile.gettempdir()`; `--region` duplicado en Price List; `--filters` repetido; `ElasticLoadBalancing` → `AWSELB`; ElastiCache tomaba tarifa de soporte extendido (0.026 en vez de 0.016); DynamoDB tomaba el tramo gratuito (0 en vez de 0.25); la evidencia AWS se leía del directorio equivocado y llegaba vacía.
+- **Modelo financiero:** se separan bruto calculado, bruto verificado, créditos declarados, créditos verificados, cobertura, importe sin cobertura, impuestos y riesgo de cobro personal. La política de gasto personal es CERO pero **no** se presenta como prueba de ausencia de cobro: `riesgo_cobro_personal` es `True` con cobertura `UNKNOWN`.
+- **Decisión:** `BLOCKED_FINOPS` con 7 motivos (IVA no determinado, VPC Origins no confirmado, costo observado no verificado, precios incompletos, bruto verificado desconocido, cobertura no calculable y TLS sin resolver).
+- **Pruebas:** `py -3.13 -m unittest discover -s tests/infra/finops` → 140 pruebas OK. Validador SDD, H06 OpenAPI, `herramientas/tests`, `go build`, `go vet` y `go test` ejecutados en la misma corrida.
+- **Sin recursos AWS:** no se creó, modificó ni destruyó nada; no se ejecutó Terraform; la verificación de dos instancias sigue siendo de diseño (`DESIGN_VALIDATED`) con runtime `NOT_RUN`.
+
+### I-000 revisión 3 — precios completos y evidencia blindada (2026-11-06)
+
+- **Precios:** 8 SKU adicionales verificados en Price List (backup/restore DynamoDB, retención/métricas/alarmas CloudWatch, Secrets Manager, solicitudes S3 Tier1, transferencia inter-AZ) → **22 SKU `VERIFIED_AWS`**. Tres partidas sin cargo quedan `DOC_OFICIAL` con fuente oficial: certificado CloudFront, VPC Origins y gateway endpoints.
+- **Cifras:** bruto C 84.0430 USD, **bruto verificado 79.0430** (excluye 5.0000 de reservas no facturables), residual 6.8790, cobertura **TOTAL** con margen 10 % (86.9473 ≤ 120 verificados), importe sin cobertura 0.0000.
+- **Cuota EC2:** dos `t4g.micro` exigen **4 vCPU** (2 por instancia); cuota observada 16. Corregido con prueba de regresión.
+- **VPC Origins:** la documentación oficial exige **Internet Gateway adjunto** (sin rutas públicas) y una IPv4 libre en subred privada; us-east-2 está soportado. El diseño se corrigió con `internet_gateway: true` y `rutas_publicas: false`, sin NAT ni IPv4 públicas.
+- **Evidencia de despliegue:** ya no se autocertifica con `verificado_por_humano: true`; exige huella SHA-256 de la respuesta cruda, dos IDs con formato real de instancia en `running` y AZ distintas, y un documento de control con la frase `APRUEBO_DESPLIEGUE_VERIFICADO_AWS` que cite el archivo. Sigue `NOT_RUN`.
+- **TLS:** ADR con opciones A (HTTP privado CloudFront→ALB, gratis) y B (HTTPS hasta ALB, requiere dominio propio de pago); se recomienda A con aceptación formal. Pendiente de firma humana.
+- **Decisión:** `BLOCKED_FINOPS` con **5 motivos** (IVA, elegibilidad VPC Origins, costo observado, riesgo de cobro derivado y TLS). Pruebas FinOps: **149 OK**.
+
+### I-000 revisión 4 — cierre técnico (2026-11-06)
+
+- **Cobertura en dos escenarios:** A verificado 86.9473 USD y B modelado **92.4473** USD con 120 USD verificados; ambos `TOTAL`, sin importe sin cobertura.
+- **Plan Free (evidencia oficial):** AWS no admite cargos durante la vigencia; el riesgo de cobro personal pasa a `False` y el riesgo real es el **cierre automático de la cuenta** al agotar créditos o caducar (retención 90 días). Prohibido introducir Organizations, Control Tower, APN, EA, Marketplace o HIPAA/SOC.
+- **Reclasificaciones:** costo observado → control recurrente (no figura en la lista de cierre del Gate); VPC Origins y runtime → verificación diferida a I-020/I-030 por cláusula del Gate; TLS → condicionado a aceptación humana (spec §9).
+- **Matriz `matriz_gate`:** 15 condiciones con cláusula; **1 bloqueo real (IVA)**, 1 condicionada (TLS), 4 diferidas, 7 cumplidas, 1 no aplica.
+- **Documento único de decisión:** `sdd/_control/H08/DECISION_CIERRE_I000.md` (no declara el Gate aprobado). Pruebas FinOps: **153 OK**.
+
+### I-000 revision 5 — bloqueo real de conectividad privada (2026-11-06)
+
+- Interface endpoint verificado en Price List: 0.01 USD/h por AZ (USE2-VpcEndpoint-Hours).
+- Los gateway endpoints solo cubren S3 y DynamoDB; Secrets Manager, CloudWatch Logs/metricas y SSM exigen interface endpoints.
+- Minimo (Secrets + Logs, 4 ENI): 43.2000 USD -> total 122.2430, con margen 134.4673 > 120: deficit 14.4673.
+- Completo SDD (6 servicios, 12 ENI): 129.6000 USD -> con margen 235.0073 > 120: deficit 115.0073.
+- Decision D6 no efectiva: falla la condicion de presupuesto completo cubierto. Se requiere RFC (O4/O5).
+- No se fusiona el PR #15 ni se abre I-010. Pruebas FinOps: 165 OK.
+
+### I-000 revision 6 — cierre con operacion permanente y auxiliares por ventana
+
+- Diseno E: `logs` permanente (21.6000); `secretsmanager`, `ssm`, `ssmmessages` solo en ventanas (1.4400); `monitoring` por metric filters y `ec2messages` por ssmmessages (sin coste).
+- Conectividad 23.7400; total 102.7830; requerido con margen 113.0613 <= 120 (sobrante 6.9387).
+- D6 efectiva: `APRUEBO_CIERRE_I000_CON_CONDICIONES`. IVA queda condicionado (D1), sin declarar 0 %.
+- Pruebas FinOps: 167 OK. Riesgos: cache de secretos, logs bufferizados, metricas derivadas, mas ventanas encarecen.

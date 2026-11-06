@@ -49,3 +49,70 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+## Registro de verificación H08-I — 2026-11-06
+
+- [x] Herramienta reproducible de comprobación AWS Free: `infra/finops/consultas_readonly.py` (16 consultas, sólo lectura).
+- [x] Modelo de precios con fuente y fecha por SKU: `infra/finops/precios_us-east-2.json`.
+- [x] Cálculo determinista a 45 días con importes exactos: `infra/finops/modelo_costos.py` (84.0580 USD, residual 6.8440 USD).
+- [x] Escenarios de disponibilidad A/B/C con distinción 24×7: `infra/finops/escenarios.py`.
+- [x] Validación de dos instancias simultáneas y red privada sin NAT (diseño): `infra/finops/requisitos.py`.
+- [x] Cotización de EC2, EBS, ALB, CloudFront, DynamoDB, Redis OSS, S3 y CloudWatch en el catálogo (estado `DOC_ONLY`/`HIPOTESIS`/`SUPUESTO`).
+- [x] Separación de costo bruto, créditos verificados, impuestos y desembolso personal: `resultados/costos_45d.json` → `financiero`.
+- [x] Matriz de viabilidad financiera: `infra/finops/MATRIZ_VIABILIDAD_AWS_I000.md`.
+- [x] ADR de costo cero: `infra/finops/ADR_COSTO_CERO_I000.md` (estado `BLOCKED_FINOPS`).
+- [x] Evidencias sanitizadas y reproducibles: `infra/finops/evidencia/`, `infra/finops/EVIDENCIA_I000.md`.
+- [x] Pruebas unitarias del cálculo financiero: 63 pruebas OK (`tests/infra/finops`).
+- [ ] Plan Free, vigencia y créditos verificados en AWS — **NOT_VERIFIED**: sesión expirada.
+- [ ] Precios revalidados contra Price List API — **NOT_VERIFIED**.
+- [ ] SKU Redis OSS, VPC Origins, cuota de vCPU y `t4g.micro` confirmados — **NOT_VERIFIED**.
+- [ ] Costo observado (0.00 USD) comprobado — **NOT_RUN**: Cost Explorer cuesta 0.01 USD por solicitud.
+- [ ] Costo residual aceptado formalmente por el responsable — **PENDIENTE**.
+- [ ] IVA y TLS extremo a extremo decididos — **PENDIENTE**.
+- [ ] Gate I-GO con resolución expresa — **PENDIENTE**.
+
+**Estado de la spec:** `BLOCKED_FINOPS`. No se marca ningún punto no ejecutado como PASS.
+
+### Verificación H08-I — revisión 2 (2026-11-06)
+
+- [x] Catálogo con un único `--region` por comando (Price List en `us-east-1`, datos en `us-east-2`).
+- [x] Catálogo con un único `--filters` construido desde datos estructurados.
+- [x] Código `AWSELB` confirmado vía `get-products` (no `ElasticLoadBalancing`).
+- [x] Servicio de cuotas corregido a `service-quotas` (antes `servicequotas`, inválido).
+- [x] Directorio temporal nativo (`tempfile.gettempdir()`), nunca `$env:TEMP` ni el repositorio.
+- [x] 14 SKU con precio `VERIFIED_AWS`, `usagetype` y `fecha_fuente`.
+- [x] ElastiCache con tarifa ordinaria (`USE2-NodeUsage`, 0.016) y no de soporte extendido (0.026).
+- [x] DynamoDB almacenamiento con tramo marginal (0.25) y no el tramo gratuito (0.00).
+- [x] Bruto calculado separado del bruto verificado; verificado `UNKNOWN` con 11 partidas pendientes.
+- [x] Créditos declarados (120 histórico) separados de verificados (120.0 desde AWS).
+- [x] Cobertura, importe sin cobertura y riesgo de cobro personal calculados; riesgo `PRESENTE`.
+- [x] `VIABLE` exige vigencia ≥ 45 días, precios verificados, cobertura TOTAL con margen 10 %, IVA determinado y TLS resuelto.
+- [x] Topología: `DESIGN_VALIDATED` separado de `AWS_DEPLOYMENT_VERIFIED`; runtime `NOT_RUN`.
+- [x] Pruebas de regresión para cada defecto (140 pruebas OK).
+- [ ] Costo observado verificado — **NOT_RUN**: Cost Explorer cuesta 0.01 USD por solicitud.
+- [ ] Precio verificado de las 11 partidas requeridas restantes — **NOT_VERIFIED**.
+- [ ] Elegibilidad de CloudFront VPC Origins — **NOT_VERIFIED**: `list-vpc-origins` no la acredita.
+- [ ] IVA determinado — **NOT_VERIFIED**.
+- [ ] TLS extremo a extremo aceptado o recotizado — **PENDIENTE**.
+- [ ] Gate I-GO con resolución expresa — **PENDIENTE**.
+
+**Estado de la spec (revisión 2):** `BLOCKED_FINOPS` con 7 motivos. Sin recursos AWS creados.
+
+### Verificación H08-I — revisión 3 (2026-11-06)
+
+- [x] 8 SKU adicionales verificados en Price List (backup/restore DDB, retención/métricas/alarmas CW, Secrets Manager, solicitudes S3, inter-AZ): **22/22** `VERIFIED_AWS`.
+- [x] 3 partidas sin cargo con `DOC_OFICIAL` y fuente oficial (certificado CloudFront, VPC Origins, gateway endpoints).
+- [x] Bruto verificado del escenario C calculable: **79.0430 USD**; residual **6.8790 USD**.
+- [x] Cobertura con margen 10 %: 86.9473 ≤ 120 → **TOTAL**, importe sin cobertura 0.
+- [x] Cuota EC2: 2 instancias × 2 vCPU = **4 vCPU** (cuota 16), con prueba de regresión.
+- [x] Internet Gateway agregado al diseño por requisito oficial de VPC Origins, sin rutas públicas ni NAT.
+- [x] Evidencia de despliegue no autocertificable: huella SHA-256 + IDs reales + AZ distintas + documento de control con frase.
+- [x] Pruebas FinOps: **149 OK**.
+- [ ] IVA determinado — **NOT_VERIFIED** (sólo responsable fiscal).
+- [ ] Elegibilidad de VPC Origins en la cuenta — **NOT_VERIFIED** (requiere operación mutante autorizada).
+- [ ] Costo observado — **NOT_RUN** (Cost Explorer 0.01 USD/solicitud o captura de consola).
+- [ ] TLS extremo a extremo — **PENDIENTE** de firma humana (opción A recomendada).
+- [ ] Gate I-GO — **PENDIENTE**.
+
+**Estado (revisión 3):** `BLOCKED_FINOPS` con 5 motivos. Sin recursos AWS creados.
+

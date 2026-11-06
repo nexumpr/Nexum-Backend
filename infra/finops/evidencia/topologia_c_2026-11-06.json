@@ -1,0 +1,85 @@
+{
+  "id": "topologia_c",
+  "fecha": "2026-11-06",
+  "estado": "DISENO_NO_DESPLEGADO",
+  "fuente": "spec I-000 seccion 9 (topologia C); ADR_H05_CERO_PESOS_45_DIAS_V3.md; documentacion oficial de CloudFront VPC Origins",
+  "region": "us-east-2",
+  "instancias": [
+    {
+      "id": "backend-a",
+      "tipo": "proceso_servidor",
+      "az": "us-east-2a",
+      "simulado": false,
+      "misma_maquina": false,
+      "activa_simultanea": true,
+      "detras_de_balanceador": true,
+      "ipv4_publica": false,
+      "vcpu": 2
+    },
+    {
+      "id": "backend-b",
+      "tipo": "proceso_servidor",
+      "az": "us-east-2b",
+      "simulado": false,
+      "misma_maquina": false,
+      "activa_simultanea": true,
+      "detras_de_balanceador": true,
+      "ipv4_publica": false,
+      "vcpu": 2
+    }
+  ],
+  "capacidad": {
+    "instancias": 2,
+    "vcpu_por_instancia": 2,
+    "vcpu_totales_requeridos": 4,
+    "cuota_vcpu_on_demand_observada": 16,
+    "nota": "Cada t4g.micro aporta 2 vCPU: dos instancias requieren 4 vCPU, no 2"
+  },
+  "balanceador": {
+    "tipo": "cloudfront+alb",
+    "real": true,
+    "alb_esquema": "internal",
+    "cloudfront_vpc_origin": true
+  },
+  "red": {
+    "nat_gateways": 0,
+    "internet_gateway": true,
+    "rutas_publicas": false,
+    "gateway_endpoints": ["s3", "dynamodb"],
+    "interface_endpoints": 0,
+    "ipv4_publicas": 0,
+    "egress_restringido": true,
+    "nota": "El Internet Gateway es exigido por CloudFront VPC Origins para denotar que la VPC puede recibir trafico; NO se usa para enrutar y no habilita rutas por defecto hacia internet ni IPv4 publicas. Sin NAT Gateway ni interface endpoints."
+  },
+  "requisitos_vpc_origin": {
+    "region_soportada": "us-east-2 figura en la lista oficial de regiones soportadas",
+    "internet_gateway_adjunto": true,
+    "ipv4_libre_en_subred_privada": true,
+    "security_group_en_origen": "permitir inbound desde la prefix list com.amazonaws.global.cloudfront.origin-facing o desde el SG administrado CloudFront-VPCOrigins-Service-SG",
+    "restricciones": [
+      "No soporta gRPC",
+      "No soporta triggers de Lambda@Edge de origin request/response",
+      "Las NACL de entrada no se evaluan; las de salida deben permitir puertos efimeros 1024-65535"
+    ],
+    "estado_elegibilidad_cuenta": "NOT_VERIFIED: list-vpc-origins enumera origenes existentes, no la capacidad de crear uno",
+    "fuente": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-vpc-origins.html",
+    "fecha_fuente": "2026-11-06"
+  },
+  "tls": {
+    "navegador_a_cloudfront": "https_tls12+",
+    "cloudfront_a_origen": "http_privado",
+    "origen_extremo_a_extremo": false,
+    "aceptacion_humana_documentada": false,
+    "nota": "El tramo CloudFront->ALB es HTTP sobre red privada de VPC Origins. No equivale a TLS extremo a extremo. Requiere decision humana o recotizacion con ACM y nombre valido."
+  },
+  "persistencia": {
+    "dynamodb": "tabla unica on-demand con GSI",
+    "redis": "ElastiCache Redis OSS administrado, una instancia, subred privada"
+  },
+  "estado_verificacion": {
+    "disenio": "COMPLETO",
+    "recursos_creados": false,
+    "runtime": "NOT_RUN",
+    "nota": "Ningun recurso AWS ha sido creado; esta evidencia documenta diseno, no despliegue"
+  }
+}
