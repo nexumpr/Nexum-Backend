@@ -13,6 +13,24 @@
 
 `constitution.md` y `sdd/_control/H07/ESTADO_Y_GATES.md` son fuente normativa y estado único. No editar A/I/E para actualizar cabeceras históricas; conservar contraste con el Gate.
 
+## Registro de Implementación de Arquitectura Go (H08-A)
+
+### Spec A-000 (`A-000-contexto-sistema`):
+- **Alcance implementado:** Tipos de actores del sistema (`ActorUser`, `ActorMobileClient`, `ActorSystemOperator`, `ActorInfrastructure`), validación de frontera de autoridad financiera (rechazo programático de balance declarado por el cliente móvil, `R-031`, `CTX-005`), e invariantes de topología (mínimo 2 nodos en producción, TLS obligatorio, DynamoDB NoSQL y Redis distribuido).
+- **Archivos creados:** `pkg/types/system.go`, `internal/system/boundary.go`, `internal/system/context.go`, `internal/system/errors.go`, `cmd/server/main.go`, `tests/unit/system/context_test.go`.
+- **Resultado:** 100% PASS en `go test -v ./tests/unit/system/...` y `go vet ./...`.
+
+### Spec A-010 (`A-010-stack-go`):
+- **Alcance implementado:**
+  1. Runtime Go 1.27.3 y verificación de matriz de plataforma de 64 bits en Windows/Linux (`AC-A-010-01`).
+  2. HTTP y JSON seguro: `net/http` estándar, `DisallowUnknownFields`, limitación de bytes `MaxBytesReader` contra ataques de denegación de servicio (payload bombing) y estructura estándar de respuestas y errores en `pkg/httputil/json.go`.
+  3. Desacoplamiento de infraestructura: Puertos abstractos independientes para DynamoDB (`internal/ports/repository.go`) y Redis (`internal/ports/cache.go`), cumpliendo `AC-A-010-02`.
+  4. Seguridad e identidad: Puertos para derivación de contraseñas Argon2id y tokens de sesión JWT RS256 (`internal/ports/auth.go`).
+  5. Telemetría y observabilidad: Logger estructurado `log/slog` en formato JSON con filtro de sanitización automática que redacta credenciales, tokens, secretos y datos sensibles (`pkg/telemetry/logger.go`).
+  6. Construcción nativa: Totalmente funcional sin contenedores Docker locales (`AC-A-010-03`).
+- **Archivos creados:** `pkg/httputil/json.go`, `pkg/telemetry/logger.go`, `internal/ports/repository.go`, `internal/ports/cache.go`, `internal/ports/auth.go`, `tests/unit/platform/telemetry_test.go`, `tests/unit/platform/httputil_test.go`, `tests/unit/platform/auth_port_test.go`, `tests/unit/platform/repository_port_test.go`, `tests/unit/platform/runtime_test.go`.
+- **Resultado:** 100% PASS en suite completa de tests de plataforma (`tests/unit/platform/...`), 0 errores en `go vet ./...` y ejecución limpia de `cmd/server/main.go`.
+
 ## Registro de Incidentes y Resoluciones H08-A
 
 ### Incidente 1 (CI GitHub Actions: Falso Positivo `UNDECLARED_FILE` / `GIT_UNDECLARED`):
