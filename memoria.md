@@ -61,6 +61,22 @@
 - **Estado de Tareas:** A-030-T01..A-030-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
 - **Resultado:** 100% PASS en suite completa, `go vet` con 0 errores y validación SDD integral intacta.
 
+### Spec A-040 (`A-040-contratos-http`):
+- **Alcance implementado:**
+  1. Envoltorio de error canónico OpenAPI 3.1 en `pkg/httputil/contract.go`: formato `{"error":{"code":"...","message":"...","details":[],"traceId":"..."}}`, garantizando no-enumeración de recursos ajenos para 401/403/404 (`AC-A-040-02`).
+  2. Precisión monetaria estricta sin floats (GOV-06, A-040 §2.2): tipo `DecimalMoney` en `pkg/httputil/contract.go` que serializa/deserializa montos en formato string `"123.45"` mapeados a `int64` centavos y rechaza tajantemente floats crudos en JSON.
+  3. Tipos temporales estructurados: `DateOnly` (`YYYY-MM-DD`) y `YearMonth` (`YYYY-MM`) con validación de calendario civil.
+  4. Paginación segura mediante cursor opaco en `pkg/httputil/cursor.go`: cursores firmados con HMAC-SHA256, validados contra manipulación (tampering), expiración y pertenencia estricta al `userID` del solicitante (`AC-A-040-03`). Cabeceras `X-Cursor-Next` y `X-Has-More`.
+  5. Binding HTTP estricto en `internal/transport/http/binding.go`: rechazo de campos desconocidos (`DisallowUnknownFields`), límite de bytes de payload y validación de cabecera obligatoria `Idempotency-Key` para mutaciones financieras.
+  6. Suite de verificación en `tests/unit/transport/contracts_test.go`:
+     - Matriz de 75 rutas auditada con 0 colisiones: exactamente 33 M, 23 S, 12 E, 7 O (`AC-A-040-01`).
+     - Rechazo de números de coma flotante en campos monetarios.
+     - Pruebas criptográficas de integridad y vencimiento de cursores de paginación.
+     - Verificación de cabeceras de idempotencia y paginación (`AC-A-040-03`).
+- **Archivos creados:** `pkg/httputil/contract.go`, `pkg/httputil/cursor.go`, `internal/transport/http/binding.go`, `tests/unit/transport/contracts_test.go`.
+- **Estado de Tareas:** A-040-T01..A-040-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
+- **Resultado:** 100% PASS en `go test -v ./...`, `go vet ./...` con 0 errores y validación SDD integral intacta.
+
 ## Registro de Incidentes y Resoluciones H08-A
 
 ### Incidente 1 (CI GitHub Actions: Falso Positivo `UNDECLARED_FILE` / `GIT_UNDECLARED`):
@@ -68,3 +84,9 @@
 - **Causa raíz:** `validar_sdd_integral.py` fue diseñado en H07 para validar exclusivamente el SDD documental frente a `BASELINE_SHA256.json`. Al ingresar archivos Go en las rutas legítimas de H08-A (`cmd/`, `internal/`, `pkg/`, `tests/`, `go.mod`, `go.sum`), el script los trataba como extras imprevistos del SDD.
 - **Solución aplicada:** Se actualizó `herramientas/validar_sdd_integral.py` con `is_h08_code` para aislar las rutas de código de implementación H08-A de la validación estricta de documentos SDD, y se sincronizó el hash de control en `BASELINE_SHA256.json`.
 - **Verificación:** Ejecución de `validar_sdd_integral.py --check-git` (PASS), `validar_h06.py` (PASS) y `herramientas/tests/` (10/10 tests OK). Pruebas de Go en Windows nativo (`go test -v ./...` y `go vet ./...`) al 100% PASS.
+
+### Incidente 2 (A-040: Sobrescritura de TTL negativo en generador de cursores):
+- **Error observado:** Durante la prueba unitaria de expiración de cursor, `TestPaginationCursorSecurity` falló porque el cursor con TTL de `-1*time.Minute` se reportaba como no expirado.
+- **Causa raíz:** `GenerateCursor` evaluaba `if ttl <= 0 { ttl = DefaultCursorTTL }`, reemplazando cualquier duración negativa de prueba por el valor por defecto de 2 horas.
+- **Solución aplicada:** Se ajustó la condición a `if ttl == 0 { ttl = DefaultCursorTTL }`, permitiendo simular marcas de tiempo vencidas para verificación determinista de expiración.
+- **Verificación:** `go test -v ./tests/unit/transport/...` 100% PASS.
