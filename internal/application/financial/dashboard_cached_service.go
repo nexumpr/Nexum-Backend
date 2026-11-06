@@ -76,3 +76,4 @@ func (s *DashboardCachedService) InvalidateUserCache(ctx context.Context, userID
 	prefix := domainCache.UserCachePrefix(s.env, userID)
 	return s.cache.DeletePrefix(ctx, prefix)
 }
+

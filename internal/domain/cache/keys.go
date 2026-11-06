@@ -64,3 +64,4 @@ func RateLimitKey(endpointClass, identifier string) string {
 	idHash := HashIdentifier(identifier)
 	return fmt.Sprintf("nexum:rl:%s:%s", endpointClass, idHash)
 }
+
