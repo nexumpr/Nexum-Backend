@@ -43,7 +43,16 @@ MAPEO: dict[str, tuple[str, str]] = {
     "precio_ddb_wru": ("DDB_WRU_MILLON", "1000000"),
     "precio_ddb_pitr": ("DDB_PITR_GB_MES", "1"),
     "precio_s3_standard": ("S3_STANDARD_GB_MES", "1"),
+    # S3 publica por solicitud; el catálogo trabaja por mil solicitudes.
+    "precio_s3_solicitudes": ("S3_SOLICITUDES_LOTE", "1000"),
     "precio_cloudwatch_logs_ingesta": ("CW_LOGS_INGESTA_GB", "1"),
+    "precio_cw_logs_storage": ("CW_LOGS_ALMACEN_GB_MES", "1"),
+    "precio_cw_metrica": ("CW_METRICA_MES", "1"),
+    "precio_cw_alarma": ("CW_ALARMA_MES", "1"),
+    "precio_secret_manager": ("SECRETS_SECRETO_MES", "1"),
+    "precio_ddb_backup": ("DDB_BACKUP_GB_MES", "1"),
+    "precio_ddb_restore": ("DDB_RESTORE_GB", "1"),
+    "precio_interaz": ("ELASTICACHE_INTERAZ_GB", "1"),
     "precio_ipv4_publica": ("IPV4_HORA", "1"),
     "precio_cloudfront_egreso": ("EGRESO_INTERNET_GB", "1"),
 }

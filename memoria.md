@@ -218,3 +218,13 @@
 - **Decisión:** `BLOCKED_FINOPS` con 7 motivos (IVA no determinado, VPC Origins no confirmado, costo observado no verificado, precios incompletos, bruto verificado desconocido, cobertura no calculable y TLS sin resolver).
 - **Pruebas:** `py -3.13 -m unittest discover -s tests/infra/finops` → 140 pruebas OK. Validador SDD, H06 OpenAPI, `herramientas/tests`, `go build`, `go vet` y `go test` ejecutados en la misma corrida.
 - **Sin recursos AWS:** no se creó, modificó ni destruyó nada; no se ejecutó Terraform; la verificación de dos instancias sigue siendo de diseño (`DESIGN_VALIDATED`) con runtime `NOT_RUN`.
+
+### I-000 revisión 3 — precios completos y evidencia blindada (2026-11-06)
+
+- **Precios:** 8 SKU adicionales verificados en Price List (backup/restore DynamoDB, retención/métricas/alarmas CloudWatch, Secrets Manager, solicitudes S3 Tier1, transferencia inter-AZ) → **22 SKU `VERIFIED_AWS`**. Tres partidas sin cargo quedan `DOC_OFICIAL` con fuente oficial: certificado CloudFront, VPC Origins y gateway endpoints.
+- **Cifras:** bruto C 84.0430 USD, **bruto verificado 79.0430** (excluye 5.0000 de reservas no facturables), residual 6.8790, cobertura **TOTAL** con margen 10 % (86.9473 ≤ 120 verificados), importe sin cobertura 0.0000.
+- **Cuota EC2:** dos `t4g.micro` exigen **4 vCPU** (2 por instancia); cuota observada 16. Corregido con prueba de regresión.
+- **VPC Origins:** la documentación oficial exige **Internet Gateway adjunto** (sin rutas públicas) y una IPv4 libre en subred privada; us-east-2 está soportado. El diseño se corrigió con `internet_gateway: true` y `rutas_publicas: false`, sin NAT ni IPv4 públicas.
+- **Evidencia de despliegue:** ya no se autocertifica con `verificado_por_humano: true`; exige huella SHA-256 de la respuesta cruda, dos IDs con formato real de instancia en `running` y AZ distintas, y un documento de control con la frase `APRUEBO_DESPLIEGUE_VERIFICADO_AWS` que cite el archivo. Sigue `NOT_RUN`.
+- **TLS:** ADR con opciones A (HTTP privado CloudFront→ALB, gratis) y B (HTTPS hasta ALB, requiere dominio propio de pago); se recomienda A con aceptación formal. Pendiente de firma humana.
+- **Decisión:** `BLOCKED_FINOPS` con **5 motivos** (IVA, elegibilidad VPC Origins, costo observado, riesgo de cobro derivado y TLS). Pruebas FinOps: **149 OK**.

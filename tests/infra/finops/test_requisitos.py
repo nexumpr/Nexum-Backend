@@ -63,6 +63,25 @@ class RequisitosTopologia(unittest.TestCase):
             requisitos.validar_dos_instancias(self.topologia),
         )
 
+    def test_internet_gateway_requerido_por_vpc_origin(self) -> None:
+        self.topologia["red"]["internet_gateway"] = False
+        violaciones = requisitos.validar_conectividad_privada(self.topologia)
+        self.assertTrue(any("INTERNET_GATEWAY_AUSENTE" in v for v in violaciones))
+
+    def test_rutas_publicas_prohibidas(self) -> None:
+        self.topologia["red"]["rutas_publicas"] = True
+        violaciones = requisitos.validar_conectividad_privada(self.topologia)
+        self.assertTrue(any("RUTAS_PUBLICAS_PRESENTES" in v for v in violaciones))
+
+    def test_dos_instancias_requieren_cuatro_vcpu(self) -> None:
+        capacidad = self.topologia["capacidad"]
+        self.assertEqual(capacidad["vcpu_por_instancia"], 2)
+        self.assertEqual(capacidad["vcpu_totales_requeridos"], 4)
+        self.assertGreaterEqual(
+            capacidad["cuota_vcpu_on_demand_observada"],
+            capacidad["vcpu_totales_requeridos"],
+        )
+
     def test_nat_presente_falla(self) -> None:
         self.topologia["red"]["nat_gateways"] = 1
         self.assertIn(
@@ -118,38 +137,102 @@ class DisenoNoEsDespliegue(unittest.TestCase):
         self.assertEqual(resultado["estado"], "NOT_RUN")
         self.assertIsNone(resultado["evidencia"])
 
-    def test_evidencia_de_runtime_incompleta_no_acredita(self) -> None:
+    def _escribir_evidencia(self, directorio: Path, contenido: dict) -> None:
+        (directorio / "despliegue_runtime_2026-11-06.json").write_text(
+            json.dumps(contenido), encoding="utf-8"
+        )
+
+    def _evidencia_completa(self) -> dict:
+        return {
+            "origen": "aws_ec2_describe_instances",
+            "estado": "VERIFIED_AWS",
+            "verificado_por_humano": True,
+            "huella_sha256": "a" * 64,
+            "instancias": [
+                {"id": "i-0abc1234567890def", "estado": "running", "az": "us-east-2a"},
+                {"id": "i-0fedcba9876543210", "estado": "running", "az": "us-east-2b"},
+            ],
+        }
+
+    def _control(self, directorio: Path, contenido: str) -> None:
+        (directorio / requisitos.NOMBRE_APROBACION).write_text(contenido, encoding="utf-8")
+
+    def test_json_fabricado_con_humano_true_no_acredita(self) -> None:
+        """Un JSON escrito a mano no puede autocertificar el despliegue."""
+
         with tempfile.TemporaryDirectory() as tmp:
-            dir_tmp = Path(tmp)
-            (dir_tmp / "despliegue_runtime_2026-11-06.json").write_text(
-                json.dumps(
-                    {
-                        "origen": "aws_ec2_describe_instances",
-                        "estado": "VERIFIED_AWS",
-                        "verificado_por_humano": False,
-                        "instancias": [{"id": "i-1"}, {"id": "i-2"}],
-                    }
-                ),
-                encoding="utf-8",
+            dir_ev = Path(tmp) / "ev"
+            dir_ctl = Path(tmp) / "ctl"
+            dir_ev.mkdir()
+            dir_ctl.mkdir()
+            self._escribir_evidencia(dir_ev, self._evidencia_completa())
+            resultado = requisitos.verificar_despliegue(dir_ev, dir_ctl)
+        self.assertEqual(resultado["estado"], "NOT_RUN")
+        self.assertTrue(any("APROBACION_DESPLIEGUE_VERIFICADO" in d for d in resultado["detalle"]))
+
+    def test_ids_sin_formato_aws_no_acreditan(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            dir_ev = Path(tmp) / "ev"
+            dir_ctl = Path(tmp) / "ctl"
+            dir_ev.mkdir()
+            dir_ctl.mkdir()
+            datos = self._evidencia_completa()
+            datos["instancias"] = [
+                {"id": "i-1", "estado": "running", "az": "us-east-2a"},
+                {"id": "i-2", "estado": "running", "az": "us-east-2b"},
+            ]
+            self._escribir_evidencia(dir_ev, datos)
+            self._control(
+                dir_ctl,
+                f"{requisitos.FRASE_APROBACION_DESPLEGUE}\nver despliegue_runtime_2026-11-06.json",
             )
-            resultado = requisitos.verificar_despliegue(dir_tmp)
+            resultado = requisitos.verificar_despliegue(dir_ev, dir_ctl)
         self.assertEqual(resultado["estado"], "NOT_RUN")
 
-    def test_evidencia_valida_acredita_despliegue(self) -> None:
+    def test_sin_huella_no_acredita(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            dir_tmp = Path(tmp)
-            (dir_tmp / "despliegue_runtime_2026-11-06.json").write_text(
-                json.dumps(
-                    {
-                        "origen": "aws_ec2_describe_instances",
-                        "estado": "VERIFIED_AWS",
-                        "verificado_por_humano": True,
-                        "instancias": [{"id": "i-1"}, {"id": "i-2"}],
-                    }
-                ),
-                encoding="utf-8",
+            dir_ev = Path(tmp) / "ev"
+            dir_ctl = Path(tmp) / "ctl"
+            dir_ev.mkdir()
+            dir_ctl.mkdir()
+            datos = self._evidencia_completa()
+            del datos["huella_sha256"]
+            self._escribir_evidencia(dir_ev, datos)
+            self._control(
+                dir_ctl,
+                f"{requisitos.FRASE_APROBACION_DESPLEGUE}\ndespliegue_runtime_2026-11-06.json",
             )
-            resultado = requisitos.verificar_despliegue(dir_tmp)
+            resultado = requisitos.verificar_despliegue(dir_ev, dir_ctl)
+        self.assertEqual(resultado["estado"], "NOT_RUN")
+
+    def test_misma_az_no_acredita(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            dir_ev = Path(tmp) / "ev"
+            dir_ctl = Path(tmp) / "ctl"
+            dir_ev.mkdir()
+            dir_ctl.mkdir()
+            datos = self._evidencia_completa()
+            datos["instancias"][1]["az"] = "us-east-2a"
+            self._escribir_evidencia(dir_ev, datos)
+            self._control(
+                dir_ctl,
+                f"{requisitos.FRASE_APROBACION_DESPLEGUE}\ndespliegue_runtime_2026-11-06.json",
+            )
+            resultado = requisitos.verificar_despliegue(dir_ev, dir_ctl)
+        self.assertEqual(resultado["estado"], "NOT_RUN")
+
+    def test_evidencia_completa_con_control_acredita(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            dir_ev = Path(tmp) / "ev"
+            dir_ctl = Path(tmp) / "ctl"
+            dir_ev.mkdir()
+            dir_ctl.mkdir()
+            self._escribir_evidencia(dir_ev, self._evidencia_completa())
+            self._control(
+                dir_ctl,
+                f"{requisitos.FRASE_APROBACION_DESPLEGUE}\nEvidencia: despliegue_runtime_2026-11-06.json",
+            )
+            resultado = requisitos.verificar_despliegue(dir_ev, dir_ctl)
         self.assertEqual(resultado["estado"], "AWS_DEPLOYMENT_VERIFIED")
         self.assertEqual(resultado["evidencia"], "despliegue_runtime_2026-11-06.json")
 

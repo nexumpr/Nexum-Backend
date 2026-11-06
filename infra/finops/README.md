@@ -16,7 +16,7 @@ ni destruye recursos AWS; no ejecuta Terraform; no cambia el plan Free a Paid.
 | `modelo_costos.py` | Cálculo determinista a 45 días, costo residual, créditos y desembolso |
 | `viabilidad.py` | Regla de decisión `VIABLE` / `BLOCKED_FINOPS` con motivos y evidencia faltante |
 | `requisitos.py` | Valida dos instancias reales simultáneas y red privada sin NAT |
-| `consultas_readonly.py` | Catálogo de 24 consultas AWS de solo lectura; un único `--region` y un único `--filters` por comando |
+| `consultas_readonly.py` | Catálogo de 32 consultas AWS de solo lectura; un único `--region` y un único `--filters` por comando |
 | `precios_api.py` | Extrae precios reales de Price List; descarta tramos gratuitos y SKU de soporte extendido |
 | `evidencia_aws.py` | Construye evidencia sanitizada de cuenta, servicios y Free Tier con los campos reales de AWS |
 | `sanitizar.py` | Enmascara cuenta, ARN, correos, claves, IPv4 y tokens antes de versionar |
@@ -52,5 +52,9 @@ sanitizada se guarda en `evidencia/`.
 - Los créditos declarados (120 USD del contexto H05) **no** son créditos verificados.
 - Cost Explorer cobra USD 0.01 por solicitud: no se ejecuta sin aprobación humana específica.
 - La comprobación de dos instancias y red privada valida el **diseño** (`DESIGN_VALIDATED`); el
-  runtime sigue `NOT_RUN` y sólo `aws_ec2_describe_instances` con revisión humana puede cambiarlo.
+  runtime sigue `NOT_RUN`. Para pasar a `AWS_DEPLOYMENT_VERIFIED` se exige evidencia de
+  `aws_ec2_describe_instances` con huella SHA-256, dos IDs reales en AZ distintas y un documento de
+  control con la frase `APRUEBO_DESPLIEGUE_VERIFICADO_AWS`.
+- CloudFront VPC Origins exige un **Internet Gateway adjunto** (sin rutas públicas, sin NAT).
+- `DOC_OFICIAL` sólo cuenta para el bruto verificado si el precio es 0 y existe `fuente_oficial`.
 - El saldo de créditos se toma de `accountPlanRemainingCredits`; el gasto liquidado sigue en Billing.

@@ -134,9 +134,9 @@
       "sku": "backup on-demand",
       "unidad": "GB-mes",
       "precio_usd": "0.1",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item DynamoDB backup",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ddb_backup (serviceCode=AmazonDynamoDB, usagetype=USE2-TimedBackupStorage-ByteHrs)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Backup on-demand con retencion"
     },
     "DDB_RESTORE_GB": {
@@ -144,9 +144,9 @@
       "sku": "restauracion por GB",
       "unidad": "GB-restaurado",
       "precio_usd": "0.15",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item DynamoDB restore",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ddb_restore (serviceCode=AmazonDynamoDB, usagetype=USE2-RestoreDataSize-Bytes)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Restauracion de prueba; no ejecutada"
     },
     "CW_LOGS_INGESTA_GB": {
@@ -164,9 +164,9 @@
       "sku": "almacenamiento de logs",
       "unidad": "GB-mes",
       "precio_usd": "0.03",
-      "estado": "HIPOTESIS",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item CloudWatch log retention",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_cw_logs_storage (serviceCode=AmazonCloudWatch, usagetype=USE2-TimedStorage-ByteHrs)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Retencion 7 dias"
     },
     "CW_METRICA_MES": {
@@ -174,9 +174,9 @@
       "sku": "metrica personalizada",
       "unidad": "metrica-mes",
       "precio_usd": "0.3",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item CloudWatch custom metrics",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_cw_metrica (serviceCode=AmazonCloudWatch, usagetype=USE2-CW:MetricMonitorUsage)",
+      "fecha_fuente": "2026-11-06",
       "nota": "No consumir metricas ilimitadas"
     },
     "CW_ALARMA_MES": {
@@ -184,9 +184,9 @@
       "sku": "alarma estandar",
       "unidad": "alarma-mes",
       "precio_usd": "0.1",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item CloudWatch alarms",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_cw_alarma (serviceCode=AmazonCloudWatch, usagetype=USE2-CW:AlarmMonitorUsage)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Alarmas y presupuesto avisan; no impiden cargos"
     },
     "SECRETS_SECRETO_MES": {
@@ -194,9 +194,9 @@
       "sku": "secreto almacenado",
       "unidad": "secreto-mes",
       "precio_usd": "0.4",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item Secrets Manager",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_secrets (serviceCode=AWSSecretsManager, usagetype=USE2-AWSSecretsManager-Secrets)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Requests adicionales no modeladas"
     },
     "S3_STANDARD_GB_MES": {
@@ -212,12 +212,12 @@
     "S3_SOLICITUDES_LOTE": {
       "servicio": "Amazon S3",
       "sku": "lote de solicitudes PUT/GET modelado",
-      "unidad": "lote",
-      "precio_usd": "0.015",
-      "estado": "SUPUESTO",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item S3 requests",
-      "fecha_fuente": "2026-11-05",
-      "nota": "Supuesto de workload; reconciliar con consumo real"
+      "unidad": "mil-solicitudes",
+      "precio_usd": "0.005",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_s3_solicitudes (serviceCode=AmazonS3, usagetype=USE2-Requests-Tier1)",
+      "fecha_fuente": "2026-11-06",
+      "nota": "Precio Tier1 verificado por solicitud y escalado a mil; 10 mil solicitudes modeladas"
     },
     "EGRESO_INTERNET_GB": {
       "servicio": "Transferencia de datos",
@@ -234,9 +234,9 @@
       "sku": "transferencia entre zonas de disponibilidad",
       "unidad": "GB",
       "precio_usd": "0.01",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item Inter-AZ Redis",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_interaz (serviceCode=AWSDataTransfer, usagetype=USE2-DataTransfer-Regional-Bytes)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Sujeto a trafico real"
     },
     "IPV4_HORA": {
@@ -264,30 +264,36 @@
       "sku": "certificado TLS por defecto *.cloudfront.net",
       "unidad": "certificado",
       "precio_usd": "0",
-      "estado": "DISENO_DOC",
+      "estado": "DOC_OFICIAL",
       "fuente": "FINOPS_45_DIAS_MODELO_V3.json item Certificado CloudFront por defecto",
       "fecha_fuente": "2026-11-05",
-      "nota": "Sin ACM propio; no cubre TLS extremo a extremo hasta ALB"
+      "nota": "Sin cargo adicional segun la pagina oficial de precios de CloudFront; no es un SKU de Price List",
+      "fuente_oficial": "https://aws.amazon.com/cloudfront/pricing/",
+      "alcance": "Certificado TLS por defecto con dominio *.cloudfront.net; no cubre dominio propio ni el tramo hasta el origen"
     },
     "CLOUDFRONT_VPC_ORIGIN": {
       "servicio": "Amazon CloudFront",
       "sku": "funcionalidad VPC Origins",
       "unidad": "funcionalidad",
       "precio_usd": "0",
-      "estado": "DISENO_DOC",
+      "estado": "DOC_OFICIAL",
       "fuente": "AWS What's New 2024-11 CloudFront VPC Origins",
       "fecha_fuente": "2026-11-05",
-      "nota": "Sin cargo adicional por la funcionalidad segun AWS; disponibilidad en la cuenta NO confirmada"
+      "nota": "Elegibilidad de la cuenta NO verificada; list-vpc-origins no la acredita",
+      "fuente_oficial": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-vpc-origins.html",
+      "alcance": "VPC Origins no tiene cargo adicional; exige Internet Gateway adjunto (sin costo) y una IPv4 libre en subred privada; soportado en us-east-2"
     },
     "VPC_GATEWAY_ENDPOINT": {
       "servicio": "Amazon VPC",
       "sku": "gateway endpoint S3/DynamoDB",
       "unidad": "endpoint",
       "precio_usd": "0",
-      "estado": "DISENO_DOC",
+      "estado": "DOC_OFICIAL",
       "fuente": "AWS VPC Gateway endpoints",
       "fecha_fuente": "2026-11-05",
-      "nota": "Sin cargo por hora; evita NAT"
+      "nota": "Los interface endpoints si tienen cargo por hora; el diseno C no los usa",
+      "fuente_oficial": "https://aws.amazon.com/privatelink/pricing/",
+      "alcance": "Gateway endpoints para S3 y DynamoDB sin cargo por hora ni por GB procesado"
     },
     "CI_CD_RESERVA": {
       "servicio": "CI/CD",
@@ -342,5 +348,5 @@
   },
   "creditos_declarados_usd": "120",
   "estado_global": "VERIFIED_AWS_PARCIAL",
-  "nota_estado_global": "14 SKU con precio VERIFIED_AWS via aws pricing get-products; las partidas sin consulta de precio siguen DOC_ONLY/HIPOTESIS/SUPUESTO y bloquean el bruto verificado"
+  "nota_estado_global": "22 SKU con precio VERIFIED_AWS; 3 partidas sin cargo con DOC_OFICIAL y fuente oficial; el resto UNKNOWN o excluido por diseno. DOC_OFICIAL solo cuenta como verificado si el precio es 0 y hay fuente."
 }

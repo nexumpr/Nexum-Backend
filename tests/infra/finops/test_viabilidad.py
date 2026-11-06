@@ -105,23 +105,25 @@ class EvidenciaReal(unittest.TestCase):
             "IMPUESTOS_NO_DETERMINADOS",
             "VPC_ORIGIN_NO_CONFIRMADO",
             "COSTO_OBSERVADO_NO_VERIFICADO",
-            "PRECIOS_NO_VERIFICADOS",
-            "COSTO_VERIFICADO_DESCONOCIDO",
-            "COBERTURA_NO_CALCULABLE",
+            "RIESGO_COBRO_PERSONAL",
             "TLS_NO_RESUELTO",
         ):
             self.assertIn(esperado, codigos, decision["motivos"])
+        # Con 22 precios verificados y 3 partidas sin cargo documentadas, los
+        # precios ya no bloquean: el bruto verificado es calculable.
+        self.assertNotIn("PRECIOS_NO_VERIFICADOS", codigos, decision["motivos"])
 
     def test_financiero_separa_calculado_y_verificado(self) -> None:
         decision = viabilidad.evaluar(EVIDENCIA_REAL, PRECIOS, TOPOLOGIA, hoy=HOY)
         fin = decision["resumen_financiero"]
         self.assertIsNotNone(fin["costo_bruto_calculado_usd"])
-        self.assertIsNone(fin["costo_bruto_verificado_usd"])
-        self.assertEqual(fin["cobertura_creditos"], "UNKNOWN")
+        self.assertIsNotNone(fin["costo_bruto_verificado_usd"])
+        self.assertEqual(fin["partidas_sin_verificar"], [])
+        self.assertEqual(fin["cobertura_creditos"], "TOTAL")
         self.assertEqual(fin["impuestos"], "UNKNOWN")
         self.assertTrue(fin["riesgo_cobro_personal"])
         self.assertEqual(fin["politica_gasto_personal"], "CERO")
-        self.assertTrue(fin["partidas_sin_verificar"])
+        self.assertLess(float(fin["creditos_requeridos_usd"]), 120.0)
 
     def test_creditos_verificados_vienen_de_aws(self) -> None:
         decision = viabilidad.evaluar(EVIDENCIA_REAL, PRECIOS, TOPOLOGIA, hoy=HOY)
@@ -269,9 +271,13 @@ class RequisitosBloqueantes(unittest.TestCase):
     def test_precios_sin_verificar_bloquean(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             dir_tmp = Path(tmp)
+            catalogo = json.loads(PRECIOS.read_text(encoding="utf-8"))
+            catalogo["items"]["SECRETS_SECRETO_MES"]["estado"] = "DOC_ONLY"
+            ruta = dir_tmp / "precios_incompletos.json"
+            ruta.write_text(json.dumps(catalogo, ensure_ascii=False), encoding="utf-8")
             decision = self._evaluar(
                 _evidencia_verificada(),
-                PRECIOS,
+                ruta,
                 _topologia_resuelta(dir_tmp),
             )
         codigos = _codigos(decision)

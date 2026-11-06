@@ -1,0 +1,6 @@
+{
+  "FormatVersion": "aws_v1",
+  "PriceList": [
+    "{\"product\":{\"productFamily\":\"Amazon DynamoDB Restore Data Size\",\"attributes\":{\"volumeType\":\"Amazon DynamoDB - Backup Restore Size\",\"regionCode\":\"us-east-2\",\"servicecode\":\"AmazonDynamoDB\",\"usagetype\":\"USE2-RestoreDataSize-Bytes\",\"locationType\":\"AWS Region\",\"location\":\"US East (Ohio)\",\"servicename\":\"Amazon DynamoDB\",\"operation\":\"\"},\"sku\":\"UJGJNWRM8WZ4BH56\"},\"serviceCode\":\"AmazonDynamoDB\",\"terms\":{\"OnDemand\":{\"UJGJNWRM8WZ4BH56.JRTCKXETXF\":{\"priceDimensions\":{\"UJGJNWRM8WZ4BH56.JRTCKXETXF.6YS6EN2CT7\":{\"unit\":\"GB\",\"endRange\":\"Inf\",\"description\":\"$0.15 per GB of data restored\",\"appliesTo\":[],\"rateCode\":\"UJGJNWRM8WZ4BH56.JRTCKXETXF.6YS6EN2CT7\",\"beginRange\":\"0\",\"pricePerUnit\":{\"USD\":\"0.1500000000\"}}},\"sku\":\"UJGJNWRM8WZ4BH56\",\"effectiveDate\":\"2026-11-01T00:00:00Z\",\"offerTermCode\":\"JRTCKXETXF\",\"termAttributes\":{}}}},\"version\":\"20261105164016\",\"publicationDate\":\"2026-11-05T16:40:16Z\"}"
+  ]
+}

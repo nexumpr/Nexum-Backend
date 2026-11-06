@@ -1,80 +1,103 @@
-# ADR — Costo cero y plan Free para I-000
+# ADR — Costo cero, IGW/VPC Origins y TLS para I-000
 
 - **ID:** `ADR-COSTO-CERO-I000`
-- **Fecha:** 2026-11-06 · **Fase:** H08-I · **Spec:** I-000-cuenta-finops
+- **Fecha:** 2026-11-06 (revisión 3) · **Fase:** H08-I · **Spec:** I-000-cuenta-finops
 - **Estado:** `PROPUESTO — BLOCKED_FINOPS` (no aprobado; no autoriza aprovisionamiento)
 - **Aprobador requerido:** responsable humano del Backend
 
 ## 1. Contexto
 
-El requisito exige Backend en AWS con **costo cero** y el responsable fijó una regla irrenunciable:
-**cero pesos de dinero personal**, sin pasar a AWS Paid y sin comprar dominio. La topología
-seleccionable es C: CloudFront con `*.cloudfront.net`, origen VPC hacia un ALB privado, dos
-instancias EC2 privadas en zonas distintas, Redis OSS administrado, DynamoDB on-demand y gateway
-endpoints para S3 y DynamoDB (sin NAT), durante 45 días 24×7.
+Backend en AWS con **costo cero** y **cero pesos de dinero personal**, sin pasar a Paid y sin
+comprar dominio. Topología C: CloudFront (`*.cloudfront.net`) → VPC Origin → ALB privado → dos EC2
+privadas en AZ distintas, Redis OSS, DynamoDB on-demand, gateway endpoints S3/DynamoDB, 45 días 24×7.
 
-## 2. Evidencia verificada en AWS (2026-11-06)
+## 2. Evidencia AWS verificada (2026-11-06, perfil `nexum`, sólo lectura)
 
 | Hecho | Valor | Estado |
 |---|---|---|
-| Plan de cuenta | `FREE`, `ACTIVE` | `VERIFIED_AWS` |
-| Expiración del plan | 2027-05-04 | `VERIFIED_AWS` |
+| Plan | `FREE` / `ACTIVE`, expira 2027-05-04 | `VERIFIED_AWS` |
 | Créditos restantes | 120.0 USD (`accountPlanRemainingCredits`) | `VERIFIED_AWS` |
-| Cuota de vCPU On-Demand | 16 | `VERIFIED_AWS` |
-| `t4g.micro` disponible | us-east-2a / 2b / 2c | `VERIFIED_AWS` |
-| ElastiCache Redis OSS | `cache.t4g.micro` redis 7.1 a 0.016 USD/nodo-hora | `VERIFIED_AWS` |
-| ALB | 0.0225 USD/h + 0.008 USD/LCU-h (`AWSELB`) | `VERIFIED_AWS` |
-| CloudFront VPC Origins | 0 orígenes existentes; elegibilidad **no** acreditada | `NOT_VERIFIED` |
-| Costo bruto verificado 45 d | `UNKNOWN` (11 partidas sin precio verificado) | `NOT_VERIFIED` |
+| Cuota vCPU On-Demand | 16 (dos `t4g.micro` = **4 vCPU**, no 2) | `VERIFIED_AWS` |
+| `t4g.micro` | us-east-2a / 2b / 2c | `VERIFIED_AWS` |
+| Redis OSS | `cache.t4g.micro` redis 7.1, 0.016 USD/nodo-hora | `VERIFIED_AWS` |
+| Precios | **22 SKU** por Price List API | `VERIFIED_AWS` |
+| Partidas sin cargo | certificado CloudFront, VPC Origins, gateway endpoints | `DOC_OFICIAL` |
+| Costo bruto C | 84.0430 USD (verificado 79.0430) | calculado/verificado |
+| Cobertura con margen 10 % | requerido 86.9473 ≤ 120 → **TOTAL** | calculado |
 | Costo observado facturado | Desconocido; Cost Explorer no ejecutado | `NOT_RUN` |
-| IVA / impuestos | `UNKNOWN` | `NOT_VERIFIED` |
+| IVA | `UNKNOWN` | `NOT_VERIFIED` |
+| Elegibilidad VPC Origins | No acreditada por `list-vpc-origins` | `NOT_VERIFIED` |
 
-Cifras modeladas: C = 84.0080 USD (bruto calculado, tarifas mixtas), residual 6.8440 USD,
-A = 91.8080 USD, B = 28.9820 USD (no cumple 24×7).
+## 3. Internet Gateway y VPC Origins (corrección de diseño)
 
-## 3. Decisión
+La documentación oficial de CloudFront exige, para crear un VPC origin:
 
-1. **Se declara `BLOCKED_FINOPS`.** Hay cuenta Free vigente con 120 USD de créditos, pero el bruto
-   verificado y la cobertura son indeterminables mientras 11 partidas requeridas no tengan precio
-   `VERIFIED_AWS`; además el IVA no está determinado y el TLS extremo a extremo no está resuelto.
-2. **No se aprueba aprovisionamiento.** Ni recursos, ni presupuestos, ni alarmas, ni Terraform.
-3. **Se mantiene el diseño C** como candidato, condicionado a confirmar VPC Origins y completar la
-   cotización verificada.
-4. **Se rechaza la variante B (8 h/día)** como entorno requerido: no ofrece 24×7.
-5. **Se conserva A** sólo como comparador de costo mayor.
-6. **La política de gasto personal cero se mantiene**, pero se declara explícitamente que **no**
-   prueba ausencia de cobro: `riesgo_cobro_personal` es `True` mientras la cobertura sea `UNKNOWN`.
+1. **Internet Gateway adjunto** a la VPC. No se usa para enrutar; sólo denota que la VPC puede
+   recibir tráfico de internet. **No implica rutas públicas, NAT ni IPv4 públicas.**
+2. Subred **privada** con al menos **una IPv4 libre** (sin costo) para la ENI que crea CloudFront.
+3. Origen (ALB) con **security group** que permita inbound desde la prefix list
+   `com.amazonaws.global.cloudfront.origin-facing` o desde el SG administrado
+   `CloudFront-VPCOrigins-Service-SG`.
+4. Región soportada: **us-east-2 figura en la lista oficial**.
+5. Restricciones: no gRPC, no triggers de Lambda@Edge de origin.
 
-## 4. Alternativas evaluadas
+**Distinciones que no deben confundirse:** Internet Gateway (requerido, gratis, sin rutas públicas)
+≠ NAT Gateway (0 en el diseño, con costo) ≠ rutas públicas (0) ≠ IPv4 públicas de EC2 (0) ≠ acceso
+privado de CloudFront al ALB (el túnel de VPC Origins).
 
-| Alternativa | Bruto calculado 45 d | 24×7 | Decisión |
-|---|---|---|---|
-| C — CloudFront + VPC Origin + privadas | 84.0080 (no verificado) | Sí | Candidata, bloqueada por evidencia |
-| A — ALB público + IPv4 | 91.8080 (piso, no techo) | Sí | Sólo comparador |
-| B — ventanas 8 h/día | 28.9820 | **No** | Rechazada para el entorno requerido |
-| Mocks o dobles como producción | — | — | Prohibido (R-036/R-037) |
+El diseño se corrigió: `red.internet_gateway = true`, `red.rutas_publicas = false`, NAT 0, IPv4
+públicas 0. La elegibilidad de la cuenta sigue `NOT_VERIFIED` porque `list-vpc-origins` sólo enumera
+orígenes existentes (0) y **crear uno es una operación mutante no autorizada**.
 
-## 5. Riesgos residuales
+## 4. TLS extremo a extremo: opciones
 
-1. **Cobertura indeterminada**: 120 USD verificados no garantizan cubrir un bruto aún desconocido;
-   el margen exigido es 10 % y no puede aplicarse hasta tener el bruto verificado.
-2. **Costo variable**: LCU, egreso, solicitudes CloudFront y transferencia inter-AZ dependen del
-   tráfico real; las reservas del modelo son supuestos, no tarifas.
-3. **Cost Explorer facturable**: 0.01 USD por solicitud; no se usó, por lo que no se puede afirmar
-   que el gasto observado sea cero.
-4. **TLS no extremo a extremo**: el tramo CloudFront→ALB es HTTP privado; exige aceptación formal o
-   recotización con ACM y nombre válido.
-5. **IVA**: sin determinación fiscal; no se asume 0 %.
-6. **Apagado no elimina el costo**: persisten 6.8440 USD por datos, backups, logs y secretos.
-7. **Créditos con expiración no verificada individualmente**: la API expone saldo y fecha de plan,
-   no el vencimiento de cada lote de crédito.
+| Criterio | **A. HTTPS cliente→CloudFront + HTTP privado hasta ALB** | **B. HTTPS cliente→CloudFront + HTTPS hasta ALB** |
+|---|---|---|
+| Compatibilidad con VPC Origins | Sí (tráfico en túnel privado, sin internet) | Sí, con listener HTTPS en el ALB |
+| Certificado necesario | Por defecto `*.cloudfront.net` (gratis) | ACM en us-east-2 para el ALB **+ nombre de dominio propio** |
+| Dominio propio | No | **Sí** (ACM no valida sin dominio controlado) |
+| Costo | 0 USD | ACM público 0 USD, pero dominio/Route 53 > 0 USD |
+| Cero gasto personal | Compatible | **Incompatible** salvo dominio ya poseído y pagado |
+| Riesgo de seguridad | Tramo interno sin cifrar (aislado en VPC, sin tránsito público) | Cifrado de extremo a extremo |
+| Cumplimiento estricto del SDD | Requiere aceptación formal de excepción | Cumple sin excepción |
 
-## 6. Consecuencias
+**Recomendación:** opción **A** con **aceptación formal documentada** del responsable, porque B exige
+un dominio de pago y rompe la regla de cero gasto personal. Si el responsable exige B, debe aportar
+un dominio ya financiado (fuera del presupuesto del proyecto) y se recotiza. En ningún caso se
+aprueba la excepción por decisión del agente: queda `TLS_NO_RESUELTO` hasta la firma humana.
 
-- I-000 **no cierra** e I-010 **no inicia** hasta que el responsable:
-  1. acepte o rechace el costo de completar los precios pendientes (nuevas consultas sin cargo);
-  2. decida sobre el gasto de 0.01 USD por solicitud de Cost Explorer o aporte captura de consola;
-  3. resuelva IVA y TLS extremo a extremo;
-  4. firme la decisión final con la evidencia adjunta.
-- Todo importe se recalcula con `modelo_costos.py`; no se editan cifras a mano sin regenerar
-  `resultados/costos_45d.json`.
+## 5. Costo observado e impuestos
+
+- **Cost Explorer** cuesta 0.01 USD por solicitud: no se ejecutó. Alternativa gratuita: consola de
+  facturación → **Billing and Cost Management → Bills** (mes en curso) y **Free Tier** (uso por
+  servicio). Campos a revisar: `Total net cost` del periodo y uso por servicio. Evidencia admisible:
+  captura o exportación sanitizada (sin números de cuenta ni datos personales) o autorización
+  expresa de una solicitud de Cost Explorer.
+- **IVA:** no se determina desde las APIs consultadas. Distinguir (a) normativa fiscal oficial,
+  (b) datos fiscales de la cuenta, (c) impuesto realmente facturado y (d) suposición. No se imputa
+  0 %; se requiere determinación responsable o factura real.
+
+## 6. Decisión
+
+1. **`BLOCKED_FINOPS`** con 5 motivos: IVA no determinado, elegibilidad de VPC Origins no confirmada,
+   costo observado no verificado, riesgo de cobro personal asociado y TLS sin resolver.
+2. **No se aprueba aprovisionamiento.** Sin recursos, presupuestos, alarmas ni Terraform.
+3. **Cobertura de créditos `TOTAL`** con el bruto verificado y margen 10 % (86.9473 ≤ 120), pero eso
+   **no** convierte la decisión en `VIABLE`: los cinco bloqueos siguen abiertos.
+4. Se rechaza B (8 h/día) como entorno requerido y A queda como comparador de mayor costo.
+5. El riesgo de cobro personal se mantiene `True` porque el IVA no está determinado.
+
+## 7. Riesgos residuales
+
+1. Créditos: 120 USD verificados no garantizan cubrir 45 días si el tráfico real supera el modelo.
+2. Variables: LCU, egreso, solicitudes CloudFront y transferencia inter-AZ dependen del uso real.
+3. Apagado no elimina el costo: persisten **6.8790 USD** (datos, backups, logs, secretos, alarmas).
+4. Creación de VPC Origins y ALB requiere autorización mutante posterior.
+5. TLS: si se exige B, aparece costo de dominio.
+6. Cost Explorer: sin autorización, "cero gasto observado" sigue sin demostrar.
+
+## 8. Consecuencias
+
+I-000 no cierra e I-010 no inicia hasta que el responsable: (1) determine IVA, (2) acepte la opción
+TLS A o aporte dominio para B, (3) autorice la comprobación de elegibilidad de VPC Origins en fase de
+despliegue, (4) aporte evidencia de facturación o autorice Cost Explorer, y (5) firme el cierre.

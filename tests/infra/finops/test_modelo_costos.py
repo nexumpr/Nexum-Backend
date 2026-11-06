@@ -95,29 +95,68 @@ class BrutoVerificado(unittest.TestCase):
         cls.catalogo = modelo_costos.cargar_precios(RUTA_PRECIOS)
         cls.resumen = modelo_costos.calcular_todo(cls.catalogo, "0")
 
-    def test_bruto_verificado_es_none_si_falta_una_partida(self) -> None:
+    def test_todas_las_partidas_requeridas_tienen_evidencia(self) -> None:
         escenario = self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
-        self.assertIsNone(escenario["total_bruto_verificado_45d_usd"])
-        self.assertTrue(escenario["partidas_sin_verificar"])
-        self.assertIn("CERT_CF", escenario["partidas_sin_verificar"])
+        self.assertEqual(escenario["partidas_sin_verificar"], [])
+        self.assertIsNotNone(escenario["total_bruto_verificado_45d_usd"])
 
-    def test_bruto_verificado_existe_con_todo_verificado(self) -> None:
+    def test_bruto_verificado_excluye_reservas_no_facturables(self) -> None:
+        escenario = self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
+        reservas = dinero.sumar(
+            [
+                p["subtotal_usd"]
+                for p in escenario["partidas"]
+                if not p["requerida"] and p["subtotal_usd"] is not None
+            ]
+        )
+        self.assertGreater(reservas, 0)
+        self.assertEqual(
+            dinero.sumar(
+                [escenario["total_bruto_verificado_45d_usd"], dinero.formatear(reservas)]
+            ),
+            dinero.dec(escenario["total_bruto_45d_usd"]),
+        )
+
+    def test_cero_sin_cargo_oficial_cuenta_solo_con_fuente(self) -> None:
         catalogo = json.loads(json.dumps(self.catalogo))
-        for item in catalogo["items"].values():
-            if item["estado"] != "UNKNOWN":
-                item["estado"] = "VERIFIED_AWS"
+        catalogo["items"]["CLOUDFRONT_VPC_ORIGIN"]["fuente_oficial"] = ""
         escenario = modelo_costos.calcular_escenario(
             escenarios.escenario_c_cloudfront_privado(), catalogo
         )
-        self.assertEqual(escenario["total_bruto_verificado_45d_usd"], escenario["total_bruto_45d_usd"])
-        self.assertEqual(escenario["partidas_sin_verificar"], [])
+        self.assertIn("VPC_ORIGIN", escenario["partidas_sin_verificar"])
+        self.assertIsNone(escenario["total_bruto_verificado_45d_usd"])
+
+    def test_doc_oficial_con_precio_no_cero_no_cuenta(self) -> None:
+        catalogo = json.loads(json.dumps(self.catalogo))
+        catalogo["items"]["VPC_GATEWAY_ENDPOINT"]["precio_usd"] = "1.00"
+        escenario = modelo_costos.calcular_escenario(
+            escenarios.escenario_c_cloudfront_privado(), catalogo
+        )
+        self.assertIn("GW_ENDPOINTS", escenario["partidas_sin_verificar"])
+
+    def test_partida_sin_evidencia_anula_el_bruto_verificado(self) -> None:
+        catalogo = json.loads(json.dumps(self.catalogo))
+        catalogo["items"]["SECRETS_SECRETO_MES"]["estado"] = "DOC_ONLY"
+        escenario = modelo_costos.calcular_escenario(
+            escenarios.escenario_c_cloudfront_privado(), catalogo
+        )
+        self.assertIsNone(escenario["total_bruto_verificado_45d_usd"])
+        self.assertIn("SECRETS", escenario["partidas_sin_verificar"])
 
     def test_grados_de_evidencia_contabilizados(self) -> None:
         escenario = self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
         conteo = escenario["grados_evidencia"]
         self.assertEqual(sum(conteo.values()), len(escenario["partidas"]))
         self.assertGreater(conteo.get("VERIFIED_AWS", 0), 0)
-        self.assertGreater(conteo.get("DOC_ONLY", 0) + conteo.get("HIPOTESIS", 0), 0)
+        self.assertGreater(conteo.get("DOC_OFICIAL", 0), 0)
+        no_verificadas_requeridas = [
+            p["clave"]
+            for p in escenario["partidas"]
+            if p["requerida"]
+            and dinero.dec(p["cantidad"]) > 0
+            and p["estado_evidencia"] not in ("VERIFIED_AWS", "DOC_OFICIAL")
+        ]
+        self.assertEqual(no_verificadas_requeridas, [])
 
 
 class PreciosDesconocidos(unittest.TestCase):

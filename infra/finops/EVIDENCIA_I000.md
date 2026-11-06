@@ -81,3 +81,32 @@ sólo la versión sanitizada se versionó en `infra/finops/evidencia/`.
 - La verificación de dos instancias es de **diseño**; el runtime es `NOT_RUN` y no existe archivo
   `despliegue_runtime_*.json`.
 - No se creó ningún recurso, presupuesto, alarma, certificado ni se ejecutó Terraform.
+
+## 7. Revisión 3 (2026-11-06) — precios restantes y blindaje de evidencia
+
+| Cambio | Resultado real |
+|---|---|
+| SKU de precio agregados | **8**: backup y restore DynamoDB, retención/métricas/alarmas CloudWatch, Secrets Manager, solicitudes S3, transferencia inter-AZ |
+| Total de precios | **22/22** `VERIFIED_AWS` (antes 14) |
+| Partidas sin cargo | 3 con `DOC_OFICIAL` y fuente oficial: certificado CloudFront, VPC Origins, gateway endpoints |
+| Bruto verificado C | **79.0430 USD** (antes `UNKNOWN`) |
+| Costo cubierto con margen 10 % | 86.9473 USD ≤ 120 verificados → cobertura **TOTAL** |
+| Residual apagado | 6.8790 USD |
+| Motivos de bloqueo | de 7 a **5** |
+
+Correcciones adicionales:
+
+- **Cuota EC2:** dos `t4g.micro` requieren **4 vCPU** (2 por instancia), no 2. Contrastado con la cuota
+  observada de 16 vCPU y cubierto por `test_dos_instancias_requieren_cuatro_vcpu`.
+- **Internet Gateway:** la documentación oficial de CloudFront exige IGW adjunto para VPC Origins.
+  El diseño se corrigió (`internet_gateway: true`, `rutas_publicas: false`) sin NAT, rutas públicas ni
+  IPv4 públicas. Pruebas: `test_internet_gateway_requerido_por_vpc_origin`,
+  `test_rutas_publicas_prohibidas`.
+- **Evidencia de despliegue:** exige huella SHA-256 de la respuesta cruda, dos IDs con formato real de
+  instancia en `running` y AZ distintas, y un documento de control con la frase
+  `APRUEBO_DESPLIEGUE_VERIFICADO_AWS` que cite el archivo. Un JSON con `verificado_por_humano: true`
+  ya **no** acredita nada (`test_json_fabricado_con_humano_true_no_acredita`).
+- **TLS:** análisis de opciones A y B en el ADR; se recomienda A con aceptación formal, pendiente de
+  firma humana.
+
+Pruebas: `py -3.13 -m unittest discover -s tests/infra/finops` → **149 pruebas OK**.

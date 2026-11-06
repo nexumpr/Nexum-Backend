@@ -98,3 +98,21 @@
 
 **Estado de la spec (revisión 2):** `BLOCKED_FINOPS` con 7 motivos. Sin recursos AWS creados.
 
+### Verificación H08-I — revisión 3 (2026-11-06)
+
+- [x] 8 SKU adicionales verificados en Price List (backup/restore DDB, retención/métricas/alarmas CW, Secrets Manager, solicitudes S3, inter-AZ): **22/22** `VERIFIED_AWS`.
+- [x] 3 partidas sin cargo con `DOC_OFICIAL` y fuente oficial (certificado CloudFront, VPC Origins, gateway endpoints).
+- [x] Bruto verificado del escenario C calculable: **79.0430 USD**; residual **6.8790 USD**.
+- [x] Cobertura con margen 10 %: 86.9473 ≤ 120 → **TOTAL**, importe sin cobertura 0.
+- [x] Cuota EC2: 2 instancias × 2 vCPU = **4 vCPU** (cuota 16), con prueba de regresión.
+- [x] Internet Gateway agregado al diseño por requisito oficial de VPC Origins, sin rutas públicas ni NAT.
+- [x] Evidencia de despliegue no autocertificable: huella SHA-256 + IDs reales + AZ distintas + documento de control con frase.
+- [x] Pruebas FinOps: **149 OK**.
+- [ ] IVA determinado — **NOT_VERIFIED** (sólo responsable fiscal).
+- [ ] Elegibilidad de VPC Origins en la cuenta — **NOT_VERIFIED** (requiere operación mutante autorizada).
+- [ ] Costo observado — **NOT_RUN** (Cost Explorer 0.01 USD/solicitud o captura de consola).
+- [ ] TLS extremo a extremo — **PENDIENTE** de firma humana (opción A recomendada).
+- [ ] Gate I-GO — **PENDIENTE**.
+
+**Estado (revisión 3):** `BLOCKED_FINOPS` con 5 motivos. Sin recursos AWS creados.
+

@@ -148,3 +148,17 @@ equivocado.
 **No ejecutado:** Cost Explorer (0.01 USD por solicitud), Terraform, creación de recursos,
 presupuestos, alarmas, despliegue y verificación HTTP.
 
+### Revisión 3 — resolución de precios y blindaje (2026-11-06)
+
+| Tarea | Estado real | Evidencia |
+|---|---|---|
+| T-000-02 Matriz por recurso | `PASS` | 22 SKU `VERIFIED_AWS` + 3 partidas `DOC_OFICIAL` con fuente |
+| T-000-04 Costeo | `PASS` | bruto C 84.0430, verificado 79.0430, residual 6.8790 |
+| T-000-05 Bloqueo de decisión | `PASS` regla aplicada → `BLOCKED_FINOPS` (5 motivos) | `resultados/viabilidad_i000.json` |
+| T-000-90 Riesgos y dependencias | `PASS` documentado; riesgos abiertos en ADR §7 | `ADR_COSTO_CERO_I000.md` |
+
+- Cuota EC2 corregida: 2 instancias × 2 vCPU = **4 vCPU** (cuota 16).
+- Internet Gateway agregado al diseño por requisito oficial de VPC Origins (`rutas_publicas: false`).
+- Evidencia de despliegue endurecida: huella SHA-256 + IDs reales + documento de control con frase.
+- Pruebas FinOps: **149 OK**.
+

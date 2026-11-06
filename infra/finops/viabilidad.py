@@ -252,13 +252,31 @@ def _evaluar_precios(
     motivos: list[dict] = []
     condiciones: list[str] = []
     escenario = resumen_costos["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
+    def _cuenta_como_verificada(partida: dict) -> bool:
+        if partida["estado_evidencia"] == ESTADO_VERIFICADO:
+            return True
+        return (
+            partida["estado_evidencia"] == modelo_costos.ESTADO_SIN_CARGO_OFICIAL
+            and partida["subtotal_usd"] == "0.0000"
+            and bool(partida.get("fuente_oficial"))
+        )
+
     no_verificadas = [
         p["clave"]
         for p in escenario["partidas"]
-        if p["requerida"]
-        and dinero.dec(p["cantidad"]) > 0
-        and p["estado_evidencia"] != ESTADO_VERIFICADO
+        if p["requerida"] and dinero.dec(p["cantidad"]) > 0 and not _cuenta_como_verificada(p)
     ]
+    reservas = [
+        p["clave"] for p in escenario["partidas"] if not p["requerida"] and p["subtotal_usd"]
+    ]
+    if reservas:
+        reserva_total = dinero.sumar(
+            [p["subtotal_usd"] for p in escenario["partidas"] if not p["requerida"] and p["subtotal_usd"]]
+        )
+        condiciones.append(
+            f"El bruto verificado excluye reservas de modelado no facturables ({', '.join(reservas)}): "
+            f"{dinero.formatear(reserva_total)} USD"
+        )
     if no_verificadas:
         motivos.append(
             _motivo(

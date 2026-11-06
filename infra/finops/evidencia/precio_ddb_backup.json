@@ -1,0 +1,6 @@
+{
+  "FormatVersion": "aws_v1",
+  "PriceList": [
+    "{\"product\":{\"productFamily\":\"Amazon DynamoDB On-Demand Backup Storage\",\"attributes\":{\"volumeType\":\"Amazon DynamoDB - On-Demand Backup Storage\",\"regionCode\":\"us-east-2\",\"servicecode\":\"AmazonDynamoDB\",\"usagetype\":\"USE2-TimedBackupStorage-ByteHrs\",\"locationType\":\"AWS Region\",\"location\":\"US East (Ohio)\",\"servicename\":\"Amazon DynamoDB\",\"operation\":\"\"},\"sku\":\"QENR6PH8T6ETTDHT\"},\"serviceCode\":\"AmazonDynamoDB\",\"terms\":{\"OnDemand\":{\"QENR6PH8T6ETTDHT.JRTCKXETXF\":{\"priceDimensions\":{\"QENR6PH8T6ETTDHT.JRTCKXETXF.6YS6EN2CT7\":{\"unit\":\"GB-Month\",\"endRange\":\"Inf\",\"description\":\"$0.10 per GB-Month of storage used for on-demand backup\",\"appliesTo\":[],\"rateCode\":\"QENR6PH8T6ETTDHT.JRTCKXETXF.6YS6EN2CT7\",\"beginRange\":\"0\",\"pricePerUnit\":{\"USD\":\"0.1000000000\"}}},\"sku\":\"QENR6PH8T6ETTDHT\",\"effectiveDate\":\"2026-11-01T00:00:00Z\",\"offerTermCode\":\"JRTCKXETXF\",\"termAttributes\":{}}}},\"version\":\"20261105164016\",\"publicationDate\":\"2026-11-05T16:40:16Z\"}"
+  ]
+}

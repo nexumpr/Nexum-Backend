@@ -73,7 +73,7 @@ def _partidas_base_24x7() -> tuple[Partida, ...]:
         Partida("CW_ALARMAS", "CloudWatch alarmas", "3", "alarma-mes", "CW_ALARMA_MES"),
         Partida("SECRETS", "Secrets Manager", "3", "secreto-mes", "SECRETS_SECRETO_MES"),
         Partida("S3_STATE", "S3 Terraform state", "3", "GB-mes", "S3_STANDARD_GB_MES"),
-        Partida("S3_SOLICITUDES", "S3 solicitudes", "1", "lote", "S3_SOLICITUDES_LOTE"),
+        Partida("S3_SOLICITUDES", "S3 solicitudes", "10", "mil-solicitudes", "S3_SOLICITUDES_LOTE"),
         Partida("EGRESO", "Egreso a internet", "10", "GB", "EGRESO_INTERNET_GB"),
         Partida("REDIS_INTERAZ", "Transferencia inter-AZ Redis", "10", "GB", "ELASTICACHE_INTERAZ_GB"),
         Partida("CI_CD", "Reserva CI/CD", "1", "lote", "CI_CD_RESERVA", requerida=False),

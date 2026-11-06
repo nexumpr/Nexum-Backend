@@ -2,7 +2,9 @@
   "condiciones": [
     "Vigencia declarada hasta 2027-05-04: cubre la ventana de 45 dias; no garantiza que los creditos no se agoten antes",
     "Cost Explorer tiene costo por solicitud (USD 0.01); su uso requiere aprobacion humana concreta",
-    "Partidas de reserva/supuesto no tarifarias incluidas: S3_SOLICITUDES, CI_CD, RESERVA_CF",
+    "El bruto verificado excluye reservas de modelado no facturables (CI_CD, RESERVA_CF): 5.0000 USD",
+    "Partidas de reserva/supuesto no tarifarias incluidas: CI_CD, RESERVA_CF",
+    "Politica de gasto personal: CERO. No se contempla pago con fondos propios ni plan Paid",
     "Uso del plan Free Tier no verificado (aws freetier get-free-tier-usage)",
     "Instancias y balanceo reales: verificacion runtime NOT_RUN hasta que exista autorizacion de despliegue"
   ],
@@ -26,19 +28,9 @@
       "evidencia_requerida": "consola de facturacion (accion humana) o autorizacion especifica de Cost Explorer"
     },
     {
-      "codigo": "PRECIOS_NO_VERIFICADOS",
-      "detalle": "11 partidas requeridas sin precio verificado en AWS: DDB_BACKUP, DDB_RESTORE, CW_RETENCION, CW_METRICAS, CW_ALARMAS, SECRETS, S3_SOLICITUDES, REDIS_INTERAZ, CERT_CF, VPC_ORIGIN, GW_ENDPOINTS",
-      "evidencia_requerida": "aws pricing get-products por SKU en us-east-2 y actualizacion del catalogo"
-    },
-    {
-      "codigo": "COSTO_VERIFICADO_DESCONOCIDO",
-      "detalle": "el bruto verificado a 45 dias no puede calcularse: hay partidas requeridas sin precio VERIFIED_AWS",
-      "evidencia_requerida": "catalogo completo con evidencia AWS para todas las partidas requeridas"
-    },
-    {
-      "codigo": "COBERTURA_NO_CALCULABLE",
-      "detalle": "sin bruto verificado no puede afirmarse cobertura de creditos",
-      "evidencia_requerida": "precios VERIFIED_AWS de todas las partidas requeridas"
+      "codigo": "RIESGO_COBRO_PERSONAL",
+      "detalle": "existe importe potencialmente sin cobertura o impuestos indeterminados; la politica de gasto personal es cero, pero cero desembolso no es prueba de que no haya cobro",
+      "evidencia_requerida": "cobertura TOTAL verificada e impuestos determinados"
     },
     {
       "codigo": "TLS_NO_RESUELTO",
@@ -46,45 +38,36 @@
       "evidencia_requerida": "aceptacion documentada o recotizacion con ACM y nombre valido"
     }
   ],
-  "motivos_bloqueantes": 7,
+  "motivos_bloqueantes": 5,
   "nota": "VIABLE exige cuenta Free verificada, vigencia de 45 dias, precios VERIFIED_AWS, cobertura TOTAL con margen, impuestos determinados y TLS resuelto; la ausencia de errores o la existencia de creditos no eleva el estado",
   "resumen_financiero": {
-    "cobertura_creditos": "UNKNOWN",
-    "costo_bruto_calculado_usd": "84.0080",
-    "costo_bruto_verificado_usd": null,
+    "cobertura_creditos": "TOTAL",
+    "costo_bruto_calculado_usd": "84.0430",
+    "costo_bruto_verificado_usd": "79.0430",
     "creditos_declarados_usd": "120.0000",
-    "creditos_requeridos_usd": null,
+    "creditos_requeridos_usd": "86.9473",
     "creditos_verificados_usd": "120.0000",
     "desembolso_personal_autorizado_usd": "0.0000",
-    "importe_sin_cobertura_usd": null,
+    "importe_sin_cobertura_usd": "0.0000",
     "impuestos": "UNKNOWN",
     "margen_seguridad": "0.1000",
-    "partidas_sin_verificar": [
-      "DDB_BACKUP",
-      "DDB_RESTORE",
-      "CW_RETENCION",
-      "CW_METRICAS",
-      "CW_ALARMAS",
-      "SECRETS",
-      "S3_SOLICITUDES",
-      "REDIS_INTERAZ",
-      "CERT_CF",
-      "VPC_ORIGIN",
-      "GW_ENDPOINTS"
-    ],
+    "partidas_sin_verificar": [],
     "politica_gasto_personal": "CERO",
-    "residual_apagado_usd": "6.8440",
+    "residual_apagado_usd": "6.8790",
     "riesgo_cobro_personal": true
   },
   "revision_topologia": {
     "autocertificacion": [],
     "conectividad_privada": [],
+    "detalle_despliegue": [
+      "sin archivo despliegue_runtime_*.json"
+    ],
     "diseno_valido": true,
     "dos_instancias": [],
     "estado_despliegue": "NOT_RUN",
     "estado_diseno": "DESIGN_VALIDATED",
     "evidencia_despliegue": null,
-    "motivo_despliegue": "no existe evidencia de runtime AWS (se exige aws_ec2_describe_instances con 2 instancias y revisión humana)",
+    "motivo_despliegue": "no existe evidencia de runtime AWS (se exige aws_ec2_describe_instances con 2 instancias, huella y control humano)",
     "nota": "Las comprobaciones de este módulo validan el DOCUMENTO DE DISENO; un campo real=true no acredita instancias, balanceo ni trafico",
     "tls": [],
     "verificacion_runtime": "NOT_RUN"

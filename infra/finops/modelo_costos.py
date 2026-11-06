@@ -32,11 +32,17 @@ RUTA_PRECIOS = Path(__file__).with_name("precios_us-east-2.json")
 ESTADO_VERIFICADO = "VERIFIED_AWS"
 ESTADOS_CON_PRECIO = {
     "VERIFIED_AWS",
+    "DOC_OFICIAL",
     "DOC_ONLY",
     "HIPOTESIS",
     "SUPUESTO",
     "DISENO_DOC",
 }
+
+# Cuentan para el bruto verificado: precio de la Price List API, o ausencia de
+# cargo demostrada con documentacion oficial y precio 0.
+ESTADOS_VERIFICADOS = {"VERIFIED_AWS"}
+ESTADO_SIN_CARGO_OFICIAL = "DOC_OFICIAL"
 
 # Partidas que dejan de facturarse cuando el runtime se apaga.
 LINEAS_APAGABLES = {
@@ -131,6 +137,7 @@ def calcular_escenario(escenario: escenarios.Escenario, catalogo: dict) -> dict:
                 "estado_evidencia": estado,
                 "subtotal_usd": None if subtotal is None else dinero.formatear(subtotal),
                 "requerida": partida.requerida,
+                "fuente_oficial": item.get("fuente_oficial"),
                 "nota": partida.nota or item.get("nota", ""),
             }
         )
@@ -179,7 +186,12 @@ def calcular_bruto_verificado(detalle: list[dict]) -> tuple[str | None, list[str
     verificados: list[Decimal] = []
     for linea in detalle:
         requerida = linea["requerida"] and dinero.dec(linea["cantidad"]) > 0
-        if linea["estado_evidencia"] == ESTADO_VERIFICADO and linea["subtotal_usd"] is not None:
+        sin_cargo_oficial = (
+            linea["estado_evidencia"] == ESTADO_SIN_CARGO_OFICIAL
+            and linea["subtotal_usd"] == "0.0000"
+            and bool(linea.get("fuente_oficial"))
+        )
+        if (linea["estado_evidencia"] in ESTADOS_VERIFICADOS or sin_cargo_oficial) and linea["subtotal_usd"] is not None:
             verificados.append(dinero.dec(linea["subtotal_usd"]))
         elif requerida:
             pendientes.append(linea["clave"])
