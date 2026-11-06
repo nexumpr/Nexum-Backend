@@ -142,6 +142,16 @@
 - **Estado de Tareas:** A-090-T01..A-090-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
 - **Resultado:** 100% PASS en suite completa de Go y 0 errores en `go vet ./...`.
 
+### Spec A-100 (`A-100-qa-devsecops`):
+- **Alcance implementado:**
+  1. Auditoría estática de secretos y credenciales crudas (`internal/infrastructure/security/audit.go`): detector automatizado de claves de acceso AWS, llaves privadas PEM y tokens sensibles con bloqueo programático (`ErrHardcodedSecretDetected`, `GOV-07`, `AC-A-100-02`).
+  2. Procedimiento y manifiesto de release con aprobación humana (`internal/infrastructure/security/audit.go`): estructura formal `ReleaseManifest` y validador `ValidateReleaseGate` que certifica 75 operaciones OpenAPI 3.1 registradas, pruebas al 100% PASS, ausencia de secretos y aprobación humana obligatoria conforme a `GOV-01` (`AC-A-100-03`).
+  3. Validación de contratos OpenAPI 3.1 de las 75 operaciones (`tests/unit/devsecops/openapi_compliance_test.go`): auditoría programática que certifica la distribución exacta de las 75 rutas (33 Movimientos, 23 Sistema, 12 Estadísticas, 7 Otros), prefijos `/api/v1` y respuestas estructuradas RFC 7807 sin referencias rotas (`AC-A-100-01`).
+  4. Estrés de concurrencia masiva libre de data races (`tests/unit/devsecops/race_condition_test.go`): prueba con 90 workers concurrentes ejecutando operaciones sobre `DistributedCache`, `MemoryIdempotencyStore` y `SingleTableStore` sin condiciones de carrera ni corrupción de memoria (`AC-A-100-02`).
+- **Archivos creados:** `internal/infrastructure/security/audit.go`, `tests/unit/devsecops/openapi_compliance_test.go`, `tests/unit/devsecops/race_condition_test.go`.
+- **Estado de Tareas:** A-100-T01..A-100-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
+- **Resultado:** 100% PASS en suite completa de Go y 0 errores en `go vet ./...`.
+
 ## Registro de Incidentes y Resoluciones H08-A
 
 ### Incidente 1 (CI GitHub Actions: Falso Positivo `UNDECLARED_FILE` / `GIT_UNDECLARED`):
