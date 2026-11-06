@@ -2,6 +2,11 @@ variable "proyecto" {
   description = "Prefijo de nombres de recursos"
   type        = string
   default     = "nexum"
+
+  validation {
+    condition     = can(regex("^[a-z0-9-]{2,20}$", var.proyecto))
+    error_message = "proyecto debe ser minúsculas, dígitos o guiones."
+  }
 }
 
 variable "entorno" {
@@ -27,35 +32,52 @@ variable "region" {
 }
 
 variable "cidr_vpc" {
-  description = "CIDR de la VPC (RFC1918, sin superposición conocida)"
+  description = "CIDR de la VPC: debe ser RFC1918 válido"
   type        = string
   default     = "10.42.0.0/16"
 
   validation {
-    condition     = can(cidrhost(var.cidr_vpc, 0)) && can(regex("^(10|172|192)\\.", var.cidr_vpc))
-    error_message = "cidr_vpc debe ser un CIDR privado válido."
+    condition = (
+      can(cidrnetmask(var.cidr_vpc)) &&
+      (
+        can(regex("^10\\.", var.cidr_vpc)) ||
+        can(regex("^172\\.(1[6-9]|2[0-9]|3[01])\\.", var.cidr_vpc)) ||
+        can(regex("^192\\.168\\.", var.cidr_vpc))
+      ) &&
+      tonumber(split("/", var.cidr_vpc)[1]) >= 16 &&
+      tonumber(split("/", var.cidr_vpc)[1]) <= 24
+    )
+    error_message = "cidr_vpc debe ser un CIDR RFC1918 válido con prefijo entre /16 y /24."
   }
 }
 
-variable "cidrs_subredes" {
-  description = "Un CIDR privado por zona (dos zonas por requisito de ALB/AZ)"
-  type        = list(string)
-  default     = ["10.42.10.0/24", "10.42.11.0/24"]
+variable "bits_subredes" {
+  description = "Bits añadidos al CIDR de la VPC para cada subred (derivadas, sin superposición)"
+  type        = number
+  default     = 8
 
   validation {
-    condition     = length(var.cidrs_subredes) == 2 && alltrue([for c in var.cidrs_subredes : can(cidrhost(c, 0))])
-    error_message = "Se exigen exactamente 2 CIDR de subred válidos."
+    condition = (
+      var.bits_subredes >= 4 &&
+      var.bits_subredes <= 12 &&
+      (tonumber(split("/", var.cidr_vpc)[1]) + var.bits_subredes) <= 28
+    )
+    error_message = "bits_subredes debe dar subredes de al menos /16 y como máximo /28."
   }
 }
 
 variable "zonas" {
-  description = "Zonas de disponibilidad (2, distintas)"
+  description = "Zonas de disponibilidad (2, distintas, de la región)"
   type        = list(string)
   default     = ["us-east-2a", "us-east-2b"]
 
   validation {
-    condition     = length(var.zonas) == 2 && length(distinct(var.zonas)) == 2
-    error_message = "Se exigen 2 zonas distintas."
+    condition = (
+      length(var.zonas) == 2 &&
+      length(distinct(var.zonas)) == 2 &&
+      alltrue([for az in var.zonas : startswith(az, var.region)])
+    )
+    error_message = "Se exigen 2 zonas distintas y pertenecientes a var.region."
   }
 }
 

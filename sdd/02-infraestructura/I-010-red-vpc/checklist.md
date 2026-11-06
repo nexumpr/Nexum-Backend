@@ -58,3 +58,13 @@
 - [ ] Recursos AWS creados — NOT_RUN por Gate.
 - [ ] `terraform plan` contra AWS — NO AUTORIZADO.
 - [ ] Verificacion runtime de red — corresponde a I-020/I-030.
+
+### Correccion de auditoria — 2026-11-06
+
+- [x] Egress S3 por prefix list administrada en 443 (`backend_s3_443`).
+- [x] Egress DynamoDB por prefix list administrada en 443 (`backend_dynamodb_443`).
+- [x] NACL con ingress/egress completos y efimeros 1024-65535 en ambos sentidos.
+- [x] CIDR RFC1918 validado y subredes derivadas sin superposicion.
+- [x] Pruebas negativas de permisos Terraform.
+- [ ] Conectividad AWS real — NOT_RUN_AWS (sin despliegue).
+- [ ] Mecanismo de secretos demostrado (arranque, rotacion, recuperacion) — dependencia obligatoria de I-020/I-060.

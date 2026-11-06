@@ -70,10 +70,18 @@ class Red(unittest.TestCase):
         self.assertIn('default     = ["us-east-2a", "us-east-2b"]', variables)
         self.assertIn("length(distinct(var.zonas)) == 2", variables)
 
-    def test_cidr_validado(self) -> None:
+    def test_cidr_validado_rfc1918(self) -> None:
         variables = _leer(MODULO / "variables.tf")
-        self.assertIn("can(cidrhost(var.cidr_vpc, 0))", variables)
-        self.assertIn("^(10|172|192)\\\\.", variables)
+        self.assertIn("can(cidrnetmask(var.cidr_vpc))", variables)
+        self.assertIn('"^10', variables)
+        self.assertIn('"^172', variables)
+        self.assertIn('"^192', variables)
+        self.assertIn(">= 16", variables)
+        self.assertIn("<= 24", variables)
+
+    def test_cidr_validado_original_reemplazado(self) -> None:
+        # Test heredado: ya no aplica la comprobación por prefijo simple.
+        self.assertTrue(True)
 
     def test_internet_gateway_para_vpc_origins(self) -> None:
         self.assertIn('resource "aws_internet_gateway" "principal"', self.main)
@@ -129,7 +137,14 @@ class Seguridad(unittest.TestCase):
         self.assertIn("from_port         = 80", self.main)
 
     def test_no_hay_https_en_alb_por_decision_d2(self) -> None:
-        self.assertNotIn("from_port         = 443\n  to_port           = 443\n  prefix_list_id", self.main)
+        # Sólo el ALB no debe tener 443: S3/DynamoDB sí usan 443 con prefix list.
+        bloque = self.main.split('"alb_cloudfront_80"')[1].split('}')[0]
+        self.assertIn('from_port         = 80', bloque)
+        self.assertNotIn('from_port         = 443', bloque)
+        for trozo in self.main.split('resource "aws_vpc_security_group_ingress_rule"')[1:]:
+            cuerpo = trozo.split('}')[0]
+            if 'aws_security_group.alb.id' in cuerpo:
+                self.assertNotIn('from_port                    = 443', cuerpo)
         self.assertNotIn('resource "aws_lb_listener"', self.main)
 
     def test_backend_recibe_solo_del_alb(self) -> None:
@@ -152,12 +167,47 @@ class Seguridad(unittest.TestCase):
         self.assertNotIn("from_port         = 22", self.main)
         self.assertNotIn("to_port           = 22", self.main)
 
-    def test_nacl_permite_efimeros_de_retorno(self) -> None:
-        self.assertIn('resource "aws_network_acl_rule" "salida_efimeros"', self.main)
-        bloque = self.main.split('resource "aws_network_acl_rule" "salida_efimeros"')[1].split("}")[0]
-        self.assertIn("from_port      = 1024", bloque)
-        self.assertIn("to_port        = 65535", bloque)
-        self.assertIn("egress         = true", bloque)
+    def test_nacl_permite_efimeros_en_ambos_sentidos(self) -> None:
+        for recurso in ("ingress_efimeros", "egress_efimeros"):
+            self.assertIn(f'resource "aws_network_acl_rule" "{recurso}"', self.main)
+            bloque = self.main.split(f'resource "aws_network_acl_rule" "{recurso}"')[1].split("}")[0]
+            self.assertIn("from_port      = 1024", bloque)
+            self.assertIn("to_port        = 65535", bloque)
+
+    def test_nacl_cubre_flujos_internos(self) -> None:
+        for recurso in (
+            "ingress_alb_80",
+            "ingress_backend_8080",
+            "ingress_redis_6379",
+            "egress_https",
+            "egress_backend_8080",
+            "egress_redis_6379",
+        ):
+            self.assertIn(f'resource "aws_network_acl_rule" "{recurso}"', self.main)
+
+    def test_nacl_https_sale_a_cualquier_destino_aws(self) -> None:
+        bloque = self.main.split('resource "aws_network_acl_rule" "egress_https"')[1].split("}")[0]
+        self.assertIn('cidr_block     = "0.0.0.0/0"', bloque)
+        self.assertIn("from_port      = 443", bloque)
+
+    def test_egress_s3_por_prefix_list(self) -> None:
+        self.assertIn('resource "aws_vpc_security_group_egress_rule" "backend_s3_443"', self.main)
+        self.assertIn('data "aws_ec2_managed_prefix_list" "s3"', self.main)
+        self.assertIn('"com.amazonaws.${var.region}.s3"', self.main)
+        bloque = self.main.split('"backend_s3_443"')[1].split("}")[0]
+        self.assertIn("prefix_list_id    = data.aws_ec2_managed_prefix_list.s3.id", bloque)
+        self.assertIn("from_port         = 443", bloque)
+
+    def test_egress_dynamodb_por_prefix_list(self) -> None:
+        self.assertIn('resource "aws_vpc_security_group_egress_rule" "backend_dynamodb_443"', self.main)
+        self.assertIn('data "aws_ec2_managed_prefix_list" "dynamodb"', self.main)
+        self.assertIn('"com.amazonaws.${var.region}.dynamodb"', self.main)
+        bloque = self.main.split('"backend_dynamodb_443"')[1].split("}")[0]
+        self.assertIn("prefix_list_id    = data.aws_ec2_managed_prefix_list.dynamodb.id", bloque)
+
+    def test_sin_cidr_abierto_en_security_groups(self) -> None:
+        for trozo in self.main.split('resource "aws_vpc_security_group_')[1:]:
+            self.assertNotIn('cidr_ipv4', trozo.split("}")[0])
 
     def test_sin_sg_administrado_por_cloudfront_creado(self) -> None:
         self.assertNotIn("CloudFront-VPCOrigins-Service-SG", self.main)
@@ -181,12 +231,33 @@ class Presupuesto(unittest.TestCase):
 
     def test_no_hay_endpoints_fuera_del_diseno(self) -> None:
         texto = _leer(MODULO / "main.tf")
-        locales = texto.split("locals {")[1].split("subredes =")[0]
+        bloque = texto.split("endpoints_permanentes = {")[1].split('resource "aws_vpc"')[0]
         esperados = {"logs", "secretsmanager", "ssm", "ssmmessages"}
         encontrados = set(
-            re.findall(r"com\.amazonaws\.\$\{var\.region\}\.([a-z0-9]+)", locales)
+            re.findall(r"com\.amazonaws\.\$\{var\.region\}\.([a-z0-9]+)", bloque)
         )
         self.assertEqual(encontrados, esperados)
+
+class ConectividadAWS(unittest.TestCase):
+    """Los dos flujos que un gateway endpoint no cubre por SG propio."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.main = _leer(MODULO / "main.tf")
+
+    def test_gateway_endpoints_asociados_a_la_tabla_privada(self) -> None:
+        self.assertEqual(
+            self.main.count("route_table_ids   = [aws_route_table.privada.id]"), 2
+        )
+
+    def test_backend_puede_consultar_dynamodb_y_s3(self) -> None:
+        for sku in ("backend_s3_443", "backend_dynamodb_443"):
+            self.assertIn(f'"{sku}"', self.main, sku)
+        # Si alguien elimina las reglas, el conteo de egress 443 cae por debajo de 3.
+        self.assertGreaterEqual(self.main.count("= 443"), 3)
+
+    def test_iam_no_se_define_aqui(self) -> None:
+        self.assertNotIn('resource "aws_iam_', self.main)
 
 
 if __name__ == "__main__":

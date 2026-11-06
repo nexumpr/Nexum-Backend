@@ -42,6 +42,7 @@ infra/terraform/
                 │                     · ssm, ssmmessages (ventana)
                 │
                 └──▶ Gateway endpoints S3 + DynamoDB (sin cargo, por tabla de rutas)
+        Egress 443 del SG hacia prefix lists `s3` y `dynamodb` (obligatorio)
                      Internet Gateway adjunto: requerido por VPC Origins, SIN rutas públicas
 ```
 
@@ -64,15 +65,22 @@ infra/terraform/
 | Recurso | Ingress | Egress |
 |---|---|---|
 | `sg-alb` | TCP 80 desde prefix list de CloudFront | TCP 8080 a `sg-backend` |
-| `sg-backend` | TCP 8080 desde `sg-alb` | 6379 a `sg-redis`; 443 a `sg-endpoints` |
+| `sg-backend` | TCP 8080 desde `sg-alb` | 6379 a `sg-redis`; 443 a `sg-endpoints`; **443 a S3 y DynamoDB por prefix lists administradas** |
 | `sg-redis` | TCP 6379 desde `sg-backend` | — |
 | `sg-endpoints` | TCP 443 desde `sg-backend` | — |
 
 Ningún SG tiene ingress desde `0.0.0.0/0`. Sin puerto 22.
 
-NACL (stateless, una para ambas subredes): ingress 80 (ALB; el SG aplica la prefix list), 8080 y 6379
-desde el CIDR de la VPC; egress 443 al CIDR de la VPC y **1024-65535** a `0.0.0.0/0` para el retorno
-efímero que exige VPC Origins.
+NACL (stateless, una para ambas subredes, flujo completo por sentido):
+
+- **ingress**: 80 (CloudFront→ALB), 8080 (ALB→EC2) y 6379 (EC2→Redis) desde el CIDR de la VPC,
+  y **1024-65535** para el retorno de servicios.
+- **egress**: **443 a `0.0.0.0/0`** (S3, DynamoDB, interface endpoints, Secrets Manager y SSM viven
+  en rangos públicos de AWS), 8080 y 6379 al CIDR de la VPC, y **1024-65535** para el retorno hacia
+  CloudFront/ALB/endpoints.
+
+Las prefix lists administradas no pueden referenciarse en NACL; el mínimo privilegio fino se aplica
+en los security groups (`prefix_list_id`), y la NACL garantiza que ningún flujo legítimo se corte.
 
 ## 5. Diseño de secretos (decisión D y riesgo residual)
 

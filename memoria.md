@@ -263,3 +263,11 @@
 - `terraform fmt -check` PASS, `terraform init -backend=false` OK (aws 5.100.0), `terraform validate` Success.
 - 24 pruebas estaticas en `tests/infra/terraform`; presupuesto A 113.0613 y B 118.5613 (<=120).
 - Sin recursos AWS; sin plan; sin apply; sin backend remoto; 75 operaciones API intactas.
+
+### I-010 correccion de auditoria (2026-11-06)
+
+- Egress S3/DynamoDB por prefix lists administradas (443): sin ellas el SG del backend bloquea los gateway endpoints.
+- NACL completada como flujo stateless (ingress 80/8080/6379 + efimeros; egress 443 abierto a AWS, 8080/6379 al CIDR, efimeros).
+- Subredes derivadas con `cidrsubnet`; validacion RFC1918 real; zonas coherentes con la region.
+- Pruebas: 33 estaticas Terraform + 18 de permisos; fmt/init/validate PASS. Sin AWS.
+- Dependencia obligatoria registrada: el mecanismo de secretos (cache EBS + ventanas) debe demostrarse en I-020/I-060 antes de desplegar.

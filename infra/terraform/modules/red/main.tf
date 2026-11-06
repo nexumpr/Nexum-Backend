@@ -1,33 +1,41 @@
 ###############################################################################
-# Nexum-Backend — I-010 red VPC (revisión local, H08-I)
+# Nexum-Backend — I-010 red VPC (revisión local 2, H08-I)
 #
 # Diseño aprobado (D2): cliente --HTTPS--> CloudFront --HTTP 80 privado--> ALB
 # interno --HTTP 8080--> EC2 Go. Sin NAT. Un único interface endpoint permanente
 # (`logs`); `secretsmanager`, `ssm` y `ssmmessages` sólo durante ventanas.
 #
-# Nada de este directorio ha sido aplicado. No contiene backend remoto, estado,
-# credenciales ni identificadores de cuenta.
+# Correcciones de esta revisión:
+#  - Egress del backend a S3 y DynamoDB mediante las prefix lists administradas
+#    por AWS (un gateway endpoint no tiene security group propio, pero el SG de
+#    la instancia sí evalúa el destino).
+#  - NACL reescrita como flujo completo (ingress y egress, incluidos efímeros de
+#    retorno y tráfico intra-VPC) porque es stateless.
+#  - Subredes derivadas del CIDR de la VPC con `cidrsubnet`: contención y no
+#    superposición garantizadas por construcción.
+#
+# Nada de este directorio ha sido aplicado.
 ###############################################################################
 
 locals {
   nombre = "${var.proyecto}-${var.entorno}"
 
-  # Endpoints de interfaz permanentes (los gateway no generan ENI propia).
+  # Subredes derivadas: mismas bits para todas, índices distintos -> nunca se
+  # solapan y siempre están contenidas en la VPC.
+  subredes = { for indice, az in var.zonas : az => {
+    cidr = cidrsubnet(var.cidr_vpc, var.bits_subredes, 10 + indice)
+    az   = az
+  } }
+
   endpoints_permanentes = {
     logs = "com.amazonaws.${var.region}.logs"
   }
 
-  # Endpoints de interfaz que sólo existen durante una ventana de mantenimiento.
   endpoints_ventana = {
     secretsmanager = "com.amazonaws.${var.region}.secretsmanager"
     ssm            = "com.amazonaws.${var.region}.ssm"
     ssmmessages    = "com.amazonaws.${var.region}.ssmmessages"
   }
-
-  subredes = { for indice, az in var.zonas : az => {
-    cidr = var.cidrs_subredes[indice]
-    az   = az
-  } }
 }
 
 resource "aws_vpc" "principal" {
@@ -48,7 +56,7 @@ resource "aws_internet_gateway" "principal" {
 
   tags = {
     Name = "${local.nombre}-igw"
-    Nota = "Requerido por VPC Origins; sin rutas 0.0.0.0/0"
+    Nota = "Requerido por VPC Origins; sin ruta por defecto"
   }
 }
 
@@ -66,8 +74,6 @@ resource "aws_subnet" "privada" {
   }
 }
 
-# Tabla de rutas privada: sólo las rutas de los gateway endpoints. No hay ruta
-# por defecto a internet ni NAT.
 resource "aws_route_table" "privada" {
   vpc_id = aws_vpc.principal.id
 
@@ -108,13 +114,26 @@ resource "aws_vpc_endpoint" "dynamodb" {
 }
 
 ###############################################################################
-# Security groups de mínimo privilegio
+# Prefix lists administradas por AWS
 ###############################################################################
 
-# Prefijo administrado por AWS con las IP de salida de CloudFront hacia orígenes.
 data "aws_ec2_managed_prefix_list" "cloudfront_origen" {
   name = "com.amazonaws.global.cloudfront.origin-facing"
 }
+
+# Necesarias para el egress del backend a los gateway endpoints: el gateway no
+# tiene SG, pero el SG de la instancia evalúa el destino (IP públicas de AWS).
+data "aws_ec2_managed_prefix_list" "s3" {
+  name = "com.amazonaws.${var.region}.s3"
+}
+
+data "aws_ec2_managed_prefix_list" "dynamodb" {
+  name = "com.amazonaws.${var.region}.dynamodb"
+}
+
+###############################################################################
+# Security groups de mínimo privilegio
+###############################################################################
 
 resource "aws_security_group" "alb" {
   name        = "${local.nombre}-sg-alb"
@@ -146,7 +165,7 @@ resource "aws_vpc_security_group_egress_rule" "alb_backend_8080" {
 
 resource "aws_security_group" "backend" {
   name        = "${local.nombre}-sg-backend"
-  description = "Instancias Go: ingress 8080 desde ALB; egress a Redis y endpoints"
+  description = "Instancias Go: ingress desde ALB; egress a Redis, S3, DynamoDB y endpoints"
   vpc_id      = aws_vpc.principal.id
 
   tags = {
@@ -170,6 +189,26 @@ resource "aws_vpc_security_group_egress_rule" "backend_redis" {
   from_port                    = 6379
   to_port                      = 6379
   referenced_security_group_id = aws_security_group.redis.id
+}
+
+# Corrección A: S3 y DynamoDB por gateway endpoint. El SG del gateway no existe;
+# el de la instancia debe permitir 443 hacia las IP de AWS del servicio.
+resource "aws_vpc_security_group_egress_rule" "backend_s3_443" {
+  security_group_id = aws_security_group.backend.id
+  description       = "HTTPS a S3 por gateway endpoint (prefix list administrada)"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  prefix_list_id    = data.aws_ec2_managed_prefix_list.s3.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "backend_dynamodb_443" {
+  security_group_id = aws_security_group.backend.id
+  description       = "HTTPS a DynamoDB por gateway endpoint (prefix list administrada)"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  prefix_list_id    = data.aws_ec2_managed_prefix_list.dynamodb.id
 }
 
 resource "aws_vpc_security_group_egress_rule" "backend_endpoints_443" {
@@ -256,20 +295,37 @@ resource "aws_vpc_endpoint" "ventana" {
 }
 
 ###############################################################################
-# NACL: stateless, por eso se declaran los puertos efimeros de retorno.
+# NACL: stateless. Se declara el flujo completo por sentido.
+#
+# Ingress (destino = puerto en la instancia del subnet):
+#   80          CloudFront -> ALB              0.0.0.0/0 (CloudFront no tiene CIDR VPC)
+#   8080        ALB -> EC2                     CIDR VPC
+#   6379        EC2 -> Redis                   CIDR VPC
+#   1024-65535  retorno de servicios          0.0.0.0/0 (efímeros)
+# Egress (destino):
+#   443         AWS APIs (S3, DynamoDB,      0.0.0.0/0 (destinos públicos de AWS)
+#               endpoints, secrets, ssm)
+#   8080        ALB -> EC2                    CIDR VPC
+#   6379        EC2 -> Redis                  CIDR VPC
+#   1024-65535  retorno (ALB->CloudFront,     0.0.0.0/0
+#               EC2->ALB, endpoints->EC2)
+#
+# Las prefix lists administradas no pueden usarse en NACL; el mínimo privilegio
+# fino se aplica en los security groups (documentado en el README).
 ###############################################################################
 
-resource "aws_network_acl" "alb" {
+resource "aws_network_acl" "privada" {
   vpc_id     = aws_vpc.principal.id
   subnet_ids = [for az, s in aws_subnet.privada : s.id]
 
   tags = {
     Name = "${local.nombre}-nacl-privada"
+    Nota = "Stateless: incluye puertos efimeros de retorno"
   }
 }
 
-resource "aws_network_acl_rule" "entrada_api" {
-  network_acl_id = aws_network_acl.alb.id
+resource "aws_network_acl_rule" "ingress_alb_80" {
+  network_acl_id = aws_network_acl.privada.id
   rule_number    = 100
   egress         = false
   protocol       = "tcp"
@@ -279,19 +335,19 @@ resource "aws_network_acl_rule" "entrada_api" {
   to_port        = 80
 }
 
-resource "aws_network_acl_rule" "entrada_interna" {
-  network_acl_id = aws_network_acl.alb.id
+resource "aws_network_acl_rule" "ingress_backend_8080" {
+  network_acl_id = aws_network_acl.privada.id
   rule_number    = 110
   egress         = false
   protocol       = "tcp"
   rule_action    = "allow"
   cidr_block     = var.cidr_vpc
-  from_port      = 8080
-  to_port        = 8080
+  from_port      = var.puerto_backend
+  to_port        = var.puerto_backend
 }
 
-resource "aws_network_acl_rule" "entrada_redis" {
-  network_acl_id = aws_network_acl.alb.id
+resource "aws_network_acl_rule" "ingress_redis_6379" {
+  network_acl_id = aws_network_acl.privada.id
   rule_number    = 120
   egress         = false
   protocol       = "tcp"
@@ -301,20 +357,53 @@ resource "aws_network_acl_rule" "entrada_redis" {
   to_port        = 6379
 }
 
-resource "aws_network_acl_rule" "salida_https" {
-  network_acl_id = aws_network_acl.alb.id
+resource "aws_network_acl_rule" "ingress_efimeros" {
+  network_acl_id = aws_network_acl.privada.id
+  rule_number    = 130
+  egress         = false
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 1024
+  to_port        = 65535
+}
+
+resource "aws_network_acl_rule" "egress_https" {
+  network_acl_id = aws_network_acl.privada.id
   rule_number    = 100
   egress         = true
   protocol       = "tcp"
   rule_action    = "allow"
-  cidr_block     = var.cidr_vpc
+  cidr_block     = "0.0.0.0/0"
   from_port      = 443
   to_port        = 443
 }
 
-resource "aws_network_acl_rule" "salida_efimeros" {
-  network_acl_id = aws_network_acl.alb.id
+resource "aws_network_acl_rule" "egress_backend_8080" {
+  network_acl_id = aws_network_acl.privada.id
   rule_number    = 110
+  egress         = true
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = var.cidr_vpc
+  from_port      = var.puerto_backend
+  to_port        = var.puerto_backend
+}
+
+resource "aws_network_acl_rule" "egress_redis_6379" {
+  network_acl_id = aws_network_acl.privada.id
+  rule_number    = 120
+  egress         = true
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = var.cidr_vpc
+  from_port      = 6379
+  to_port        = 6379
+}
+
+resource "aws_network_acl_rule" "egress_efimeros" {
+  network_acl_id = aws_network_acl.privada.id
+  rule_number    = 130
   egress         = true
   protocol       = "tcp"
   rule_action    = "allow"

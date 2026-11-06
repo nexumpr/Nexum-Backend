@@ -87,3 +87,12 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - `tests/infra/terraform/test_red_contrato.py`: 24 pruebas (estructura, red, endpoints, seguridad, presupuesto).
 - Correccion D2: ALB en HTTP 80 desde prefix list; backend 8080. Sin 443 en el ALB.
 - Sin recursos AWS creados; sin plan/apply/destroy; sin backend remoto.
+
+### Correccion de auditoria — 2026-11-06
+
+- A) Egress del backend a S3 y DynamoDB via prefix lists administradas (`com.amazonaws.<region>.s3` y `.dynamodb`) en TCP/443. Sin el, un gateway endpoint no es alcanzable por SG.
+- B) NACL reescrita como flujo completo: ingress 80/8080/6379 + efimeros; egress 443 a 0.0.0.0/0, 8080/6379 al CIDR VPC y efimeros. Documentado que las prefix lists no aplican a NACL.
+- C) CIDR: validacion RFC1918 real (`cidrnetmask` + rangos 10/172.16-31/192.168) y subredes derivadas con `cidrsubnet` (contencion y no superposicion por construccion); zonas deben empezar por la region.
+- D) Permisos: `terraform init -backend=false` permitido; denies especificos y pruebas negativas (plan/apply/destroy/import/state y variantes de init).
+- `terraform fmt` PASS, `terraform init -backend=false` OK, `terraform validate` Success, 33 pruebas estaticas OK.
+- Sin recursos AWS, sin plan, sin apply.

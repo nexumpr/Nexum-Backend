@@ -36,7 +36,7 @@ module "red" {
   entorno                      = var.entorno
   region                       = var.region
   cidr_vpc                     = var.cidr_vpc
-  cidrs_subredes               = var.cidrs_subredes
+  bits_subredes                = var.bits_subredes
   zonas                        = var.zonas
   puerto_backend               = var.puerto_backend
   ventana_mantenimiento_activa = var.ventana_mantenimiento_activa

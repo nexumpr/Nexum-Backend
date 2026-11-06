@@ -11,19 +11,19 @@ variable "region" {
 }
 
 variable "cidr_vpc" {
-  description = "CIDR de la VPC"
+  description = "CIDR RFC1918 de la VPC"
   type        = string
   default     = "10.42.0.0/16"
 }
 
-variable "cidrs_subredes" {
-  description = "CIDR por zona"
-  type        = list(string)
-  default     = ["10.42.10.0/24", "10.42.11.0/24"]
+variable "bits_subredes" {
+  description = "Bits para derivar las subredes privadas del CIDR de la VPC"
+  type        = number
+  default     = 8
 }
 
 variable "zonas" {
-  description = "Zonas de disponibilidad"
+  description = "Zonas de disponibilidad de la región"
   type        = list(string)
   default     = ["us-east-2a", "us-east-2b"]
 }

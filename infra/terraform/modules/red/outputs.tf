@@ -53,7 +53,7 @@ output "security_groups" {
 
 output "nacl_id" {
   description = "NACL de las subredes privadas"
-  value       = aws_network_acl.alb.id
+  value       = aws_network_acl.privada.id
 }
 
 output "ventana_activa" {
