@@ -92,6 +92,33 @@
 - **Estado de Tareas:** A-050-T01..A-050-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
 - **Resultado:** 100% PASS en `go test ./...` y 0 errores en `go vet ./...`.
 
+### Spec A-060 (`A-060-modelo-dynamodb`):
+- **Alcance implementado:**
+  1. Single-Table Design canónico para la tabla `NEXUM_CORE` en `internal/domain/dynamo/`:
+     - Claves primarias compuestas `PK` y `SK`, con índice global secundario sparse `GSI1PK` y `GSI1SK` para consultas filtradas por tipo de movimiento y fecha.
+     - Partición de usuario (`PK=USER#<id>`): perfil, metas de ahorro, movimientos financieros con importes exactos en centavos `int64`, gastos recurrentes y presupuestos.
+  2. Prohibición estricta de Scan (`AC-A-060-01`): el motor de persistencia bloquea llamadas a Scan mediante `ErrScanProhibited`, obligando a resolver todos los accesos mediante `GetItem` o `Query` sobre particiones.
+  3. Transacciones atómicas atadas a condiciones (`AC-A-060-02`): implementación de `TransactWriteItems` con comprobación previa de condiciones (optimistic locking `version = :expectedVersion` y `attribute_not_exists`). Si alguna condición falla, la transacción se aborta con `ErrTransactionCanceled` y ningún saldo ni movimiento es modificado de forma parcial.
+  4. Reserva de unicidad de email transaccional (`EMAIL#<sha256(email)>`): garantiza unicidad sin exponer PII en claves primarias (`A-060 §2.2`).
+  5. Cobertura de patrones de acceso de los 75 endpoints sin Scan (`AC-A-060-03`): consultas particionadas validadas para movimientos por fecha/tipo, metas, presupuestos y borrado completo de cuenta.
+- **Archivos creados:** `internal/domain/dynamo/keys.go`, `internal/domain/dynamo/item.go`, `internal/infrastructure/dynamo/table.go`, `internal/adapters/dynamo/repository.go`, `tests/unit/dynamo/dynamodb_model_test.go`.
+- **Estado de Tareas:** A-060-T01..A-060-T14 completadas y marcadas en `tasks.md` y `checklist.md`.
+- **Resultado:** 100% PASS en `go test ./...` y 0 errores en `go vet ./...`.
+
+### Spec A-070 (`A-070-consistencia-resiliencia`):
+- **Alcance implementado:**
+  1. Aritmética racional exacta de equivalencia mensual en `internal/domain/financial/calculation.go`: cálculo con enteros grandes y redondeo HALF_UP a nivel de centavos para todas las periodicidades (daily 365/12, weekly 52/12, fortnightly 2, etc.) eliminando discrepancias de float (`A-070 §2.2`, `GOV-06`).
+  2. Algoritmo de división equitativa de aportaciones en `internal/domain/financial/split.go`:
+     - Ordenamiento determinista por `GoalID`.
+     - Casos de centavos indivisibles (0.01c, 0.02c/3) y redistribución automática por saturación de metas (`AC-A-070-01`).
+     - Verificación determinista de 100 repeticiones idénticas sin divergencia de redondeo.
+  3. Cálculo de disponible mensual V6 y prevención de doble descuento en `internal/application/financial/available_calculator.go`: garantía de que los gastos fijos recurrentes pagados en el mes registran su movimiento sin descontarse dos veces (`AC-A-070-02`).
+  4. Invariante de metas y reversión segura en `tests/unit/financial/consistency_resilience_test.go`: conservación de la regla de oro `saved = openingSaved + sum(activeAllocations)` ante creaciones y reversiones (`AC-A-070-03`).
+  5. Gestor de idempotencia financiera en `internal/application/financial/idempotency.go`: bloqueo concurrente, hash SHA-256 de payload, repetición de respuesta idéntica y emisión de 409 Conflict si la misma clave se reutiliza con un cuerpo diferente (`A-070 §2.7`).
+- **Archivos creados:** `internal/domain/financial/calculation.go`, `internal/domain/financial/split.go`, `internal/application/financial/available_calculator.go`, `internal/application/financial/idempotency.go`, `tests/unit/financial/consistency_resilience_test.go`.
+- **Estado de Tareas:** A-070-T01..A-070-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
+- **Resultado:** 100% PASS en `go test ./...` y 0 errores en `go vet ./...`.
+
 ## Registro de Incidentes y Resoluciones H08-A
 
 ### Incidente 1 (CI GitHub Actions: Falso Positivo `UNDECLARED_FILE` / `GIT_UNDECLARED`):

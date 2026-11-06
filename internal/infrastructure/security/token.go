@@ -211,3 +211,4 @@ func (p *RSATokenProvider) GenerateRefreshToken(ctx context.Context) (string, er
 	}
 	return base64.RawURLEncoding.EncodeToString(bytes), nil
 }
+

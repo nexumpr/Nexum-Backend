@@ -242,3 +242,4 @@ func (s *SessionService) Logout(ctx context.Context, sessionID string) error {
 	}
 	return s.store.RevokeSession(ctx, sessionID)
 }
+
