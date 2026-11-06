@@ -1,58 +1,145 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "default_agent": "nexum-orchestrator",
   "instructions": [
     "constitution.md",
-    "memoria.md"
+    "memoria.md",
+    "sdd/_control/H08/CONTRATO_INICIO_H08A.md"
   ],
   "permissions": [
     {
-      "action": "external_directory",
+      "action": "*",
       "resource": "*",
       "effect": "deny"
     },
     {
       "action": "read",
       "resource": "*",
-      "effect": "ask"
-    },
-    {
-      "action": "read",
-      "resource": "constitution.md",
       "effect": "allow"
     },
     {
       "action": "read",
-      "resource": "AGENTS.md",
-      "effect": "allow"
+      "resource": "*.env*",
+      "effect": "deny"
     },
     {
       "action": "read",
-      "resource": "memoria.md",
-      "effect": "allow"
+      "resource": "*.tfstate*",
+      "effect": "deny"
     },
     {
       "action": "read",
-      "resource": "README.md",
-      "effect": "allow"
+      "resource": "*.pem",
+      "effect": "deny"
     },
     {
       "action": "read",
-      "resource": "opencode.json",
-      "effect": "allow"
+      "resource": "*.key",
+      "effect": "deny"
     },
     {
       "action": "read",
-      "resource": ".gitignore",
+      "resource": "*/.aws/*",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "*/.ssh/*",
+      "effect": "deny"
+    },
+    {
+      "action": "glob",
+      "resource": "*",
       "effect": "allow"
+    },
+    {
+      "action": "grep",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "list",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "deny"
     },
     {
       "action": "edit",
       "resource": "*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "cmd/**",
+      "effect": "ask"
+    },
+    {
+      "action": "edit",
+      "resource": "internal/**",
+      "effect": "ask"
+    },
+    {
+      "action": "edit",
+      "resource": "pkg/**",
+      "effect": "ask"
+    },
+    {
+      "action": "edit",
+      "resource": "tests/**",
+      "effect": "ask"
+    },
+    {
+      "action": "edit",
+      "resource": "go.mod",
+      "effect": "ask"
+    },
+    {
+      "action": "edit",
+      "resource": "go.sum",
       "effect": "ask"
     },
     {
       "action": "shell",
       "resource": "*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "git status *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git diff *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git log *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "git push *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "gh *",
       "effect": "deny"
     },
     {
@@ -61,9 +148,69 @@
       "effect": "deny"
     },
     {
+      "action": "subagent",
+      "resource": "sdd-guardian",
+      "effect": "ask"
+    },
+    {
+      "action": "subagent",
+      "resource": "go-backend-architect",
+      "effect": "ask"
+    },
+    {
+      "action": "subagent",
+      "resource": "qa-evidence-verifier",
+      "effect": "ask"
+    },
+    {
+      "action": "subagent",
+      "resource": "devsecops-security",
+      "effect": "ask"
+    },
+    {
+      "action": "subagent",
+      "resource": "api-contract-guardian",
+      "effect": "ask"
+    },
+    {
+      "action": "subagent",
+      "resource": "finops-guardian",
+      "effect": "ask"
+    },
+    {
       "action": "skill",
       "resource": "*",
       "effect": "deny"
+    },
+    {
+      "action": "skill",
+      "resource": "read-sdd",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "trace-requirements",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "record-evidence",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "validate-go",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "validate-ci-security",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "manage-change-request",
+      "effect": "ask"
     },
     {
       "action": "webfetch",
@@ -79,32 +226,17 @@
   "policies": [
     {
       "action": "tool.use",
-      "resource": "shell:*",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
-      "resource": "external_directory:*",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
-      "resource": "subagent:*",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
-      "resource": "skill:*",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
       "resource": "read:*.env*",
       "effect": "deny"
     },
     {
       "action": "tool.use",
       "resource": "read:*.tfstate*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "read:*.tfvars*",
       "effect": "deny"
     },
     {
@@ -119,62 +251,27 @@
     },
     {
       "action": "tool.use",
-      "resource": "read:*/.ssh/*",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
       "resource": "read:*/.aws/*",
       "effect": "deny"
     },
     {
       "action": "tool.use",
-      "resource": "edit:sdd/*",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
-      "resource": "edit:cmd/*",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
-      "resource": "edit:internal/*",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
-      "resource": "edit:infra/*",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
-      "resource": "edit:tests/*",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
-      "resource": "edit:.github/*",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
-      "resource": "edit:*.go",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
-      "resource": "edit:*.tf",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
-      "resource": "edit:*.tfvars*",
+      "resource": "read:*/.ssh/*",
       "effect": "deny"
     },
     {
       "action": "tool.use",
       "resource": "edit:*.env*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "edit:*.tfstate*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "edit:*.tfvars*",
       "effect": "deny"
     },
     {
@@ -185,6 +282,71 @@
     {
       "action": "tool.use",
       "resource": "edit:*.key",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "edit:*/.aws/*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "edit:*/.ssh/*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:terraform *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:gh *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:git push *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:git reset --hard *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:git clean *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:Remove-Item *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:rm *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:docker *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:wsl *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:kubectl *",
       "effect": "deny"
     }
   ]

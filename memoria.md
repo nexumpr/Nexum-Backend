@@ -1,29 +1,14 @@
-# memoria.md — estado factual vigente de Nexum-Backend
+# Nexum-Backend — memoria vigente H08-A
 
-**Actualización:** 2026-11-05. **Fuente:** salidas Warp y capturas comunicadas por el responsable; baseline consolidado y revalidado localmente. No se presume acceso en tiempo real al Windows ni a AWS. El historial anterior completo permanece en Git, commit inicial `84be72d`; su redacción histórica **no constituye instrucciones vigentes**.
+**Fuente:** reportes Warp/capturas del responsable y ZIP final H07 reproducido localmente. La activación H08-A requiere ratificación explícita mediante CLI y CI verde; no se asume por presencia de archivos.
 
-## Gates y publicación (verdad operativa actual)
+- H03 APPROVED: constitución, 8 agentes, 9 skills; configuración originalmente denegatoria conservada en historia Git; RFC-001 abre permisos limitados Go H08-A.
+- H04 APPROVED: A-000..A-110 (48 docs), sin modificar.
+- H05 APPROVED_DOCUMENTAL_CONDICIONADO: 16 I y 64 docs, AWS no desplegado. Free, 120 USD créditos referidos, 45 días, 0 MXN personales. Redis SKU, IVA, CloudFront VPC Origin create, TLS y egreso pendientes.
+- H06 APPROVED_DOCUMENTAL_BASELINE **tras ratificación**: 75 operaciones 33+23+12+7, 300 docs, OpenAPI 3.1. Fuente docente/prototipo sin cotejo independiente reciente; futuras E076+ por RFC. Endpoints en ejecución NOT_RUN.
+- H07 APPROVED_DOCUMENTAL_PUBLICADO **tras ratificación**: repositorio privado `nexumpr/Nexum-Backend`, primer commit `84be72d`, PR #1 y main `dc23e9bc9b432631ce5346adc201cd96851edecc`; CI success run `42138280237` según evidencia compartida. Fallo CRLF histórico y fix no ocultos.
+- H08-A AUTHORIZED_LOCAL_ONLY **tras ratificación**: código de arquitectura Go, una spec por vez y primera A-000, permisos ASK. H08-I/E esperan aprobación y no se implementan/despliegan todavía.
 
-- **H03:** APPROVED por responsable; 8 agentes y 9 skills presentes. Prueba de motor de permisos H03 indicada: 54 decisiones (53 DENY, 1 ALLOW), según evidencia compartida; las herramientas continúan denegadas en `opencode.json`.
-- **H04:** APPROVED por responsable; 12 specs A-000..A-110 con 48 documentos. No modificar sin RFC.
-- **H05:** APPROVED_DOCUMENTAL_CONDICIONADO; 16 specs I-000..I-150 con 64 documentos; V2, V3 y V4 instalados, coste y permisos AWS aún no certificados; **sin autorización AWS real**.
-- **H06:** INSTALLED/VERIFY_PASS: 75 operaciones E001..E075 con 300 documentos y OpenAPI 3.1, 33 maqueta + 23 soporte + 12 esperadas/simuladas + 7 opcionales. **Gate humano H06 aún pendiente**.
-- **H07:** el repositorio privado `nexumpr/Nexum-Backend` **sí fue creado y publicado**, primer commit `84be72d` el 2026-11-05. El workflow documental de ese commit falló con exit code 2; se identificó un CSV CRLF con SHA distinto tras checkout Linux. El usuario **autorizó explícitamente corregir estructura y publicar la corrección**. Gate formal H07 todavía pendiente de validación CI corregida y ratificación expresa.
-- **H08+:** NOT_STARTED. No se ha autorizado nueva política de permisos OpenCode ni despliegue AWS, aunque la preparación del trabajo de equipo mediante revisión y PRs documentales ya puede hacerse.
+**Advertencia:** no se ha realizado prueba de ejecución de configuración OpenCode en Windows 11 actual, ni Go build, ni AWS/HTTP real; pruebas estáticas del paquete no sustituyen esas evidencias. Deben validarse tras publicar configuración y antes de usar cambios automáticos.
 
-## Requisitos innegociables de implementación futura
-
-- Solo Backend Go, HTTP/OpenAPI, DynamoDB NoSQL, Redis OSS real, AWS CloudFront/ALB privado, dos EC2 Go activas simultáneamente, HTTPS público, IaC Terraform, pruebas, CI/CD, IAM OIDC, DevSecOps, logs, paginación/rate limiting y recuperación real.
-- Infraestructura 100 % orquestada por IaC y pipelines, no por consola manual; acciones `plan`, `apply`, `status`, `suspend-aux`, `resume-aux`, `reconcile`, `rollback`, `destroy-aux`. Mantener esenciales operativos; solo auxiliares suspendibles.
-- Plan AWS Free, cero pesos personales, 120 USD de créditos referidos y al menos 45 días estimados, sin promover a Paid; no afirmar presupuesto garantizado ni gastos $0 sin lectura real de cuenta. Redis SKU exacto, impuestos, CloudFront CreateVpcOrigin, conectividad y saldo/vencimiento están BLOQUEADOS antes de aplicar.
-- No Mobile, Play Store ni frontend dentro de Backend. Equipo Mobile puede solicitar E076+ por RFC de compatibilidad, sin decidir Gates del Backend.
-
-## Evidencias, diferencias y limitaciones
-
-- Las verificaciones **locales** de H03/H04/H05/H06/H07 se reportaron desde Warp; no prueban ejecución de endpoints ni consumo AWS. H06 está completo documentalmente para el baseline actual, no es garantía de que nunca haya ampliaciones.
-- El PDF docente original y último ZIP Android no fueron cotejados nuevamente de manera independiente para H07. Cualquier diferencia posterior debe registrarse, clasificarse y resolverse por RFC antes de declarar cumplimiento integral de fuentes.
-- El commit inicial dejó `gobierno/H07/`, una carpeta que el responsable **no había autorizado como ampliación de estructura**. Se acordó trasladar los documentos auxiliares a `sdd/_control/H07/`, dejando **exactamente tres bloques de especificaciones**.
-- Falla CI inicial: el CSV `FINOPS_45_DIAS_DESGLOSE_V2.csv` fue el único CRLF en el baseline, Git normalizó a LF y SHA del snapshot no coincidió. Solución: normalizar CSV, `.gitattributes` para LF, rehash de todos los archivos (sin eliminar controles), regresión en checkout Windows/Linux, informe de causa raíz.
-- Historial específico de H03-D: hubo fallo en script PowerShell, corregido posteriormente; un ensayo de inferencia resultó inconcluso y fue sustituido por prueba del motor. No borrar ni reescribir commits para ocultarlo.
-
-**Próximo paso de control:** verificar corrección H07 en un PR y checkout Linux, obtener CI `success`, integrar sin `--force`, presentar Gate H06 y H07 para ratificación formal; después autorizar H08 e implementar primero arquitectura, luego IaC 100 % y endpoints. `AGENTS.md` es la única instrucción operativa vigente de agentes, subordinada a `constitution.md`.
+`constitution.md` y `sdd/_control/H07/ESTADO_Y_GATES.md` son fuente normativa y estado único. No editar A/I/E para actualizar cabeceras históricas; conservar contraste con el Gate.
