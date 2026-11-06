@@ -47,3 +47,32 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+### Verificacion H08-I — 2026-11-06
+
+- [x] Launch Template con AMI oficial por parametro SSM y sin id fijado.
+- [x] `t4g.micro` ARM64 y `cpu_credits = standard` explicito.
+- [x] IMDSv2 obligatorio (`http_tokens = required`, hop limit 1).
+- [x] EBS cifrado, gp3, 15 GB por instancia.
+- [x] Sin clave SSH y sin IPv4 publica.
+- [x] SG del backend proveniente de I-010; instance profile por variable (I-060).
+- [x] ASG min=desired=max=2, dos subredes/2 AZ, balanced-only, instance refresh 50 %.
+- [x] user-data sin secretos, descarga de S3 con SHA-256 e instalacion atomica.
+- [x] Unidad systemd endurecida (usuario no root, ProtectSystem=strict, MemoryMax=512M).
+- [x] Compilacion real linux/arm64 con manifiesto y SHA-256.
+- [ ] Garantia estricta de una instancia por AZ — depende de capacidad AWS (NOT_RUN_AWS).
+- [ ] Endpoint ELB / target group — corresponde a I-030.
+- [ ] **BLOQUEO DE DESPLIEGUE**: RFC-004 (secretos en reemplazo automatico de instancias).
+
+### Correccion de cierre
+
+- [x] La unidad systemd se instala desde S3 con SHA-256 verificado.
+- [x] Binario y directorio propiedad de root; el usuario del servicio no puede modificarlos.
+- [x] El bootstrap falla si falta unidad, binario o `/etc/nexum/backend.env`.
+- [x] Comprueba servicio activo y liveness local; si no, `exit 1`.
+- [x] Instance refresh con `min_healthy_percentage = 100`.
+- [x] Validacion estricta de `sg_backend_id`.
+- [x] Script de build restaura el entorno.
+- [ ] **D-01** Rutas de salud no registradas en el router Go — bloquea I-030/despliegue.
+- [ ] **RFC-004** pendiente de aprobacion humana — bloquea despliegue.
+- [ ] NOT_RUN_AWS / NOT_RUN_LINUX: sin instancias ni systemd real.
