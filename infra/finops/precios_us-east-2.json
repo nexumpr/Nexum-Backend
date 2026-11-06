@@ -344,6 +344,16 @@
       "fuente": "sin determinacion fiscal; no asumir 0%",
       "fecha_fuente": null,
       "nota": "No se imputa 0; requiere determinacion fiscal o factura real"
+    },
+    "VPC_INTERFACE_ENDPOINT_HORA": {
+      "servicio": "Amazon VPC",
+      "sku": "interface endpoint por AZ",
+      "unidad": "endpoint-hora-AZ",
+      "precio_usd": "0.01",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products --service-code AmazonVPC --filters Type=TERM_MATCH,Field=usagetype,Value=USE2-VpcEndpoint-Hours",
+      "fecha_fuente": "2026-11-06",
+      "nota": "Se cobra por hora y por AZ; los gateway endpoints S3/DynamoDB no tienen cargo"
     }
   },
   "creditos_declarados_usd": "120",

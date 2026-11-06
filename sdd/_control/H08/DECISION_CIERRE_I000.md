@@ -3,114 +3,108 @@
 | Campo | Valor |
 |---|---|
 | Documento | `sdd/_control/H08/DECISION_CIERRE_I000.md` |
-| Fecha | 2026-11-06 |
+| Fecha | 2026-11-06 (revisión 2) |
 | Spec | `sdd/02-infraestructura/I-000-cuenta-finops` |
 | Rama / PR | `feat/h08i-i000-finops` / PR #15 |
-| Evidencia reproducible | `infra/finops/resultados/viabilidad_i000.json` (campo `matriz_gate`) |
-| Estado del documento | **PROPUESTA PARA DECISIÓN HUMANA — no es una aprobación** |
+| Motor reproducible | `infra/finops/resultados/viabilidad_i000.json` (`matriz_gate`, `recotizacion_conectividad`) |
+| Estado | **BLOQUEO REAL — merge NO autorizado** |
 
-> Este documento **no** declara aprobado el Gate H08-I ni cerrada I-000. Ordena la evidencia y
-> enumera las decisiones que sólo el responsable puede tomar.
+## 1. Decisiones humanas recibidas (registro)
 
-## 1. Estado final de I-000
-
-| Aspecto | Resultado |
-|---|---|
-| Decisión del motor | **`BLOCKED_FINOPS`** con 3 motivos automáticos |
-| Bloqueos reales (matriz) | **1**: determinación de impuestos/IVA |
-| Condicionados a aprobación humana | 1: TLS extremo a extremo (opción A) |
-| Verificaciones diferidas a Gates posteriores | 4: VPC Origins, runtime de dos instancias, costo observado, interrupción por créditos |
-| Cumplidos con evidencia | 7 |
-| No aplica justificado | 1 (reservas de modelado) |
-| Infraestructura AWS creada | **ninguna** |
-| Terraform ejecutado | **ninguno** |
-| Plan AWS | `FREE` / `ACTIVE`, expira 2027-05-04 |
-
-## 2. Evidencias que sostienen el cierre
-
-| Requisito del Gate ("Cierre de I-000") | Evidencia | Estado |
+| ID | Contenido | Registro |
 |---|---|---|
-| Saldo | 120.0 USD (`accountPlanRemainingCredits`) | `VERIFIED_AWS` |
-| Vigencia | 2027-05-04 (≈180 días ≥ 45) | `VERIFIED_AWS` |
-| Precios exactos | **22 SKU** Price List + 3 partidas sin cargo `DOC_OFICIAL` | `VERIFIED_AWS` / `DOC_OFICIAL` |
-| SKU Redis | `cache.t4g.micro` redis 7.1 (`redis7`) a 0.016 USD/nodo-hora | `VERIFIED_AWS` |
-| Cuentas (cuotas) | 16 vCPU On-Demand ≥ 4 requeridas | `VERIFIED_AWS` |
-| Presupuesto | verificado 79.0430 (+10 % = 86.9473); modelado 84.0430 (+10 % = **92.4473**) | calculado |
-| Cobertura | **TOTAL** en ambos escenarios (≤ 120 USD) | calculado |
-| Riesgos | ADR §7 + matriz `matriz_gate` | documentado |
-| Impuestos / IVA | **no determinado** | `BLOQUEO_REAL` |
+| **D1 — IVA** | Cierre condicionado mientras AWS permanezca Free/Active sin cargos; no se declara IVA 0 % ni se inventa determinación; tratamiento documentado y revisable | **REGISTRADA** |
+| **D2 — TLS** | `ACEPTO_TLS_CLOUDFRONT_ALB_HTTP_PRIVADO`: HTTPS cliente→CloudFront y HTTP sólo en el tramo privado de VPC Origins; no exponer el ALB ni transmitir credenciales fuera de la conexión privada | **REGISTRADA** en este documento (no se modifica `spec.md`/`plan.md`) |
+| **D3 — VPC Origins** | Comprobación real diferida a I-030; no equivale a `VERIFIED_AWS` | **REGISTRADA** |
+| **D4 — Runtime** | Dos instancias y balanceador verificados en fases de despliegue | **REGISTRADA** |
+| **D5 — Costo observado** | Monitoreo recurrente de créditos como obligación operativa, sin consultas facturables no autorizadas | **REGISTRADA** |
+| **D6 — Cierre** | `APRUEBO_CIERRE_I000_CON_CONDICIONES`, **efectiva sólo si las comprobaciones finales son satisfactorias** | **NO EFECTIVA** |
 
-**Separación financiera:** costo bruto ≠ consumo de créditos ≠ impuestos ≠ desembolso personal. El
-plan Free **no admite cargos** durante su vigencia (documentación oficial), por lo que el desembolso
-personal bajo el plan activo es estructuralmente nulo; el riesgo real es el **cierre automático de la
-cuenta** al agotar créditos o caducar (pérdida de acceso, retención de 90 días).
+D6 no es efectiva porque una de las comprobaciones finales exigidas por el propio responsable
+—“presupuesto completo de 45 días cubierto con margen” y “ninguna dependencia indispensable sin
+solución técnica”— **falla** con evidencia verificada (ver §3).
 
-## 3. Pendientes reales
+## 2. Estado financiero verificado (2026-11-06)
 
-| # | Pendiente | Por qué no puede cerrarlo el agente |
+| Concepto | Valor | Evidencia |
 |---|---|---|
-| 1 | Determinación fiscal del IVA | Requiere criterio fiscal responsable; la spec prohíbe asumir 0 % |
-| 2 | Aceptación de seguridad de TLS opción A | La spec la declara "pendiente de aceptación de seguridad" |
-| 3 | Elegibilidad de CloudFront VPC Origins | Sólo se comprueba creando un VPC origin (operación mutante) |
-| 4 | Runtime de dos instancias y balanceo | Gate: obligación de Gates posteriores, no estado PASS |
-| 5 | Costo observado facturado | No figura en la lista de cierre; control recurrente de operación |
+| Plan | `FREE` / `ACTIVE`, expira 2027-05-04 | `VERIFIED_AWS` |
+| Créditos | 120.0000 USD | `accountPlanRemainingCredits` |
+| Bruto verificado (sin conectividad) | 79.0430 USD | 22 SKU + 3 `DOC_OFICIAL` |
+| Bruto modelado completo | 84.0430 USD | reservas no facturables 5.0000 |
+| Cobertura A (verificado ×1.10) | 86.9473 ≤ 120 → TOTAL | calculado |
+| Cobertura B (modelado ×1.10) | 92.4473 ≤ 120 → TOTAL | calculado |
+| **Interface endpoint (verificado)** | **0.01 USD/h por AZ** (`USE2-VpcEndpoint-Hours`) | Price List API |
+| Residual con runtime apagado | 6.8790 USD | calculado |
 
-## 4. Excepciones que se proponen (ninguna se aprueba aquí)
+## 3. Bloqueo real: conectividad privada sin NAT
 
-| Excepción | Alcance | Base normativa | Alternativa |
-|---|---|---|---|
-| **E1** — TCP sin cifrar en el tramo CloudFront→ALB (opción A) | Tráfico dentro de VPC Origins, sin tránsito público; TLS del cliente a CloudFront se mantiene | spec I-000 §9: "I-030 plantea TLS de cliente en CloudFront con tramo HTTP privado ALB: pendiente de aceptación de seguridad" | Opción B: HTTPS hasta ALB con ACM + dominio propio → coste de dominio fuera del presupuesto de cero pesos |
-| **E2** — IVA no imputado hasta factura real | Presupuesto sin línea de impuestos | spec I-000 §8: "no asumir ni 0 ni un cobro sin evidencia" | Determinación fiscal explícita antes de operar |
+Los **gateway endpoints sólo cubren S3 y DynamoDB**. Con dos EC2 en subredes privadas y sin NAT, las
+dependencias del SDD exigen **interface endpoints** (PrivateLink), que sí tienen costo por hora y AZ:
 
-## 5. Riesgos residuales (declarados, no mitigados)
+| Dependencia | Mecanismo | ¿Costo? |
+|---|---|---|
+| DynamoDB | gateway endpoint | 0 |
+| S3 (artefactos, respaldos, state) | gateway endpoint | 0 |
+| Secrets Manager | interface endpoint | **sí** |
+| CloudWatch Logs | interface endpoint | **sí** |
+| CloudWatch metrics | interface endpoint | **sí** |
+| SSM / SSM Messages / EC2 Messages | interface endpoint ×3 | **sí** |
+| Credenciales (IMDS) y hora (link-local) | sin egreso | 0 |
+| Health checks y CloudFront | sin egreso de la instancia | 0 |
 
-1. **Cierre de cuenta** por agotar 120 USD antes de 45 días (~28 % de holgura sobre el bruto
-   verificado) → interrupción del servicio y pérdida de datos tras 90 días.
-2. **Costo variable** real (LCU, egreso, solicitudes CloudFront, inter-AZ) puede elevar el consumo de
-   créditos; el modelo es una estimación, no una factura.
-3. **TLS**: opción A deja el tramo interno sin cifrar (mitigado por aislamiento de VPC Origins).
-4. **VPC Origins**: si la cuenta no puede crearlo, la topología C cae y habría que recotizar la
-   alternativa con ALB público (+ ~7.80 USD y 4 IPv4).
-5. **Costo observado** sin verificar: no se puede afirmar "0 USD facturados" desde las APIs usadas.
-6. **Residual apagado** 6.8790 USD: apagar el runtime no elimina datos, backups, logs ni secretos.
+| Escenario | Coste conectividad | Bruto total | Con margen 10 % | vs 120 USD |
+|---|---|---|---|---|
+| Mínimo (Secrets Manager + Logs, 4 ENI) | 43.2000 | 122.2430 | **134.4673** | **déficit 14.4673** |
+| Completo SDD (6 servicios, 12 ENI) | 129.6000 | 213.6430 | **235.0073** | **déficit 115.0073** |
 
-## 6. Decisiones humanas exactas
+**Conclusión:** no existe solución de conectividad privada compatible con el SDD y con costo cero.
+NAT Gateway tampoco es gratis. Renunciar a SSM o a la observabilidad cambiaría requisitos aprobados y
+no se asume. Por tanto `CONECTIVIDAD_PRIVADA_NO_CUBIERTA` es **BLOQUEO_REAL**.
 
-Marcar y firmar (una sola vez):
+## 4. Matriz de Gate (16 condiciones)
 
-- [ ] **D1 — IVA:** declarar el tratamiento fiscal aplicable.
-  - `D1.a` "El plan Free no genera cargos; no hay base gravable hasta que exista factura real; se
-    revisará en cada corte de facturación." → convierte IVA en `CUMPLIDA_CONDICIONADA`.
-  - `D1.b` "Se determina IVA de X % sobre el bruto modelado (92.4473 + IVA)." → requiere recotizar
-    cobertura con el importe resultante.
-- [ ] **D2 — TLS:** `ACEPTO_TLS_CLOUDFRONT_ALB_HTTP_PRIVADO` (opción A) o exigir opción B (implica
-  dominio financiado y RFC de cambio de alcance).
-- [ ] **D3 — VPC Origins:** aceptar `VERIFICACION_DIFERIDA_A_FASE_POSTERIOR` con obligación de
-  comprobación en I-030 antes de cualquier creación de ALB/VPC origin.
-- [ ] **D4 — Runtime:** aceptar que dos instancias reales, balanceo y 45 días se verifican en
-  I-020/I-030/H08-E, no en I-000 (cláusula del Gate).
-- [ ] **D5 — Costo observado:** aceptar el control recurrente (captura de Billing/Bills o autorización
-  de una consulta de Cost Explorer a 0.01 USD) o autorizar esa consulta ahora.
-- [ ] **D6 — Cierre:** `APRUEBO_CIERRE_I000_CON_CONDICIONES` o `RECHAZO_CIERRE_I000`.
+| Clasificación | Nº | Condiciones |
+|---|---|---|
+| `CUMPLIDA_CON_EVIDENCIA` | **8** | saldo · vigencia · precios · SKU Redis · cuotas 4 vCPU · presupuesto base · riesgo de cobro · actualización automática a Paid |
+| `CUMPLIDA_CONDICIONADA_A_APROBACION` | **1** | TLS (D2 registrada) |
+| `VERIFICACION_DIFERIDA_A_FASE_POSTERIOR` | **4** | VPC Origins (D3) · runtime (D4) · costo observado (D5) · interrupción por créditos |
+| `BLOQUEO_REAL` | **2** | IVA (D1 condicionada) · **conectividad privada sin NAT** |
+| `NO_APLICA_JUSTIFICADO` | **1** | reservas de modelado no facturables |
 
-## 7. Condiciones para liberar I-010
+## 5. Opciones para desbloquear (decisión humana)
 
-1. D1 resuelta (a o b) y presupuesto recalculado con impuestos si aplica.
-2. D2 firmada.
-3. D3 y D4 aceptadas por escrito, con la obligación de verificación trasladada a I-020/I-030.
-4. D6 firmada.
-5. `main` con el PR de I-000 fusionado (aprobación separada del merge) y CI verde.
-6. Autorización específica para la primera mutación AWS de I-010 (VPC y red), que hoy sigue prohibida.
+| Opción | Efecto | Requiere |
+|---|---|---|
+| **O1** Ampliar créditos por encima de 235.01 USD | Cobertura TOTAL con el diseño completo | Fondos adicionales — **hoy prohibido** |
+| **O2** Reducir el conjunto de endpoints asumido y aceptar el déficit (134.4673) | Sigue sin cobertura: no resuelve | Nada; **no válido** |
+| **O3** Aceptar interrupción antes del día 45 por agotamiento | Incumple “45 días consecutivos” | Inaceptable |
+| **O4** RFC de cambio de alcance: sustituir interface endpoints por alternativas sin costo (artefactos y logs vía S3 gateway, despliegue por AMI, métricas básicas de hipervisor) | Elimina el costo de conectividad, pero cambia requisitos de observabilidad/administración y de gestión de secretos | **RFC + aprobación humana** |
+| **O5** Postergar I-010 y replantear topología (ALB público con IPv4, sin VPC Origins) | Reduce endpoints pero añade IPv4 y egreso; requiere recotización | RFC |
 
-## 8. ¿Se requiere RFC?
+## 6. Riesgos residuales
 
-- **No** para cerrar I-000 con las excepciones E1/E2: la propia spec I-000 §9 prevé la aceptación de
-  seguridad del tramo privado y §8 prohíbe asumir impuestos, de modo que ambas son decisiones
-  previstas, no cambios de alcance.
-- **Sí** (RFC mínimo de cambio de alcance/coste) si el responsable exige TLS extremo a extremo en esta
-  fase o un IVA que altere el presupuesto más allá de la cobertura.
+1. Cierre de cuenta por agotamiento de créditos (retención 90 días) si el consumo real excede el modelo.
+2. Conectividad: cualquier servicio AWS no cubierto por gateway endpoints falla en runtime sin el endpoint correspondiente.
+3. TLS opción A: tramo interno sin cifrar (mitigado por aislamiento de VPC Origins).
+4. VPC Origins: si la cuenta no puede crearlo, la topología C cae.
+5. Costo observado sin verificar (control recurrente, D5).
 
-## 9. Estado propuesto
+## 7. ¿Se requiere RFC?
 
-`I000_LISTO_PARA_DECISION_HUMANA` — 1 bloqueo real (IVA), 1 condicionado (TLS), 4 verificaciones
-diferidas autorizables y 7 requisitos cumplidos con evidencia. Sin infraestructura creada.
+**Sí.** Para desbloquear hace falta un RFC de cambio de alcance/topología (O4 u O5): la solución sin
+costo de conectividad altera requisitos aprobados de observabilidad, administración y gestión de
+secretos. Sin ese RFC aprobado, I-000 **no puede cerrarse** ni I-010 iniciarse.
+
+## 8. Condiciones para liberar I-010
+
+1. RFC aprobado que resuelva la conectividad privada (O4/O5) **o** créditos suficientes para O1.
+2. Presupuesto recalculado con la solución aprobada y cobertura TOTAL con margen 10 %.
+3. D1 con tratamiento fiscal registrado y D6 firmada.
+4. Merge del PR #15 con aprobación separada y CI verde.
+5. Autorización específica para la primera mutación AWS de I-010.
+
+## 9. Estado
+
+`I000_BLOQUEO_REAL_IDENTIFICADO` — un bloqueo técnico-financiero verificado (conectividad privada)
+además del fiscal (IVA). No se fusiona el PR #15 y no se abre I-010.

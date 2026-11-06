@@ -23,6 +23,7 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
+import conectividad
 import dinero
 import modelo_costos
 import requisitos
@@ -641,8 +642,49 @@ def evaluar(
     matriz_gate = construir_matriz_gate(
         cuenta, servicios, costos, financiero, financiero_modelado, revision, resumen_costos
     )
-    bloqueos_reales = [m for m in matriz_gate if m["clasificacion"] == BLOQUEO_REAL]
 
+    # Conectividad privada obligatoria: los gateway endpoints sólo cubren S3 y
+    # DynamoDB; el resto de APIs exige interface endpoints (con costo por AZ).
+    recotizacion = conectividad.recotizar(
+        financiero["costo_bruto_verificado_usd"] or "0",
+        creditos_verificados,
+        margen_seguridad,
+        catalogo,
+        incluir_ssm=True,
+    )
+    cubierto = recotizacion["cubierto"]
+    matriz_gate.append(
+        {
+            "condicion": "Conectividad privada de las EC2 sin NAT",
+            "clasificacion": CUMPLIDA_CON_EVIDENCIA if cubierto else BLOQUEO_REAL,
+            "clausula": (
+                "spec I-000 seccion 9 (topologia C sin NAT, S3+DynamoDB por gateway endpoints) "
+                "y spec I-050/I-070/I-090 (Redis, secretos y observabilidad reales)"
+            ),
+            "evidencia": (
+                f"interface endpoints obligatorios: {', '.join(recotizacion['endpoints_incluidos'])}; "
+                f"costo {recotizacion['costo_conectividad_usd']} USD/45 d; total con margen "
+                f"{recotizacion['creditos_requeridos_usd']} USD frente a "
+                f"{recotizacion['creditos_verificados_usd']} verificados"
+            ),
+        }
+    )
+    if not cubierto:
+        motivos.append(
+            _motivo(
+                "CONECTIVIDAD_PRIVADA_NO_CUBIERTA",
+                f"sin NAT, Secrets Manager/CloudWatch Logs/metricas/SSM exigen interface endpoints: "
+                f"{recotizacion['costo_conectividad_usd']} USD adicionales en 45 d; total "
+                f"{recotizacion['bruto_total_usd']} USD con margen "
+                f"{recotizacion['creditos_requeridos_usd']} > "
+                f"{recotizacion['creditos_verificados_usd']} verificados (faltan "
+                f"{recotizacion['importe_sin_cobertura_usd']} USD)",
+                "recotizar el acceso privado o ampliar creditos; no se reduce alcance ni se "
+                "sustituyen servicios",
+            )
+        )
+
+    bloqueos_reales = [m for m in matriz_gate if m["clasificacion"] == BLOQUEO_REAL]
     bloques_bloqueantes = len(motivos)
     estado = "VIABLE" if bloques_bloqueantes == 0 else "BLOCKED_FINOPS"
     escenario = resumen_costos["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
@@ -673,6 +715,7 @@ def evaluar(
             "residual_apagado_usd": escenario["residual_apagado_usd"],
         },
         "revision_topologia": revision,
+        "recotizacion_conectividad": recotizacion,
         "matriz_gate": matriz_gate,
         "bloqueos_reales": [m["condicion"] for m in bloqueos_reales],
         "cobertura_modelada": {

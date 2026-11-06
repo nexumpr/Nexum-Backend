@@ -110,3 +110,11 @@ Correcciones adicionales:
   firma humana.
 
 Pruebas: `py -3.13 -m unittest discover -s tests/infra/finops` → **149 pruebas OK**.
+
+## 9. Revision 5 — conectividad privada
+
+- Precio de interface endpoint verificado: 0.01 USD/h por AZ.
+- Gateway endpoints solo S3/DynamoDB; Secrets Manager, CloudWatch y SSM requieren interface endpoint.
+- Recotizacion: minimo 134.4673 y completo 235.0073 con margen, ambos sobre 120 verificados.
+- Bloqueo real `CONECTIVIDAD_PRIVADA_NO_CUBIERTA`; D6 no efectiva; se requiere RFC.
+- Pruebas FinOps: 165 OK.

@@ -236,3 +236,12 @@
 - **Reclasificaciones:** costo observado → control recurrente (no figura en la lista de cierre del Gate); VPC Origins y runtime → verificación diferida a I-020/I-030 por cláusula del Gate; TLS → condicionado a aceptación humana (spec §9).
 - **Matriz `matriz_gate`:** 15 condiciones con cláusula; **1 bloqueo real (IVA)**, 1 condicionada (TLS), 4 diferidas, 7 cumplidas, 1 no aplica.
 - **Documento único de decisión:** `sdd/_control/H08/DECISION_CIERRE_I000.md` (no declara el Gate aprobado). Pruebas FinOps: **153 OK**.
+
+### I-000 revision 5 — bloqueo real de conectividad privada (2026-11-06)
+
+- Interface endpoint verificado en Price List: 0.01 USD/h por AZ (USE2-VpcEndpoint-Hours).
+- Los gateway endpoints solo cubren S3 y DynamoDB; Secrets Manager, CloudWatch Logs/metricas y SSM exigen interface endpoints.
+- Minimo (Secrets + Logs, 4 ENI): 43.2000 USD -> total 122.2430, con margen 134.4673 > 120: deficit 14.4673.
+- Completo SDD (6 servicios, 12 ENI): 129.6000 USD -> con margen 235.0073 > 120: deficit 115.0073.
+- Decision D6 no efectiva: falla la condicion de presupuesto completo cubierto. Se requiere RFC (O4/O5).
+- No se fusiona el PR #15 ni se abre I-010. Pruebas FinOps: 165 OK.

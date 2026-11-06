@@ -18,6 +18,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(RAIZ / "infra" / "finops"))
 
+import dinero  # noqa: E402
 import viabilidad  # noqa: E402
 
 EVIDENCIA_REAL = RAIZ / "infra" / "finops" / "evidencia"
@@ -47,7 +48,9 @@ def _evidencia_verificada() -> dict[str, dict]:
                 "estado_plan": "ACTIVE",
                 "fecha_expiracion": "2027-05-04T01:22:26Z",
                 "creditos_declarados_usd": "120",
-                "creditos_verificados_usd": "120",
+                # Fixture sintetico: 300 USD para que el caso "todo verificado"
+                # cubra tambien la conectividad privada obligatoria.
+                "creditos_verificados_usd": "300",
                 "impuestos": "DETERMINADO",
             },
         },
@@ -105,6 +108,7 @@ class EvidenciaReal(unittest.TestCase):
             "IMPUESTOS_NO_DETERMINADOS",
             "VPC_ORIGIN_NO_CONFIRMADO",
             "TLS_NO_RESUELTO",
+            "CONECTIVIDAD_PRIVADA_NO_CUBIERTA",
         ):
             self.assertIn(esperado, codigos, decision["motivos"])
         # El plan Free verificado elimina el riesgo de cobro y el costo
@@ -127,6 +131,13 @@ class EvidenciaReal(unittest.TestCase):
         self.assertTrue(fin["riesgo_interrupcion_servicio"])
         self.assertEqual(fin["politica_gasto_personal"], "CERO")
         self.assertLess(float(fin["creditos_requeridos_usd"]), 120.0)
+
+    def test_conectividad_recotiza_por_encima_de_creditos(self) -> None:
+        decision = viabilidad.evaluar(EVIDENCIA_REAL, PRECIOS, TOPOLOGIA, hoy=HOY)
+        recoste = decision["recotizacion_conectividad"]
+        self.assertEqual(recoste["costo_conectividad_usd"], "129.6000")
+        self.assertFalse(recoste["cubierto"])
+        self.assertGreater(dinero.dec(recoste["creditos_requeridos_usd"]), dinero.dec("120"))
 
     def test_cobertura_modelada_con_margen(self) -> None:
         decision = viabilidad.evaluar(EVIDENCIA_REAL, PRECIOS, TOPOLOGIA, hoy=HOY)
@@ -159,7 +170,10 @@ class EvidenciaReal(unittest.TestCase):
             por_condicion["Reservas de modelado no facturables (5.0000 USD)"]["clasificacion"],
             "NO_APLICA_JUSTIFICADO",
         )
-        self.assertEqual(decision["bloqueos_reales"], ["Impuestos / IVA"])
+        self.assertEqual(
+            decision["bloqueos_reales"],
+            ["Impuestos / IVA", "Conectividad privada de las EC2 sin NAT"],
+        )
         for entrada in decision["matriz_gate"]:
             self.assertTrue(entrada["clausula"], entrada["condicion"])
 
