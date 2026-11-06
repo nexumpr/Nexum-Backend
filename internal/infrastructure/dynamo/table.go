@@ -122,8 +122,8 @@ func (t *DynamoTable) DeleteItem(ctx context.Context, pk, sk string) error {
 	return nil
 }
 
-// QueryPartition consulta elementos dentro de una partición PK acotados por prefijo de SK (A-060 §2.4).
-func (t *DynamoTable) QueryPartition(ctx context.Context, pk string, skPrefix string, forward bool, limit int) ([]domainDynamo.DynamoItem, error) {
+// QueryPartition consulta elementos dentro de una partición PK acotados por prefijo de SK y cursor ExclusiveStartKey (A-060 §2.4, A-080 §2.6).
+func (t *DynamoTable) QueryPartition(ctx context.Context, pk string, skPrefix string, startSK string, forward bool, limit int) ([]domainDynamo.DynamoItem, error) {
 	if pk == "" {
 		return nil, errors.New("la clave de particion (PK) es obligatoria para Query")
 	}
@@ -135,6 +135,14 @@ func (t *DynamoTable) QueryPartition(ctx context.Context, pk string, skPrefix st
 	for _, item := range t.items {
 		if item.PK == pk {
 			if skPrefix == "" || strings.HasPrefix(item.SK, skPrefix) {
+				if startSK != "" {
+					if forward && item.SK <= startSK {
+						continue
+					}
+					if !forward && item.SK >= startSK {
+						continue
+					}
+				}
 				matched = append(matched, item)
 			}
 		}
