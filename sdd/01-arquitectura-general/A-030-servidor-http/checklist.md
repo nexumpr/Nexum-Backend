@@ -12,20 +12,20 @@
 
 ## Aceptación específica
 
-- [ ] **AC-A-030-01:** Timeout, 413, 415, 405, HEAD/OPTIONS y 429 reproducibles.
-- [ ] **AC-A-030-02:** No hay secreto ni PII en logs HTTP ni respuestas de error.
-- [ ] **AC-A-030-03:** Shutdown sin solicitudes perdidas indebidas.
+- [x] **AC-A-030-01:** Timeout, 413, 415, 405, HEAD/OPTIONS y 429 reproducibles y probados en http_server_test.go.
+- [x] **AC-A-030-02:** No hay secreto ni PII en logs HTTP ni respuestas de error (probado en Recovery).
+- [x] **AC-A-030-03:** Shutdown sin solicitudes perdidas indebidas y probe /ready en 503 verificado.
 
 ## Revisiones de construcción
 
-- [ ] Se revisó **Routing** (§2.1) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Tiempo y recursos** (§2.2) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Cadena middleware** (§2.3) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Seguridad HTTP** (§2.4) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **CORS** (§2.5) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Protección de entradas** (§2.6) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Graceful shutdown** (§2.7) y su mecanismo de aceptación con casos positivos, negativos y límites.
-- [ ] Se revisó **Compresión** (§2.8) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Routing** (§2.1) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Tiempo y recursos** (§2.2) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Cadena middleware** (§2.3) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Seguridad HTTP** (§2.4) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **CORS** (§2.5) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Protección de entradas** (§2.6) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Graceful shutdown** (§2.7) y su mecanismo de aceptación con casos positivos, negativos y límites.
+- [x] Se revisó **Compresión** (§2.8) y su mecanismo de aceptación con casos positivos, negativos y límites.
 
 ## Estado de las evidencias
 
