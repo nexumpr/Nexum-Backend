@@ -130,6 +130,18 @@
 - **Estado de Tareas:** A-080-T01..A-080-T14 completadas y marcadas en `tasks.md` y `checklist.md`.
 - **Resultado:** 100% PASS en suite completa de Go y 0 errores en `go vet ./...`.
 
+### Spec A-090 (`A-090-observabilidad-salud`):
+- **Alcance implementado:**
+  1. Trazabilidad distribuida W3C Trace Context (`internal/infrastructure/telemetry/tracer.go`): parser y generador canónico de cabeceras `traceparent` (`00-<trace_id>-<span_id>-<flags>`), propagación contextual de `x-request-id`, gestión de spans raíz e hijos conservando la correlación `handler -> usecase -> dynamodb/redis` sin exponer datos privados (`A-090 §2.1`, `AC-A-090-01`).
+  2. Middleware de rastreo HTTP (`internal/transport/http/middleware/tracing.go`): interceptor que extrae o genera el contexto W3C, asocia metadatos de ruta y método HTTP, inyecta el `TraceSpan` en el contexto y replica las cabeceras en la respuesta HTTP.
+  3. Redacción profunda de PII y secretos en logs estructurados (`internal/infrastructure/telemetry/redactor.go`): wrapper de `log/slog.Handler` (`SensitiveLogFilterHandler`) que audita y enmascara automáticamente contraseñas, tokens Bearer, JWTs, números de tarjeta de crédito, transcripciones de voz privadas y datos sensibles (`AC-A-090-03`), inyectando automáticamente `trace_id` y `request_id` en cada registro JSON.
+  4. Sondas de salud diferenciadas (`internal/transport/http/health_handler.go`):
+     - `/api/v1/health/live`: responde inmediatamente 200 UP sin evaluar dependencias externas ni filtrar secretos (`A-090 §2.4`).
+     - `/api/v1/health/ready`: evalúa concurrentemente con timeout acotado las dependencias críticas registradas (DynamoDB y Redis); devuelve 503 Service Unavailable si alguna de ellas se encuentra degradada o inaccesible (`AC-A-090-02`).
+- **Archivos creados:** `internal/infrastructure/telemetry/tracer.go`, `internal/infrastructure/telemetry/redactor.go`, `internal/transport/http/health_handler.go`, `internal/transport/http/middleware/tracing.go`, `tests/unit/telemetry/observability_health_test.go`.
+- **Estado de Tareas:** A-090-T01..A-090-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
+- **Resultado:** 100% PASS en suite completa de Go y 0 errores en `go vet ./...`.
+
 ## Registro de Incidentes y Resoluciones H08-A
 
 ### Incidente 1 (CI GitHub Actions: Falso Positivo `UNDECLARED_FILE` / `GIT_UNDECLARED`):

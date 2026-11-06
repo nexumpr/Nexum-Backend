@@ -59,3 +59,4 @@ func (rl *RateLimiter) CheckLimit(
 	}
 	return true, rem, 0, nil
 }
+
