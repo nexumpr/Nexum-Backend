@@ -52,6 +52,7 @@ Causa raíz: `main` no ejecuta `NewRouter()` ni `NewHTTPServer(...).Start()` y n
 ```
 cmd/server/main.go                              (modificado)
 tests/unit/transport/http_runtime_test.go       (nuevo)
+cmd/server/main_test.go                         (nuevo, prueba del punto de entrada)
 sdd/_control/H08/GATE_H08A_HOTFIX_A030_RUNTIME.md (este documento)
 sdd/01-arquitectura-general/A-030-servidor-http/{tasks,checklist}.md (registro)
 memoria.md
@@ -82,6 +83,13 @@ contratos OpenAPI, Terraform.
 | Regresión Go | `gofmt`, `go build`, `go vet`, `go test ./... -count=1` |
 | Integridad | `validar_sdd_integral --check-git` PASS; `validar_h06` 75 ops |
 | Seguridad | diff sin secretos; `git diff --check` limpio |
+
+## 4.b Correcciones de la revisión (2026-11-06, segunda pasada)
+
+| Observación | Corrección |
+|---|---|
+| La prueba sólo cubría `NewHTTPServer`, no la composición de `main` | Se extrajo `run(ctx, cfg, logger) error` en `cmd/server`; `main` la invoca. `cmd/server/main_test.go` ejercita arranque, 404, apagado y error de puerto ocupado sobre ese mismo camino |
+| El log afirmaba “inicializado con éxito” antes de escuchar | El mensaje pasa a “Contexto de sistema inicializado (A-000); se inicia el listener HTTP (A-030)”; no se declara disponibilidad hasta el apagado. Prueba que verifica la ausencia de la palabra “éxito” en el arranque |
 
 ## 5. Condiciones de cierre
 

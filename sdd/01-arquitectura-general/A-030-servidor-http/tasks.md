@@ -32,3 +32,10 @@ Las tareas de implementación, pruebas HTTP, CI/CD y despliegue pertenecen a H08
 - Pruebas nuevas: `tests/unit/transport/http_runtime_test.go` (arranque real con socket, 200/404/405, puerto ocupado, shutdown y liberacion del puerto).
 - Evidencia manual: binario vivo, `GET /health` 200, `/api/v1/nope` 404, parada limpia.
 - Sin cambios en `server.go`, `router.go` ni middlewares. A-090 sigue pendiente (rutas normativas y HealthRegistry).
+
+### Segunda pasada del hotfix (2026-11-06)
+
+- `run(ctx, cfg, logger)` extraído en `cmd/server`; `main` sólo construye logger/contexto y delega. La prueba de regresión ya cubre el punto de entrada real (si se elimina la composición, falla).
+- `cmd/server/main_test.go`: arranque con puerto efímero, `/health` 200, 404, cancelación y liberación de puerto; puerto ocupado devuelve error por `run`; verifica que el log de arranque no afirma éxito y no contiene datos sensibles.
+- Mensaje de arranque corregido: no declara disponibilidad antes de escuchar.
+- Evidencia: `go test ./cmd/server/...` PASS (2 pruebas); binario real vivo con `/health` 200 y `/api/v1/nope` 404; `go test ./...` PASS.

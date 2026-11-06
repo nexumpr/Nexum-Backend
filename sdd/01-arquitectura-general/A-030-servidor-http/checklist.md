@@ -46,3 +46,10 @@
 - [x] `gofmt`, `go build`, `go vet`, `go test ./...` PASS.
 - [ ] Senales SIGTERM reales en Linux — NOT_RUN_LINUX.
 - [ ] Rutas normativas `/api/v1/health/live|ready` — fuera de alcance (A-090).
+
+### Segunda pasada — observaciones cerradas
+
+- [x] Prueba automatizada del camino de composición usado por `main` (`run`).
+- [x] Error de puerto ocupado propagado por `run` y verificado.
+- [x] Log de arranque sin afirmación de éxito antes del listener.
+- [x] Sin datos sensibles en logs de arranque (prueba).
