@@ -1,35 +1,24 @@
-# Nexum-Backend — AGENTS.md operativo H08-A
+# Nexum-Backend — AGENTS.md operativo de infraestructura H08-I (I-000)
 
-**Autoridad:** decisión humana expresa > `constitution.md` > 103 specs aprobadas/documentadas > registro `sdd/_control/H07/ESTADO_Y_GATES.md` > este archivo > perfiles/skills. Si hay contradicción bloquear y preguntar; no ocultarla ni editar SDD para forzar PASS.
+**Autoridad:** decisión humana expresa > constitution.md > specs aprobadas > sdd/_control/H07/ESTADO_Y_GATES.md > Gate H08-I firmado > este archivo > agentes.
 
-## Fase única
-H08-A: implementación **local** de arquitectura Go de A-000 a A-110, una spec a la vez, iniciando A-000. H03/H04 aprobados; H05 aprobado documentalmente con bloqueos AWS; H06 baseline aprobado con fuente docente/prototipo pendiente de cotejo independiente; H07 publicado y CI verde. La ratificación solo es válida si el usuario ejecutó el instalador con frase exacta y fue integrado el PR con GitHub Actions verde.
+## Estado y alcance activo
+- A-000..A-110: implementación Go integrada en main con PR #3..#13; pruebas `go build`, `go vet`, `go test ./... -count=1` PASS según ejecución del responsable; **AWS NOT_RUN**.
+- H05: APPROVED_DOCUMENTAL_CONDICIONADO. H08-I abre **SOLO I-000** mediante el Gate local y la frase explícita del instalador; H08-E permanece NO AUTORIZADO.
+- RFC-002 habilita herramientas para que OpenCode implemente directamente, sin delegar archivos ni comandos rutinarios al humano. RFC-003 registra la interpretación del histórico de 24 tareas/checklists A sin falsificar firmas.
+- Rama de gobierno actual: `chore/h08i-rfc002-rfc003-gate-i000`. Después del PR de apertura y merge, la implementación I-000 irá en rama `feat/h08i-i000-finops` creada por OpenCode desde main limpio.
 
-## Restricciones absolutas
-- Solo Backend Go y sus contratos. Mobile, Play Store, landing y aprobación móvil fuera de alcance.
-- No modificar sin RFC/decisión `constitution.md`, `sdd/**`, `.github/**`, `.opencode/**`, `opencode.json`, contratos OpenAPI ni el repositorio de terceros.
-- No AWS ni Terraform (incluidos `plan`/`apply`), no actualizaciones AWS Paid, no recursos cloud, no dinero personal, no Docker ni WSL, no `git push` o `gh` desde OpenCode; operador publica PRs.
-- No leer/escribir/copiar secretos `.env`, tokens, `.aws`, `.ssh`, `*.pem`, `*.tfstate`; solo datos ficticios locales para unit tests.
-- El permiso shell ASK se revisa **cada vez** y no se permite «Allow always»; una configuración no es aislamiento de OS. Un comando indirecto que permita AWS o borrar datos sigue prohibido.
+## Operación autónoma con controles de riesgo
+1. **Una spec técnica a la vez**. I-000: leer los 4 archivos (spec/plan/tasks/checklist), confirmar evidencia y plan conciso; obtener aprobación humana de alcance de esa spec UNA VEZ antes de escribir. Después crear archivos, ejecutar validaciones, actualizar registro de tareas y checklist con evidencia, crear commit/PR de la rama, revisar CI, arreglar errores; no terminar solo con planes reiterados.
+2. OpenCode puede usar shell, Git, GitHub CLI, escritura y subagentes según `opencode.json`. No remitir al usuario comandos que OpenCode pueda ejecutar con sus propias herramientas. Ante permiso ASK, solicitarlo **dentro de OpenCode** una sola vez por acción; el usuario revisa y pulsa Allow once. No elegir Allow always.
+3. Para **este PR de apertura**, OpenCode puede verificar, completar documentos de control RFC-002/003/Gate y actualizar hashes autorizados; ejecutar pruebas, hacer commit, `git push` de la rama, abrir PR y seguir CI. Nunca `push` directo a main. Merge requiere aprobación humana separada del PR y checks verdes.
+4. Prohibido cambios de especificaciones (`spec.md`/`plan.md`) sin RFC específica; sdd A tareas/checklists históricos NO se reescriben en I-000. Resguardar `constitution.md`, `.env`, `.aws`, `.ssh`, tfstate/tfvars, secretos, `.pem`, `.key` y datos sensibles.
+5. **AWS I-000: consultas de solo lectura** autorizadas una por una en OpenCode, sanitizar salidas, no revelar datos personales ni credenciales. `aws create/update/delete/put`, presupuestos mutantes, upgrade Paid, Terraform init/plan/apply/destroy, despliegue, networking real e I-010+ BLOQUEADOS hasta Gate explícito posterior. AWS Free 0 MXN personales, 45 días, dos EC2, DynamoDB, Redis OSS, ALB/CloudFront HTTPS requisitos indeclinables; si no viable, `BLOCKED_FINOPS` y ADR.
+6. **No Docker ni WSL.** Backend exclusivamente; Mobile, Play Store, landing y aprobación móvil ajenos. No declarar PASS sin ejecución ni AWS_DEPLOYED si no está probado por HTTP real.
+7. Si el proveedor/modelo carece realmente de herramienta shell/edit, la configuración no puede inventarla: mostrar error exacto y cambiar al agente primario `nexum-orchestrator` en sesión nueva; comprobar `opencode debug agents` y `opencode debug config`.
 
-## Responsabilidades y secuencia
-1. Antes de cada acción: leer constitución, AGENTS, memoria, `sdd/_control/H08/CONTRATO_INICIO_H08A.md`, cuatro documentos de la spec A objetivo y dependencias.
-2. Primera respuesta por spec: **solo plan**, rutas exactas `cmd/**`, `internal/**`, `pkg/**`, `tests/**`, `go.mod`, `go.sum`, riesgos y comandos de prueba; esperar aprobación.
-3. Después de autorización concreta: delegar Go al arquitecto, revisión de conformidad a SDD guardian y QA; ninguna ejecución por sorpresa.
-4. Validar con Go nativo en Windows: compilación, `go test`, `go vet`, `go test -race` si la plataforma lo soporta, sin afirmar pruebas ejecutadas cuando no lo están.
-5. Equipo crea PR manual; CI verde y aprobación humana por spec antes de cambiar de A-000 a A-010 etc. Implementación I-000..I-150 y E001..E075 esperan sus propios Gates.
+## Flujo por especificación
+Aprobar SPEC → rama de feature → implementar exclusivamente SPEC → gofmt/pruebas/seguridad/conformidad → commit+push+PR por agente → CI y revisión humana → merge autorizado → SPEC siguiente solo tras autorización. No usar pseudoarchivos ni reportes como sustituto de recursos AWS reales.
 
-## Estado técnico
-103 specs/412 docs/75 rutas H06; GitHub CI SDD H07 success (evidencia compartida). Go backend, API HTTP real, DynamoDB/Redis reales, AWS FinOps y despliegue = **NOT_RUN**. Los encabezados DRAFT de las specs reflejan fecha de redacción, no sustituyen la aprobación formal H04 del control vigente. Cualquier diferencia de fuente docente o prototipo se registra RFC; no declarar cobertura absoluta de fuentes.
-
-## 8 agentes y 9 skills
-- Orquestador principal `nexum-orchestrator` coordina sin escribir; Go architect implementa solo rutas de código y con ASK.
-- `sdd-guardian`, `qa-evidence-verifier`, `devsecops-security`, `api-contract-guardian`, `finops-guardian` revisan dentro de su competencia.
-- `aws-terraform-engineer` conserva rol pero no puede operar AWS en esta fase.
-- Las skills se consultan con permiso ASK según `opencode.json`; las skills no conceden acceso por sí mismas.
-
-## Salida obligatoria de cada propuesta
-`FASE | SPEC | GATE | REQUISITOS/FUENTES | ARCHIVOS EXACTOS | COMANDOS PROPUESTOS | PERMISOS | PRUEBAS/ESTADO | BLOQUEOS | APROBACIÓN REQUERIDA`.
-
-## Inicio
-Leer `sdd/_control/H08/PRIMERA_TAREA_OPENCODE_A000.md` y producir plan para A-000 sin cambios. Detener ante divergencia de permisos reales, errores o petición de AWS. Nunca marcar `DEPLOYED_VERIFIED` sin ejecutar cloud/HTTP real.
+## Salida compacta
+`FASE | SPEC | GATE | CAMBIOS | PRUEBAS_REALES | GIT/PR | BLOQUEOS | SIGUIENTE_APROBACION`.
