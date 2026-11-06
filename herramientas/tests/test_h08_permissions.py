@@ -33,7 +33,7 @@ class PermisosH08I(unittest.TestCase):
   self.assertEqual(self.eff('shell','go test ./...'),'allow')
   self.assertEqual(self.eff('shell','git status -sb'),'allow')
  def test_cloud_deny_readonly_ask(self):
-  for cmd in ['aws ec2 run-instances --x','aws ec2 create-vpc --x','aws budgets create-budget --x','terraform apply -auto-approve','terraform init','terraform plan','terraform destroy','git push origin main','git reset --hard HEAD','docker build .']:
+  for cmd in ['aws ec2 run-instances --x','aws ec2 create-vpc --x','aws budgets create-budget --x','terraform apply -auto-approve','terraform init -backend=true','terraform plan','terraform destroy','git push origin main','git reset --hard HEAD','docker build .']:
    self.assertEqual(self.eff('shell',cmd),'deny',cmd)
   for cmd in ['aws sts get-caller-identity --profile nexum','aws freetier get-account-plan-state --region us-east-2','aws pricing get-products --service-code AmazonEC2','terraform fmt -check']:
    self.assertEqual(self.eff('shell',cmd),'ask',cmd)
@@ -48,3 +48,47 @@ class PermisosH08I(unittest.TestCase):
   self.assertEqual(len(agents),8)
   for p in agents:
    txt=p.read_text(encoding='utf8'); self.assertTrue(txt.startswith('---\n'));self.assertIn('permissions:',txt)
+
+
+class TerraformGateTests(unittest.TestCase):
+    """Negativos del ajuste de permisos de I-010 (init local sin backend)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        import json as _json
+        from pathlib import Path as _Path
+
+        raiz = _Path(__file__).resolve().parents[2]
+        cfg = _json.loads((raiz / "opencode.json").read_text(encoding="utf-8"))
+        cls.politicas = {(p.get("resource"), p.get("effect")) for p in cfg.get("policies", [])}
+        cls.permisos = {(p.get("resource"), p.get("effect")) for p in cfg.get("permissions", [])}
+
+    def test_init_local_sin_backend_permitido(self) -> None:
+        self.assertIn(("shell:terraform init -backend=false*", "allow"), self.politicas)
+
+    def test_init_con_backend_remoto_denegado(self) -> None:
+        self.assertIn(("shell:terraform init -backend=true*", "deny"), self.politicas)
+
+    def test_init_migracion_y_reconfigure_denegados(self) -> None:
+        self.assertIn(("shell:terraform init -migrate-state*", "deny"), self.politicas)
+        self.assertIn(("shell:terraform init -reconfigure*", "deny"), self.politicas)
+
+    def test_operaciones_mutantes_denegadas(self) -> None:
+        for verbo in ("plan", "apply", "destroy", "import", "state"):
+            self.assertTrue(
+                any(r == f"shell:terraform {verbo}*" and e == "deny" for r, e in self.politicas),
+                verbo,
+            )
+
+    def test_no_hay_allow_para_plan_apply_destroy(self) -> None:
+        for recurso, efecto in self.politicas:
+            if efecto != "allow":
+                continue
+            self.assertNotRegex(recurso, r"terraform (plan|apply|destroy|import|state)")
+
+    def test_aws_mutante_sigue_denegado(self) -> None:
+        for recurso, efecto in self.permisos:
+            if recurso.startswith("aws *") and any(
+                verbo in recurso for verbo in ("create-", "update-", "delete-", "put-")
+            ):
+                self.assertEqual(efecto, "deny", recurso)

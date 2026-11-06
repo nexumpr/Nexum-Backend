@@ -252,3 +252,30 @@
 - Conectividad 23.7400; total 102.7830; requerido con margen 113.0613 <= 120 (sobrante 6.9387).
 - D6 efectiva: `APRUEBO_CIERRE_I000_CON_CONDICIONES`. IVA queda condicionado (D1), sin declarar 0 %.
 - Pruebas FinOps: 167 OK. Riesgos: cache de secretos, logs bufferizados, metricas derivadas, mas ventanas encarecen.
+
+### I-010 red VPC — implementacion local (2026-11-06)
+
+- Rama `feat/h08i-i010-red-vpc`; modulo `infra/terraform/modules/red` + entorno `envs/h08i`.
+- D2 aplicada: CloudFront (443 HTTPS) -> ALB HTTP 80 desde prefix list -> backend 8080. El ALB no tiene 443 ni listener TLS.
+- IGW adjunto (requisito VPC Origins) sin rutas publicas; NAT 0; IPv4 publicas 0; gateway endpoints S3/DynamoDB.
+- Interface endpoints: logs permanente; secretsmanager, ssm y ssmmessages por ventana (`ventana_mantenimiento_activa`).
+- Permiso tramitado: `shell:terraform init -backend=false*` allow; denies especificos para `-backend=true`, `-migrate-state`, `-reconfigure`; `plan/apply/destroy/import/state` siguen denegados.
+- `terraform fmt -check` PASS, `terraform init -backend=false` OK (aws 5.100.0), `terraform validate` Success.
+- 24 pruebas estaticas en `tests/infra/terraform`; presupuesto A 113.0613 y B 118.5613 (<=120).
+- Sin recursos AWS; sin plan; sin apply; sin backend remoto; 75 operaciones API intactas.
+
+### I-010 correccion de auditoria (2026-11-06)
+
+- Egress S3/DynamoDB por prefix lists administradas (443): sin ellas el SG del backend bloquea los gateway endpoints.
+- NACL completada como flujo stateless (ingress 80/8080/6379 + efimeros; egress 443 abierto a AWS, 8080/6379 al CIDR, efimeros).
+- Subredes derivadas con `cidrsubnet`; validacion RFC1918 real; zonas coherentes con la region.
+- Pruebas: 33 estaticas Terraform + 18 de permisos; fmt/init/validate PASS. Sin AWS.
+- Dependencia obligatoria registrada: el mecanismo de secretos (cache EBS + ventanas) debe demostrarse en I-020/I-060 antes de desplegar.
+
+### I-010 cierre final (2026-11-06)
+
+- Subredes derivadas con indices 0 y 1; prefijo final /20../27 (ALB exige 8 libres; AWS reserva 5). `/28` rechazado.
+- Validaciones cruzadas en `terraform_data` preconditions; `required_version` >= 1.4.0, < 2.0.0 (no se declara compatibilidad con 1.6 si se usan preconditions de 1.4: si, es compatible).
+- `.terraform.lock.hcl` versionado (aws 5.100.0); `.terraform/` y tfstate excluidos.
+- 43 pruebas Terraform + 18 permisos + 167 FinOps; fmt/init/validate PASS. Sin AWS.
+- Dependencia bloqueante de despliegue: demostrar el mecanismo de secretos (I-020/I-060).

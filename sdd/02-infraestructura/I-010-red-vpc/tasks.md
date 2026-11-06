@@ -78,3 +78,30 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+## Registro de implementacion H08-I — 2026-11-06
+
+- `infra/terraform/modules/red`: VPC, 2 subredes privadas en 2 AZ, IGW (requisito VPC Origins), tabla de rutas privada sin ruta por defecto, gateway endpoints S3/DynamoDB, 4 SG de minimo privilegio, NACL con puertos efimeros, interface endpoints (logs permanente; secretsmanager/ssm/ssmmessages por ventana).
+- `infra/terraform/envs/h08i`: composicion, provider AWS ~> 5.60, sin backend remoto.
+- `terraform fmt -check -recursive`: PASS. `terraform init -backend=false`: ejecutado (proveedor 5.100.0). `terraform validate`: Success.
+- `tests/infra/terraform/test_red_contrato.py`: 24 pruebas (estructura, red, endpoints, seguridad, presupuesto).
+- Correccion D2: ALB en HTTP 80 desde prefix list; backend 8080. Sin 443 en el ALB.
+- Sin recursos AWS creados; sin plan/apply/destroy; sin backend remoto.
+
+### Correccion de auditoria — 2026-11-06
+
+- A) Egress del backend a S3 y DynamoDB via prefix lists administradas (`com.amazonaws.<region>.s3` y `.dynamodb`) en TCP/443. Sin el, un gateway endpoint no es alcanzable por SG.
+- B) NACL reescrita como flujo completo: ingress 80/8080/6379 + efimeros; egress 443 a 0.0.0.0/0, 8080/6379 al CIDR VPC y efimeros. Documentado que las prefix lists no aplican a NACL.
+- C) CIDR: validacion RFC1918 real (`cidrnetmask` + rangos 10/172.16-31/192.168) y subredes derivadas con `cidrsubnet` (contencion y no superposicion por construccion); zonas deben empezar por la region.
+- D) Permisos: `terraform init -backend=false` permitido; denies especificos y pruebas negativas (plan/apply/destroy/import/state y variantes de init).
+- `terraform fmt` PASS, `terraform init -backend=false` OK, `terraform validate` Success, 33 pruebas estaticas OK.
+- Sin recursos AWS, sin plan, sin apply.
+
+### Correccion final — capacidad, version y lock (2026-11-06)
+
+- Subredes con indices 0 y 1; politica /20../27 (ALB exige 8 libres, AWS reserva 5).
+- Validaciones cruzadas movidas a `terraform_data` preconditions (Terraform >= 1.4); `required_version` = >= 1.4.0, < 2.0.0.
+- `.terraform.lock.hcl` versionado (aws 5.100.0); `.terraform/` y estado excluidos.
+- Pruebas: 43 estaticas (incluye /24, /27, /28 rechazado, RFC1918, solape, AZ duplicadas).
+- `terraform fmt` PASS, `terraform init -backend=false` OK, `terraform validate` Success.
+- NOT_RUN_AWS: direcciones libres y conectividad real solo se comprueban al desplegar.

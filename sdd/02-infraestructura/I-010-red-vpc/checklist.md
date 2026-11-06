@@ -46,3 +46,34 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+### Verificacion H08-I — 2026-11-06
+
+- [x] INF-010-01 topologia: 2 subredes privadas en 2 AZ, sin NAT, IGW para VPC Origins.
+- [x] INF-010-02 flujos: matriz origen-destino en `infra/terraform/README.md`.
+- [x] INF-010-03 NAT/IP: sin NAT, `map_public_ip_on_launch=false`, sin IPv4 publicas.
+- [x] INF-010-05 seguridad: SG minimos, sin SSH, sin ingress 0.0.0.0/0, NACL con efimeros.
+- [x] `terraform fmt -check` y `terraform validate` PASS; init solo `-backend=false`.
+- [x] Interfaces: logs permanente; secretsmanager/ssm/ssmmessages por ventana; monitoring y ec2messages no requeridos.
+- [ ] Recursos AWS creados — NOT_RUN por Gate.
+- [ ] `terraform plan` contra AWS — NO AUTORIZADO.
+- [ ] Verificacion runtime de red — corresponde a I-020/I-030.
+
+### Correccion de auditoria — 2026-11-06
+
+- [x] Egress S3 por prefix list administrada en 443 (`backend_s3_443`).
+- [x] Egress DynamoDB por prefix list administrada en 443 (`backend_dynamodb_443`).
+- [x] NACL con ingress/egress completos y efimeros 1024-65535 en ambos sentidos.
+- [x] CIDR RFC1918 validado y subredes derivadas sin superposicion.
+- [x] Pruebas negativas de permisos Terraform.
+- [ ] Conectividad AWS real — NOT_RUN_AWS (sin despliegue).
+- [ ] Mecanismo de secretos demostrado (arranque, rotacion, recuperacion) — dependencia obligatoria de I-020/I-060.
+
+### Correccion final — capacidad y versionado
+
+- [x] Subredes derivadas con indices 0/1 y prefijo final acotado a /27.
+- [x] `/28` rechazado por politica; `/27` aceptado; `/24` por defecto.
+- [x] Validaciones cruzadas compatibles con Terraform >= 1.4 (preconditions).
+- [x] Lock file versionado para reproducibilidad.
+- [x] 43 pruebas estaticas OK; fmt/init/validate PASS.
+- [ ] Direcciones libres reales y conectividad — NOT_RUN_AWS.
