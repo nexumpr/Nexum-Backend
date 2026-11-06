@@ -69,13 +69,26 @@ try {
     $fecha = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     $ldflags = "-s -w -X main.version=$Version -X main.commit=$commit"
 
+    # Se conservan los valores previos y se restauran siempre (tambien si falla).
+    $previo = @{
+        CGO_ENABLED = $env:CGO_ENABLED
+        GOOS        = $env:GOOS
+        GOARCH      = $env:GOARCH
+    }
     $env:CGO_ENABLED = "0"
     $env:GOOS = "linux"
     $env:GOARCH = "arm64"
     Write-Host "Compilando GOOS=linux GOARCH=arm64 CGO_ENABLED=0"
     & go build -trimpath -ldflags $ldflags -o $binario ./cmd/server
     $codigo = $LASTEXITCODE
-    Remove-Item Env:CGO_ENABLED, Env:GOOS, Env:GOARCH -ErrorAction SilentlyContinue
+    foreach ($clave in $previo.Keys) {
+        if ($null -eq $previo[$clave]) {
+            Remove-Item "Env:$clave" -ErrorAction SilentlyContinue
+        }
+        else {
+            Set-Item "Env:$clave" $previo[$clave]
+        }
+    }
     if ($codigo -ne 0) { throw "go build fallo para linux/arm64." }
 
     # --- Integridad ----------------------------------------------------------

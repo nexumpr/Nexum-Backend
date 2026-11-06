@@ -71,3 +71,15 @@ variable "artefacto_sha256" {
   type        = string
   default     = ""
 }
+
+variable "unidad_s3_uri" {
+  description = "URI S3 de la unidad systemd"
+  type        = string
+  default     = "s3://PENDIENTE-I080/nexum-backend.service"
+}
+
+variable "unidad_sha256" {
+  description = "SHA-256 de la unidad systemd"
+  type        = string
+  default     = ""
+}

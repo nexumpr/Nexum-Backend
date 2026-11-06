@@ -63,3 +63,16 @@
 - [ ] Garantia estricta de una instancia por AZ — depende de capacidad AWS (NOT_RUN_AWS).
 - [ ] Endpoint ELB / target group — corresponde a I-030.
 - [ ] **BLOQUEO DE DESPLIEGUE**: RFC-004 (secretos en reemplazo automatico de instancias).
+
+### Correccion de cierre
+
+- [x] La unidad systemd se instala desde S3 con SHA-256 verificado.
+- [x] Binario y directorio propiedad de root; el usuario del servicio no puede modificarlos.
+- [x] El bootstrap falla si falta unidad, binario o `/etc/nexum/backend.env`.
+- [x] Comprueba servicio activo y liveness local; si no, `exit 1`.
+- [x] Instance refresh con `min_healthy_percentage = 100`.
+- [x] Validacion estricta de `sg_backend_id`.
+- [x] Script de build restaura el entorno.
+- [ ] **D-01** Rutas de salud no registradas en el router Go — bloquea I-030/despliegue.
+- [ ] **RFC-004** pendiente de aprobacion humana — bloquea despliegue.
+- [ ] NOT_RUN_AWS / NOT_RUN_LINUX: sin instancias ni systemd real.

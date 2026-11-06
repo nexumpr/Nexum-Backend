@@ -16,6 +16,8 @@ locals {
   # El binario se publica en S3 (gateway endpoint: sin NAT ni IPv4 publica).
   artefacto_uri = var.artefacto_s3_uri
   artefacto_sha = lower(var.artefacto_sha256)
+  unidad_uri    = var.unidad_s3_uri
+  unidad_sha    = lower(var.unidad_sha256)
 }
 
 # AMI oficial y reproducible desde el parametro publico de SSM
@@ -27,7 +29,7 @@ data "aws_ssm_parameter" "ami_arm64" {
 # Invariantes de seguridad y disponibilidad. Se evaluan en plan/apply; validate
 # no las ejecuta, por eso las pruebas estaticas verifican que existan.
 resource "terraform_data" "invariantes_computo" {
-  input = "${var.instance_type}|${var.asg_capacidad}|${var.artefacto_sha256}|${var.iam_instance_profile_name}|${length(var.subnet_ids)}"
+  input = "${var.instance_type}|${var.asg_capacidad}|${var.artefacto_sha256}|${var.unidad_sha256}|${var.iam_instance_profile_name}|${length(var.subnet_ids)}"
 
   lifecycle {
     precondition {
@@ -48,6 +50,11 @@ resource "terraform_data" "invariantes_computo" {
     precondition {
       condition     = can(regex("^[0-9a-f]{64}$", local.artefacto_sha))
       error_message = "artefacto_sha256 debe ser un SHA-256 hexadecimal de 64 caracteres."
+    }
+
+    precondition {
+      condition     = can(regex("^[0-9a-f]{64}$", local.unidad_sha))
+      error_message = "unidad_sha256 debe ser un SHA-256 hexadecimal de 64 caracteres."
     }
 
     precondition {
@@ -103,6 +110,8 @@ resource "aws_launch_template" "backend" {
     templatefile("${path.module}/user-data.sh.tftpl", {
       artefacto_uri = local.artefacto_uri
       artefacto_sha = local.artefacto_sha
+      unidad_uri    = local.unidad_uri
+      unidad_sha    = local.unidad_sha
       servicio      = var.servicio_nombre
     })
   )
@@ -155,7 +164,11 @@ resource "aws_autoscaling_group" "backend" {
     strategy = "Rolling"
 
     preferences {
-      min_healthy_percentage = 50
+      # 100 %: durante el refresh nunca se baja de 2 instancias sanas. El ASG
+      # lanza una instancia temporal (max_healthy_percentage = 200) cuyo coste
+      # se documenta en FinOps (0.0084 USD/h durante minutos).
+      min_healthy_percentage = 100
+      max_healthy_percentage = 200
       instance_warmup        = 120
     }
   }

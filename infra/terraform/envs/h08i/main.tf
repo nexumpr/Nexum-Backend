@@ -73,6 +73,8 @@ module "computo" {
   root_volume_gb            = var.root_volume_gb
   artefacto_s3_uri          = var.artefacto_s3_uri
   artefacto_sha256          = var.artefacto_sha256
+  unidad_s3_uri             = var.unidad_s3_uri
+  unidad_sha256             = var.unidad_sha256
 }
 
 output "asg_name" {

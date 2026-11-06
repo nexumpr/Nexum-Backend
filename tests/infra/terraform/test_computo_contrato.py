@@ -58,6 +58,11 @@ class LaunchTemplate(unittest.TestCase):
         self.assertIn("vpc_security_group_ids = [var.sg_backend_id]", self.main)
         self.assertIn('module.red.security_groups["backend"]', _leer(ENV / "main.tf"))
 
+    def test_sg_validacion_estricta(self) -> None:
+        # No debe aceptarse cualquier cadena no vacia.
+        self.assertNotIn('|| var.sg_backend_id != ""', self.vars)
+        self.assertIn('can(regex("^sg-[0-9a-f]{8,17}$", var.sg_backend_id))', self.vars)
+
     def test_ami_desde_parametro_publico_ssm(self) -> None:
         self.assertIn('data "aws_ssm_parameter" "ami_arm64"', self.main)
         self.assertIn("al2023-ami-kernel-default-arm64", self.vars)
@@ -93,14 +98,18 @@ class AutoScalingGroup(unittest.TestCase):
         self.assertIn("health_check_type         = var.health_check_type", self.main)
         self.assertIn('default     = "EC2"', self.vars)
 
-    def test_instance_refresh_acotado(self) -> None:
-        self.assertIn("min_healthy_percentage = 50", self.main)
+    def test_instance_refresh_no_baja_de_dos(self) -> None:
+        self.assertIn("min_healthy_percentage = 100", self.main)
+        self.assertIn("max_healthy_percentage = 200", self.main)
+        self.assertNotIn("min_healthy_percentage = 50", self.main)
 
     def test_proteccion_scale_in(self) -> None:
         self.assertIn("protect_from_scale_in = true", self.main)
 
 
 class Bootstrap(unittest.TestCase):
+    """Cadena completa: binario + unidad + config + arranque, con fallo explicito."""
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.userdata = _leer(MODULO / "user-data.sh.tftpl")
@@ -109,22 +118,78 @@ class Bootstrap(unittest.TestCase):
         for patron in ("AKIA", "BEGIN RSA", "BEGIN PRIVATE", "password=", "token=", "aws_secret"):
             self.assertNotIn(patron, self.userdata, patron)
 
-    def test_artefacto_desde_s3_y_sha_verificado(self) -> None:
-        self.assertIn("aws s3 cp", self.userdata)
+    def test_descarga_binario_y_unidad_con_sha(self) -> None:
+        self.assertIn('descargar "$BINARIO_URI"', self.userdata)
+        self.assertIn('descargar "$UNIDAD_URI"', self.userdata)
         self.assertIn("sha256sum", self.userdata)
-        self.assertIn('if [[ "$CALCULADO" != "$SHA_ESPERADO" ]]', self.userdata)
+        self.assertIn('[[ "$calculado" == "$sha_esperado" ]]', self.userdata)
+
+    def test_instala_unidad_systemd(self) -> None:
+        self.assertIn('install -m 0644 -o root -g root "$TMP/$SERVICIO.service"', self.userdata)
+        self.assertIn("/etc/systemd/system/$SERVICIO.service", self.userdata)
+        self.assertIn("systemctl daemon-reload", self.userdata)
+        self.assertIn('systemctl enable "$SERVICIO"', self.userdata)
+        self.assertIn('systemctl restart "$SERVICIO"', self.userdata)
+
+    def test_binario_propiedad_de_root(self) -> None:
+        self.assertIn('install -m 0755 -o root -g root "$TMP/nexum-backend"', self.userdata)
+        self.assertIn('install -d -m 0755 -o root -g root "$DIR_BIN"', self.userdata)
+        self.assertNotIn('-o "$USUARIO" -g "$USUARIO" "$TMP/nexum-backend"', self.userdata)
+
+    def test_falla_si_falta_configuracion(self) -> None:
+        self.assertIn('if [[ ! -f "$ENV_FILE" ]]', self.userdata)
+        self.assertIn("fail ", self.userdata)
+        self.assertIn("exit 1", self.userdata)
+
+    def test_comprueba_servicio_activo_y_liveness(self) -> None:
+        self.assertIn('systemctl is-active --quiet "$SERVICIO"', self.userdata)
+        self.assertIn("/api/v1/health/live", self.userdata)
+        self.assertIn('fail "el servicio no alcanzo estado activo', self.userdata)
+
+    def test_sin_exito_silencioso(self) -> None:
+        # El bootstrap nunca debe terminar con AVISO por falta de unidad.
+        self.assertNotIn("AVISO: unidad", self.userdata)
+        self.assertNotIn("sin activar", self.userdata)
 
     def test_instalacion_atomica_e_idempotente(self) -> None:
         self.assertIn("mv -f", self.userdata)
         self.assertIn("useradd --system", self.userdata)
         self.assertIn("set -euo pipefail", self.userdata)
 
+    def test_verifica_herramientas_de_la_ami(self) -> None:
+        for cmd in ("aws", "sha256sum", "systemctl", "curl"):
+            self.assertIn(cmd, self.userdata)
+
     def test_sin_descargas_de_internet(self) -> None:
-        for patron in ("curl ", "wget ", "apt-get", "dnf install", "pip install"):
+        for patron in ("curl http://", "curl https://", "wget ", "apt-get", "dnf install", "pip install"):
             self.assertNotIn(patron, self.userdata, patron)
 
-    def test_servicio_no_root(self) -> None:
-        self.assertIn('USUARIO="nexum"', self.userdata)
+
+class ScriptDeBuild(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.ps1 = (RAIZ / "scripts" / "build-backend.ps1").read_text(encoding="utf-8")
+
+    def test_compila_linux_arm64_sin_cgo(self) -> None:
+        for fragmento in ('GOOS = "linux"', 'GOARCH = "arm64"', 'CGO_ENABLED = "0"', "-trimpath"):
+            self.assertIn(fragmento, self.ps1, fragmento)
+
+    def test_restaura_variables_de_entorno(self) -> None:
+        self.assertIn("$previo", self.ps1)
+        self.assertIn("Set-Item \"Env:$clave\"", self.ps1)
+
+    def test_preflight_anti_sobrescritura(self) -> None:
+        self.assertIn("ya existe", self.ps1)
+        self.assertIn("-Force", self.ps1)
+
+    def test_integridad_y_manifiesto(self) -> None:
+        self.assertIn("Get-FileHash -Algorithm SHA256", self.ps1)
+        self.assertIn("manifest.json", self.ps1)
+        self.assertIn("recalculado", self.ps1)
+
+    def test_sin_secretos(self) -> None:
+        for patron in ("AKIA", "BEGIN PRIVATE", "password=", "aws_secret"):
+            self.assertNotIn(patron, self.ps1, patron)
 
 
 class IntegracionI030(unittest.TestCase):

@@ -1,66 +1,94 @@
 #!/bin/bash
-# Nexum-Backend — bootstrap de instancia privada (I-020).
+# Nexum-Backend — bootstrap de instancia privada (I-020, revision 2).
 #
-# Sin NAT ni IPv4 publica: el binario se obtiene de S3 por el gateway endpoint,
-# se verifica su SHA-256 y se instala de forma atomica. No descarga nada de
-# Internet, no contiene secretos y es idempotente.
+# Cadena completa y verificable:
+#   1. Descarga binario y unidad systemd desde S3 (gateway endpoint, sin NAT).
+#   2. Verifica el SHA-256 de AMBOS contra el valor publicado por Terraform.
+#   3. Instala binario (root:root 0755) y unidad (root:root 0644) de forma atomica.
+#   4. Verifica que exista la configuracion indispensable.
+#   5. Activa y arranca el servicio y comprueba que quedo activo y respondiendo.
 #
-# Variables sustituidas por Terraform:
-#   ${artefacto_uri}  s3://bucket/clave
-#   ${artefacto_sha}  sha256 hexadecimal de 64 caracteres
-#   ${servicio}       nombre del servicio systemd
+# Cualquier fallo termina con exit != 0: la instancia no se declara sana y el ASG
+# la reemplaza. No hay "advertencias" que permitan un exito falso.
+#
+# Sin secretos en este archivo: los valores reales llegan en /etc/nexum/backend.env
+# durante la ventana autorizada (ver RFC-004).
 set -euo pipefail
 
-ARTEFACTO="${artefacto_uri}"
-SHA_ESPERADO="${artefacto_sha}"
+BINARIO_URI="${artefacto_uri}"
+BINARIO_SHA="${artefacto_sha}"
+UNIDAD_URI="${unidad_uri}"
+UNIDAD_SHA="${unidad_sha}"
 SERVICIO="${servicio}"
 USUARIO="nexum"
 DIR_BIN="/opt/nexum/bin"
 DIR_CFG="/etc/nexum"
 DIR_ESTADO="/var/lib/nexum"
 DIR_LOGS="/var/log/nexum"
+ENV_FILE="$${DIR_CFG}/backend.env"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 log() { printf '%s\n' "[bootstrap] $*"; }
+fail() { printf '%s\n' "[bootstrap][ERROR] $*" >&2; exit 1; }
 
-if [[ "$(id -u)" -ne 0 ]]; then
-  log "ERROR: el bootstrap debe ejecutarse como root (lo invoca cloud-init)"
-  exit 1
-fi
+[[ "$(id -u)" -eq 0 ]] || fail "debe ejecutarse como root (cloud-init)"
 
-# Usuario no privilegiado del servicio (idempotente).
+# Herramientas indispensables en AL2023 (documentadas en el README).
+for cmd in aws sha256sum install systemctl curl; do
+  command -v "$cmd" >/dev/null 2>&1 || fail "falta la herramienta '$cmd' en la AMI"
+done
+
+# Usuario del servicio (idempotente, sin shell).
 if ! id -u "$USUARIO" >/dev/null 2>&1; then
-  useradd --system --home-dir /opt/nexum --shell /usr/sbin/nologin "$USUARIO"
+  useradd --system --home-dir /opt/nexum --shell /usr/sbin/nologin "$USUARIO" || fail "no se pudo crear $USUARIO"
 fi
 
-install -d -m 0750 -o "$USUARIO" -g "$USUARIO" "$DIR_BIN" "$DIR_ESTADO" "$DIR_LOGS"
-install -d -m 0750 -o root -g "$USUARIO" "$DIR_CFG"
+# Directorios: el binario es de root y NO modificable por el usuario del servicio.
+install -d -m 0755 -o root -g root "$DIR_BIN" || fail "no se pudo crear $DIR_BIN"
+install -d -m 0750 -o "$USUARIO" -g "$USUARIO" "$DIR_ESTADO" "$DIR_LOGS" || fail "no se pudieron crear directorios de estado"
+install -d -m 0750 -o root -g "$USUARIO" "$DIR_CFG" || fail "no se pudo crear $DIR_CFG"
 
-# Descarga desde S3 por el gateway endpoint, con la identidad de la instancia.
-if ! aws s3 cp --only-show-errors "$ARTEFACTO" "$TMP/nexum-backend"; then
-  log "ERROR: no se pudo descargar $ARTEFACTO (¿gateway endpoint S3 o IAM?)"
-  exit 1
+descargar() {
+  local uri="$1" destino="$2" sha_esperado="$3" etiqueta="$4"
+  aws s3 cp --only-show-errors "$uri" "$destino" || fail "no se pudo descargar $etiqueta desde $uri"
+  local calculado
+  calculado="$(sha256sum "$destino" | awk '{print $1}')"
+  [[ "$calculado" == "$sha_esperado" ]] || fail "$etiqueta: SHA-256 no coincide (esperado $sha_esperado, obtenido $calculado)"
+  log "$etiqueta verificado: $calculado"
+}
+
+descargar "$BINARIO_URI" "$TMP/nexum-backend" "$BINARIO_SHA" "binario"
+descargar "$UNIDAD_URI" "$TMP/$SERVICIO.service" "$UNIDAD_SHA" "unidad systemd"
+
+# Instalacion atomica en el mismo sistema de archivos y con propietario root.
+install -m 0755 -o root -g root "$TMP/nexum-backend" "$DIR_BIN/.nexum-backend.nuevo" || fail "no se pudo instalar el binario"
+mv -f "$DIR_BIN/.nexum-backend.nuevo" "$DIR_BIN/nexum-backend" || fail "no se pudo activar el binario"
+
+install -m 0644 -o root -g root "$TMP/$SERVICIO.service" "/etc/systemd/system/$SERVICIO.service" || fail "no se pudo instalar la unidad"
+
+# Verificacion explicita de los artefactos antes de tocar systemd.
+[[ -x "$DIR_BIN/nexum-backend" ]] || fail "el binario no quedo ejecutable"
+[[ -f "/etc/systemd/system/$SERVICIO.service" ]] || fail "la unidad no quedo instalada"
+
+# Configuracion indispensable: sin ella el backend no puede operar.
+if [[ ! -f "$ENV_FILE" ]]; then
+  fail "falta $ENV_FILE (secretos/configuracion no suministrados; ver RFC-004)"
 fi
 
-# Verificacion de integridad antes de tocar el binario en uso.
-CALCULADO="$(sha256sum "$TMP/nexum-backend" | awk '{print $1}')"
-if [[ "$CALCULADO" != "$SHA_ESPERADO" ]]; then
-  log "ERROR: SHA-256 no coincide (esperado $SHA_ESPERADO, obtenido $CALCULADO)"
-  exit 1
-fi
-log "SHA-256 verificado: $CALCULADO"
+systemctl daemon-reload || fail "daemon-reload fallo"
+systemctl enable "$SERVICIO" >/dev/null 2>&1 || fail "no se pudo habilitar $SERVICIO"
+systemctl restart "$SERVICIO" || fail "no se pudo arrancar $SERVICIO"
 
-# Instalacion atomica: se escribe en el mismo sistema de archivos y se renombra.
-install -m 0755 -o "$USUARIO" -g "$USUARIO" "$TMP/nexum-backend" "$DIR_BIN/.nexum-backend.nuevo"
-mv -f "$DIR_BIN/.nexum-backend.nuevo" "$DIR_BIN/nexum-backend"
+# Debe quedar activo y responder liveness en local.
+for intento in 1 2 3 4 5 6 7 8 9 10; do
+  if systemctl is-active --quiet "$SERVICIO" && \
+     curl -fsS --max-time 2 "http://127.0.0.1:8080/api/v1/health/live" >/dev/null 2>&1; then
+    log "servicio activo y liveness OK tras $$intento intento(s)"
+    exit 0
+  fi
+  sleep 3
+done
 
-if [[ -f /etc/systemd/system/"$SERVICIO".service ]]; then
-  systemctl daemon-reload
-  systemctl enable "$SERVICIO" >/dev/null 2>&1 || true
-  systemctl restart "$SERVICIO"
-else
-  log "AVISO: unidad $SERVICIO no encontrada; el binario queda instalado sin activar"
-fi
-
-log "bootstrap completado"
+journalctl -u "$SERVICIO" --no-pager -n 50 >&2 || true
+fail "el servicio no alcanzo estado activo con liveness correcto"

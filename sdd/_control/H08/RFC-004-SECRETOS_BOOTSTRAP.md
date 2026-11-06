@@ -69,3 +69,32 @@ efímeras. Queda registrada como bloqueo de despliegue (no de la implementación
 
 `BLOQUEO_DE_DESPLIEGUE` registrado en I-020 (`checklist.md`) y en `memoria.md`. La implementación
 local de I-020 (Terraform, systemd, build ARM64, pruebas) **no** se ve afectada.
+
+
+## 7. Análisis ampliado de la opción B (sin aprobar)
+
+| Aspecto | Detalle |
+|---|---|
+| Cifrado en reposo | SSE-S3 (AES-256) lo aplica AWS; **no hay CMK propia ni KMS API desde la instancia**. Cifrado ≠ control total: sin CMK no hay revocación criptográfica inmediata ni separación de deberes sobre la clave |
+| Cifrado en tránsito | TLS extremo a extremo mediante gateway endpoint (el tráfico no sale a Internet) |
+| IAM | Rol de instancia con `s3:GetObject` **sólo** sobre `arn:aws:s3:::<bucket>/nexum/secrets/*`; bucket con Block Public Access, versionado y política que deniega `s3:*` fuera del rol |
+| Rotación | Se publica una versión nueva (versionado del bucket) y se ejecuta `instance_refresh`; el bootstrap lee `secrets.json` actual |
+| Auditoría | Server access logging + CloudTrail de datos (`s3:GetObject`) sobre el prefijo; alerta si un principal inesperado lee |
+| Recuperación | Cualquier instancia nueva lee el bundle al arrancar; no depende de EBS ni de ventanas |
+| Versionado | Versionado de bucket + campo `version` en el JSON; el bootstrap puede fijar versión por `?versionId=` si se requiere reproducibilidad |
+| Si el secreto se compromete | Rotar en Secrets Manager (fuente de verdad), publicar nueva versión y refrescar; el objeto antiguo sigue existiendo hasta expirar (política de ciclo de vida) → **riesgo residual** |
+| Costes reales | Almacenamiento (≤1 MB, céntimos/año), solicitudes GET (2 por arranque, 0.0004 USD/mil), **Versionado y logging pueden generar coste**: se acota con lifecycle de 30 días y un único prefijo |
+| Coste total | **No es cero absoluto**; es ~0.00 USD en 45 días para el patrón previsto, pero no se declara "gratis": requiere medición en el Gate de despliegue |
+| Dependencias I-060 | Rol, política del bucket, KMS opcional, CloudTrail de datos, lifecycle |
+
+**Riesgo que impide declararlo equivalente a Secrets Manager:** sin CMK no hay revocación criptográfica
+ni rotación automática; la rotación es operativa (humano + refresh). Debe aceptarse explícitamente.
+
+**Estado:** PROPUESTO. No se implementa ni se aprueba en I-020.
+
+## 8. Bloqueo de despliegue vigente
+
+Hasta decisión humana sobre este RFC, el ASG queda con `min = desired = max = 2` y bootstrap que
+**falla explícitamente** si falta `/etc/nexum/backend.env`. Consecuencia asumida: un reemplazo de
+instancia fuera de ventana deja la capacidad en 1 hasta abrir ventana. Es un bloqueo de **despliegue**,
+no de la implementación local.

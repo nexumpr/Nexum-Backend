@@ -68,8 +68,9 @@ variable "sg_backend_id" {
   type        = string
 
   validation {
-    condition     = can(regex("^sg-[0-9a-f]{8,17}$", var.sg_backend_id)) || var.sg_backend_id != ""
-    error_message = "sg_backend_id debe ser el id del SG del backend."
+    # Estricto: no se acepta cualquier cadena no vacia.
+    condition     = can(regex("^sg-[0-9a-f]{8,17}$", var.sg_backend_id))
+    error_message = "sg_backend_id debe tener el formato de un security group real (sg-...)."
   }
 }
 
@@ -155,4 +156,21 @@ variable "puerto_backend" {
     condition     = var.puerto_backend >= 1024 && var.puerto_backend <= 65535
     error_message = "puerto_backend debe ser no privilegiado."
   }
+}
+
+variable "unidad_s3_uri" {
+  description = "URI S3 de la unidad systemd publicada junto al binario"
+  type        = string
+  default     = "s3://PENDIENTE-I080/nexum-backend.service"
+
+  validation {
+    condition     = startswith(var.unidad_s3_uri, "s3://")
+    error_message = "La unidad debe servirse desde S3 (gateway endpoint, sin NAT)."
+  }
+}
+
+variable "unidad_sha256" {
+  description = "SHA-256 del archivo de unidad systemd"
+  type        = string
+  default     = ""
 }
