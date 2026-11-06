@@ -1,15 +1,33 @@
 {
   "id": "servicios",
   "fecha": "2026-11-06",
-  "estado": "NOT_RUN",
-  "fuente": "aws elasticache describe-cache-engine-versions; aws cloudfront list-vpc-origins; aws servicequotas get-service-quota; aws ec2 describe-instance-type-offerings",
+  "estado": "VERIFIED_AWS",
+  "fuente": "aws elasticache describe-cache-engine-versions; aws ec2 describe-instance-type-offerings; aws service-quotas get-service-quota; aws cloudfront list-vpc-origins; aws dynamodb describe-limits",
   "datos": {
-    "redis_oss_sku": null,
+    "redis_oss_sku": "cache.t4g.micro redis 7.1 (redis7)",
+    "redis_versiones_observadas": 6,
     "cloudfront_vpc_origin_habilitado": null,
-    "cuota_vcpu_on_demand": null,
-    "t4g_micro_disponible_az": null,
-    "dynamodb_limites": null
+    "cloudfront_vpc_origin_nota": "list-vpc-origins enumera origenes existentes; no demuestra que la cuenta pueda crear VPC Origins, por lo que NO se marca como habilitado",
+    "vpc_origins_observados": 0,
+    "cuota_vcpu_on_demand": 16,
+    "az_con_t4g_micro": [
+      "us-east-2a",
+      "us-east-2b",
+      "us-east-2c"
+    ],
+    "dynamodb_limites": {
+      "lecturas_max_cuenta": 80000,
+      "escrituras_max_cuenta": 80000,
+      "lecturas_max_tabla": 40000,
+      "escrituras_max_tabla": 40000
+    }
   },
-  "motivo": "No ejecutado: sin sesion AWS valida",
+  "estados_consulta": {
+    "redis": "PASS",
+    "zonas": "PASS",
+    "cuota": "PASS",
+    "origins": "PASS",
+    "ddb": "PASS"
+  },
   "sanitizado": true
 }

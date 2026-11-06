@@ -16,7 +16,9 @@ ni destruye recursos AWS; no ejecuta Terraform; no cambia el plan Free a Paid.
 | `modelo_costos.py` | Cálculo determinista a 45 días, costo residual, créditos y desembolso |
 | `viabilidad.py` | Regla de decisión `VIABLE` / `BLOCKED_FINOPS` con motivos y evidencia faltante |
 | `requisitos.py` | Valida dos instancias reales simultáneas y red privada sin NAT |
-| `consultas_readonly.py` | Catálogo de 16 consultas AWS de solo lectura, con clasificación de costo |
+| `consultas_readonly.py` | Catálogo de 24 consultas AWS de solo lectura; un único `--region` y un único `--filters` por comando |
+| `precios_api.py` | Extrae precios reales de Price List; descarta tramos gratuitos y SKU de soporte extendido |
+| `evidencia_aws.py` | Construye evidencia sanitizada de cuenta, servicios y Free Tier con los campos reales de AWS |
 | `sanitizar.py` | Enmascara cuenta, ARN, correos, claves, IPv4 y tokens antes de versionar |
 | `evidencia/` | Instantáneas sanitizadas con estado honesto (`VERIFIED_AWS`, `NOT_RUN`, `NOT_VERIFIED`) |
 | `resultados/` | Salidas deterministas del modelo y de la decisión de viabilidad |
@@ -29,6 +31,8 @@ py -3.13 infra/finops/consultas_readonly.py --listar      # catálogo con costo 
 py -3.13 infra/finops/modelo_costos.py --texto            # totales por escenario
 py -3.13 infra/finops/requisitos.py                       # invariantes de topología
 py -3.13 infra/finops/viabilidad.py                       # decisión VIABLE/BLOCKED_FINOPS
+py -3.13 infra/finops/precios_api.py --aplicar            # revalida precios AWS (omite los ya verificados)
+py -3.13 infra/finops/evidencia_aws.py                    # evidencia read-only de cuenta y servicios
 py -3.13 -m unittest discover -s tests/infra/finops       # pruebas
 ```
 
@@ -47,4 +51,6 @@ sanitizada se guarda en `evidencia/`.
 - `DOC_ONLY`, `HIPOTESIS` y `SUPUESTO` son evidencia histórica o de modelado: **no** habilitan `VIABLE`.
 - Los créditos declarados (120 USD del contexto H05) **no** son créditos verificados.
 - Cost Explorer cobra USD 0.01 por solicitud: no se ejecuta sin aprobación humana específica.
-- La comprobación de dos instancias y red privada valida el **diseño**; el runtime sigue `NOT_RUN`.
+- La comprobación de dos instancias y red privada valida el **diseño** (`DESIGN_VALIDATED`); el
+  runtime sigue `NOT_RUN` y sólo `aws_ec2_describe_instances` con revisión humana puede cambiarlo.
+- El saldo de créditos se toma de `accountPlanRemainingCredits`; el gasto liquidado sigue en Billing.

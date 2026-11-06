@@ -20,7 +20,6 @@ PATRONES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(?:i|vol|snap|ami|vpc|subnet|sg|eni|igw|nat|eipalloc|eipassoc|fs|ar)-[0-9a-f]{8,17}\b"), "<RESOURCE_ID>"),
     (re.compile(r"\b[a-z0-9]{4}[a-z0-9]{4}[a-z0-9]{4}[a-z0-9]{4}\b(?=\s*$)"), "<ACCOUNT_ID>"),
     (re.compile(r"\b\d{12}\b"), "<ACCOUNT_ID>"),
-    (re.compile(r"Account\"?\s*[:=]\s*\"?<ACCOUNT_ID>"), "Account\":\"<ACCOUNT_ID>"),
     (re.compile(r"\bBearer\s+[A-Za-z0-9\-._~+/]+=*"), "Bearer <TOKEN>"),
     (re.compile(r"\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b"), "<JWT>"),
 )

@@ -24,9 +24,9 @@
       "sku": "t4g.micro on-demand Linux ARM64",
       "unidad": "hora-instancia",
       "precio_usd": "0.0084",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item EC2 Go",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ec2_t4g_micro (serviceCode=AmazonEC2, usagetype=USE2-BoxUsage:t4g.micro)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Evidencia Price List previa del proyecto; revalidar contra Price List API de Ohio"
     },
     "EC2_T4G_MICRO_HORA_VERIFICADO": {
@@ -44,9 +44,9 @@
       "sku": "Application Load Balancer hora",
       "unidad": "hora-ALB",
       "precio_usd": "0.0225",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item ALB fijo",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_alb_hora (serviceCode=AWSELB, usagetype=USE2-LoadBalancerUsage)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Revalidar tarifa Ohio y modalidad internet-facing vs interno"
     },
     "ALB_LCU_HORA": {
@@ -54,9 +54,9 @@
       "sku": "LCU consumida por hora",
       "unidad": "LCU-hora",
       "precio_usd": "0.008",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item ALB LCU",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_alb_lcu (serviceCode=AWSELB, usagetype=USE2-LCUUsage)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Partida variable; 1 LCU promedio es supuesto, no medicion"
     },
     "ELASTICACHE_REDIS_T4G_MICRO_HORA": {
@@ -64,9 +64,9 @@
       "sku": "cache.t4g.micro motor Redis OSS, on-demand, sin replicas",
       "unidad": "nodo-hora",
       "precio_usd": "0.016",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item ElastiCache Redis OSS",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_elasticache_redis (serviceCode=AmazonElastiCache, usagetype=USE2-NodeUsage:cache.t4g.micro)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Referencia terciaria Ohio; requiere SKU exacto de Redis OSS en Price List API"
     },
     "EBS_GP3_GB_MES": {
@@ -74,9 +74,9 @@
       "sku": "gp3 almacenamiento",
       "unidad": "GB-mes",
       "precio_usd": "0.08",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item EBS gp3",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ebs_gp3 (serviceCode=AmazonEC2, usagetype=USE2-EBS:VolumeUsage.gp3)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Sin IOPS ni throughput adicional"
     },
     "EBS_SNAPSHOT_GB_MES": {
@@ -84,9 +84,9 @@
       "sku": "snapshot estandar",
       "unidad": "GB-mes",
       "precio_usd": "0.05",
-      "estado": "HIPOTESIS",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item EBS snapshots",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ebs_snapshot (serviceCode=AmazonEC2, usagetype=USE2-EBS:SnapshotUsage)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Hipotesis del modelo H05; requiere cotizacion real"
     },
     "DDB_STORAGE_GB_MES": {
@@ -94,9 +94,9 @@
       "sku": "almacenamiento on-demand",
       "unidad": "GB-mes",
       "precio_usd": "0.25",
-      "estado": "HIPOTESIS",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item DynamoDB storage",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ddb_storage (serviceCode=AmazonDynamoDB, usagetype=USE2-TimedStorage-ByteHrs)",
+      "fecha_fuente": "2026-11-06",
       "nota": "No se aplica franquicia de 25 GB por prudencia; verificar Ohio"
     },
     "DDB_RRU_MILLON": {
@@ -104,9 +104,9 @@
       "sku": "lecturas on-demand por millon RRU",
       "unidad": "millon-RRU",
       "precio_usd": "0.125",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item DynamoDB reads",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ddb_rru (serviceCode=AmazonDynamoDB, usagetype=USE2-ReadRequestUnits)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Incluye GSI y lecturas transaccionales modeladas"
     },
     "DDB_WRU_MILLON": {
@@ -114,9 +114,9 @@
       "sku": "escrituras on-demand por millon WRU",
       "unidad": "millon-WRU",
       "precio_usd": "0.625",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item DynamoDB writes",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ddb_wru (serviceCode=AmazonDynamoDB, usagetype=USE2-WriteRequestUnits)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Incluye GSIs y transacciones como WRU facturables"
     },
     "DDB_PITR_GB_MES": {
@@ -124,9 +124,9 @@
       "sku": "point-in-time recovery",
       "unidad": "GB-mes",
       "precio_usd": "0.2",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item DynamoDB PITR",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ddb_pitr (serviceCode=AmazonDynamoDB, usagetype=USE2-TimedPITRStorage-ByteHrs)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Retencion 35 dias"
     },
     "DDB_BACKUP_GB_MES": {
@@ -154,9 +154,9 @@
       "sku": "ingesta de logs",
       "unidad": "GB",
       "precio_usd": "0.5",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item CloudWatch log ingestion",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_cloudwatch_logs_ingesta (serviceCode=AmazonCloudWatch, usagetype=USE2-DataProcessing-Bytes)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Precio regional pendiente de cierre"
     },
     "CW_LOGS_ALMACEN_GB_MES": {
@@ -204,9 +204,9 @@
       "sku": "S3 Standard almacenamiento",
       "unidad": "GB-mes",
       "precio_usd": "0.023",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item S3 Terraform-state",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_s3_standard (serviceCode=AmazonS3, usagetype=USE2-TimedStorage-ByteHrs)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Versioning con lifecycle"
     },
     "S3_SOLICITUDES_LOTE": {
@@ -223,10 +223,10 @@
       "servicio": "Transferencia de datos",
       "sku": "egreso a internet",
       "unidad": "GB",
-      "precio_usd": "0.09",
-      "estado": "SUPUESTO",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json item Internet egress",
-      "fecha_fuente": "2026-11-05",
+      "precio_usd": "0.085",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_cloudfront_egreso (serviceCode=AmazonCloudFront, usagetype=US-DataTransfer-Out-Bytes)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Supuesto alto frente a franquicia; revalidar allowance"
     },
     "ELASTICACHE_INTERAZ_GB": {
@@ -244,9 +244,9 @@
       "sku": "direccion IPv4 publica",
       "unidad": "IP-hora",
       "precio_usd": "0.005",
-      "estado": "DOC_ONLY",
-      "fuente": "FINOPS_45_DIAS_MODELO_V3.json items IPv4",
-      "fecha_fuente": "2026-11-05",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_ipv4_publica (serviceCode=AmazonVPC, usagetype=USE2-PublicIPv4:InUseAddress)",
+      "fecha_fuente": "2026-11-06",
       "nota": "Topologia C no usa IPv4 publica"
     },
     "ROUTE53_ZONA_MES": {
@@ -339,5 +339,8 @@
       "fecha_fuente": null,
       "nota": "No se imputa 0; requiere determinacion fiscal o factura real"
     }
-  }
+  },
+  "creditos_declarados_usd": "120",
+  "estado_global": "VERIFIED_AWS_PARCIAL",
+  "nota_estado_global": "14 SKU con precio VERIFIED_AWS via aws pricing get-products; las partidas sin consulta de precio siguen DOC_ONLY/HIPOTESIS/SUPUESTO y bloquean el bruto verificado"
 }

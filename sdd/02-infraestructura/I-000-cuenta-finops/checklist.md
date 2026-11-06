@@ -73,3 +73,28 @@
 
 **Estado de la spec:** `BLOCKED_FINOPS`. No se marca ningún punto no ejecutado como PASS.
 
+### Verificación H08-I — revisión 2 (2026-11-06)
+
+- [x] Catálogo con un único `--region` por comando (Price List en `us-east-1`, datos en `us-east-2`).
+- [x] Catálogo con un único `--filters` construido desde datos estructurados.
+- [x] Código `AWSELB` confirmado vía `get-products` (no `ElasticLoadBalancing`).
+- [x] Servicio de cuotas corregido a `service-quotas` (antes `servicequotas`, inválido).
+- [x] Directorio temporal nativo (`tempfile.gettempdir()`), nunca `$env:TEMP` ni el repositorio.
+- [x] 14 SKU con precio `VERIFIED_AWS`, `usagetype` y `fecha_fuente`.
+- [x] ElastiCache con tarifa ordinaria (`USE2-NodeUsage`, 0.016) y no de soporte extendido (0.026).
+- [x] DynamoDB almacenamiento con tramo marginal (0.25) y no el tramo gratuito (0.00).
+- [x] Bruto calculado separado del bruto verificado; verificado `UNKNOWN` con 11 partidas pendientes.
+- [x] Créditos declarados (120 histórico) separados de verificados (120.0 desde AWS).
+- [x] Cobertura, importe sin cobertura y riesgo de cobro personal calculados; riesgo `PRESENTE`.
+- [x] `VIABLE` exige vigencia ≥ 45 días, precios verificados, cobertura TOTAL con margen 10 %, IVA determinado y TLS resuelto.
+- [x] Topología: `DESIGN_VALIDATED` separado de `AWS_DEPLOYMENT_VERIFIED`; runtime `NOT_RUN`.
+- [x] Pruebas de regresión para cada defecto (140 pruebas OK).
+- [ ] Costo observado verificado — **NOT_RUN**: Cost Explorer cuesta 0.01 USD por solicitud.
+- [ ] Precio verificado de las 11 partidas requeridas restantes — **NOT_VERIFIED**.
+- [ ] Elegibilidad de CloudFront VPC Origins — **NOT_VERIFIED**: `list-vpc-origins` no la acredita.
+- [ ] IVA determinado — **NOT_VERIFIED**.
+- [ ] TLS extremo a extremo aceptado o recotizado — **PENDIENTE**.
+- [ ] Gate I-GO con resolución expresa — **PENDIENTE**.
+
+**Estado de la spec (revisión 2):** `BLOCKED_FINOPS` con 7 motivos. Sin recursos AWS creados.
+

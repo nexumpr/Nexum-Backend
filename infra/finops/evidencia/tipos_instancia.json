@@ -1,0 +1,19 @@
+{
+  "InstanceTypeOfferings": [
+    {
+      "InstanceType": "t4g.micro",
+      "Location": "us-east-2a",
+      "LocationType": "availability-zone"
+    },
+    {
+      "InstanceType": "t4g.micro",
+      "Location": "us-east-2c",
+      "LocationType": "availability-zone"
+    },
+    {
+      "InstanceType": "t4g.micro",
+      "Location": "us-east-2b",
+      "LocationType": "availability-zone"
+    }
+  ]
+}

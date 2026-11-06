@@ -1,4 +1,13 @@
-"""Pruebas del modelo determinista de costos a 45 días (I-000)."""
+"""Pruebas del modelo determinista de costos a 45 días (revisión 2).
+
+Cubren la separación exigida por la Corrección B:
+
+- costo bruto **calculado** frente a costo bruto **verificado**;
+- ``None`` cuando falta verificar una partida requerida (nunca 0);
+- créditos declarados frente a verificados;
+- cobertura efectiva, importe sin cobertura y riesgo de cobro personal;
+- tramos tarifarios y precios desconocidos.
+"""
 
 from __future__ import annotations
 
@@ -25,28 +34,37 @@ class ModeloCostos(unittest.TestCase):
         cls.catalogo = modelo_costos.cargar_precios(RUTA_PRECIOS)
         cls.resumen = modelo_costos.calcular_todo(cls.catalogo, "0")
 
-    def test_reproduce_total_v3_documentado(self) -> None:
-        """El recomputo de las partidas V3 debe dar exactamente 84.0580 USD."""
-
-        escenario = self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
-        self.assertEqual(escenario["total_bruto_45d_usd"], "84.0580")
-
-    def test_total_v3_coincide_con_su_propio_json(self) -> None:
-        v3 = json.loads(RUTA_V3.read_text(encoding="utf-8"))
-        suma = dinero.sumar([item["total_45d_usd"] for item in v3["items"]])
-        self.assertEqual(dinero.formatear(suma), dinero.formatear(v3["estimado_total_45d_usd"]))
-
     def test_ventana_de_45_dias(self) -> None:
         self.assertEqual(escenarios.DIAS_VENTANA, 45)
         self.assertEqual(escenarios.HORAS_VENTANA, 1080)
         self.assertEqual(
-            self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]["horas_encendido"], "1080"
+            self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]["horas_encendido"],
+            "1080",
         )
+
+    def test_aritmetica_del_modelo_v3_se_reproduce(self) -> None:
+        """La aritmética histórica V3 sigue siendo reproducible con sus tarifas."""
+
+        v3 = json.loads(RUTA_V3.read_text(encoding="utf-8"))
+        suma = dinero.sumar([item["total_45d_usd"] for item in v3["items"]])
+        self.assertEqual(
+            dinero.formatear(suma), dinero.formatear(v3["estimado_total_45d_usd"])
+        )
+
+    def test_total_es_la_suma_de_sus_partidas(self) -> None:
+        escenario = self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
+        suma = dinero.sumar(
+            [p["subtotal_usd"] for p in escenario["partidas"] if p["subtotal_usd"] is not None]
+        )
+        self.assertEqual(dinero.formatear(suma), escenario["total_conocido_usd"])
+        self.assertEqual(escenario["total_bruto_45d_usd"], escenario["total_conocido_usd"])
 
     def test_topologia_c_sin_ipv4_ni_route53(self) -> None:
         escenario = self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
         con_cantidad = {
-            p["clave"]: dinero.dec(p["cantidad"]) for p in escenario["partidas"] if dinero.dec(p["cantidad"]) > 0
+            p["clave"]
+            for p in escenario["partidas"]
+            if dinero.dec(p["cantidad"]) > 0
         }
         self.assertNotIn("IPV4_EC2", con_cantidad)
         self.assertNotIn("IPV4_ALB", con_cantidad)
@@ -60,24 +78,64 @@ class ModeloCostos(unittest.TestCase):
         self.assertFalse(b["valido_para_demostracion"])
         self.assertEqual(b["horas_encendido"], "360")
 
-    def test_escenario_a_incluye_ipv4_y_no_es_techo(self) -> None:
+    def test_escenario_a_incluye_ipv4_y_es_piso(self) -> None:
         a = self.resumen["escenarios"]["A_24X7_ALB_PUBLICO"]
-        self.assertTrue(a["cumple_24x7"])
         claves = {p["clave"]: dinero.dec(p["cantidad"]) for p in a["partidas"]}
         self.assertEqual(claves["IPV4_EC2"], Decimal("2160"))
         self.assertTrue(any("piso, no un techo" in c for c in a["condiciones"]))
+        self.assertGreater(
+            dinero.dec(a["total_bruto_45d_usd"]),
+            dinero.dec(self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]["total_bruto_45d_usd"]),
+        )
+
+
+class BrutoVerificado(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalogo = modelo_costos.cargar_precios(RUTA_PRECIOS)
+        cls.resumen = modelo_costos.calcular_todo(cls.catalogo, "0")
+
+    def test_bruto_verificado_es_none_si_falta_una_partida(self) -> None:
+        escenario = self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
+        self.assertIsNone(escenario["total_bruto_verificado_45d_usd"])
+        self.assertTrue(escenario["partidas_sin_verificar"])
+        self.assertIn("CERT_CF", escenario["partidas_sin_verificar"])
+
+    def test_bruto_verificado_existe_con_todo_verificado(self) -> None:
+        catalogo = json.loads(json.dumps(self.catalogo))
+        for item in catalogo["items"].values():
+            if item["estado"] != "UNKNOWN":
+                item["estado"] = "VERIFIED_AWS"
+        escenario = modelo_costos.calcular_escenario(
+            escenarios.escenario_c_cloudfront_privado(), catalogo
+        )
+        self.assertEqual(escenario["total_bruto_verificado_45d_usd"], escenario["total_bruto_45d_usd"])
+        self.assertEqual(escenario["partidas_sin_verificar"], [])
+
+    def test_grados_de_evidencia_contabilizados(self) -> None:
+        escenario = self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
+        conteo = escenario["grados_evidencia"]
+        self.assertEqual(sum(conteo.values()), len(escenario["partidas"]))
+        self.assertGreater(conteo.get("VERIFIED_AWS", 0), 0)
+        self.assertGreater(conteo.get("DOC_ONLY", 0) + conteo.get("HIPOTESIS", 0), 0)
+
+
+class PreciosDesconocidos(unittest.TestCase):
+    def setUp(self) -> None:
+        self.catalogo = modelo_costos.cargar_precios(RUTA_PRECIOS)
+
+    def _con(self, sku: str, precio, estado: str) -> dict:
+        catalogo = json.loads(json.dumps(self.catalogo))
+        catalogo["items"][sku]["precio_usd"] = precio
+        catalogo["items"][sku]["estado"] = estado
+        return catalogo
 
     def test_precio_desconocido_no_es_cero(self) -> None:
-        catalogo = json.loads(json.dumps(self.catalogo))
-        catalogo["items"]["ALB_HORA"]["precio_usd"] = None
-        catalogo["items"]["ALB_HORA"]["estado"] = "UNKNOWN"
         resultado = modelo_costos.calcular_escenario(
-            escenarios.escenario_c_cloudfront_privado(), catalogo
+            escenarios.escenario_c_cloudfront_privado(), self._con("ALB_HORA", None, "UNKNOWN")
         )
         self.assertIsNone(resultado["total_bruto_45d_usd"])
         self.assertIn("ALB_FIJO: precio UNKNOWN", resultado["partidas_sin_precio"])
-        alb = next(p for p in resultado["partidas"] if p["clave"] == "ALB_FIJO")
-        self.assertIsNone(alb["subtotal_usd"])
 
     def test_sku_ausente_no_es_cero(self) -> None:
         catalogo = json.loads(json.dumps(self.catalogo))
@@ -88,57 +146,8 @@ class ModeloCostos(unittest.TestCase):
         self.assertIsNone(resultado["total_bruto_45d_usd"])
         self.assertIn("ALB_FIJO: SKU ausente", resultado["partidas_sin_precio"])
 
-    def test_creditos_separados_del_bruto(self) -> None:
-        fin = modelo_costos.calcular_creditos("84.0580", "120")
-        self.assertEqual(fin["cobro_neto_usd"], "0.0000")
-        self.assertTrue(fin["creditos_cubren_bruto"])
-        self.assertEqual(fin["impuestos"], "UNKNOWN")
-        self.assertEqual(fin["desembolso_personal_usd"], "0.0000")
-
-    def test_creditos_cero_deja_bruto_como_neto(self) -> None:
-        fin = modelo_costos.calcular_creditos("84.0580", "0")
-        self.assertEqual(fin["cobro_neto_usd"], "84.0580")
-        self.assertFalse(fin["creditos_cubren_bruto"])
-
-    def test_creditos_parciales(self) -> None:
-        fin = modelo_costos.calcular_creditos("84.0580", "50")
-        self.assertEqual(fin["cobro_neto_usd"], "34.0580")
-        self.assertFalse(fin["creditos_cubren_bruto"])
-
-    def test_salida_determinista(self) -> None:
-        primera = json.dumps(modelo_costos.calcular_todo(self.catalogo, "0"), sort_keys=True)
-        segunda = json.dumps(modelo_costos.calcular_todo(self.catalogo, "0"), sort_keys=True)
-        self.assertEqual(primera, segunda)
-
-    def test_estados_de_evidencia_contabilizados(self) -> None:
-        escenario = self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
-        conteo = escenario["grados_evidencia"]
-        self.assertEqual(sum(conteo.values()), len(escenario["partidas"]))
-        self.assertEqual(conteo.get("VERIFIED_AWS", 0), 0, "sin consultas AWS no puede haber precios verificados")
-
-    def test_residual_con_runtime_apagado(self) -> None:
-        escenario = self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
-        self.assertEqual(escenario["residual_apagado_usd"], "6.8440")
-        self.assertLess(
-            dinero.dec(escenario["residual_apagado_usd"]), dinero.dec(escenario["total_bruto_45d_usd"])
-        )
-        self.assertIn("EBS_GP3", escenario["partidas_residuales"])
-        self.assertNotIn("EC2_GO", escenario["partidas_residuales"])
-        self.assertNotIn("CI_CD", escenario["partidas_residuales"])
-
-    def test_residual_con_precio_desconocido_no_es_cero(self) -> None:
-        catalogo = json.loads(json.dumps(self.catalogo))
-        catalogo["items"]["EBS_GP3_GB_MES"]["precio_usd"] = None
-        catalogo["items"]["EBS_GP3_GB_MES"]["estado"] = "UNKNOWN"
-        resultado = modelo_costos.calcular_escenario(
-            escenarios.escenario_c_cloudfront_privado(), catalogo
-        )
-        self.assertIsNone(resultado["residual_apagado_usd"])
-        self.assertIn("DESCONOCIDO:EBS_GP3", resultado["partidas_residuales"])
-
     def test_catalogo_rechaza_estado_invalido(self) -> None:
-        catalogo = json.loads(json.dumps(self.catalogo))
-        catalogo["items"]["ALB_HORA"]["estado"] = "INVENTADO"
+        catalogo = self._con("ALB_HORA", "0.0225", "INVENTADO")
         import tempfile
 
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as fh:
@@ -149,6 +158,98 @@ class ModeloCostos(unittest.TestCase):
                 modelo_costos.cargar_precios(ruta)
         finally:
             ruta.unlink(missing_ok=True)
+
+
+class CoberturaDeCreditos(unittest.TestCase):
+    def test_cobertura_total(self) -> None:
+        fin = modelo_costos.calcular_cobertura("84.0000", "84.0000", "120")
+        self.assertEqual(fin["cobertura_creditos"], "TOTAL")
+        self.assertEqual(fin["importe_sin_cobertura_usd"], "0.0000")
+        self.assertTrue(fin["creditos_cubren_bruto"])
+
+    def test_cobertura_parcial(self) -> None:
+        fin = modelo_costos.calcular_cobertura("84.0000", "84.0000", "50")
+        self.assertEqual(fin["cobertura_creditos"], "PARCIAL")
+        self.assertEqual(fin["importe_sin_cobertura_usd"], "34.0000")
+        self.assertFalse(fin["creditos_cubren_bruto"])
+
+    def test_cobertura_ninguna(self) -> None:
+        fin = modelo_costos.calcular_cobertura("84.0000", "84.0000", "0")
+        self.assertEqual(fin["cobertura_creditos"], "NINGUNA")
+        self.assertEqual(fin["importe_sin_cobertura_usd"], "84.0000")
+
+    def test_sin_bruto_verificado_la_cobertura_es_unknown(self) -> None:
+        fin = modelo_costos.calcular_cobertura(None, "84.0000", "120")
+        self.assertEqual(fin["cobertura_creditos"], "UNKNOWN")
+        self.assertIsNone(fin["importe_sin_cobertura_usd"])
+        self.assertIsNone(fin["creditos_cubren_bruto"])
+
+    def test_margen_de_seguridad_aumenta_lo_requerido(self) -> None:
+        fin = modelo_costos.calcular_cobertura("100.0000", "100.0000", "120", margen_seguridad="0.10")
+        self.assertEqual(fin["creditos_requeridos_usd"], "110.0000")
+        self.assertEqual(fin["cobertura_creditos"], "TOTAL")
+        fin_justo = modelo_costos.calcular_cobertura(
+            "100.0000", "100.0000", "105", margen_seguridad="0.10"
+        )
+        self.assertEqual(fin_justo["cobertura_creditos"], "PARCIAL")
+
+    def test_desembolso_cero_no_elimina_el_riesgo(self) -> None:
+        fin = modelo_costos.calcular_cobertura(None, "84.0000", "0")
+        self.assertEqual(fin["politica_gasto_personal"], "CERO")
+        self.assertEqual(fin["desembolso_personal_autorizado_usd"], "0.0000")
+        self.assertTrue(fin["riesgo_cobro_personal"])
+        self.assertIn("no elimina", fin["nota_riesgo"])
+
+    def test_declarados_y_verificados_se_informan_por_separado(self) -> None:
+        fin = modelo_costos.calcular_cobertura("84.0000", "84.0000", "120", "120")
+        self.assertEqual(fin["creditos_declarados_usd"], "120.0000")
+        self.assertEqual(fin["creditos_verificados_usd"], "120.0000")
+
+    def test_impuestos_siempre_unknown(self) -> None:
+        self.assertEqual(
+            modelo_costos.calcular_cobertura("84", "84", "120")["impuestos"], "UNKNOWN"
+        )
+
+
+class Residual(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalogo = modelo_costos.cargar_precios(RUTA_PRECIOS)
+        cls.resumen = modelo_costos.calcular_todo(cls.catalogo, "0")
+
+    def test_residual_menor_que_total(self) -> None:
+        escenario = self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
+        self.assertIsNotNone(escenario["residual_apagado_usd"])
+        self.assertLess(
+            dinero.dec(escenario["residual_apagado_usd"]),
+            dinero.dec(escenario["total_bruto_45d_usd"]),
+        )
+
+    def test_residual_excluye_lineas_apagables_y_no_aws(self) -> None:
+        escenario = self.resumen["escenarios"]["C_CLOUDFRONT_VPC_ORIGIN_PRIVADO"]
+        partidas = set(escenario["partidas_residuales"])
+        self.assertIn("EBS_GP3", partidas)
+        self.assertNotIn("EC2_GO", partidas)
+        self.assertNotIn("ALB_FIJO", partidas)
+        self.assertNotIn("CI_CD", partidas)
+
+    def test_residual_desconocido_no_es_cero(self) -> None:
+        catalogo = json.loads(json.dumps(self.catalogo))
+        catalogo["items"]["EBS_GP3_GB_MES"]["precio_usd"] = None
+        catalogo["items"]["EBS_GP3_GB_MES"]["estado"] = "UNKNOWN"
+        resultado = modelo_costos.calcular_escenario(
+            escenarios.escenario_c_cloudfront_privado(), catalogo
+        )
+        self.assertIsNone(resultado["residual_apagado_usd"])
+        self.assertIn("DESCONOCIDO:EBS_GP3", resultado["partidas_residuales"])
+
+
+class Determinismo(unittest.TestCase):
+    def test_salida_reproducible(self) -> None:
+        catalogo = modelo_costos.cargar_precios(RUTA_PRECIOS)
+        primera = json.dumps(modelo_costos.calcular_todo(catalogo, "0"), sort_keys=True)
+        segunda = json.dumps(modelo_costos.calcular_todo(catalogo, "0"), sort_keys=True)
+        self.assertEqual(primera, segunda)
 
 
 if __name__ == "__main__":

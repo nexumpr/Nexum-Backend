@@ -123,3 +123,28 @@ runtime `NOT_RUN`; `viabilidad.py` → `BLOCKED_FINOPS`.
 **No ejecutado:** Terraform init/plan/apply/destroy, creación de recursos, presupuestos, alarmas,
 Cost Explorer (0.01 USD por solicitud), cualquier verificación HTTP pública.
 
+### Corrección H08-I — revisión 2 (2026-11-06, sesión AWS válida)
+
+| Tarea | Estado real | Evidencia |
+|---|---|---|
+| T-000-01 Plan y contexto | `PASS` (AWS real) | `evidencia/cuenta_2026-11-06.json`: FREE/ACTIVE, expira 2027-05-04, 120.0 USD |
+| T-000-02 Matriz por recurso | `PASS` parcial | 14 SKU `VERIFIED_AWS`; 11 partidas requeridas pendientes |
+| T-000-03 Escenarios | `PASS` | A 91.8080 · B 28.9820 (no 24×7) · C 84.0080 |
+| T-000-04 Costeo | `PASS` cálculo; bruto verificado `UNKNOWN` | `resultados/costos_45d.json` |
+| T-000-05 Bloqueo de decisión | `PASS` regla aplicada → `BLOCKED_FINOPS` (7 motivos) | `resultados/viabilidad_i000.json` |
+| T-000-06 Controles | `NOT_RUN` (crear presupuestos/alarmas prohibido en I-000) | catálogo `presupuestos` |
+| T-000-07 Investigación con fecha | `PASS` parcial | `usagetype` y `fecha_fuente` por SKU verificado |
+| T-000-08 Separación de responsabilidades | `PASS` | `MATRIZ_VIABILIDAD_AWS_I000.md` §1 |
+| T-000-90 Riesgos y dependencias | `BLOCKED` (7 riesgos abiertos) | `ADR_COSTO_CERO_I000.md` §5 |
+| T-000-99 Ratificación | `PENDIENTE` de decisión humana | PR #15 |
+
+**Defectos corregidos:** `servicequotas` → `service-quotas`; `$env:TEMP` → `tempfile.gettempdir()`;
+`--region` duplicado; `--filters` repetido; `ElasticLoadBalancing` → `AWSELB`; ElastiCache con
+tarifa de soporte extendido; DynamoDB con tramo gratuito; lectura de evidencia desde el directorio
+equivocado.
+
+**Pruebas:** `py -3.13 -m unittest discover -s tests/infra/finops` → 140 pruebas OK.
+
+**No ejecutado:** Cost Explorer (0.01 USD por solicitud), Terraform, creación de recursos,
+presupuestos, alarmas, despliegue y verificación HTTP.
+
