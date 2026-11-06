@@ -1,7 +1,6 @@
 {
   "bloqueos_reales": [
-    "Impuestos / IVA",
-    "Conectividad privada de las EC2 sin NAT"
+    "Impuestos / IVA"
   ],
   "cobertura_modelada": {
     "cobertura_creditos": "TOTAL",
@@ -115,10 +114,10 @@
       "evidencia": "no se planea AWS Organizations, Control Tower, APN, EA, HIPAA/SOC ni Marketplace; el plan Free bloquea Savings Plans y Reserved Instances"
     },
     {
-      "clasificacion": "BLOQUEO_REAL",
+      "clasificacion": "CUMPLIDA_CON_EVIDENCIA",
       "clausula": "spec I-000 seccion 9 (topologia C sin NAT, S3+DynamoDB por gateway endpoints) y spec I-050/I-070/I-090 (Redis, secretos y observabilidad reales)",
       "condicion": "Conectividad privada de las EC2 sin NAT",
-      "evidencia": "interface endpoints obligatorios: ec2messages, logs, monitoring, secretsmanager, ssm, ssmmessages; costo 129.6000 USD/45 d; total con margen 229.5073 USD frente a 120.0000 verificados"
+      "evidencia": "diseno E: permanente logs y temporales secretsmanager, ssm, ssmmessages; costo 23.7400 USD/45 d; total con margen 113.0613 USD frente a 120.0000 verificados"
     }
   ],
   "motivos": [
@@ -136,15 +135,55 @@
       "codigo": "TLS_NO_RESUELTO",
       "detalle": "el tramo CloudFront->ALB es HTTP privado y no existe decision humana que lo acepte ni certificado extremo a extremo",
       "evidencia_requerida": "aceptacion documentada o recotizacion con ACM y nombre valido"
-    },
-    {
-      "codigo": "CONECTIVIDAD_PRIVADA_NO_CUBIERTA",
-      "detalle": "sin NAT, Secrets Manager/CloudWatch Logs/metricas/SSM exigen interface endpoints: 129.6000 USD adicionales en 45 d; total 208.6430 USD con margen 229.5073 > 120.0000 verificados (faltan 109.5073 USD)",
-      "evidencia_requerida": "recotizar el acceso privado o ampliar creditos; no se reduce alcance ni se sustituyen servicios"
     }
   ],
-  "motivos_bloqueantes": 4,
+  "motivos_bloqueantes": 3,
   "nota": "VIABLE exige cuenta Free verificada, vigencia de 45 dias, precios VERIFIED_AWS, cobertura TOTAL con margen, impuestos determinados y TLS resuelto; la ausencia de errores o la existencia de creditos no eleva el estado",
+  "recotizacion_conectividad": {
+    "bruto_total_usd": "102.7830",
+    "bruto_verificado_sin_conectividad_usd": "79.0430",
+    "consumo_estimado_por_dia_usd": "2.2841",
+    "costo_conectividad_usd": "23.7400",
+    "creditos_requeridos_usd": "113.0613",
+    "creditos_verificados_usd": "120.0000",
+    "cubierto": true,
+    "detalle_conectividad": {
+      "costo_total_45d_usd": "23.7400",
+      "formula": "1 permanentes x 2 AZ x 1080 h + 3 temporales x 2 AZ x 24 h + datos + reserva",
+      "horas_por_ventana": 3,
+      "horas_temporales": 24,
+      "permanentes": {
+        "az": 2,
+        "costo_usd": "21.6000",
+        "enis": 2,
+        "horas": 1080,
+        "precio_hora_por_az_usd": "0.0100",
+        "servicios": [
+          "logs"
+        ]
+      },
+      "procesamiento_datos_gb": "20",
+      "procesamiento_datos_usd": "0.2000",
+      "reserva_contingencia_usd": "0.50",
+      "temporales": {
+        "az": 2,
+        "costo_usd": "1.4400",
+        "enis": 6,
+        "horas": 24,
+        "precio_hora_por_az_usd": "0.0100",
+        "servicios": [
+          "secretsmanager",
+          "ssm",
+          "ssmmessages"
+        ]
+      },
+      "ventanas": 8
+    },
+    "diseno": "E",
+    "importe_sin_cobertura_usd": "0.0000",
+    "margen_seguridad": "0.1000",
+    "sobrante_usd": "6.9387"
+  },
   "resumen_financiero": {
     "cobertura_creditos": "TOTAL",
     "costo_bruto_calculado_usd": "84.0430",

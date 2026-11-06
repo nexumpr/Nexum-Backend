@@ -108,7 +108,6 @@ class EvidenciaReal(unittest.TestCase):
             "IMPUESTOS_NO_DETERMINADOS",
             "VPC_ORIGIN_NO_CONFIRMADO",
             "TLS_NO_RESUELTO",
-            "CONECTIVIDAD_PRIVADA_NO_CUBIERTA",
         ):
             self.assertIn(esperado, codigos, decision["motivos"])
         # El plan Free verificado elimina el riesgo de cobro y el costo
@@ -132,12 +131,17 @@ class EvidenciaReal(unittest.TestCase):
         self.assertEqual(fin["politica_gasto_personal"], "CERO")
         self.assertLess(float(fin["creditos_requeridos_usd"]), 120.0)
 
-    def test_conectividad_recotiza_por_encima_de_creditos(self) -> None:
+    def test_conectividad_diseno_e_cabe_en_creditos(self) -> None:
         decision = viabilidad.evaluar(EVIDENCIA_REAL, PRECIOS, TOPOLOGIA, hoy=HOY)
         recoste = decision["recotizacion_conectividad"]
-        self.assertEqual(recoste["costo_conectividad_usd"], "129.6000")
-        self.assertFalse(recoste["cubierto"])
-        self.assertGreater(dinero.dec(recoste["creditos_requeridos_usd"]), dinero.dec("120"))
+        self.assertEqual(recoste["diseno"], "E")
+        self.assertEqual(recoste["costo_conectividad_usd"], "23.7400")
+        self.assertTrue(recoste["cubierto"])
+        self.assertEqual(recoste["creditos_requeridos_usd"], "113.0613")
+        self.assertEqual(recoste["sobrante_usd"], "6.9387")
+        self.assertEqual(
+            recoste["detalle_conectividad"]["permanentes"]["servicios"], ["logs"]
+        )
 
     def test_cobertura_modelada_con_margen(self) -> None:
         decision = viabilidad.evaluar(EVIDENCIA_REAL, PRECIOS, TOPOLOGIA, hoy=HOY)
@@ -170,10 +174,7 @@ class EvidenciaReal(unittest.TestCase):
             por_condicion["Reservas de modelado no facturables (5.0000 USD)"]["clasificacion"],
             "NO_APLICA_JUSTIFICADO",
         )
-        self.assertEqual(
-            decision["bloqueos_reales"],
-            ["Impuestos / IVA", "Conectividad privada de las EC2 sin NAT"],
-        )
+        self.assertEqual(decision["bloqueos_reales"], ["Impuestos / IVA"])
         for entrada in decision["matriz_gate"]:
             self.assertTrue(entrada["clausula"], entrada["condicion"])
 

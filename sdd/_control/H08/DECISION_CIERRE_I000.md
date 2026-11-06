@@ -108,3 +108,63 @@ secretos. Sin ese RFC aprobado, I-000 **no puede cerrarse** ni I-010 iniciarse.
 
 `I000_BLOQUEO_REAL_IDENTIFICADO` — un bloqueo técnico-financiero verificado (conectividad privada)
 además del fiscal (IVA). No se fusiona el PR #15 y no se abre I-010.
+
+---
+
+# Resolución — revisión 3 (2026-11-06, política de operación permanente con auxiliares bajo demanda)
+
+El responsable sustituyó la hipótesis de "seis endpoints permanentes" por: **API y DynamoDB 24/7**
+y componentes **auxiliares por ventanas**. Con esa política el bloqueo técnico se resuelve.
+
+## R1. Diseño aprobado (escenario E)
+
+| Servicio | Modo | Horas | Coste 45 d |
+|---|---|---|---|
+| `logs` | PERMANENTE | 1080 | 21.6000 |
+| `secretsmanager` | TEMPORAL (8 ventanas × 3 h) | 24 | 0.4800 |
+| `ssm` | TEMPORAL | 24 | 0.4800 |
+| `ssmmessages` | TEMPORAL | 24 | 0.4800 |
+| `monitoring` | NO REQUERIDO (métricas por *metric filters* sobre logs) | — | 0 |
+| `ec2messages` | NO REQUERIDO (SSM opera por `ssmmessages`) | — | 0 |
+| Datos (20 GB) + reserva de contingencia | — | — | 0.7000 |
+| **Total conectividad** | | | **23.7400** |
+
+Dos endpoints permanentes no caben (43.20 → requerido 134.47 > 120); por eso `secretsmanager` y SSM
+son de ventana, con caché cifrada de secretos en EBS que sobrevive al reinicio.
+
+## R2. Resultado financiero
+
+| Concepto | Importe |
+|---|---|
+| Bruto verificado | 79.0430 |
+| Conectividad E | 23.7400 |
+| Bruto total | **102.7830** |
+| Requerido con margen 10 % | **113.0613** |
+| Créditos verificados | 120.0000 |
+| Cobertura | **TOTAL**, sobrante **6.9387** |
+| Consumo estimado | 2.2841 USD/día |
+
+## R3. Matriz de Gate actualizada (16 condiciones)
+
+`9` CUMPLIDA_CON_EVIDENCIA (se suma conectividad privada) · `1` CONDICIONADA (TLS, D2) · `4`
+VERIFICACIÓN_DIFERIDA (VPC Origins D3, runtime D4, costo observado D5, interrupción) · `1`
+BLOQUEO_REAL (**IVA**, D1 condicionada) · `1` NO_APLICA_JUSTIFICADO.
+
+## R4. Efectividad de D6
+
+`APRUEBO_CIERRE_I000_CON_CONDICIONES` se declara **EFECTIVA** porque se cumplen las condiciones
+fijadas por el responsable: SDD íntegro, presupuesto completo cubierto con margen, cuenta Free/Active,
+cero desembolso personal, sin dependencias indispensables sin solución, pruebas y CI en verde.
+D1 se registra como cierre condicionado (no se declara IVA 0 %), D2–D5 como quedaron registradas.
+
+## R5. Riesgos residuales de la solución
+
+1. Reinicio sin ventana depende de la caché cifrada de secretos.
+2. Posible pérdida de logs bufferizados ante fallo de instancia antes de la ventana.
+3. Métricas derivadas de logs, no `PutMetricData` continuo.
+4. Más ventanas de las previstas elevan el coste (0.06 USD/h por servicio temporal).
+5. Si se exigiera `monitoring` permanente, el presupuesto volvería a quedar sin cobertura.
+
+## R6. Estado
+
+`I000_APROBADO_CON_CONDICIONES` — sin bloqueos reales abiertos salvo el fiscal condicionado (D1).

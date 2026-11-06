@@ -29,22 +29,35 @@ class Dependencias(unittest.TestCase):
         cls.analisis = conectividad.evaluar(cls.catalogo)
 
     def test_gateway_endpoints_solo_cubren_s3_y_dynamodb(self) -> None:
-        cubiertas = {d["dependencia"] for d in self.analisis["dependencias"] if d["mecanismo"] == "GATEWAY_ENDPOINT"}
+        cubiertas = {
+            d["dependencia"]
+            for d in self.analisis["sin_red"]
+            if "GATEWAY_ENDPOINT" in d["mecanismo"]
+        }
         self.assertEqual(cubiertas, {"DynamoDB", "S3 (artefactos, respaldos, terraform state)"})
 
-    def test_secrets_y_logs_requieren_interface_endpoint(self) -> None:
-        por_nombre = {d["dependencia"]: d for d in self.analisis["dependencias"]}
-        self.assertEqual(por_nombre["Secrets Manager (credenciales JWT, claves)"]["mecanismo"], "INTERFACE_ENDPOINT")
-        self.assertEqual(por_nombre["CloudWatch Logs (observabilidad del backend)"]["mecanismo"], "INTERFACE_ENDPOINT")
+    def test_solo_logs_es_permanente(self) -> None:
+        self.assertEqual(conectividad.PERMANENTES, ("logs",))
 
-    def test_imds_y_ntp_no_requieren_egreso(self) -> None:
-        sin_red = {d["dependencia"] for d in self.analisis["dependencias"] if not d["requiere_red"]}
+    def test_auxiliares_son_temporales(self) -> None:
+        self.assertEqual(
+            set(conectividad.TEMPORALES), {"secretsmanager", "ssm", "ssmmessages"}
+        )
+
+    def test_monitoring_y_ec2messages_no_se_presupuestan(self) -> None:
+        modos = {s["servicio"]: s["modo"] for s in conectividad.SERVICIOS}
+        self.assertEqual(modos["monitoring"], "NO_REQUERIDO")
+        self.assertEqual(modos["ec2messages"], "NO_REQUERIDO")
+
+    def test_imds_y_ntp_sin_egreso(self) -> None:
+        sin_red = {d["dependencia"] for d in self.analisis["sin_red"]}
         self.assertIn("Credenciales de instancia (IAM role)", sin_red)
         self.assertIn("Sincronización horaria", sin_red)
 
-    def test_todas_las_interface_endpoints_tienen_fuente(self) -> None:
-        for dependencia in self.analisis["dependencias"]:
-            self.assertTrue(dependencia["fuente"].startswith("https://"), dependencia["dependencia"])
+    def test_gateway_endpoints_no_cuestan(self) -> None:
+        for dependencia in self.analisis["sin_red"]:
+            self.assertEqual(dependencia["costo"], "0")
+            self.assertTrue(dependencia["fuente"].startswith("https://"))
 
 
 class CosteDeEndpoints(unittest.TestCase):
@@ -55,15 +68,17 @@ class CosteDeEndpoints(unittest.TestCase):
     def test_precio_verificado(self) -> None:
         self.assertEqual(conectividad.precio_endpoint(self.catalogo), Decimal("0.01"))
 
-    def test_dos_servicios_dos_az(self) -> None:
-        coste = conectividad.costo_endpoints(("secretsmanager", "logs"), self.catalogo)
-        self.assertEqual(coste["enis_totales"], 4)
-        self.assertEqual(coste["costo_45d_usd"], "43.2000")  # 4 ENI x 0.01 x 1080 h
+    def test_un_permanente_dos_az(self) -> None:
+        coste = conectividad.costo_servicios(("logs",), 1080, self.catalogo)
+        self.assertEqual(coste["enis"], 2)
+        self.assertEqual(coste["costo_usd"], "21.6000")
 
-    def test_seis_servicios_cuestan_mas(self) -> None:
-        coste = conectividad.costo_endpoints(conectividad.ENDPOINTS_OBLIGATORIOS_SDD, self.catalogo)
-        self.assertEqual(coste["enis_totales"], 12)
-        self.assertEqual(coste["costo_45d_usd"], "129.6000")
+    def test_tres_temporales_en_ventanas(self) -> None:
+        coste = conectividad.costo_servicios(
+            ("secretsmanager", "ssm", "ssmmessages"), 24, self.catalogo
+        )
+        self.assertEqual(coste["enis"], 6)
+        self.assertEqual(coste["costo_usd"], "1.4400")
 
     def test_catalogo_sin_verificar_falla(self) -> None:
         catalogo = json.loads(json.dumps(self.catalogo))
@@ -73,27 +88,27 @@ class CosteDeEndpoints(unittest.TestCase):
 
 
 class Recotizacion(unittest.TestCase):
-    def test_minimo_sin_ssm_sigue_sin_cobertura(self) -> None:
-        recoste = conectividad.recotizar("79.0430", "120", incluir_ssm=False)
-        self.assertEqual(recoste["costo_conectividad_usd"], "43.2000")
-        self.assertEqual(recoste["bruto_total_usd"], "122.2430")
-        self.assertEqual(recoste["creditos_requeridos_usd"], "134.4673")
-        self.assertFalse(recoste["cubierto"])
-        self.assertEqual(recoste["importe_sin_cobertura_usd"], "14.4673")
+    def test_diseno_e_cubierto(self) -> None:
+        recoste = conectividad.recotizar("79.0430", "120")
+        self.assertEqual(recoste["costo_conectividad_usd"], "23.7400")
+        self.assertEqual(recoste["bruto_total_usd"], "102.7830")
+        self.assertEqual(recoste["creditos_requeridos_usd"], "113.0613")
+        self.assertTrue(recoste["cubierto"])
+        self.assertEqual(recoste["importe_sin_cobertura_usd"], "0.0000")
+        self.assertEqual(recoste["sobrante_usd"], "6.9387")
 
-    def test_con_ssm_el_deficit_crece(self) -> None:
-        minimo = conectividad.recotizar("79.0430", "120", incluir_ssm=False)
-        completo = conectividad.recotizar("79.0430", "120", incluir_ssm=True)
-        self.assertEqual(completo["costo_conectividad_usd"], "129.6000")
-        self.assertGreater(
-            dinero.dec(completo["creditos_requeridos_usd"]),
-            dinero.dec(minimo["creditos_requeridos_usd"]),
-        )
-        self.assertFalse(completo["cubierto"])
+    def test_dos_permanentes_no_caben(self) -> None:
+        dos = conectividad.costo_servicios(("logs", "secretsmanager"), 1080, None)
+        self.assertEqual(dos["costo_usd"], "43.2000")
+        base = Decimal("79.0430") + Decimal("43.2000")
+        self.assertGreater(base * Decimal("1.10"), Decimal("120"))
 
-    def test_sin_conectividad_habria_cobertura(self) -> None:
-        base = dinero.dec("79.0430") * Decimal("1.10")
-        self.assertLessEqual(base, dinero.dec("120"))
+    def test_escenarios(self) -> None:
+        e = conectividad.escenarios()
+        self.assertEqual(e["A_todos_permanentes"]["costo_total_usd"], "86.4000")
+        self.assertEqual(e["B_solo_operacion"]["costo_total_usd"], "21.6000")
+        self.assertEqual(e["C_operacion_mas_ventanas"]["costo_total_usd"], "23.0400")
+        self.assertEqual(e["E_optimizado"]["costo_total_usd"], "23.0400")
 
 
 if __name__ == "__main__":

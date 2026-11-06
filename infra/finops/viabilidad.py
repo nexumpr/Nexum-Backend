@@ -650,7 +650,6 @@ def evaluar(
         creditos_verificados,
         margen_seguridad,
         catalogo,
-        incluir_ssm=True,
     )
     cubierto = recotizacion["cubierto"]
     matriz_gate.append(
@@ -662,7 +661,8 @@ def evaluar(
                 "y spec I-050/I-070/I-090 (Redis, secretos y observabilidad reales)"
             ),
             "evidencia": (
-                f"interface endpoints obligatorios: {', '.join(recotizacion['endpoints_incluidos'])}; "
+                f"diseno E: permanente {', '.join(recotizacion['detalle_conectividad']['permanentes']['servicios'])} "
+                f"y temporales {', '.join(recotizacion['detalle_conectividad']['temporales']['servicios'])}; "
                 f"costo {recotizacion['costo_conectividad_usd']} USD/45 d; total con margen "
                 f"{recotizacion['creditos_requeridos_usd']} USD frente a "
                 f"{recotizacion['creditos_verificados_usd']} verificados"
@@ -673,14 +673,13 @@ def evaluar(
         motivos.append(
             _motivo(
                 "CONECTIVIDAD_PRIVADA_NO_CUBIERTA",
-                f"sin NAT, Secrets Manager/CloudWatch Logs/metricas/SSM exigen interface endpoints: "
-                f"{recotizacion['costo_conectividad_usd']} USD adicionales en 45 d; total "
-                f"{recotizacion['bruto_total_usd']} USD con margen "
+                f"conectividad en diseno E: {recotizacion['costo_conectividad_usd']} USD en 45 d; "
+                f"total {recotizacion['bruto_total_usd']} USD con margen "
                 f"{recotizacion['creditos_requeridos_usd']} > "
                 f"{recotizacion['creditos_verificados_usd']} verificados (faltan "
                 f"{recotizacion['importe_sin_cobertura_usd']} USD)",
-                "recotizar el acceso privado o ampliar creditos; no se reduce alcance ni se "
-                "sustituyen servicios",
+                "reducir endpoints permanentes, ampliar creditos o aprobar por RFC; no se "
+                "reduce alcance ni se sustituyen servicios",
             )
         )
 

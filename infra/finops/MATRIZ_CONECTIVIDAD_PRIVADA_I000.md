@@ -1,62 +1,89 @@
-# Matriz de conectividad privada — I-000 (revisión 5)
+# Matriz de conectividad privada — I-000 (revisión 6, diseño E)
 
-**Fecha:** 2026-11-06 · **Topología:** 2 EC2 privadas en 2 AZ, **sin NAT**, gateway endpoints S3/DynamoDB
-**Módulo:** `infra/finops/conectividad.py` · **Pruebas:** `tests/infra/finops/test_conectividad.py`
+**Fecha:** 2026-11-06 · **Política:** API y DynamoDB 24/7; auxiliares por ventanas
+**Topología:** 2 EC2 privadas en 2 AZ, sin NAT, gateway endpoints S3/DynamoDB
 **Precio verificado:** interface endpoint `USE2-VpcEndpoint-Hours` = **0.01 USD/h por AZ**
-**Resultado:** `CONECTIVIDAD_PRIVADA_NO_CUBIERTA` (bloqueo real)
+**Resultado:** `VIABLE` con conectividad de **23.7400 USD** en 45 días
 
-## 1. Dependencia por dependencia
+## 1. Regla que gobierna el diseño
 
-| Dependencia del Backend | ¿Necesita red? | Mecanismo | Coste 45 d (2 AZ) | Fuente |
+Con 79.0430 USD de bruto verificado y 120 USD de créditos, el margen del 10 % sólo admite
+**un interface endpoint permanente** (21.60 USD). Dos permanentes (43.20) dejan el presupuesto sin
+cobertura (134.47 > 120). Por eso el diseño separa permanencia de temporalidad.
+
+## 2. Clasificación por servicio
+
+| Servicio | Origen de las solicitudes | Modo | Horas | Coste 45 d |
 |---|---|---|---|---|
-| DynamoDB | Sí | **Gateway endpoint** | 0 | privatelink/pricing |
-| S3 (artefactos, respaldos, terraform state) | Sí | **Gateway endpoint** | 0 | privatelink/pricing |
-| Secrets Manager (claves JWT, credenciales) | Sí | **Interface endpoint** | 21.6000 | Secrets Manager + PrivateLink |
-| CloudWatch Logs (observabilidad) | Sí | **Interface endpoint** | 21.6000 | CloudWatch Logs interface VPC |
-| CloudWatch metrics (métricas del agente) | Sí | **Interface endpoint** | 21.6000 | CloudWatch interface VPC |
-| SSM (parches, comandos, despliegue) | Sí | **Interface endpoint** | 21.6000 | Systems Manager PrivateLink |
-| SSM Messages | Sí | **Interface endpoint** | 21.6000 | Systems Manager PrivateLink |
-| EC2 Messages | Sí | **Interface endpoint** | 21.6000 | Systems Manager PrivateLink |
-| Credenciales de instancia (IAM role) | No | IMDS link-local | 0 | EC2 user guide |
-| Sincronización horaria | No | Amazon Time Sync `169.254.169.123` | 0 | EC2 user guide |
-| Health checks del ALB / CloudFront | No | Entrada por VPC Origins | 0 | CloudFront VPC origins |
+| `logs` | Backend Go y agente de CloudWatch | **PERMANENTE** | 1080 | 21.6000 |
+| `secretsmanager` | Backend al arrancar/rotar (caché cifrada en EBS) | TEMPORAL | 24 | 0.4800 |
+| `ssm` | Agente SSM y GitHub Actions | TEMPORAL | 24 | 0.4800 |
+| `ssmmessages` | Agente SSM | TEMPORAL | 24 | 0.4800 |
+| `monitoring` | Agente de CloudWatch | **NO REQUERIDO** | — | 0 |
+| `ec2messages` | Agente SSM heredado | **NO REQUERIDO** | — | 0 |
+| Gateway endpoints S3/DynamoDB | Backend y Terraform | PERMANENTE | — | 0 |
 
-Los **gateway endpoints no dan conectividad a Secrets Manager, CloudWatch ni SSM**. No existe NAT en
-el diseño y NAT tampoco es gratuito. Las interface endpoints se cobran **por hora y por AZ**, no por
-uso.
+- **Métricas y alarmas sin `monitoring`:** se derivan del log ya ingerido con *metric filters* de
+  CloudWatch (evaluación del lado del servicio). Se conserva GOV-10 sin `PutMetricData` desde la EC2.
+- **`ec2messages`:** el agente SSM moderno opera por `ssmmessages`; si una versión concreta lo exige,
+  se habilita dentro de la ventana con cargo a la reserva de contingencia (0.50 USD).
+- **Secretos:** caché cifrada en EBS, sobrevive al reinicio; se refresca en ventana. Rotación y
+  recuperación siguen disponibles activando la ventana (~2 min de creación del endpoint).
 
-## 2. Recotización del presupuesto completo
+## 3. Coste de conectividad
 
-| Escenario | Endpoints | ENI | Coste conectividad | Bruto total | Con margen 10 % | Créditos | Déficit |
-|---|---|---|---|---|---|---|---|
-| Mínimo (renunciando a SSM en línea) | Secrets Manager + Logs | 4 | 43.2000 | 122.2430 | **134.4673** | 120 | **14.4673** |
-| Completo según SDD | 6 servicios | 12 | 129.6000 | 213.6430 | **235.0073** | 120 | **115.0073** |
+| Concepto | Importe |
+|---|---|
+| Permanente (1 × 2 AZ × 1080 h) | 21.6000 |
+| Temporales (3 × 2 AZ × 24 h) | 1.4400 |
+| Procesamiento de datos (20 GB × 0.01) | 0.2000 |
+| Reserva de contingencia (`ec2messages`, picos) | 0.5000 |
+| **Total 45 días** | **23.7400** |
 
-Fórmula: `servicios × 2 AZ × 1080 h × 0.01 USD`.
+## 4. Escenarios comparados
 
-## 3. Por qué no se reduce alcance unilateralmente
+| Escenario | Permanentes | Temporales | Coste conectividad |
+|---|---|---|---|
+| A — todos permanentes | logs, secretsmanager, ssm, ssmmessages | — | 86.4000 |
+| B — sólo operación | logs | — | 21.6000 |
+| C — operación + ventanas | logs | secretsmanager, ssm, ssmmessages | 23.0400 |
+| D — una sola AZ | logs | 3 | 11.5200 |
+| **E — optimizado** | **logs** | **secretsmanager, ssm, ssmmessages** | **23.0400** |
 
-- Renunciar a **SSM** cambia la administración y el despliegue aprobados (I-120/I-130).
-- Renunciar a **CloudWatch** incumple observabilidad (GOV-10, I-090).
-- Sustituir **Secrets Manager** por secretos embebidos viola la constitución (R-019, GOV-09).
-- Añadir **NAT** implica costo por hora y por GB, también fuera de cobertura.
+D no se adopta: un endpoint en una AZ es punto único de fallo para un componente crítico.
 
-Cualquiera de esas vías exige **RFC de cambio de alcance** con aprobación humana; no se aplica aquí.
+## 5. Presupuesto completo con diseño E
 
-## 4. Alternativa sin costo (para RFC, no aplicada)
+| Concepto | Importe |
+|---|---|
+| Bruto verificado (sin conectividad) | 79.0430 |
+| Conectividad E | 23.7400 |
+| **Bruto total** | **102.7830** |
+| Margen 10 % → requerido | **113.0613** |
+| Créditos verificados | 120.0000 |
+| **Cobertura** | **TOTAL** · sobrante **6.9387** |
+| Consumo estimado | 2.2841 USD/día |
 
-| Necesidad | Alternativa sin coste | Coste de cumplimiento |
-|---|---|---|
-| Artefactos y despliegue | S3 gateway endpoint + AMI inmutable reconstruida en CI (sin SSM en la instancia) | Cambia el modelo de parches/despliegue |
-| Logs | Escritura a S3 vía gateway endpoint con ciclo de vida | Cambia la observabilidad de CloudWatch a S3 |
-| Métricas | Métricas básicas de hipervisor (gratuitas, sin agente) | Pierde métricas de aplicación |
-| Secretos | Inyección en el arranque desde un almacén cifrado en S3 con política restringida | Cambia la gestión de secretos aprobada |
-| Hora / credenciales | Link-local (ya contemplado) | Ninguno |
+## 6. Modos operativos
 
-Esta alternativa **elimina el costo de conectividad** pero modifica requisitos aprobados: sólo es
-viable con RFC y firma humana.
+### Modo OPERACIÓN (permanente)
 
-## 5. Estado
+Activos: 2 EC2 Go, ALB, CloudFront + VPC Origin, DynamoDB, Redis OSS, EBS, `logs` endpoint, gateway
+endpoints. Health checks y alarmas por metric filter operan sin intervención. No requiere acciones
+manuales.
 
-`CONECTIVIDAD_PRIVADA_NO_CUBIERTA` — bloqueo real. Ningún recurso creado; ningún endpoint
-aprovisionado; Terraform no ejecutado.
+### Modo MANTENIMIENTO Y PRUEBAS (ventanas)
+
+Se habilitan `secretsmanager`, `ssm` y `ssmmessages` (2 AZ). Usos: rotación de secretos, parches,
+diagnóstico, despliegues, pruebas de recuperación. Al cerrar la ventana se verifica que API y
+DynamoDB siguen disponibles, se conservan evidencias y se desactivan sólo los recursos temporales.
+El ciclo es idempotente y auditable y se implementará en Terraform en las specs de automatización.
+
+## 7. Riesgos declarados
+
+1. Reinicio de instancia **sin** ventana: usa la caché de secretos; si la caché estuviera corrupta,
+   la API no arranca hasta abrir ventana (~2 min).
+2. Pérdida de logs bufferizados si una instancia falla antes de la ventana.
+3. Métricas con granularidad derivada de logs (no hay `PutMetricData` continuo).
+4. 8 ventanas × 3 h es una previsión; más ventanas elevan el coste a 0.06 USD/h por servicio.
+5. Si se exige `monitoring` permanente, el presupuesto pasa a 134.47 y **no** hay cobertura.

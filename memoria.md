@@ -245,3 +245,10 @@
 - Completo SDD (6 servicios, 12 ENI): 129.6000 USD -> con margen 235.0073 > 120: deficit 115.0073.
 - Decision D6 no efectiva: falla la condicion de presupuesto completo cubierto. Se requiere RFC (O4/O5).
 - No se fusiona el PR #15 ni se abre I-010. Pruebas FinOps: 165 OK.
+
+### I-000 revision 6 — cierre con operacion permanente y auxiliares por ventana
+
+- Diseno E: `logs` permanente (21.6000); `secretsmanager`, `ssm`, `ssmmessages` solo en ventanas (1.4400); `monitoring` por metric filters y `ec2messages` por ssmmessages (sin coste).
+- Conectividad 23.7400; total 102.7830; requerido con margen 113.0613 <= 120 (sobrante 6.9387).
+- D6 efectiva: `APRUEBO_CIERRE_I000_CON_CONDICIONES`. IVA queda condicionado (D1), sin declarar 0 %.
+- Pruebas FinOps: 167 OK. Riesgos: cache de secretos, logs bufferizados, metricas derivadas, mas ventanas encarecen.
