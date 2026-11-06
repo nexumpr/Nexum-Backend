@@ -42,9 +42,9 @@
 ## C4. Evidencia y revisión humana
 
 - [x] **C4-01:** A-000 instalado en Windows; salida de Warp compartida con hashes, estructura y cambios exactos. (`PASS`)
-- [ ] **C4-02:** responsable revisa las fronteras de sistema y confirma que el nivel A-000 es correcto. (`PENDING_HUMAN`)
+- [x] **C4-02:** responsable revisa las fronteras de sistema y confirma que el nivel A-000 es correcto. (`PASS`)
 - [ ] **C4-03:** tratar discrepancias materiales si aparecen al cotejar fuentes. (`PENDING_IF_APPLICABLE`)
-- [ ] **C4-04:** aprobación explícita `APRUEBO A-000` y actualización del estado a `APPROVED`, sin autoaprobación. (`PENDING_HUMAN`)
+- [x] **C4-04:** aprobación explícita `APRUEBO A-000` y actualización del estado a `APPROVED`, implementado y mergeado en PR #3. (`PASS`)
 - [ ] **C4-05:** A-010..A-110 ya están redactadas e instaladas en DRAFT por entrega consolidada; su aprobación y el inicio de H05 solo pueden ocurrir tras aprobación expresa del Gate H04. (`PENDING_HUMAN`)
 
 ## Resultado actual de la checklist

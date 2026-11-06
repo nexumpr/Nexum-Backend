@@ -15,8 +15,8 @@
 | A000-T007 | Construir trazabilidad GOV→CTX y coherencia transversal de cuatro documentos. | T002..T006. | `spec.md` §9; `checklist.md` con IDs y evidencia. | `[x]` redactado, revisión pendiente. |
 | A000-T008 | Registrar fuentes no cotejadas y decisiones no adoptadas. | Contexto v1.3; fuentes del profesor/prototipo. | `spec.md` §8, `plan.md` §6; sin atribuciones ficticias. | `[x]` identificadas las fuentes y cotejados directamente el PDF docente v3 y ZIP Android `(3)` durante la consolidación H04. |
 | A000-T009 | Ejecutar validación local de hashes/estructura y aislar el paquete de A-000. | T001..T008; ZIP completo. | Salida del instalador y manifiesto SHA-256 en Warp. | `[x]` `PASS` en Windows, evidencia compartida por el usuario el 2026-11-05; no equivale a aprobación. |
-| A000-T010 | Revisar y resolver hallazgos de alcance con el responsable. | T001..T009. | Respuesta humana con correcciones o aceptación. | `[ ]` PENDIENTE. |
-| A000-T011 | Ratificar A-000 si cumple criterios y actualizar memoria aprobada. | T010 y `checklist.md` sin bloqueo esencial. | Aprobación explícita y registro de estado. | `[ ]` PENDIENTE. |
+| A000-T010 | Revisar y resolver hallazgos de alcance con el responsable. | T001..T009. | Respuesta humana con correcciones o aceptación. | `[x]` Revisado y aprobado por el responsable; implementado en Go local. |
+| A000-T011 | Ratificar A-000 si cumple criterios y actualizar memoria aprobada. | T010 y `checklist.md` sin bloqueo esencial. | Aprobación explícita y registro de estado. | `[x]` Ratificado formalmente en PR #3 mergeado a main. |
 | A000-T012 | Autorizar H05 solo tras aprobación humana del Gate H04 (A-000..A-110). | T011 y revisión H04 integral. | A-010..A-110 ya redactadas en DRAFT; H05 aún sin archivos. | `[ ]` BLOQUEADA hasta Gate H04. |
 
 ## Criterios de terminación por tarea
