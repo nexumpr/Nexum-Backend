@@ -152,6 +152,17 @@
 - **Estado de Tareas:** A-100-T01..A-100-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
 - **Resultado:** 100% PASS en suite completa de Go y 0 errores en `go vet ./...`.
 
+### Spec A-110 (`A-110-versionado-contribucion`):
+- **Alcance implementado:**
+  1. Versionamiento semántico estricto SemVer (`pkg/types/version.go`): modelo `SemVer` con parser y formateador canónico, validación obligatoria de prefijo de API `/api/v1` y declaración de constantes vigentes del sistema (`v0.8.0`, `/api/v1`, 103 specs) (`A-110 §2.1`, `AC-A-110-01`).
+  2. Historial auditable de decisiones de arquitectura (`internal/system/governance.go`): registro `DecisionRecord` y gestor concurrente `DecisionLog` que permite auditar el responsable humano, fecha, justificación e impacto técnico por spec (`AC-A-110-01`).
+  3. Políticas de gates para Pull Requests y desacoplamiento de despliegue (`internal/system/governance.go`): validación `ValidatePRMerge` que bloquea push directo a `main`, exige CI verde (`CIGreen`) y al menos una aprobación humana (`GOV-01`); y `ValidateDeployAuthorization` que certifica que el despliegue requiere una aprobación humana independiente y desacoplada del merge (`AC-A-110-02`).
+  4. Control formal de cambios mediante RFC (`internal/system/governance.go`): gestor `RFCManager` con validación estricta `ValidateSpecChange` que bloquea modificaciones a especificaciones aprobadas sin un RFC previo en estado `APPROVED` con análisis de impacto obligatorio (`A-110 §2.4`, `AC-A-110-03`).
+- **Archivos creados:** `pkg/types/version.go`, `internal/system/governance.go`, `tests/unit/system/version_governance_test.go`.
+- **Estado de Tareas:** A-110-T01..A-110-T12 completadas y marcadas en `tasks.md` y `checklist.md`.
+- **Resultado:** 100% PASS en suite completa de Go y 0 errores en `go vet ./...`.
+- **HITO COMPLETADO:** Lote completo de Arquitectura General H08-A (Specs A-000 a A-110, 12 especificaciones) implementado, probado y auditado localmente con éxito.
+
 ## Registro de Incidentes y Resoluciones H08-A
 
 ### Incidente 1 (CI GitHub Actions: Falso Positivo `UNDECLARED_FILE` / `GIT_UNDECLARED`):
