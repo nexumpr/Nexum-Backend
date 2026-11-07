@@ -297,3 +297,11 @@
 - Defecto D-01 detectado y documentado (no corregido por alcance): `/api/v1/health/live` y `/ready` no estan registrados en el router Go; solo existe el handler. Bloquea I-030 y el despliegue.
 - RFC-004 ampliado (IAM, rotacion, auditoria, SSE-S3, costes, compromiso) y sigue PROPUESTO. Bloqueo de despliegue vigente.
 - Pruebas: 76 Terraform, 11 systemd, 167 FinOps, 18 permisos; fmt/init/validate PASS.
+
+### Hotfix A-050 — D-10 (2026-11-06)
+
+- Gate `GATE_H08A_HOTFIX_A050_G115` aprobado; rama `fix/h08a-a050-gosec-g115` desde main 10f6327.
+- Causa real: `VerifyPassword` aceptaba memoria/iteraciones/paralelismo y longitud de digest desde el hash almacenado sin acotar (agotamiento de recursos + G115).
+- Correccion: guardas de politica y longitud antes de Argon2; longitud del digest desde constantes uint32; sin `#nosec`.
+- gosec PASS, govulncheck PASS, go build/vet/test PASS; 7 grupos de pruebas nuevas.
+- CI Go no aplicable en este PR hasta integrar A-100 (dependencia de bootstrap registrada).
