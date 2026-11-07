@@ -547,7 +547,6 @@
     "sdd/03-endpoints/openapi/nexum-api-v1.json": "0a1e41b73230c0566ec6c6e8af871731937de6ccc5637ad39dbc552d65542308",
     "sdd/03-endpoints/openapi/nexum-api-v1.yaml": "f9d18efe1e4c1f80d768fd0219f7d31207c30a74c54cf13aebdb3485db8a4b33",
     "sdd/_control/H07/00_LEER_ANTES_DE_PUBLICAR.md": "016f938ec3ce8e9927da425830f57b8b49f00eb5eb8188ccfd0595b1fef1c2d5",
-    "sdd/_control/H07/BASELINE_SHA256.json": "fc07b71bbcc4a487e67d7faf0c5baa433154c57cbc5840b47d490f60ae49524f",
     "sdd/_control/H07/CAUSA_RAIZ_CI_Y_MIGRACION.md": "7897c6c09aed4f58d0b460e3c0da0005d8ac759a21c578997bf8c82450017ec2",
     "sdd/_control/H07/CHECKLIST_PR_Y_RELEASE.md": "d7a57217ac5fac61e4a15fcb937cbfeedaa1fa0c0c41b591afb190d966ea1e1d",
     "sdd/_control/H07/CONTRATO_AUTOMATIZACION_AWS.md": "a11ceab47133bbb1f6a4316af83b7ac147a2586effaefb2f7620bada5217f066",
