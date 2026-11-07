@@ -36,3 +36,16 @@
 | Pruebas Go / HTTP reales | PASS (100% unit tests) | Validado con `go test ./...` |
 | AWS/Redis/2 instancias/despliegue real | SIMULADO LOCAL / NOT_RUN CLOUD | Cloud real reservado para Gate correspondiente |
 | Costo cero y permisos de cuenta AWS | PENDIENTE H05 | Bloquea H05 si no viable |
+
+### Verificacion H08-A — D-02/D-06
+
+- [x] `/api/v1/health/live` 200 sin consultar DynamoDB/Redis.
+- [x] `/api/v1/health/ready` 503 sin dependencias criticas registradas.
+- [x] `/api/v1/health/ready` 200 con dependencia controlada sana y 503 con fallida.
+- [x] 503 por timeout sin bloquear la sonda.
+- [x] 503 durante apagado antes del drenado.
+- [x] Respuestas sin detalles internos ni mensajes de error de dependencias.
+- [x] Probes heredados consistentes con el registro (compatibilidad documentada).
+- [x] 405 con `Allow` en metodo incorrecto.
+- [ ] Dependencias reales DynamoDB/Redis — NOT_RUN (I-040/I-050).
+- [ ] Race detector local — NOT_RUN en Windows (CGO); ejecutado en CI Linux.
