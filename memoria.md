@@ -304,3 +304,4 @@
 - `.github/workflows/go-backend.yml`: jobs calidad, seguridad, secretos y SBOM; herramientas fijadas (govulncheck 1.9.0, gosec 2.30.0, gitleaks 8.30.1, syft 1.57.0); sin AWS/Docker/secretos.
 - Local: actionlint PASS, go build/vet/test PASS, govulncheck PASS.
 - Bloqueo nuevo D-10: gosec HIGH G115 en `internal/infrastructure/security/hasher.go:126` (A-050). No se suprime; requiere decision humana (fix acotado o exclusion justificada).
+- A-100: allowlist por ruta de gitleaks reemplazada por baseline revisado (16 falsos positivos historicos); una credencial nueva en esas rutas ya se detecta (probado con ficheros sinteticos en %TEMP%).

@@ -47,3 +47,4 @@
 - [ ] Job `seguridad` en verde — **FAIL** por G115 en A-050 (pendiente de decision).
 - [ ] DAST, politica de licencias y controles de I-100 — fuera del alcance de este hotfix.
 - [ ] Branch protection / required checks — no disponible en plan Free (limitacion registrada).
+- [x] Secret scanning reforzado: baseline revisado en lugar de allowlist por ruta; credencial nueva en ruta antes excluida se detecta (probado).

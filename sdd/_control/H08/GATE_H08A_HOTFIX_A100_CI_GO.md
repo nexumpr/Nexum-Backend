@@ -67,3 +67,15 @@ Opciones para el responsable:
 - `calidad`, `seguridad`, `secretos`, `cadena-suministro` en verde, o bloqueo documentado con decisión.
 - SDD PASS, SHA-256 exacto, OpenAPI 75.
 - Merge con autorización humana específica sobre el HEAD resultante.
+
+## 7. Refuerzo del escaneo de secretos (A.2)
+
+Se comprobó mediante pruebas aisladas en `%TEMP%` que una allowlist **por ruta** ocultaba cualquier
+credencial colocada en ese archivo. Se sustituyó por:
+
+- `.gitleaks.toml` con las reglas por defecto y **sin exclusiones por ruta**.
+- `.gitleaks-baseline.json`: 16 hallazgos históricos revisados (14 `generic-api-key` en manifiestos
+  SHA-256 y 2 `jwt` en un fixture con el token de ejemplo de jwt.io).
+
+Verificación: el repositorio da `no leaks found` con baseline; una clave AWS sintética y un JWT distinto
+colocados en las rutas antes excluidas **se detectan**. El CI ejecuta `--baseline-path`.
