@@ -32,4 +32,3 @@ func TestRuntimeAndPlatformMatrix(t *testing.T) {
 
 	t.Logf("Verificación de Runtime Exitosa: OS=%s | Arch=%s | Version=%s | Modo: Nativo sin Docker (AC-A-010-03)", osName, archName, goVer)
 }
-

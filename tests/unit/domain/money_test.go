@@ -123,4 +123,3 @@ func TestMoneyPredicatesAndFormatting(t *testing.T) {
 		t.Errorf("formato esperado '0.00 EUR', obtenido '%s'", mZero.Formatted())
 	}
 }
-

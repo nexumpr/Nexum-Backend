@@ -94,4 +94,3 @@ func (c *MemoryCache) ReleaseLock(ctx context.Context, key string) error {
 	delete(c.locks, key)
 	return nil
 }
-

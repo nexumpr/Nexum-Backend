@@ -23,3 +23,13 @@
 ## C. Ejecución futura después de H07
 
 Las tareas de implementación, pruebas HTTP, CI/CD y despliegue pertenecen a H08+, nunca se marcan completadas por el documento. Cada cambio requiere release autorizado.
+
+## Hotfix H08-A/A-090 — D-02 y D-06 (2026-11-06)
+
+- Gate `sdd/_control/H08/GATE_H08A_HOTFIX_A090_HEALTH.md`.
+- Rutas normativas `GET /api/v1/health/live` y `GET /api/v1/health/ready` registradas en el router real mediante `RegisterHealth`.
+- Liveness no consulta dependencias; readiness devuelve 503 durante apagado, sin dependencias registradas, con dependencia caida o por timeout (pendientes `UNKNOWN`, sin bloqueo).
+- `run()` conecta el registro al runtime y marca `BeginShutdown()` antes del drenado.
+- Probes heredados `/health` y `/ready` se conservan como compatibilidad delegando en el mismo registro.
+- Pruebas nuevas: `tests/unit/transport/health_normative_test.go` (8 casos, HTTP real en puerto efimero).
+- Evidencia: go build/vet/test PASS, gosec 0, govulncheck PASS, SDD PASS, OpenAPI 75. race: NOT_RUN en Windows (CGO), se ejecuta en CI.

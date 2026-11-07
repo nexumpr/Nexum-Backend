@@ -116,4 +116,3 @@ func TestAuthPortContracts(t *testing.T) {
 		}
 	})
 }
-

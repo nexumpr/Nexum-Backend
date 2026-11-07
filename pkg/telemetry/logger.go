@@ -117,4 +117,3 @@ func ContextAttrs(ctx context.Context) []slog.Attr {
 	}
 	return attrs
 }
-

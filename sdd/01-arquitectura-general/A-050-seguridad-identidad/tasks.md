@@ -23,3 +23,12 @@
 ## C. Ejecución futura después de H07
 
 Las tareas de implementación, pruebas HTTP, CI/CD y despliegue pertenecen a H08+, nunca se marcan completadas por el documento. Cada cambio requiere release autorizado.
+
+## Hotfix H08-A/A-050 — D-10 (2026-11-06)
+
+- Gate `sdd/_control/H08/GATE_H08A_HOTFIX_A050_G115.md` (frase `APRUEBO_FIX_A050_GOSEC_G115`).
+- `VerifyPassword` valida politica y longitudes ANTES de `argon2.IDKey`: memoria 8-256 MiB, iteraciones 1-10, paralelismo 1-16, sal 8-64 B, digest en {16,24,32,48,64} y hash codificado <= 4096 caracteres.
+- La longitud del digest se toma de constantes uint32: se elimina la conversion int->uint32 (G115) sin `#nosec` ni exclusiones.
+- Sin cambios de algoritmo, formato ni parametros por defecto; comparacion en tiempo constante intacta.
+- Pruebas nuevas en `tests/unit/security/hasher_hardening_test.go` (7 grupos, incluido rechazo en <250 ms de parametros peligrosos).
+- gosec PASS (0 hallazgos), govulncheck PASS, go build/vet/test PASS.

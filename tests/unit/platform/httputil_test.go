@@ -152,4 +152,3 @@ func TestDecodeJSON(t *testing.T) {
 		}
 	})
 }
-

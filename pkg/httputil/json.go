@@ -92,4 +92,3 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any, maxBytes int64)
 
 	return nil
 }
-

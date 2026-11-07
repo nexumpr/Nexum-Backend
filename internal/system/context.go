@@ -52,4 +52,3 @@ func DefaultProductionMetadata() types.SystemMetadata {
 		CacheProvider: "Redis",
 	}
 }
-

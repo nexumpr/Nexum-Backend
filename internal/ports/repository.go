@@ -54,4 +54,3 @@ type NoSQLRepository interface {
 	// Query ejecuta una consulta particionada paginada.
 	Query(ctx context.Context, tableName string, input QueryInput) (*QueryResult, error)
 }
-

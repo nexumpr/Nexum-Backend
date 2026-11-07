@@ -297,3 +297,37 @@
 - Defecto D-01 detectado y documentado (no corregido por alcance): `/api/v1/health/live` y `/ready` no estan registrados en el router Go; solo existe el handler. Bloquea I-030 y el despliegue.
 - RFC-004 ampliado (IAM, rotacion, auditoria, SSE-S3, costes, compromiso) y sigue PROPUESTO. Bloqueo de despliegue vigente.
 - Pruebas: 76 Terraform, 11 systemd, 167 FinOps, 18 permisos; fmt/init/validate PASS.
+
+### Hotfix H08-A/A-030 — runtime HTTP (2026-11-06)
+
+- Gate `GATE_H08A_HOTFIX_A030_RUNTIME` aprobado por frase humana; base `main` 10f6327; rama `fix/h08a-a030-runtime-http`.
+- `cmd/server/main.go` ahora compone Router+HTTPServer, arranca `Start()` en goroutine, escucha SIGINT/SIGTERM y ejecuta `Shutdown` con 15 s; exit 1 en fallo de escucha o de apagado.
+- Prueba de regresion real: socket efimero, /health 200, /api/v1/unknown 404, POST 405, puerto ocupado con error, shutdown libera el puerto.
+- A-090 sigue pendiente (rutas normativas y HealthRegistry); I-020 bootstrap dependera de ese hotfix para su curl de liveness.
+
+### Hotfix A-030 — segunda pasada (2026-11-06)
+
+- Se extrajo `run(ctx, cfg, logger)` en `cmd/server`; `main` delega y `cmd/server/main_test.go` prueba el punto de entrada real (arranque, 404, cancelación, puerto ocupado, liberación del puerto).
+- Log de arranque corregido: ya no afirma éxito antes de escuchar; la prueba verifica la ausencia de "éxito" y de datos sensibles.
+- Evidencia: `go test ./cmd/server/...` 2 PASS, `go test ./...` PASS, binario vivo con `/health` 200 y `/api/v1/nope` 404.
+### A-100 CI funcional (2026-11-06)
+
+- Gate `GATE_H08A_HOTFIX_A100_CI_GO` aprobado; rama `fix/h08a-a100-ci-go` desde main 10f6327.
+- `.github/workflows/go-backend.yml`: jobs calidad, seguridad, secretos y SBOM; herramientas fijadas (govulncheck 1.9.0, gosec 2.30.0, gitleaks 8.30.1, syft 1.57.0); sin AWS/Docker/secretos.
+- Local: actionlint PASS, go build/vet/test PASS, govulncheck PASS.
+- Bloqueo nuevo D-10: gosec HIGH G115 en `internal/infrastructure/security/hasher.go:126` (A-050). No se suprime; requiere decision humana (fix acotado o exclusion justificada).
+- A-100: allowlist por ruta de gitleaks reemplazada por baseline revisado (16 falsos positivos historicos); una credencial nueva en esas rutas ya se detecta (probado con ficheros sinteticos en %TEMP%).
+### Hotfix A-050 — D-10 (2026-11-06)
+
+- Gate `GATE_H08A_HOTFIX_A050_G115` aprobado; rama `fix/h08a-a050-gosec-g115` desde main 10f6327.
+- Causa real: `VerifyPassword` aceptaba memoria/iteraciones/paralelismo y longitud de digest desde el hash almacenado sin acotar (agotamiento de recursos + G115).
+- Correccion: guardas de politica y longitud antes de Argon2; longitud del digest desde constantes uint32; sin `#nosec`.
+- gosec PASS, govulncheck PASS, go build/vet/test PASS; 7 grupos de pruebas nuevas.
+- CI Go no aplicable en este PR hasta integrar A-100 (dependencia de bootstrap registrada).
+
+### Hotfix A-090 — salud (2026-11-06)
+
+- Gate `GATE_H08A_HOTFIX_A090_HEALTH` aprobado; rama `fix/h08a-a090-health` desde main 1546254.
+- Rutas normativas `/api/v1/health/live` y `/ready` conectadas al HealthRegistry real; liveness independiente de servicios; readiness 503 en apagado, sin dependencias, con fallo o timeout.
+- `run()` conecta el registro y marca BeginShutdown antes del drenado; probes heredados delegados (compatibilidad documentada).
+- Sin dependencias reales registradas: readiness 503 por diseno hasta I-040/I-050.
