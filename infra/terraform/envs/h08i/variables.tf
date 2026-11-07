@@ -83,3 +83,17 @@ variable "unidad_sha256" {
   type        = string
   default     = ""
 }
+
+# --- I-030: balanceo y publicación HTTPS --------------------------------
+
+variable "health_check_path" {
+  description = "Ruta de liveness del target group (A-090); readiness queda excluida por 503 de diseño"
+  type        = string
+  default     = "/api/v1/health/live"
+}
+
+variable "cloudfront_price_class" {
+  description = "Price class de CloudFront; PriceClass_100 es la más barata"
+  type        = string
+  default     = "PriceClass_100"
+}

@@ -13,7 +13,7 @@
 | H08-I / I-000 | AUTHORIZED_I000_LOCAL_AWS_READONLY **solo tras ratificación** | Trabajo FinOps/consultas AWS lectura y PR por agente; cero infraestructura mutable; 0 MXN personales |
 | H08-I / I-010 | IMPLEMENTED_LOCAL_NOT_DEPLOYED | Módulo `red` validado (`fmt`/`validate`); AWS NOT_RUN |
 | H08-I / I-020 | IMPLEMENTED_LOCAL_NOT_DEPLOYED | Módulo `computo` (2 ARM64, cpu_credits standard) y bootstrap systemd; AWS NOT_RUN; despliegue bloqueado por RFC-004 |
-| H08-I / I-030 | **D2_RATIFICADA — IMPLEMENTACION_NO_AUTORIZADA** | `RATIFICO_D2_PARA_I030` concedida 2026-11-06 (`RFC-005`); falta `APRUEBO_GATE_I030_LOCAL`; sin Terraform, sin PR, sin AWS |
+| H08-I / I-030 | **IMPLEMENTED_LOCAL_NOT_DEPLOYED — PR PENDIENTE** | `APRUEBO_GATE_I030_LOCAL` 2026-11-06; módulo `balanceo` + CloudFront VPC origin validados (`fmt`/`validate`); hallazgo H-01 (TLSv1 con certificado por defecto) abierto; AWS NOT_RUN |
 | H08-I / I-040..I-150; H08-E / E001..E075 | NOT_AUTHORIZED | Gates por spec futuros; despliegue requiere autorización humana independiente |
 
 El Gate H08-A se registra en `sdd/_control/H08/GATE_H06_H07_H08A_RATIFICACION.md`. Shell con ASK **no** es un sandbox: el usuario revisa cada orden. El registro de `main` debe seguir limpio; los cambios de H08-A se publican como PR y pasan checks.

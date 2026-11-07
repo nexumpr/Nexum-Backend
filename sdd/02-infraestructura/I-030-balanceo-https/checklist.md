@@ -25,21 +25,23 @@
 - [x] `INF-030-02` **Certificado:** diseño justificado, referencias, supuestos y evidencia trazable.
   — **D2 ratificada 2026-11-06**: certificado por defecto de CloudFront; sin ACM ni dominio. No es evidencia AWS.
 - [ ] `INF-030-03` **Health:** diseño justificado, referencias, supuestos y evidencia trazable.
-  — parámetros definidos (30 s/5 s/2/3, `/api/v1/health/live`); falta implementación.
+  — implementado en el módulo (30 s/5 s/2/3, `/api/v1/health/live`, matcher 200); **comportamiento en AWS NOT_RUN**.
 - [ ] `INF-030-04` **Redirección:** diseño justificado, referencias, supuestos y evidencia trazable.
-  — definida en CloudFront (`redirect-to-https`); falta implementación.
+  — implementado en CloudFront (`redirect-to-https`); **verificación HTTP real NOT_RUN**.
 - [x] `INF-030-05` **Failover:** diseño justificado, referencias, supuestos y evidencia trazable.
   — diseño de dos targets en AZ distintas; **prueba real NOT_RUN**.
 - [ ] `INF-030-06` **Evidencias:** diseño justificado, referencias, supuestos y evidencia trazable.
-  — formato previsto; salidas reales `NOT_RUN`.
+  — salidas reales `NOT_RUN`; sólo hay evidencia estática local.
 
 ### Pruebas y cobertura de diseño
 
 - [ ] URL pública con certificado de CA confiable, TLS 1.2+.
+  — **NO CUMPLIDO como TLS 1.2**: con certificado por defecto AWS fija TLSv1 (hallazgo H-01, RFC-005 §8).
 - [ ] Distribución a dos targets simultáneos demostrada después del deploy.
 - [ ] Failover de un nodo sin pérdida de persistencia.
 - [ ] Cálculo ALB hourly+LCU y uso IPv4 / DNS verificado.
 - [ ] No publicar credenciales ni origen interno en headers.
+  — diseño cumple (sin credenciales; ALB no expuesto); verificación HTTP `NOT_RUN`.
 
 ### Riesgos, economía y aprobaciones
 
@@ -54,15 +56,16 @@
 - [ ] SCP y disponibilidad de servicios relevantes documentados (no simulados).
 - [ ] Gate I-GO tiene resolución expresa del responsable, o esta spec continúa DRAFT/BLOCKED.
 
-### Gate de implementación local I-030 (pendiente)
+### Gate de implementación local I-030
 
-- [ ] `APRUEBO_GATE_I030_LOCAL` concedido de forma explícita (no inferido).
-- [ ] Módulo `infra/terraform/modules/balanceo` escrito sin ACM, sin Route 53, sin listener 443 ni ALB público.
-- [ ] Target group 8080 con health check `/api/v1/health/live` y `deregistration_delay` ≤ 60 s.
-- [ ] CloudFront con VPC Origin, `redirect-to-https`, TTL 0 y métodos REST completos.
-- [ ] `fmt -check`, `init -backend=false`, `validate` ejecutados y con salida real.
-- [ ] Pruebas estáticas de contrato y regresión FinOps/SDD/H06/Go en verde.
+- [x] `APRUEBO_GATE_I030_LOCAL` concedido de forma explícita (2026-11-06).
+- [x] Módulo `infra/terraform/modules/balanceo` escrito sin ACM, sin Route 53, sin listener 443 ni ALB público.
+- [x] Target group 8080 con health check `/api/v1/health/live` y `deregistration_delay` ≤ 60 s.
+- [x] CloudFront con VPC Origin, `redirect-to-https`, sin caché y métodos REST completos.
+- [x] `fmt -check`, `init -backend=false`, `validate` ejecutados con salida real (Success).
+- [x] Pruebas estáticas de contrato y regresión FinOps/SDD/H06/Go en verde en local.
 - [ ] PR único revisado; merge y despliegue requieren autorización humana independiente.
+- [ ] Aceptación humana del hallazgo H-01 (TLSv1 con certificado por defecto) antes del Gate de despliegue.
 
 ### Ejecución futura H08 (NO ejecutada en este lote)
 

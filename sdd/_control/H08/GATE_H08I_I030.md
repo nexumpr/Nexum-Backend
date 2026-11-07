@@ -5,7 +5,7 @@
 | Documento | `sdd/_control/H08/GATE_H08I_I030.md` |
 | Fecha | 2026-11-06 |
 | Spec | `sdd/02-infraestructura/I-030-balanceo-https/` (v0.2.0 por enmienda) |
-| Estado | **D2_RATIFICADA — GATE_DE_IMPLEMENTACION_PENDIENTE** |
+| Estado | **IMPLEMENTADO_LOCAL — PR PENDIENTE; DESPLIEGUE NO AUTORIZADO** |
 | Precondición | I-020 cerrada (PR #17 `10f6327`); hotfixes A-030/A-050/A-090/A-100 en `main` `3de4fc6` |
 | Rama | `feat/h08i-i030-balanceo-https` (sincronizada con `main`; sin PR creado) |
 | Enmienda | `sdd/_control/H08/RFC-005-ENMIENDA_I030_TLS_D2.md` |
@@ -16,6 +16,7 @@
 |---|---|---|
 | v0.1.0 | `PROPUESTO` | Gate propuesto; conflicto TLS D2 vs DRAFT documentado, sin resolver |
 | v0.2.0 | `D2_RATIFICADA` | Ratificación humana `RATIFICO_D2_PARA_I030`; conflicto resuelto por RFC-005. Sigue **sin** autorizar implementación |
+| v0.3.0 | `IMPLEMENTADO_LOCAL` | `APRUEBO_GATE_I030_LOCAL` concedida 2026-11-06; módulo `balanceo` escrito y validado localmente. Sin AWS, sin PR aún |
 
 ## 1. Conflicto normativo — RESUELTO por ratificación
 
@@ -98,6 +99,39 @@ Gate aparte.
 | Control | Estado | Efecto |
 |---|---|---|
 | `RATIFICO_D2_PARA_I030` | **CONCEDIDA** 2026-11-06 | Sólo decisión normativa + ajustes documentales |
-| `APRUEBO_GATE_I030_LOCAL` | **PENDIENTE** | Autoriza escribir/validar I-030 localmente; no despliega ni fusiona |
+| `APRUEBO_GATE_I030_LOCAL` | **CONCEDIDA** 2026-11-06 | Autorizó escribir/validar I-030 localmente; no despliega ni fusiona |
 | Autorización de merge | **PENDIENTE** | Requiere PR, checks verdes y frase humana específica |
 | Autorización de despliegue AWS | **NO SOLICITADA** | Gate independiente y separado |
+
+## 9. Registro de implementación local (2026-11-06)
+
+**Alcance ejecutado:** únicamente archivos locales del repositorio. `terraform plan/apply/destroy` **no** se
+ejecutaron (denegados por política); **ningún** recurso AWS existe; costo incurrido 0.0000 USD.
+
+| Artefacto | Estado |
+|---|---|
+| `infra/terraform/modules/balanceo/{main,variables,outputs}.tf` | Creado — ALB interno, TG 8080, listener HTTP:80, `aws_autoscaling_attachment`, `aws_cloudfront_vpc_origin`, distribución CloudFront |
+| `infra/terraform/envs/h08i/main.tf` | `module "balanceo"` compuesto + salida `balanceo`; proveedor AWS `~> 5.72` |
+| `infra/terraform/envs/h08i/variables.tf` | `health_check_path`, `cloudfront_price_class` |
+| `tests/infra/terraform/test_balanceo_contrato.py` | 35 pruebas estáticas |
+| `tests/infra/finops/test_i030_alineacion.py` | 8 pruebas de alineación con el escenario C |
+
+**Evidencia ejecutada:** `terraform fmt -check` exit 0 · `terraform init -backend=false` OK · `terraform validate`
+`Success` · `tests/infra/terraform` 103 pruebas OK (76 previas + 35 nuevas, solapadas por clase) ·
+`tests/infra/finops` 175 OK · `tests/infra/systemd` 11 OK · `herramientas/tests` 18 OK · `go build/vet/test` PASS ·
+`validar_sdd_integral.py --check-git` PASS · `validar_h06.py` PASS.
+
+**Decisiones de implementación registradas:**
+- El security group del ALB **no** se duplica: se reutiliza el de I-010 (ingress 80 sólo desde la prefix list
+  `com.amazonaws.global.cloudfront.origin-facing`, egress 8080 al SG del backend). Se añadió precondition
+  `sg_alb_id != sg_backend_id`.
+- Health check del target group en `/api/v1/health/live`; una precondition y una validación de variable
+  **rechazan** `/ready` para no marcar unhealthy el par mientras I-040/I-050 no existan.
+- La API no se cachea: `Managed-CachingDisabled` + `Managed-AllViewer` (Authorization e idempotencia reenviados).
+
+**Hallazgo H-01 (abierto):** con el certificado por defecto de CloudFront, AWS fija la security policy en
+**TLSv1** y no permite `TLSv1.2_2021`. No se declara TLS 1.2+ en el borde. Exige aceptación humana explícita
+antes del Gate de despliegue (o certificado propio + dominio, con RFC y financiación). Ver RFC-005 §8.
+
+**Requisito no suprimido:** no existe CI de Terraform todavía; corresponde a I-080. Hasta entonces la evidencia
+es local (`fmt`/`validate` + pruebas estáticas) y el PR ejecutará los workflows existentes (SDD y Go).

@@ -101,36 +101,54 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
 
-## Tareas de implementación H08-I (bloqueadas hasta `APRUEBO_GATE_I030_LOCAL`)
+## Tareas de implementación H08-I (habilitadas por `APRUEBO_GATE_I030_LOCAL`)
 
-Todas en estado `BLOQUEADO_POR_GATE`. No se ha escrito ni ejecutado nada de esta sección.
+Gate concedido 2026-11-06. Todas las tareas siguientes se ejecutaron **localmente**; ningún recurso AWS existe.
 
-### T-030-10 — Módulo `infra/terraform/modules/balanceo`
-- ALB `internal`, subredes privadas de I-010, SG propio, target group 8080 con health check
-  `/api/v1/health/live`, listener HTTP:80, `deregistration_delay` 30 s.
+### T-030-10 — Módulo `infra/terraform/modules/balanceo` — HECHO
+- `aws_lb` `internal = true`, subredes privadas de I-010, SG de I-010 reutilizado, `drop_invalid_header_fields`,
+  `idle_timeout = 60`, `enable_deletion_protection = false`.
+- `aws_lb_target_group` 8080/HTTP/`instance`, matcher `200`, health check `/api/v1/health/live`
+  (30/5/2/3), `deregistration_delay` 30 s, sin stickiness.
+- `aws_lb_listener` HTTP:80 `forward`; sin 443, sin ACM, sin Route 53.
 
-### T-030-11 — Asociación ASG ↔ target group
-- `aws_autoscaling_attachment` sobre el ASG de I-020 (min=desired=max=2, AZ distintas); sin tercer servidor.
+### T-030-11 — Asociación ASG ↔ target group — HECHO
+- `aws_autoscaling_attachment` sobre `module.computo.asg_name`; no se crean instancias ni ASG nuevos.
 
-### T-030-12 — CloudFront con VPC Origin
-- Distribución HTTPS, `*.cloudfront.net`, origen VPC (ALB), `redirect-to-https`, TTL 0, métodos completos,
-  `Authorization`/`Idempotency-Key` reenviados, sin `CacheEverything`, sin WAF de pago.
+### T-030-12 — CloudFront con VPC Origin — HECHO
+- `aws_cloudfront_vpc_origin` con `origin_protocol_policy = "http-only"`, `http_port = 80`.
+- Distribución con `vpc_origin_config`, `redirect-to-https`, `Managed-CachingDisabled`,
+  `Managed-AllViewer`, 7 métodos REST, `compress = false`, `http2`, `PriceClass_100`.
+- Sin WAF, sin logging de pago, sin IPv6, certificado por defecto.
 
-### T-030-13 — Variables, outputs y composición en `envs/h08i`
-- Entradas documentadas, salidas `distribution_domain`, `alb_arn`, `target_group_arn`; `Spec` de etiquetas
-  actualizado sin romper I-010/I-020.
+### T-030-13 — Variables, outputs y composición en `envs/h08i` — HECHO
+- `module "balanceo"` compuesto con `red` y `computo`; salidas `balanceo`, `health_check`, `estado_despliegue`.
+- Proveedor AWS elevado a `~> 5.72` (mínimo con `aws_cloudfront_vpc_origin`); lock sigue en 5.100.0.
 
-### T-030-14 — Pruebas estáticas
-- `tests/infra/terraform/test_balanceo_contrato.py`: ALB interno, ausencia de ACM/Route 53/443 público,
-  TTL 0, métodos, SG restringido, 2 targets, health check correcto, ausencia de `0.0.0.0/0` en 8080.
+### T-030-14 — Pruebas estáticas — HECHO
+- `tests/infra/terraform/test_balanceo_contrato.py`: 35 pruebas (internet-facing prohibido, sin ACM/Route 53/443,
+  TG 8080 con `/live`, drenado ≤ 60, 2 zonas, SG de I-010, VPC origin http-only, sin caché, métodos completos,
+  composición del entorno, ausencia de recursos prohibidos en `infra/terraform`).
+- `tests/infra/finops/test_i030_alineacion.py`: 8 pruebas de alineación con el escenario C de I-000.
 
-### T-030-15 — Validación y FinOps
-- `terraform fmt -check`, `terraform init -backend=false`, `terraform validate`; recálculo del presupuesto
-  sin partidas nuevas (≤ 118.5613 USD/45 d).
+### T-030-15 — Validación y FinOps — HECHO
+- `terraform fmt -check` PASS; `terraform init -backend=false` OK; `terraform validate` **Success**.
+- FinOps: 175 pruebas OK; I-030 no añade partidas (sólo `aws_lb`, TG, listener, attachment, VPC origin,
+  distribución). Presupuesto sin cambios: 113.0613 / 118.5613 USD/45 d.
 
-### T-030-16 — Integridad y CI
-- `validar_sdd_integral.py --check-git`, `validar_h06.py`, pruebas de herramientas, `go build/vet/test`,
-  SHA-256 sincronizado, PR único con checks en verde.
+### T-030-16 — Integridad y CI — PENDIENTE DE PR
+- `validar_sdd_integral.py --check-git`, `validar_h06.py`, herramientas, `go build/vet/test`: ejecutados en local.
+- CI Terraform **no existe todavía** (`I-080` es su dueño): el requisito no se suprime, se registra como
+  dependencia y las pruebas estáticas + `fmt/validate` locales son la evidencia disponible.
+- PR único pendiente de abrir; merge requiere autorización humana separada.
+
+## Hallazgo H-01 (2026-11-06) — security policy TLSv1
+
+Con el certificado por defecto de CloudFront (`cloudfront_default_certificate = true`) **AWS fija la security
+policy en TLSv1 y no permite elegir TLSv1.2_2021**. El módulo lo declara en comentarios y en el output
+`cloudfront_certificado`; no se afirma «TLS 1.2+». Queda `ABIERTO` y exige aceptación humana explícita antes
+del Gate de despliegue (o certificado propio con dominio, que exigiría RFC y financiación). Detalle en
+`sdd/_control/H08/RFC-005-ENMIENDA_I030_TLS_D2.md` §8.
 
 ## Registro de ratificación D2 (2026-11-06)
 

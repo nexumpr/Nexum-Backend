@@ -3,8 +3,9 @@ terraform {
 
   required_providers {
     aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.60"
+      source = "hashicorp/aws"
+      # `aws_cloudfront_vpc_origin` existe desde el proveedor 5.72.0.
+      version = "~> 5.72"
     }
   }
 
@@ -91,4 +92,41 @@ output "cpu_credits" {
 
 output "health_endpoints" {
   value = module.computo.health_endpoints
+}
+
+# --- I-030: balanceo interno + publicación HTTPS por CloudFront (D2) -------
+
+module "balanceo" {
+  source = "../../modules/balanceo"
+
+  proyecto = "nexum"
+  entorno  = var.entorno
+  region   = var.region
+  vpc_id   = module.red.vpc_id
+
+  subnet_ids    = module.red.subredes_privadas
+  sg_alb_id     = module.red.security_groups["alb"]
+  sg_backend_id = module.red.security_groups["backend"]
+  asg_name      = module.computo.asg_name
+
+  puerto_backend         = var.puerto_backend
+  health_check_path      = var.health_check_path
+  cloudfront_price_class = var.cloudfront_price_class
+}
+
+output "balanceo" {
+  description = "ALB interno, target group, VPC origin y dominio CloudFront"
+  value = {
+    alb_arn           = module.balanceo.alb_arn
+    alb_es_interno    = module.balanceo.alb_es_interno
+    target_group_arn  = module.balanceo.target_group_arn
+    listener          = module.balanceo.listener_http_privado
+    health_check      = module.balanceo.health_check
+    vpc_origin_id     = module.balanceo.vpc_origin_id
+    cloudfront_domain = module.balanceo.cloudfront_domain_name
+    cloudfront_id     = module.balanceo.cloudfront_distribution_id
+    certificado       = module.balanceo.cloudfront_certificado
+    sin_cache         = module.balanceo.sin_cache
+    estado_despliegue = module.balanceo.estado_despliegue
+  }
 }

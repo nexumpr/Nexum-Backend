@@ -39,7 +39,9 @@ El texto original de `spec.md`/`plan.md` permanece íntegro (historial conservad
 2. **Cero exposición pública del backend**: subredes privadas, sin IPv4 públicas, sin NAT, sin SSH.
 3. **Ingreso al ALB restringido** a la prefix list administrada de CloudFront en el puerto 80; el SG del backend sólo acepta 8080 desde el SG del ALB.
 4. **IGW adjunto sin rutas públicas**, exigido por CloudFront VPC Origins; no habilita tráfico de entrada arbitrario.
-5. **TLS 1.2+ en el borde** con `viewer_protocol_policy = redirect-to-https`; HTTP del cliente no se sirve.
+5. **TLS en el borde**: `viewer_protocol_policy = redirect-to-https` (nunca `allow-all`). La *security policy*
+   queda fijada por AWS en **TLSv1** porque el certificado es el de CloudFront por defecto; ver §8 (hallazgo H-01).
+   No se declara «TLS 1.2+ garantizado».
 6. **Sin caché de API financiera**: `default_ttl = 0`, `max_ttl = 0`, sin `CacheEverything`; no se cachean respuestas con `Authorization` ni datos personalizados; métodos REST completos (GET/POST/PUT/PATCH/DELETE/OPTIONS/HEAD).
 7. **Identidad intacta**: `Authorization` e `Idempotency-Key` reenviados; JWT no se altera ni se registra.
 8. **Sin secretos** en Terraform, Git, user-data ni cabeceras propias.
@@ -63,6 +65,32 @@ El tramo CloudFront→ALB discurre por VPC Origin dentro de la VPC y **no usa TL
 | Control | Estado |
 |---|---|
 | `RATIFICO_D2_PARA_I030` | **CONCEDIDA** 2026-11-06 |
-| `APRUEBO_GATE_I030_LOCAL` | **PENDIENTE** — sin ella no se escribe Terraform de I-030 |
+| `APRUEBO_GATE_I030_LOCAL` | **CONCEDIDA** 2026-11-06 — implementación y validación local |
 | Autorización de merge | **PENDIENTE** — posterior al PR y a checks en verde |
 | Autorización de despliegue AWS | **NO SOLICITADA** — Gate independiente, fuera de I-030 |
+| Aceptación del hallazgo H-01 (TLSv1) | **PENDIENTE** — obligatoria antes de afirmar cumplimiento TLS |
+
+## 8. Hallazgo H-01 — la security policy del borde es TLSv1, no TLS 1.2
+
+**Fuente oficial verificada el 2026-11-06** (Amazon CloudFront, *Distribution settings*, sección
+«Security policy (minimum SSL/TLS version)»): «When **SSL Certificate** is **Default CloudFront Certificate
+(\*.cloudfront.net)** (when `CloudFrontDefaultCertificate` is `true` in the API), CloudFront automatically
+sets the security policy to TLSv1».
+
+**Consecuencia:** con el diseño D2 (certificado por defecto, sin dominio propio) la distribución **no puede**
+configurar `minimum_protocol_version = TLSv1.2_2021`; la política queda en **TLSv1**, que admite TLS 1.0/1.1
+para clientes antiguos. Cualquier afirmación de «TLS 1.2 obligatorio en el borde» sería falsa.
+
+**Lo que sí se conserva:** certificado de CA pública válido para `*.cloudfront.net`, HTTPS obligatorio para el
+visitante, tramo CloudFront→ALB privado y ausencia de exposición del ALB.
+
+**Opciones (ninguna autorizada aquí):**
+
+| Opción | Efecto | Coste |
+|---|---|---|
+| Aceptar H-01 y documentar el límite | Mantiene D2 y el presupuesto | 0 USD |
+| Certificado propio (ACM) + dominio | Permite `TLSv1.2_2021`; exige RFC, dominio financiado y recotización | > 0 USD |
+
+**Estado:** `ABIERTO — requiere aceptación humana explícita antes del Gate de despliegue`. No bloquea la
+implementación local ni la validación estática, pero **sí** debe resolverse antes de afirmar cumplimiento de
+TLS moderno en la demostración.
