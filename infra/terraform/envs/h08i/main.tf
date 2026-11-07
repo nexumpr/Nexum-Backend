@@ -130,3 +130,37 @@ output "balanceo" {
     estado_despliegue = module.balanceo.estado_despliegue
   }
 }
+
+# --- I-040: DynamoDB (tabla única A-060) -----------------------------------
+
+module "dynamodb" {
+  source = "../../modules/dynamodb"
+
+  proyecto = "nexum"
+  entorno  = var.entorno
+  region   = var.region
+
+  nombre_tabla       = var.dynamodb_nombre_tabla
+  atributo_ttl       = var.dynamodb_atributo_ttl
+  pitr_habilitado    = var.dynamodb_pitr_habilitado
+  proteccion_borrado = var.dynamodb_proteccion_borrado
+  habilitar_gsi2     = var.dynamodb_habilitar_gsi2
+}
+
+output "dynamodb" {
+  description = "Tabla única, claves, índices, TTL, cifrado y PITR"
+  value = {
+    table_name         = module.dynamodb.table_name
+    table_arn          = module.dynamodb.table_arn
+    hash_key           = module.dynamodb.hash_key
+    range_key          = module.dynamodb.range_key
+    billing_mode       = module.dynamodb.billing_mode
+    indices            = module.dynamodb.indices
+    ttl                = module.dynamodb.ttl
+    cifrado_en_reposo  = module.dynamodb.cifrado_en_reposo
+    pitr               = module.dynamodb.pitr
+    streams            = module.dynamodb.streams
+    proteccion_borrado = module.dynamodb.proteccion_borrado
+    estado_despliegue  = module.dynamodb.estado_despliegue
+  }
+}

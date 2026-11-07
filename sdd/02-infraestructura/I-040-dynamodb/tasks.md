@@ -92,7 +92,35 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 
 ### T-040-99 — Ratificación de la especificación
 
-- **Estado:** REVIEW pendiente.
+- **Estado:** **IMPLEMENTADO_LOCAL 2026-11-07** (Gate `APRUEBO_GATE_I040_LOCAL`); falta el Gate de despliegue AWS.
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+## Implementación H08-I (2026-11-07) — no reescribe el estado H05
+
+Gate `APRUEBO_GATE_I040_LOCAL`; registro en `sdd/_control/H08/GATE_H08I_I040.md`. Rama
+`feat/h08i-i040-dynamodb`. Sin recursos AWS: `AWS_NOT_RUN`, `INFRA_NOT_DEPLOYED`.
+
+| Tarea | Estado real | Evidencia |
+|---|---|---|
+| T-040-01 Tabla principal | **IMPLEMENTADO_LOCAL** | `infra/terraform/modules/dynamodb`: `NEXUM_CORE_<ENV>`, `PAY_PER_REQUEST`, `PK`/`SK` (S), SSE, deletion protection por variable |
+| T-040-02 Entidades y claves | **IMPLEMENTADO_LOCAL** | Prefijos de A-060 ya en `internal/domain/dynamo/keys.go`; prueba compara claves con la matriz H05 |
+| T-040-03 Rutas de acceso | **APP (A-040/A-060)** | La tabla sólo soporta `GetItem`/`Query` por partición; sin capacidad de Scan en el diseño; cursores firmados en A-040 |
+| T-040-04 Unicidad y consistencia | **APP (A-060/A-070)** | `EMAIL#<sha256>/OWNER` con `ConditionExpression`; transacciones y optimistic locking en app |
+| T-040-05 Dinero y tiempo | **APP (A-070)** | `int64` centavos y fechas UTC; la tabla no introduce floats |
+| T-040-06 TTL y privacidad | **IMPLEMENTADO_LOCAL** | `ttl { attribute_name = "expiresAt" }`, habilitado; documentado como eventual |
+| T-040-07 Índices concretos | **IMPLEMENTADO_LOCAL** | `GSI1` (ALL) justificado por E027–E031; `GSI2` opt-in (`habilitar_gsi2 = false`) por no existir scheduler confirmado |
+| T-040-08 Infra Terraform | **IMPLEMENTADO_LOCAL** | `aws_dynamodb_table` + TTL + SSE + PITR + tags; GSI enumerados con `dynamic` |
+| T-040-90 Riesgos | **CLASIFICADOS** | R01 mitigado en diseño (`NOT_RUN` en AWS); R02 presupuestado (0.6000 USD); R03 en I-130/H08-E; R04 en A-070 |
+| T-040-99 Ratificación | **IMPLEMENTADO_LOCAL** | Gate registrado; despliegue y merge requieren autorización humana específica |
+
+**Pruebas:** 23 de contrato en `tests/infra/terraform/test_dynamodb_contrato.py` y 10 de alineación FinOps en
+`tests/infra/finops/test_i040_alineacion.py`; `fmt -check`, `init -backend=false` y `validate` en verde.
+CI de Terraform sigue inexistente (dueño I-080): requisito registrado, no suprimido.
+
+**Matriz de accesos y FinOps:** `sdd/_control/H08/MATRIZ_ACCESOS_I040.md` recorre entidad por entidad las
+operaciones, claves/índices, consistencia, condiciones, transacciones y coste; demuestra que las 75 operaciones
+no necesitan `Scan` y cuantifica la amplificación de `GSI1`. Registra también que el nombre físico
+`NEXUM_CORE_<ENV>` (autoridad H05/A-060) difiere en capitalización de la «propuesta» `nexum-core-<entorno>` de
+H06, sin cambio de claves ni semántica.
