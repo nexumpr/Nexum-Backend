@@ -193,7 +193,12 @@ resource "aws_cloudfront_distribution" "api" {
   http_version    = "http2"
 
   origin {
-    domain_name = aws_cloudfront_vpc_origin.alb.arn
+    # `DomainName` es el nombre DNS del recurso de origen (documentación CloudFront:
+    # «Origin domain is the DNS domain name of the resource», ejemplo ELB
+    # `*.us-west-2.elb.amazonaws.com`). El ARN del VPC origin NO es un nombre DNS y
+    # el recurso `VpcOrigin` ni siquiera expone campo `DomainName`: se usa el DNS del
+    # ALB interno y el vínculo con el VPC origin va en `vpc_origin_config`.
+    domain_name = aws_lb.principal.dns_name
     origin_id   = local.origin_id
 
     connection_attempts = 3

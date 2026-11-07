@@ -62,6 +62,8 @@
 - [x] Módulo `infra/terraform/modules/balanceo` escrito sin ACM, sin Route 53, sin listener 443 ni ALB público.
 - [x] Target group 8080 con health check `/api/v1/health/live` y `deregistration_delay` ≤ 60 s.
 - [x] CloudFront con VPC Origin, `redirect-to-https`, sin caché y métodos REST completos.
+- [x] `origin.domain_name` = DNS del ALB (`aws_lb.principal.dns_name`), **no** el ARN del VPC origin (corrección 2026-11-07).
+- [x] Excepción de gitleaks dentro de la regla `generic-api-key` con `condition = "AND"` y sin allowlist global; credencial sintética dentro del manifiesto sigue detectándose.
 - [x] `fmt -check`, `init -backend=false`, `validate` ejecutados con salida real (Success).
 - [x] Pruebas estáticas de contrato y regresión FinOps/SDD/H06/Go en verde en local.
 - [ ] PR único revisado; merge y despliegue requieren autorización humana independiente.

@@ -4,18 +4,28 @@
 # gestionan con un baseline revisado (`.gitleaks-baseline.json`), que suprime
 # hallazgos concretos y sigue detectando credenciales nuevas.
 #
-# Excepción acotada (I-030, 2026-11-06): el manifiesto de integridad contiene la
-# línea `"sdd/_control/H08/RFC-004-SECRETOS_BOOTSTRAP.md": "<sha256>"`. La regla
-# `generic-api-key` la interpreta como clave/valor por la palabra «SECRETOS» de la
-# ruta del documento. La exclusión exige a la vez la ruta exacta del manifiesto y
-# la forma exacta de esa línea con un digest de 64 hex; cualquier otro contenido
-# en ese archivo sigue siendo analizado.
+# Excepción acotada (I-030, 2026-11-06; endurecida 2026-11-07):
+# el manifiesto de integridad contiene la línea
+#   "sdd/_control/H08/RFC-004-SECRETOS_BOOTSTRAP.md": "<sha256>"
+# y la regla `generic-api-key` la interpreta como clave/valor por la palabra
+# «SECRETOS» de la ruta del documento.
+#
+# La excepción se declara DENTRO de la regla `generic-api-key` (no global) y exige
+# `condition = "AND"`: deben cumplirse a la vez la ruta exacta del manifiesto y la
+# forma exacta de esa línea con un digest de 64 hex. Con la condición por defecto
+# («OR») bastaba la ruta para ignorar *todos* los hallazgos del archivo
+# (`checkCommitOrPathAllowed`, gitleaks v8.30.1); con «AND» sólo se descarta esa
+# línea concreta y cualquier otra credencial del mismo archivo se detecta.
 
 [extend]
 useDefault = true
 
-[[allowlists]]
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
 description = "Digest SHA-256 del documento RFC-004 dentro del manifiesto de integridad (no es una credencial)"
+condition = "AND"
 paths = ['''^sdd/_control/H07/BASELINE_SHA256\.json$''']
 regexTarget = "line"
 regexes = ['''"sdd/_control/H08/RFC-004-SECRETOS_BOOTSTRAP\.md":\s*"[a-f0-9]{64}"''']

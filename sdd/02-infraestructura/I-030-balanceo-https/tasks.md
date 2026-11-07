@@ -120,16 +120,24 @@ Gate concedido 2026-11-06. Todas las tareas siguientes se ejecutaron **localment
 - Distribución con `vpc_origin_config`, `redirect-to-https`, `Managed-CachingDisabled`,
   `Managed-AllViewer`, 7 métodos REST, `compress = false`, `http2`, `PriceClass_100`.
 - Sin WAF, sin logging de pago, sin IPv6, certificado por defecto.
+- **Corrección 2026-11-07 (auditoría externa):** `origin.domain_name` usaba el **ARN** del VPC origin; la
+  documentación oficial exige el **nombre DNS del recurso de origen** y `VpcOrigin` no expone `DomainName`.
+  Ahora `domain_name = aws_lb.principal.dns_name` y el vínculo va sólo por
+  `vpc_origin_config { vpc_origin_id = aws_cloudfront_vpc_origin.alb.id }`.
 
 ### T-030-13 — Variables, outputs y composición en `envs/h08i` — HECHO
 - `module "balanceo"` compuesto con `red` y `computo`; salidas `balanceo`, `health_check`, `estado_despliegue`.
 - Proveedor AWS elevado a `~> 5.72` (mínimo con `aws_cloudfront_vpc_origin`); lock sigue en 5.100.0.
 
 ### T-030-14 — Pruebas estáticas — HECHO
-- `tests/infra/terraform/test_balanceo_contrato.py`: 35 pruebas (internet-facing prohibido, sin ACM/Route 53/443,
-  TG 8080 con `/live`, drenado ≤ 60, 2 zonas, SG de I-010, VPC origin http-only, sin caché, métodos completos,
-  composición del entorno, ausencia de recursos prohibidos en `infra/terraform`).
+- `tests/infra/terraform/test_balanceo_contrato.py`: 32 pruebas con **análisis estructural** por bloques
+  (conteo de llaves) en lugar de búsqueda de cadenas: ALB `internal` en su bloque, listener 80/HTTP, TG 8080
+  con matcher 200 y `/live`, drenado ≤ 60, 2 zonas, SG de I-010, `origin.domain_name` = DNS del ALB (nunca ARN),
+  `vpc_origin_id` = ID del VPC origin, VPC origin `http-only`, HTTPS público con certificado por defecto,
+  sin caché, métodos completos, ausencia de ACM/Route 53/WAF/NAT/EIP.
 - `tests/infra/finops/test_i030_alineacion.py`: 8 pruebas de alineación con el escenario C de I-000.
+- `herramientas/tests/test_gitleaks_config.py`: 7 pruebas de la excepción de gitleaks (regla y AND obligatorios,
+  sin allowlist global, ruta anclada a un archivo).
 
 ### T-030-15 — Validación y FinOps — HECHO
 - `terraform fmt -check` PASS; `terraform init -backend=false` OK; `terraform validate` **Success**.

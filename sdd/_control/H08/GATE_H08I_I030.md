@@ -113,11 +113,11 @@ ejecutaron (denegados por política); **ningún** recurso AWS existe; costo incu
 | `infra/terraform/modules/balanceo/{main,variables,outputs}.tf` | Creado — ALB interno, TG 8080, listener HTTP:80, `aws_autoscaling_attachment`, `aws_cloudfront_vpc_origin`, distribución CloudFront |
 | `infra/terraform/envs/h08i/main.tf` | `module "balanceo"` compuesto + salida `balanceo`; proveedor AWS `~> 5.72` |
 | `infra/terraform/envs/h08i/variables.tf` | `health_check_path`, `cloudfront_price_class` |
-| `tests/infra/terraform/test_balanceo_contrato.py` | 35 pruebas estáticas |
+| `tests/infra/terraform/test_balanceo_contrato.py` | 32 pruebas estáticas estructurales |
 | `tests/infra/finops/test_i030_alineacion.py` | 8 pruebas de alineación con el escenario C |
 
 **Evidencia ejecutada:** `terraform fmt -check` exit 0 · `terraform init -backend=false` OK · `terraform validate`
-`Success` · `tests/infra/terraform` 103 pruebas OK (76 previas + 35 nuevas, solapadas por clase) ·
+`Success` · `tests/infra/terraform` 108 pruebas OK (43 red + 33 computo + 32 balanceo) ·
 `tests/infra/finops` 175 OK · `tests/infra/systemd` 11 OK · `herramientas/tests` 18 OK · `go build/vet/test` PASS ·
 `validar_sdd_integral.py --check-git` PASS · `validar_h06.py` PASS.
 
@@ -135,3 +135,18 @@ antes del Gate de despliegue (o certificado propio + dominio, con RFC y financia
 
 **Requisito no suprimido:** no existe CI de Terraform todavía; corresponde a I-080. Hasta entonces la evidencia
 es local (`fmt`/`validate` + pruebas estáticas) y el PR ejecutará los workflows existentes (SDD y Go).
+
+## 10. Correcciones de auditoría externa (2026-11-07)
+
+| # | Defecto | Causa raíz | Corrección |
+|---|---|---|---|
+| 1 | `origin.domain_name` usaba `aws_cloudfront_vpc_origin.alb.arn` | La documentación de CloudFront define el *origin domain* como el **DNS del recurso** y el recurso `VpcOrigin` no expone `DomainName`; el ARN habría fallado en el primer `apply` | `domain_name = aws_lb.principal.dns_name`; `vpc_origin_config { vpc_origin_id = ...id }` se mantiene |
+| 2 | Allowlist de gitleaks en modo **OR** | En v8.30.1 una allowlist **global** en OR ejecuta `checkCommitOrPathAllowed` y descarta **todos** los hallazgos de la ruta, sin evaluar el patrón: una credencial nueva en el manifiesto quedaba oculta | Excepción movida **dentro de la regla `generic-api-key`**, `condition = "AND"`, ruta anclada a un archivo y patrón de línea; sin allowlist global |
+
+**Pruebas de la corrección 2 (credenciales sintéticas, entorno temporal, git y dir):** AND endurecida detecta
+3 hallazgos —credencial **dentro** del manifiesto, credencial externa y token `github-pat`— y no reporta el
+digest legítimo; la configuración OR anterior detectaba sólo 2 y **ocultaba** la credencial del manifiesto.
+El repositorio completo queda en «no leaks found».
+
+**H-01 no se acepta aquí:** sigue bloqueando la autorización de despliegue hasta decisión humana específica.
+`AWS_NOT_RUN`; `terraform plan/apply/destroy` no ejecutados.
