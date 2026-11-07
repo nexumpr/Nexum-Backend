@@ -3,6 +3,19 @@
 # oculta cualquier credencial en ese archivo. Los falsos positivos históricos se
 # gestionan con un baseline revisado (`.gitleaks-baseline.json`), que suprime
 # hallazgos concretos y sigue detectando credenciales nuevas.
+#
+# Excepción acotada (I-030, 2026-11-06): el manifiesto de integridad contiene la
+# línea `"sdd/_control/H08/RFC-004-SECRETOS_BOOTSTRAP.md": "<sha256>"`. La regla
+# `generic-api-key` la interpreta como clave/valor por la palabra «SECRETOS» de la
+# ruta del documento. La exclusión exige a la vez la ruta exacta del manifiesto y
+# la forma exacta de esa línea con un digest de 64 hex; cualquier otro contenido
+# en ese archivo sigue siendo analizado.
 
 [extend]
 useDefault = true
+
+[[allowlists]]
+description = "Digest SHA-256 del documento RFC-004 dentro del manifiesto de integridad (no es una credencial)"
+paths = ['''^sdd/_control/H07/BASELINE_SHA256\.json$''']
+regexTarget = "line"
+regexes = ['''"sdd/_control/H08/RFC-004-SECRETOS_BOOTSTRAP\.md":\s*"[a-f0-9]{64}"''']
