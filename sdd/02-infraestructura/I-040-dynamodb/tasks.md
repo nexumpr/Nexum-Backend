@@ -118,3 +118,9 @@ Gate `APRUEBO_GATE_I040_LOCAL`; registro en `sdd/_control/H08/GATE_H08I_I040.md`
 **Pruebas:** 23 de contrato en `tests/infra/terraform/test_dynamodb_contrato.py` y 10 de alineación FinOps en
 `tests/infra/finops/test_i040_alineacion.py`; `fmt -check`, `init -backend=false` y `validate` en verde.
 CI de Terraform sigue inexistente (dueño I-080): requisito registrado, no suprimido.
+
+**Matriz de accesos y FinOps:** `sdd/_control/H08/MATRIZ_ACCESOS_I040.md` recorre entidad por entidad las
+operaciones, claves/índices, consistencia, condiciones, transacciones y coste; demuestra que las 75 operaciones
+no necesitan `Scan` y cuantifica la amplificación de `GSI1`. Registra también que el nombre físico
+`NEXUM_CORE_<ENV>` (autoridad H05/A-060) difiere en capitalización de la «propuesta» `nexum-core-<entorno>` de
+H06, sin cambio de claves ni semántica.

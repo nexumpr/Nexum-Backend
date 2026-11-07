@@ -58,6 +58,14 @@ sin copias programadas (I-130), `deletion_protection` desactivado en h08i para p
 | `validar_h06.py` | PASS (75 operaciones) |
 | `go build/vet/test` | PASS (sin cambios de código Go) |
 
+**Matriz de accesos, seguridad y FinOps:** `sdd/_control/H08/MATRIZ_ACCESOS_I040.md` documenta entidad por
+entidad la operación, clave/índice, consistencia, condición de escritura, transacción, aislamiento y coste; prueba
+que las 75 operaciones se resuelven sin `Scan` y cuantifica la amplificación de escrituras de `GSI1` (≈0.375 USD
+dentro del margen de 6.9387 USD).
+
+**CI aplicable:** Terraform local, CI Go y CI SDD con resultado **PASS real**; **CI Terraform =
+`NOT_IMPLEMENTED`** (dueño I-080, no se crea aquí ni se declara verde).
+
 **`terraform validate` acredita configuración válida; NO acredita despliegue.** `AWS_NOT_RUN`,
 `INFRA_NOT_DEPLOYED`, coste incurrido 0.0000 USD.
 
