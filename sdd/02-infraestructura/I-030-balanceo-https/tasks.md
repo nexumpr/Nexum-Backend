@@ -96,7 +96,7 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 
 ### T-030-99 — Ratificación de la especificación
 
-- **Estado:** **D2 RATIFICADO 2026-11-06; Gate de implementación pendiente.** Falta `APRUEBO_GATE_I030_LOCAL`.
+- **Estado:** **D2 RATIFICADO 2026-11-06; INTEGRADO_MAIN 2026-11-07.** Falta únicamente el Gate de despliegue AWS.
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
@@ -144,11 +144,12 @@ Gate concedido 2026-11-06. Todas las tareas siguientes se ejecutaron **localment
 - FinOps: 175 pruebas OK; I-030 no añade partidas (sólo `aws_lb`, TG, listener, attachment, VPC origin,
   distribución). Presupuesto sin cambios: 113.0613 / 118.5613 USD/45 d.
 
-### T-030-16 — Integridad y CI — PENDIENTE DE PR
+### T-030-16 — Integridad y CI — HECHO
 - `validar_sdd_integral.py --check-git`, `validar_h06.py`, herramientas, `go build/vet/test`: ejecutados en local.
 - CI Terraform **no existe todavía** (`I-080` es su dueño): el requisito no se suprime, se registra como
   dependencia y las pruebas estáticas + `fmt/validate` locales son la evidencia disponible.
-- PR único pendiente de abrir; merge requiere autorización humana separada.
+- PR único **#22** con 5/5 checks en verde; autorización `AUTORIZO_MERGE_PR_22_HEAD_121a75c` y merge
+  `cc19a77b14d73f4a146baa899a2febe677c267fa`. CI de `main`: Go Backend CI y SDD documental SUCCESS.
 
 ## Hallazgo H-01 (2026-11-06) — security policy TLSv1
 

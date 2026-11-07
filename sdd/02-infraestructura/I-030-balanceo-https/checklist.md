@@ -66,7 +66,8 @@
 - [x] Excepción de gitleaks dentro de la regla `generic-api-key` con `condition = "AND"` y sin allowlist global; credencial sintética dentro del manifiesto sigue detectándose.
 - [x] `fmt -check`, `init -backend=false`, `validate` ejecutados con salida real (Success).
 - [x] Pruebas estáticas de contrato y regresión FinOps/SDD/H06/Go en verde en local.
-- [ ] PR único revisado; merge y despliegue requieren autorización humana independiente.
+- [x] PR único revisado; merge y despliegue requieren autorización humana independiente.
+  — PR **#22** con 5/5 checks; autorización `AUTORIZO_MERGE_PR_22_HEAD_121a75c`; merge `cc19a77`. **Despliegue sigue sin autorizar.**
 - [ ] Aceptación humana del hallazgo H-01 (TLSv1 con certificado por defecto) antes del Gate de despliegue.
 
 ### Ejecución futura H08 (NO ejecutada en este lote)
