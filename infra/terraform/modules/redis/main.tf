@@ -78,6 +78,11 @@ resource "terraform_data" "validacion_redis" {
       condition     = length(var.password_aplicacion) >= 16
       error_message = "La contraseña RBAC debe tener al menos 16 caracteres y no se versiona (RFC-004 en despliegue)."
     }
+
+    precondition {
+      condition     = var.sg_redis_id != var.sg_backend_id && var.cifrado_en_transito
+      error_message = "Redis debe ser privado y usar TLS; el usuario default sustituido no debe quedar accesible."
+    }
   }
 }
 
@@ -118,11 +123,16 @@ resource "aws_elasticache_parameter_group" "redis" {
 
 # Usuario RBAC dedicado (INF-050-03): sin usuario por defecto, sin comandos
 # administrativos ni peligrosos, y limitado al espacio de claves `nexum:` de A-080.
+#
+# Política: se parte de `-@all` y se conceden sólo las categorías que A-080 exige
+# (lecturas, escrituras, TTL/keyspace, scripts Lua para rate limiting atómico,
+# transacciones y comandos de conexión). Se bloquean además KEYS/SCAN/RANDOMKEY,
+# que permiten recorrer el espacio de claves sin necesidad funcional.
 resource "aws_elasticache_user" "aplicacion" {
   user_id       = "${var.proyecto}-app"
   user_name     = "${var.proyecto}-app"
   engine        = "redis"
-  access_string = "on ~nexum:* +@all -@admin -@dangerous"
+  access_string = "on ~nexum:* -@all +@read +@write +@keyspace +@scripting +@transactions +@connection -keys -scan -randomkey"
 
   authentication_mode {
     type      = "password"
@@ -138,10 +148,39 @@ resource "aws_elasticache_user" "aplicacion" {
   )
 }
 
+# ElastiCache **añade automáticamente** un usuario `default` con `on ~* +@all` a
+# todos los grupos de usuarios y no permite borrarlo (RBAC, doc oficial). No basta
+# con no crearlo: hay que SUSTITUIRLO creando otro usuario cuyo `user_name` sea
+# `default`, deshabilitado (`off ~* -@all`) y sin contraseña, y añadirlo al grupo.
+resource "aws_elasticache_user" "default_deshabilitado" {
+  user_id       = "${var.proyecto}-default-off"
+  user_name     = "default"
+  engine        = "redis"
+  access_string = "off ~* -@all"
+
+  authentication_mode {
+    type = "no-password-required"
+  }
+
+  tags = merge(
+    {
+      Name = "${var.proyecto}-redis-default-off"
+      Spec = "I-050-redis-distribuido"
+    },
+    var.etiquetas
+  )
+}
+
 resource "aws_elasticache_user_group" "aplicacion" {
   engine        = "redis"
   user_group_id = "${var.proyecto}-app"
-  user_ids      = [aws_elasticache_user.aplicacion.user_id]
+
+  # El grupo contiene exactamente dos identidades: la aplicación (con contraseña)
+  # y el `default` deshabilitado que sustituye al permisivo automático.
+  user_ids = [
+    aws_elasticache_user.aplicacion.user_id,
+    aws_elasticache_user.default_deshabilitado.user_id,
+  ]
 
   tags = merge(
     {

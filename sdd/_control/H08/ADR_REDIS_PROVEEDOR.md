@@ -79,3 +79,11 @@ ninguna de las cuatro actividades de créditos adicionales (20 USD cada una) por
 **Descartes justificados:** C por requisito normativo; D y E por coste no modelado; B por introducir una tercera
 instancia no autorizada, fuera-del-presupuesto y con carga operativa, además de no poder residir en el ASG sin
 perder el servicio.
+
+## 7. Endurecimiento RBAC del servicio elegido
+
+ElastiCache añade un usuario `default` (`on ~* +@all`) a todos los grupos y no permite eliminarlo; la única
+forma soportada de neutralizarlo es **crear otro usuario con `user_name = "default"`** y añadirlo al grupo. El
+módulo lo hace con `access_string = "off ~* -@all"` y `no-password-required`, y mantiene el usuario de
+aplicación con contraseña y ACL restringida al espacio `nexum:`. Detalle y evidencia oficial en
+`GATE_H08I_I050.md` §7. Esto no altera la alternativa elegida, su coste ni su topología.

@@ -85,8 +85,19 @@ class Seguridad(unittest.TestCase):
         self.assertIn("user_group_ids", self.outs)
 
     def test_acl_acotada_al_espacio_nexum(self) -> None:
+        """Mínimo privilegio: -@all + categorías necesarias; sin admin/dangerous."""
         usuario = self.recursos[("aws_elasticache_user", "aplicacion")]
-        self.assertIn('access_string = "on ~nexum:* +@all -@admin -@dangerous"', usuario)
+        self.assertIn(
+            'access_string = "on ~nexum:* -@all +@read +@write +@keyspace +@scripting +@transactions +@connection -keys -scan -randomkey"',
+            usuario,
+        )
+        self.assertNotIn("+@all", usuario)
+        self.assertNotIn("+@admin", usuario)
+        self.assertNotIn("+@dangerous", usuario)
+        # Categorías que A-080 necesita: lecturas, escrituras, TTL/keyspace,
+        # scripts (rate limiting atómico), transacciones y conexión.
+        for categoria in ("+@read", "+@write", "+@keyspace", "+@scripting", "+@transactions", "+@connection"):
+            self.assertIn(categoria, usuario)
         # El prefijo del ACL debe coincidir con el espacio de claves real (A-080).
         claves = _leer(RAIZ / "internal" / "domain" / "cache" / "keys.go")
         self.assertIn('CachePrefix = "nexum:v1"', claves)
@@ -133,6 +144,86 @@ class CacheYTtl(unittest.TestCase):
 
     def test_estado_no_se_declara_desplegado(self) -> None:
         self.assertIn('value       = "NOT_RUN_AWS"', _leer(MODULO / "outputs.tf"))
+
+
+class UsuarioDefaultDeshabilitado(unittest.TestCase):
+    """ElastiCache añade un usuario `default` con `on ~* +@all` a todos los grupos
+    y no permite borrarlo: hay que sustituirlo explícitamente (doc oficial RBAC)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.main = _leer(MODULO / "main.tf")
+        cls.recursos = recursos(cls.main)
+
+    def test_existe_usuario_default_explicito(self) -> None:
+        self.assertIn(("aws_elasticache_user", "default_deshabilitado"), self.recursos)
+
+    def test_user_name_es_default(self) -> None:
+        usuario = atributos(self.recursos[("aws_elasticache_user", "default_deshabilitado")])
+        self.assertEqual(usuario.get("user_name"), '"default"')
+        self.assertEqual(usuario.get("engine"), '"redis"')
+
+    def test_default_esta_deshabilitado_off(self) -> None:
+        """`off` impide cualquier acceso, incluido anónimo."""
+        usuario = atributos(self.recursos[("aws_elasticache_user", "default_deshabilitado")])
+        self.assertEqual(usuario.get("access_string"), '"off ~* -@all"')
+
+    def test_default_sin_permiso_de_claves_ni_comandos(self) -> None:
+        cuerpo = self.recursos[("aws_elasticache_user", "default_deshabilitado")]
+        access = atributos(cuerpo)["access_string"]
+        self.assertTrue(access.startswith('"off'), "debe empezar por off")
+        self.assertIn("-@all", access)
+        self.assertNotIn("+@", access)
+        self.assertNotIn('"on ', access)
+
+    def test_default_sin_password_y_sin_acceso_anonimo_util(self) -> None:
+        cuerpo = self.recursos[("aws_elasticache_user", "default_deshabilitado")]
+        modo = atributos(bloque(cuerpo, "authentication_mode"))
+        self.assertEqual(modo.get("type"), '"no-password-required"')
+        self.assertNotIn("passwords", cuerpo)
+
+    def test_grupo_referencia_ambas_identidades(self) -> None:
+        cuerpo = self.recursos[("aws_elasticache_user_group", "aplicacion")]
+        self.assertIn("aws_elasticache_user.aplicacion.user_id", cuerpo)
+        self.assertIn("aws_elasticache_user.default_deshabilitado.user_id", cuerpo)
+        ids = re.findall(r"aws_elasticache_user\.([a-z_]+)\.user_id", cuerpo)
+        self.assertEqual(sorted(ids), ["aplicacion", "default_deshabilitado"])
+
+    def test_grupo_aplicado_al_grupo_de_replicacion(self) -> None:
+        self.assertIn(
+            "user_group_ids = [aws_elasticache_user_group.aplicacion.user_group_id]",
+            self.main,
+        )
+
+    def test_sin_passwords_embebidas(self) -> None:
+        self.assertEqual(self.main.count("passwords = ["), 1)
+        self.assertIn("passwords = [var.password_aplicacion]", self.main)
+        for archivo in (MODULO / "main.tf", MODULO / "variables.tf"):
+            texto = _leer(archivo)
+            self.assertNotRegex(texto, r'passwords\s*=\s*\[\s*"[^"]{16,}"')
+
+    def test_tls_cifrado_y_red_privada_intactos(self) -> None:
+        grupo = atributos(self.recursos[("aws_elasticache_replication_group", "redis")])
+        self.assertEqual(grupo.get("transit_encryption_enabled"), "var.cifrado_en_transito")
+        self.assertEqual(grupo.get("at_rest_encryption_enabled"), "var.cifrado_en_reposo")
+        self.assertEqual(grupo.get("security_group_ids"), "[var.sg_redis_id]")
+        self.assertNotIn("cidr_blocks", self.main)
+        self.assertIn("var.sg_redis_id != var.sg_backend_id && var.cifrado_en_transito", self.main)
+
+    def test_no_se_anade_servicio_facturable(self) -> None:
+        """Dos usuarios y un grupo no tienen coste; no aparece ningún recurso nuevo."""
+        tipos = {t for t, _ in self.recursos}
+        self.assertEqual(
+            tipos,
+            {
+                "terraform_data",
+                "aws_elasticache_subnet_group",
+                "aws_elasticache_parameter_group",
+                "aws_elasticache_user",
+                "aws_elasticache_user_group",
+                "aws_elasticache_replication_group",
+            },
+        )
 
 
 class ComposicionDelEntorno(unittest.TestCase):

@@ -35,7 +35,7 @@ días, plan Free, recuperación, compatibilidad SDD y riesgos por alternativa) e
 |---|---|---|
 | INF-050-01 | `aws_elasticache_replication_group` con `engine = "redis"`, `engine_version = "7.1"`, `node_type = "cache.t4g.micro"`; motor validado y no sustituible sin ADR | spec + I-000 |
 | INF-050-02 | `num_cache_clusters = 1`, `automatic_failover_enabled = false`, `multi_az_enabled = false`; precondition que impide failover con un nodo y salida `alta_disponibilidad = false` | spec §2 |
-| INF-050-03 | `transit_encryption_enabled = true`, `at_rest_encryption_enabled = true`, **usuario RBAC dedicado** (`aws_elasticache_user` + `aws_elasticache_user_group`), contraseña por variable `sensitive`, SG de I-010 (6379 sólo desde backend), subnet group con las 2 subredes privadas | spec §3 |
+| INF-050-03 | `transit_encryption_enabled = true`, `at_rest_encryption_enabled = true`, **usuario RBAC dedicado** (`aws_elasticache_user` + `aws_elasticache_user_group`), contraseña por variable `sensitive`, SG de I-010 (6379 sólo desde backend), subnet group con las 2 subredes privadas. El usuario `default` automático se **sustituye** por uno deshabilitado (`off ~* -@all`) | spec §3 + RBAC de AWS |
 | INF-050-04 | `parameter_group` familia `redis7` con `maxmemory-policy = volatile-lru` (sólo se expulsan claves con TTL); prefijo de claves `nexum:*` coherente con A-080 | spec §4 |
 | INF-050-05 | `snapshot_retention_limit = 0`: Redis es caché, DynamoDB es la verdad; el fail-close por operación vive en la app (A-080) | spec §5 |
 | INF-050-06 | Prueba compartida real `NOT_RUN`; el diseño garantiza un endpoint único consumido por ambas instancias vía SG/subnet group compartidos | spec §6 |
@@ -62,7 +62,7 @@ declara alta disponibilidad y no se introduce KMS propio (el cifrado en reposo l
 | `terraform fmt -check -recursive` | exit 0 |
 | `terraform init -backend=false` (`TF_DATA_DIR` externo) | OK, lock 5.100.0 sin cambios |
 | `terraform validate` | **Success** |
-| `tests/infra/terraform` | 148 pruebas OK (17 de contrato I-050) |
+| `tests/infra/terraform` | 158 pruebas OK (27 de contrato I-050) |
 | `tests/infra/finops` | 193 pruebas OK (8 nuevas de alineación I-050) |
 | `validar_sdd_integral.py --check-git` | PASS |
 | `validar_h06.py` | PASS (75 operaciones) |
@@ -81,3 +81,33 @@ declara alta disponibilidad y no se introduce KMS propio (el cifrado en reposo l
 - **I-010**: el endpoint `secretsmanager` sólo existe en ventana de mantenimiento.
 - **I-080**: CI de Terraform.
 - **H-01**, I-060–I-150 y H08-E: sin cambios.
+
+## 7. Endurecimiento RBAC (2026-11-07)
+
+**Hallazgo:** ElastiCache **crea automáticamente** un usuario `default` con `on ~* +@all` y lo añade a **todos**
+los grupos de usuarios, sin permitir modificarlo ni borrarlo (documentación oficial, *Role-Based Access Control
+(RBAC)*). El módulo declaraba únicamente el usuario de aplicación, por lo que el `default` permisivo
+permanecía en el grupo: riesgo de acceso anónimo con permisos totales si el cliente no autentica.
+
+**Corrección aplicada:**
+
+| Elemento | Valor |
+|---|---|
+| Usuario sustituto | `aws_elasticache_user.default_deshabilitado`, `user_id = nexum-default-off`, **`user_name = "default"`** (así sustituye al automático) |
+| Política | `off ~* -@all` (usuario deshabilitado, sin comandos) |
+| Autenticación | `no-password-required` (no introduce un secreto adicional ni acceso anónimo útil) |
+| Grupo | contiene **exactamente dos identidades**: aplicación (con contraseña) y `default` desactivado |
+| ACL de aplicación | endurecida de `+@all -@admin -@dangerous` a `-@all` + `+@read +@write +@keyspace +@scripting +@transactions +@connection`, con `-keys -scan -randomkey` |
+
+**Compatibilidad con A-080 (verificada por categoría):** lecturas y escrituras (`@read`/`@write`), TTL e
+invalidación (`DEL`/`EXPIRE`/`TTL` en `@keyspace`), rate limiting atómico (Lua en `@scripting`), transacciones
+(`MULTI`/`EXEC` en `@transactions`) y handshake de cliente (`PING`/`SELECT`/`HELLO`/`CLIENT` en `@connection`).
+Se bloquean `KEYS`, `SCAN` y `RANDOMKEY`, que permiten recorrer el espacio de claves sin necesidad funcional.
+Ningún contrato de A-080 se modifica.
+
+**Límite declarado:** la comprobación real en AWS sigue `NOT_RUN`. Si el servicio rechazara
+`no-password-required` para el usuario `default`, el fallback sería un `default` con contraseña fuerte, lo que
+reintroduce la dependencia de **RFC-004** para ese secreto. No se declara la vulnerabilidad cerrada en producción
+hasta verificarlo con `describe-users`/`ACL LIST` en el Gate de despliegue.
+
+**Coste:** usuarios y grupos de usuarios de ElastiCache **no** se facturan; no hay partida nueva.

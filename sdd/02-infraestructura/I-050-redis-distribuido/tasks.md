@@ -97,7 +97,7 @@ Gate `APRUEBO_GATE_I050_LOCAL`; registro en `sdd/_control/H08/GATE_H08I_I050.md`
 |---|---|---|
 | T-050-01 Servicio | **IMPLEMENTADO_LOCAL** | `aws_elasticache_replication_group` engine `redis` 7.1; decisión heredada de I-000 (SKU `VERIFIED_AWS`), no elegida en I-050 |
 | T-050-02 Topología | **IMPLEMENTADO_LOCAL** | 1 nodo `cache.t4g.micro`, sin réplicas, sin Multi-AZ; precondition impide failover con un nodo; salida `alta_disponibilidad = false` |
-| T-050-03 Red | **IMPLEMENTADO_LOCAL** | Subnet group con las 2 subredes de I-010; SG de I-010 (6379 sólo desde backend); TLS + cifrado en reposo obligatorios; RBAC dedicado con contraseña sensible |
+| T-050-03 Red | **IMPLEMENTADO_LOCAL** | Subnet group con las 2 subredes de I-010; SG de I-010 (6379 sólo desde backend); TLS + cifrado en reposo obligatorios; RBAC dedicado con contraseña sensible; **usuario `default` sustituido por uno deshabilitado (`off ~* -@all`)** |
 | T-050-04 Objetivos | **APP (A-080)** | TTL/versión/HMAC en claves y rate limiting atómico viven en la aplicación; la caché aporta política `volatile-lru` |
 | T-050-05 Fallo | **APP (A-080) + DISEÑO** | DynamoDB es la verdad; sin snapshots; fail-close/degradación por operación en el cliente |
 | T-050-06 Prueba compartida | **NOT_RUN** | Requiere AWS; el endpoint único y el SG compartido hacen posible la prueba desde ambos nodos |
