@@ -97,7 +97,6 @@
     "infra/terraform/modules/red/main.tf": "1ad923ba3a01106502991d62aea85dcf91f6232ef0461109fa2c9b6d802d065d",
     "infra/terraform/modules/red/outputs.tf": "ac6d974955746074742477e1155b7c95a3cd9c6be480347caae1b429f9b8ab50",
     "infra/terraform/modules/red/variables.tf": "470106daff3077b43b51c5a07de44d944d29b9831c03c266d57ff2c3446c29ea",
-    "internal/infrastructure/security/hasher.go": "aa2d657d38188202884355a8014ba16e1415b0dcd0b8c7284e5425cdb1796927",
     "memoria.md": "581f86c70a9902d9ebd167685d26f40ef38c882214bce5854d450c5a1439ada7",
     "opencode.json": "e0c52f9989fbeb5c27c589f1d427b8e809bfc40752d4a13d78e78e18a66fbd96",
     "scripts/build-backend.ps1": "bbf09e25ade53e404dac35e5e13e0d80f22710611307739f6b325d92b4f17dc7",
