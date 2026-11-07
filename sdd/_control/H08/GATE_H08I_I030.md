@@ -1,97 +1,103 @@
-# Gate H08-I — I-030 `balanceo-https` (propuesta de apertura)
+# Gate H08-I — I-030 `balanceo-https`
 
 | Campo | Valor |
 |---|---|
 | Documento | `sdd/_control/H08/GATE_H08I_I030.md` |
 | Fecha | 2026-11-06 |
-| Spec | `sdd/02-infraestructura/I-030-balanceo-https/{spec,plan,tasks,checklist}.md` |
-| Estado | **PROPUESTO — requiere aprobación humana; contiene un conflicto normativo a resolver** |
-| Precondición | I-020 cerrada: PR #17 MERGED (`10f6327`) |
-| Rama preparada | `feat/h08i-i030-balanceo-https` (desde `main` actualizado) |
+| Spec | `sdd/02-infraestructura/I-030-balanceo-https/` (v0.2.0 por enmienda) |
+| Estado | **D2_RATIFICADA — GATE_DE_IMPLEMENTACION_PENDIENTE** |
+| Precondición | I-020 cerrada (PR #17 `10f6327`); hotfixes A-030/A-050/A-090/A-100 en `main` `3de4fc6` |
+| Rama | `feat/h08i-i030-balanceo-https` (sincronizada con `main`; sin PR creado) |
+| Enmienda | `sdd/_control/H08/RFC-005-ENMIENDA_I030_TLS_D2.md` |
 
-## 1. Conflicto normativo detectado (bloqueante de diseño)
+## Historial del Gate
 
-| Fuente | Exige |
-|---|---|
-| `spec.md` I-030 (estado **DRAFT / REVIEW — NO APROBADO**), INF-030-01/02 | ALB con **listener HTTPS:443** y **certificado ACM público para un dominio bajo control del proyecto**, validación DNS, sin autofirmado |
-| **D2**, decisión humana firmada (2026-11-06) | Cliente → CloudFront **HTTPS**; CloudFront → ALB **HTTP 80 privado**; certificado **`*.cloudfront.net`**; sin dominio propio |
-| Constitución R-019/GOV-14 y D1/D2 | **Cero dinero personal**; comprar/renovar dominio está prohibido |
-
-**Consecuencia:** el texto DRAFT de I-030 y D2 son incompatibles en TLS y en certificado. La jerarquía
-vigente da precedencia a la **decisión humana expresa** (D2) sobre una spec en DRAFT, pero **no puedo
-resolverlo unilateralmente**: se requiere ratificación explícita para I-030.
-
-### Opciones para la ratificación
-
-| Opción | Efecto | Coste | Estado |
-|---|---|---|---|
-| **A (recomendada)** | Ratificar D2 para I-030: CloudFront `*.cloudfront.net` + HTTP privado a ALB interno; ALB sin 443 ni ACM | 0 USD | Cumple cero gasto; **excepción de seguridad ya aceptada en D2** |
-| B | Cumplir el DRAFT: ALB HTTPS con ACM + dominio propio | Dominio + Route 53 (>0 USD) | **Incompatible con cero dinero personal**; requeriría RFC y financiación |
-| C | CloudFront + ALB HTTPS con certificado de un dominio ya financiado externamente | 0 USD nuevo para el proyecto | Requiere que el responsable aporte el dominio y su financiación |
-
-Sin ratificación, I-030 **no puede implementarse** sin violar D2 o el DRAFT.
-
-## 2. Bloqueos adicionales heredados
-
-| ID | Bloqueo | Impacto en I-030 |
+| Versión | Estado | Cambio |
 |---|---|---|
-| **D-01** | `/api/v1/health/live` y `/ready` **no están registrados** en el router Go (solo existe el handler) | El target group no puede tener health checks válidos; I-030 queda bloqueada para pruebas reales hasta que A-090/H08-A los exponga |
-| **RFC-004** | Secretos en reemplazo automático de instancias | Bloquea **despliegue**, no la implementación local de I-030 |
+| v0.1.0 | `PROPUESTO` | Gate propuesto; conflicto TLS D2 vs DRAFT documentado, sin resolver |
+| v0.2.0 | `D2_RATIFICADA` | Ratificación humana `RATIFICO_D2_PARA_I030`; conflicto resuelto por RFC-005. Sigue **sin** autorizar implementación |
 
-## 3. Alcance autorizable (una vez ratificado)
+## 1. Conflicto normativo — RESUELTO por ratificación
+
+| Fuente | Exigía |
+|---|---|
+| `spec.md` I-030 `INF-030-01`/`INF-030-02`, §8 | listener **HTTPS:443** con **ACM público** de dominio propio |
+| **D2** | CloudFront **HTTPS** por defecto → VPC Origin → ALB **interno HTTP:80** |
+
+**Resolución (2026-11-06):** el responsable ratificó `RATIFICO_D2_PARA_I030` con alcance limitado a
+registrar la decisión y resolver la contradicción, sin autorizar implementación, merge, despliegue ni gastos.
+La precedencia queda fijada en `RFC-005` §3: se **superan** las cláusulas de listener 443 y ACM/dominio;
+se **conservan** ALB interno, subredes privadas, 0 IPv4 públicas, SG restringido por prefix list, TLS 1.2+,
+sin caché de API financiera, JWT intacto y dos targets reales.
+
+**Restricción de herramienta registrada:** `opencode.json` deniega `edit` sobre `sdd/**/spec.md` y
+`sdd/**/plan.md`. El agente no eludió la denegación (R-021); la enmienda vive en el RFC-005 y se refleja en
+`tasks.md`, `checklist.md` y este Gate. El cuerpo original de `spec.md`/`plan.md` permanece intacto.
+
+**Límite de seguridad aceptado:** el tramo CloudFront→ALB es privado de red pero **sin TLS de aplicación**.
+No puede presentarse como TLS extremo a extremo (RFC-005 §5).
+
+## 2. Bloqueos y dependencias
+
+| ID | Estado | Impacto |
+|---|---|---|
+| **D-01** (rutas de salud no registradas) | **CERRADO** por PR #21 (`3de4fc6`): `/api/v1/health/live` y `/ready` registrados en el router | El target group puede usar `/api/v1/health/live` con matcher 200 |
+| **Readiness 503 por diseño** | VIGENTE | `/ready` devuelve 503 sin DynamoDB/Redis (I-040/I-050); **no** puede usarse como health check del TG ni como prueba de disponibilidad |
+| **RFC-004** (secretos del bootstrap) | PROPUESTO | Bloquea **despliegue**, no la implementación local |
+| **VPC Origins / elegibilidad de cuenta** | `NOT_VERIFIED` | Sólo verificable con AWS; se difiere al Gate de despliegue |
+| **`terraform plan/apply`** | DENEGADO por política | No se solicitan; ni siquiera se intentan |
+
+## 3. Alcance autorizable por `APRUEBO_GATE_I030_LOCAL`
 
 | Requisito | Implementación prevista |
 |---|---|
-| INF-030-01 | `aws_lb` **interno**, `aws_lb_target_group` (puerto 8080, matcher 200, health check a la ruta que resuelva D-01), `aws_lb_listener` **HTTP 80** (opción A) |
-| INF-030-02 | CloudFront con certificado por defecto `*.cloudfront.net`; **sin ACM ni Route 53** (opción A). Si se ratifica B/C, se recotiza antes |
-| INF-030-03 | Health interval/timeout/threshold parametrizados; `deregistration_delay` acotado; liveness vs readiness separados |
-| INF-030-04 | Sin redirección 80→443 pública: el ALB es interno; la redirección se hace en CloudFront (HTTP→HTTPS) |
-| INF-030-05 | Failover: dos targets, `target_group_attachment` por instancia del ASG (o `aws_autoscaling_attachment`), ALB retira destinos no sanos |
-| INF-030-06 | Evidencias: salidas Terraform, pruebas estáticas y `NOT_RUN_AWS` explícito |
+| INF-030-01 | `aws_lb` **interno**, target group 8080 (matcher 200), listener **HTTP:80**, SG propio; `deregistration_delay` 30 s |
+| INF-030-02 | CloudFront con certificado por defecto; **sin ACM ni Route 53**; VPC Origin hacia el ALB |
+| INF-030-03 | Health check `/api/v1/health/live` (30 s / 5 s / 2 / 3); liveness y readiness separados |
+| INF-030-04 | Redirección HTTP→HTTPS en CloudFront; ALB interno sin 443 |
+| INF-030-05 | `aws_autoscaling_attachment` al ASG de I-020 (2 instancias, AZ distintas) |
+| INF-030-06 | Evidencias locales (`fmt/validate`, pruebas estáticas); AWS `NOT_RUN` |
 
-**CloudFront VPC Origin:** requiere `internet_gateway` (ya en I-010), subred privada con IPv4 libre,
-SG del ALB permitiendo la prefix list de CloudFront (ya implementado) y el ALB creado (I-030).
-La elegibilidad real de la cuenta sigue `NOT_VERIFIED` hasta el despliegue.
+## 4. Fuera de alcance (denegado explícitamente)
 
-## 4. Fuera de alcance
-
-- `terraform plan/apply/destroy`, crear ALB/CloudFront/certificados, DNS, despliegue y pruebas HTTP reales.
-- I-040 (DynamoDB), I-050 (Redis), I-060 (IAM), E001–E075.
-- Cambios en los 75 contratos OpenAPI.
+- `terraform plan/apply/destroy`, creación de ALB/CloudFront/distribución/certificados, DNS, despliegue.
+- I-040 (DynamoDB), I-050 (Redis), I-060 (IAM), E001–E075, H08-E.
+- Modificación de los 75 contratos OpenAPI o de specs ajenas.
+- Cambios de plan AWS, compras de dominio, gasto personal.
+- Merge del PR sin autorización humana separada.
 
 ## 5. Archivos previstos
 
 ```
 infra/terraform/modules/balanceo/{main.tf,variables.tf,outputs.tf}
-infra/terraform/envs/h08i/main.tf                  (module "balanceo")
-infra/terraform/envs/h08i/variables.tf
+infra/terraform/envs/h08i/{main.tf,variables.tf,outputs.tf}
 tests/infra/terraform/test_balanceo_contrato.py
 sdd/02-infraestructura/I-030-balanceo-https/{tasks,checklist}.md
+sdd/_control/H08/GATE_H08I_I030.md
 ```
 
-## 6. Pruebas previstas
+## 6. Pruebas exigidas antes del PR
 
-1. ALB `internal` (nunca `internet-facing`), listener HTTP 80 sólo si se ratifica A; ausencia de ACM.
-2. Target group puerto 8080, matcher `200`, health check a la ruta acordada; `deregistration_delay` ≤ 60 s.
-3. Dos targets (uno por instancia del ASG) o attachment del ASG; sin tercer servidor.
-4. CloudFront con origen VPC (sin `custom_origin_config` público) y `viewer_protocol_policy = redirect-to-https`.
-5. Sin `aws_acm_certificate` ni `aws_route53_*` en el módulo (opción A).
-6. `terraform fmt -check` y `terraform validate`.
-7. Regresión: FinOps, SDD, H06, permisos, Go.
+1. ALB `internal` (nunca `internet-facing`); ausencia de `aws_acm_certificate`, `aws_route53_*`, listener 443.
+2. Target group 8080, matcher `200`, health check `/api/v1/health/live`, `deregistration_delay` ≤ 60 s.
+3. Dos destinos vía ASG; sin tercer servidor; sin `0.0.0.0/0` hacia 8080.
+4. CloudFront: origen VPC, `redirect-to-https`, TTL 0, métodos completos, `Authorization` reenviado, sin `CacheEverything`.
+5. `terraform fmt -check`, `terraform init -backend=false`, `terraform validate`.
+6. Regresión: FinOps, SDD/SHA-256, H06/OpenAPI, permisos, `go build/vet/test`.
+7. CI en verde en el PR.
 
 ## 7. Coste
 
-ALB fijo + LCU (24.3000 + 8.6400 USD/45 d) y CloudFront (0.8500 de egreso + reserva) ya están en el
-diseño E. No hay partidas nuevas si se ratifica A. La opción B añadiría dominio y Route 53 (no
-presupuestados). Presupuesto vigente: A 113.0613 · B **118.5613** ≤ 120.
+Sin partidas nuevas: ALB interno + LCU y egreso CloudFront ya están en el diseño E de I-000.
+Presupuesto vigente: A **113.0613** · B **118.5613** USD/45 d ≤ 120.0000 verificados. `terraform plan`
+permanece denegado, por lo que no hay recálculo automático de costos: cualquier recurso adicional exige
+Gate aparte.
 
-## 8. Aprobaciones solicitadas (dos, en este orden)
+## 8. Aprobaciones
 
-1. **Ratificar TLS de I-030**:
-   - `RATIFICO_D2_PARA_I030` → opción A (recomendada).
-   - `RATIFICO_I030_TLS_CON_DOMINIO` → opción B/C, indicando dominio y financiación (implica RFC).
-2. **Gate de implementación local**:
-   - `APRUEBO_GATE_I030_LOCAL` o `APRUEBO_GATE_I030_LOCAL_Y_VALIDACION_TERRAFORM`.
-
-**D-01 debe corregirse en A-090/H08-A antes de cualquier prueba real de balanceo**; no se corrige aquí
-porque no pertenece al alcance de I-030.
+| Control | Estado | Efecto |
+|---|---|---|
+| `RATIFICO_D2_PARA_I030` | **CONCEDIDA** 2026-11-06 | Sólo decisión normativa + ajustes documentales |
+| `APRUEBO_GATE_I030_LOCAL` | **PENDIENTE** | Autoriza escribir/validar I-030 localmente; no despliega ni fusiona |
+| Autorización de merge | **PENDIENTE** | Requiere PR, checks verdes y frase humana específica |
+| Autorización de despliegue AWS | **NO SOLICITADA** | Gate independiente y separado |

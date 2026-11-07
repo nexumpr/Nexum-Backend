@@ -3,10 +3,11 @@
 | Campo | Valor |
 |---|---|
 | Etapa | H05 — Infraestructura AWS |
-| Versión | 0.1.0 |
-| Estado | **DRAFT / REVIEW — NO APROBADO** |
+| Versión | 0.2.0 |
+| Estado | **D2 RATIFICADO (2026-11-06) — IMPLEMENTACIÓN NO AUTORIZADA** |
 | Trazabilidad | A-030, I-000, I-010, I-020 |
 | Implementación | H08+, tras H07 aprobado y autorización humana por release |
+| Enmienda | v0.2.0 — `RATIFICO_D2_PARA_I030`; precedencia fijada en `sdd/_control/H08/RFC-005-ENMIENDA_I030_TLS_D2.md` |
 
 ## Checklist de revisión (cada punto requiere evidencia, no basta la presencia de este archivo)
 
@@ -19,12 +20,18 @@
 
 ### Decisiones técnicas
 
-- [ ] `INF-030-01` **Alternativa candidata:** diseño justificado, referencias, supuestos y evidencia trazable.
-- [ ] `INF-030-02` **Certificado:** diseño justificado, referencias, supuestos y evidencia trazable.
+- [x] `INF-030-01` **Alternativa candidata:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — **D2 ratificada 2026-11-06** (`RATIFICO_D2_PARA_I030`, RFC-005). Decisión humana, **no** prueba de nube.
+- [x] `INF-030-02` **Certificado:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — **D2 ratificada 2026-11-06**: certificado por defecto de CloudFront; sin ACM ni dominio. No es evidencia AWS.
 - [ ] `INF-030-03` **Health:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — parámetros definidos (30 s/5 s/2/3, `/api/v1/health/live`); falta implementación.
 - [ ] `INF-030-04` **Redirección:** diseño justificado, referencias, supuestos y evidencia trazable.
-- [ ] `INF-030-05` **Failover:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — definida en CloudFront (`redirect-to-https`); falta implementación.
+- [x] `INF-030-05` **Failover:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — diseño de dos targets en AZ distintas; **prueba real NOT_RUN**.
 - [ ] `INF-030-06` **Evidencias:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — formato previsto; salidas reales `NOT_RUN`.
 
 ### Pruebas y cobertura de diseño
 
@@ -37,11 +44,25 @@
 ### Riesgos, economía y aprobaciones
 
 - [ ] Resuelto o escalado formalmente: ALB no habilitado en plan Free concreto.
-- [ ] Resuelto o escalado formalmente: Certificado/dominio no disponibles.
+  — **OPEN**: sólo verificable con AWS; Gate de despliegue.
+- [x] Resuelto o escalado formalmente: Certificado/dominio no disponibles.
+  — **RESOLVED** por D2 (sin dominio ni ACM); ver RFC-005 §3.
 - [ ] Resuelto o escalado formalmente: ALB mantiene cobro cuando los nodos están apagados.
-- [ ] Costos potenciales (incluido apagado) identificados por servicio en I-000; no se afirma $0 por usar créditos.
+  — **OPEN**: residual 6.8440 USD/45 d documentado en I-000; aceptación en Gate de despliegue.
+- [x] Costos potenciales (incluido apagado) identificados por servicio en I-000; no se afirma $0 por usar créditos.
+  — D6 `APRUEBO_CIERRE_I000_CON_CONDICIONES`; presupuesto A 113.0613 / B 118.5613 ≤ 120.0000.
 - [ ] SCP y disponibilidad de servicios relevantes documentados (no simulados).
 - [ ] Gate I-GO tiene resolución expresa del responsable, o esta spec continúa DRAFT/BLOCKED.
+
+### Gate de implementación local I-030 (pendiente)
+
+- [ ] `APRUEBO_GATE_I030_LOCAL` concedido de forma explícita (no inferido).
+- [ ] Módulo `infra/terraform/modules/balanceo` escrito sin ACM, sin Route 53, sin listener 443 ni ALB público.
+- [ ] Target group 8080 con health check `/api/v1/health/live` y `deregistration_delay` ≤ 60 s.
+- [ ] CloudFront con VPC Origin, `redirect-to-https`, TTL 0 y métodos REST completos.
+- [ ] `fmt -check`, `init -backend=false`, `validate` ejecutados y con salida real.
+- [ ] Pruebas estáticas de contrato y regresión FinOps/SDD/H06/Go en verde.
+- [ ] PR único revisado; merge y despliegue requieren autorización humana independiente.
 
 ### Ejecución futura H08 (NO ejecutada en este lote)
 

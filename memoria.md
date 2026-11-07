@@ -331,3 +331,14 @@
 - Rutas normativas `/api/v1/health/live` y `/ready` conectadas al HealthRegistry real; liveness independiente de servicios; readiness 503 en apagado, sin dependencias, con fallo o timeout.
 - `run()` conecta el registro y marca BeginShutdown antes del drenado; probes heredados delegados (compatibilidad documentada).
 - Sin dependencias reales registradas: readiness 503 por diseno hasta I-040/I-050.
+
+### I-030 — ratificación D2 y enmienda normativa (2026-11-06)
+
+- El responsable concedió `RATIFICO_D2_PARA_I030`, con alcance **exclusivo**: registrar la decisión TLS y resolver la contradicción del DRAFT de I-030. No autoriza Terraform, merge, despliegue, gasto ni otras specs.
+- Conflicto resuelto: `spec.md` I-030 exigía listener HTTPS:443 con ACM público y dominio propio; D2 fija CloudFront HTTPS (`*.cloudfront.net`) → VPC Origin → **ALB interno HTTP:80** → 2 instancias Go HTTP:8080.
+- Instrumento: `sdd/_control/H08/RFC-005-ENMIENDA_I030_TLS_D2.md`. La política `opencode.json` **deniega editar** `sdd/**/spec.md` y `sdd/**/plan.md`; no se eludió (R-021). El cuerpo original permanece intacto y la precedencia queda en el RFC.
+- Actualizados con evidencia: `tasks.md` (T-030-01/02 RESUELTOS por D2; T-030-03..06 diseño cerrado; T-030-90 con R-02 RESOLVED y R-01/R-03 OPEN; T-030-10..16 bloqueadas), `checklist.md`, `GATE_H08I_I030.md` (v0.2.0 `D2_RATIFICADA`) y este estado.
+- D-01 (rutas de salud no registradas) **cerrado** por PR #21 (`3de4fc6`): el target group podrá usar `/api/v1/health/live`. `/ready` seguirá en 503 por diseño y **no** sirve como health check.
+- Límite de seguridad aceptado y escrito: el tramo CloudFront→ALB es privado de red sin TLS de aplicación; no es TLS extremo a extremo.
+- Rama `feat/h08i-i030-balanceo-https` sincronizada con `main` `3de4fc6` mediante merge normal (sin force push). Sin recursos AWS, sin `terraform plan/apply`, sin PR todavía.
+- Pendiente de decisión humana: `APRUEBO_GATE_I030_LOCAL` para escribir y validar el módulo `balanceo` localmente.
