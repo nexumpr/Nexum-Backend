@@ -15,6 +15,7 @@ type Router struct {
 	isReady   bool
 	probeMux  *http.ServeMux
 	apiPrefix string
+	health    *HealthRegistry
 }
 
 // NewRouter crea un enrutador con soporte estricto de métodos, 404 no enumerable y 405 Method Not Allowed.
@@ -45,7 +46,27 @@ func NewRouter() *Router {
 	return r
 }
 
-// SetReady permite cambiar el estado del probe de readiness (usado en graceful shutdown).
+// RegisterHealth conecta el HealthRegistry de A-090 al router: expone las rutas
+// normativas /api/v1/health/live y /api/v1/health/ready y hace que los probes
+// heredados /health y /ready reflejen el mismo estado real.
+func (rt *Router) RegisterHealth(hr *HealthRegistry) {
+	rt.mu.Lock()
+	rt.health = hr
+	rt.mu.Unlock()
+
+	rt.HandleFunc(http.MethodGet, "/health/live", hr.LiveHandler())
+	rt.HandleFunc(http.MethodGet, "/health/ready", hr.ReadyHandler())
+}
+
+// healthRegistry devuelve el registro conectado, si existe.
+func (rt *Router) healthRegistry() *HealthRegistry {
+	rt.mu.RLock()
+	defer rt.mu.RUnlock()
+	return rt.health
+}
+
+// SetReady permite cambiar el estado del probe heredado de readiness cuando no
+// hay HealthRegistry conectado (usado en graceful shutdown).
 func (rt *Router) SetReady(ready bool) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
@@ -72,8 +93,18 @@ func (rt *Router) HandleFunc(method, pattern string, handler http.HandlerFunc) {
 func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 
-	// 1. Resolver probes del balanceador (/health, /ready)
+	// 1. Resolver probes heredados del balanceador (/health, /ready).
+	// Con HealthRegistry conectado reflejan el estado real de A-090; sin él se
+	// conserva el comportamiento previo de A-030.
 	if path == "/health" || path == "/ready" {
+		if hr := rt.healthRegistry(); hr != nil {
+			if path == "/health" {
+				hr.LiveHandler().ServeHTTP(w, r)
+			} else {
+				hr.ReadyHandler().ServeHTTP(w, r)
+			}
+			return
+		}
 		rt.probeMux.ServeHTTP(w, r)
 		return
 	}

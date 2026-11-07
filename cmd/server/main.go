@@ -25,6 +25,13 @@ const shutdownTimeout = 15 * time.Second
 // de regresión ejercite el mismo camino que producción (defecto D-01).
 func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) error {
 	router := nexumhttp.NewRouter()
+
+	// A-090: registro de salud conectado al runtime real. No se registran
+	// dependencias todavía (DynamoDB/Redis se integran en I-040/I-050); por
+	// diseño readiness devuelve 503 hasta que exista una comprobación real.
+	health := nexumhttp.NewHealthRegistry(2 * time.Second)
+	router.RegisterHealth(health)
+
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
 	// Start bloquea hasta que el listener falla o se cierra; el canal transporta
@@ -46,6 +53,9 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
+
+	// A-090: readiness pasa a 503 antes del drenado para retirar el destino.
+	health.BeginShutdown()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("graceful shutdown: %w", err)

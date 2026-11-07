@@ -324,3 +324,10 @@
 - Correccion: guardas de politica y longitud antes de Argon2; longitud del digest desde constantes uint32; sin `#nosec`.
 - gosec PASS, govulncheck PASS, go build/vet/test PASS; 7 grupos de pruebas nuevas.
 - CI Go no aplicable en este PR hasta integrar A-100 (dependencia de bootstrap registrada).
+
+### Hotfix A-090 — salud (2026-11-06)
+
+- Gate `GATE_H08A_HOTFIX_A090_HEALTH` aprobado; rama `fix/h08a-a090-health` desde main 1546254.
+- Rutas normativas `/api/v1/health/live` y `/ready` conectadas al HealthRegistry real; liveness independiente de servicios; readiness 503 en apagado, sin dependencias, con fallo o timeout.
+- `run()` conecta el registro y marca BeginShutdown antes del drenado; probes heredados delegados (compatibilidad documentada).
+- Sin dependencias reales registradas: readiness 503 por diseno hasta I-040/I-050.
