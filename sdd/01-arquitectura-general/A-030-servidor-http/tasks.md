@@ -23,3 +23,19 @@
 ## C. Ejecución futura después de H07
 
 Las tareas de implementación, pruebas HTTP, CI/CD y despliegue pertenecen a H08+, nunca se marcan completadas por el documento. Cada cambio requiere release autorizado.
+
+## Hotfix H08-A/A-030 — D-01 runtime HTTP (2026-11-06)
+
+- Gate: `sdd/_control/H08/GATE_H08A_HOTFIX_A030_RUNTIME.md`, base `main` `10f632799f00c998aaf648e1cb9d27c4b3e5bf52`.
+- Defecto: `main` inicializaba logger y `SystemContext` y salia sin abrir listener.
+- Correccion: composicion `NewRouter()` + `NewHTTPServer(DefaultServerConfig(), ...)`, `Start()` en goroutine con canal de error, `signal.NotifyContext(SIGINT/SIGTERM)` y `Shutdown` con timeout de 15 s. Puerto ocupado y errores de escucha producen exit 1; `http.ErrServerClosed` se trata como cierre esperado.
+- Pruebas nuevas: `tests/unit/transport/http_runtime_test.go` (arranque real con socket, 200/404/405, puerto ocupado, shutdown y liberacion del puerto).
+- Evidencia manual: binario vivo, `GET /health` 200, `/api/v1/nope` 404, parada limpia.
+- Sin cambios en `server.go`, `router.go` ni middlewares. A-090 sigue pendiente (rutas normativas y HealthRegistry).
+
+### Segunda pasada del hotfix (2026-11-06)
+
+- `run(ctx, cfg, logger)` extraído en `cmd/server`; `main` sólo construye logger/contexto y delega. La prueba de regresión ya cubre el punto de entrada real (si se elimina la composición, falla).
+- `cmd/server/main_test.go`: arranque con puerto efímero, `/health` 200, 404, cancelación y liberación de puerto; puerto ocupado devuelve error por `run`; verifica que el log de arranque no afirma éxito y no contiene datos sensibles.
+- Mensaje de arranque corregido: no declara disponibilidad antes de escuchar.
+- Evidencia: `go test ./cmd/server/...` PASS (2 pruebas); binario real vivo con `/health` 200 y `/api/v1/nope` 404; `go test ./...` PASS.

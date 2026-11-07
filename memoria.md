@@ -298,6 +298,18 @@
 - RFC-004 ampliado (IAM, rotacion, auditoria, SSE-S3, costes, compromiso) y sigue PROPUESTO. Bloqueo de despliegue vigente.
 - Pruebas: 76 Terraform, 11 systemd, 167 FinOps, 18 permisos; fmt/init/validate PASS.
 
+### Hotfix H08-A/A-030 — runtime HTTP (2026-11-06)
+
+- Gate `GATE_H08A_HOTFIX_A030_RUNTIME` aprobado por frase humana; base `main` 10f6327; rama `fix/h08a-a030-runtime-http`.
+- `cmd/server/main.go` ahora compone Router+HTTPServer, arranca `Start()` en goroutine, escucha SIGINT/SIGTERM y ejecuta `Shutdown` con 15 s; exit 1 en fallo de escucha o de apagado.
+- Prueba de regresion real: socket efimero, /health 200, /api/v1/unknown 404, POST 405, puerto ocupado con error, shutdown libera el puerto.
+- A-090 sigue pendiente (rutas normativas y HealthRegistry); I-020 bootstrap dependera de ese hotfix para su curl de liveness.
+
+### Hotfix A-030 — segunda pasada (2026-11-06)
+
+- Se extrajo `run(ctx, cfg, logger)` en `cmd/server`; `main` delega y `cmd/server/main_test.go` prueba el punto de entrada real (arranque, 404, cancelación, puerto ocupado, liberación del puerto).
+- Log de arranque corregido: ya no afirma éxito antes de escuchar; la prueba verifica la ausencia de "éxito" y de datos sensibles.
+- Evidencia: `go test ./cmd/server/...` 2 PASS, `go test ./...` PASS, binario vivo con `/health` 200 y `/api/v1/nope` 404.
 ### A-100 CI funcional (2026-11-06)
 
 - Gate `GATE_H08A_HOTFIX_A100_CI_GO` aprobado; rama `fix/h08a-a100-ci-go` desde main 10f6327.
