@@ -36,3 +36,15 @@
 | Pruebas Go / HTTP reales | PASS (100% unit tests) | Validado con `go test ./...` |
 | AWS/Redis/2 instancias/despliegue real | SIMULADO LOCAL / NOT_RUN CLOUD | Cloud real reservado para Gate correspondiente |
 | Costo cero y permisos de cuenta AWS | PENDIENTE H05 | Bloquea H05 si no viable |
+
+### Verificacion H08-A — CI funcional (2026-11-06)
+
+- [x] Workflow Go con triggers PR->main y push->main, `contents: read`, timeouts y concurrencia.
+- [x] Formato, vet, build, tests y race detector en CI.
+- [x] govulncheck y gosec en CI (sin exclusiones), gitleaks y SBOM SPDX.
+- [x] Validacion local con `actionlint` PASS.
+- [x] Sin Docker, sin AWS, sin secretos, sin `pull_request_target`.
+- [ ] Job `seguridad` en verde — **FAIL** por G115 en A-050 (pendiente de decision).
+- [ ] DAST, politica de licencias y controles de I-100 — fuera del alcance de este hotfix.
+- [ ] Branch protection / required checks — no disponible en plan Free (limitacion registrada).
+- [x] Secret scanning reforzado: baseline revisado en lugar de allowlist por ruta; credencial nueva en ruta antes excluida se detecta (probado).

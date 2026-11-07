@@ -114,4 +114,3 @@ func TestTwoInstancesStatelessIdentity(t *testing.T) {
 		t.Errorf("Nodo B debio rechazar al usuario eliminado con ErrUserDeleted, obtenido: %v", err)
 	}
 }
-

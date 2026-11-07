@@ -76,4 +76,3 @@ func (rl *RateLimiter) allow(ctx context.Context, key string) (bool, time.Durati
 	rl.localCounts[key]++
 	return true, 0
 }
-

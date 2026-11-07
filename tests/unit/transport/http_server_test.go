@@ -273,4 +273,3 @@ func TestHealthAndReadinessProbes(t *testing.T) {
 		}
 	})
 }
-

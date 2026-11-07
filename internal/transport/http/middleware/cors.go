@@ -56,4 +56,3 @@ func CORS(opts CORSOptions) Middleware {
 		})
 	}
 }
-

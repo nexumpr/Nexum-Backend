@@ -30,9 +30,9 @@ func (a ActorType) IsValid() bool {
 type Environment string
 
 const (
-	EnvLocal       Environment = "LOCAL"
-	EnvCI          Environment = "CI"
-	EnvProduction  Environment = "PRODUCTION"
+	EnvLocal      Environment = "LOCAL"
+	EnvCI         Environment = "CI"
+	EnvProduction Environment = "PRODUCTION"
 )
 
 // IsValid verifica que el entorno de ejecución sea soportado.
@@ -79,4 +79,3 @@ func (m SystemMetadata) Validate() error {
 	}
 	return nil
 }
-

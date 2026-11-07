@@ -1,0 +1,8 @@
+# Configuración de gitleaks para Nexum-Backend (A-100).
+# Se usan las reglas por defecto SIN exclusiones por ruta: una allowlist de ruta
+# oculta cualquier credencial en ese archivo. Los falsos positivos históricos se
+# gestionan con un baseline revisado (`.gitleaks-baseline.json`), que suprime
+# hallazgos concretos y sigue detectando credenciales nuevas.
+
+[extend]
+useDefault = true

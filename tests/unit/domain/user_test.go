@@ -76,4 +76,3 @@ func TestUserDomainEntity(t *testing.T) {
 		}
 	})
 }
-

@@ -23,3 +23,11 @@
 ## C. Ejecución futura después de H07
 
 Las tareas de implementación, pruebas HTTP, CI/CD y despliegue pertenecen a H08+, nunca se marcan completadas por el documento. Cada cambio requiere release autorizado.
+
+## Registro H08-A — CI funcional (2026-11-06)
+
+- Gate `sdd/_control/H08/GATE_H08A_HOTFIX_A100_CI_GO.md` (frase `APRUEBO_GATE_HOTFIX_A100_CI_GO`).
+- Se crea `.github/workflows/go-backend.yml` con cuatro jobs: calidad (`gofmt`, `vet`, `build`, `test`, `test -race`), seguridad (`go mod verify`, `govulncheck@v1.9.0`, `gosec@v2.30.0`), secretos (`gitleaks@v8.30.1`) y SBOM (`syft@v1.57.0`).
+- Verificacion local: `actionlint v1.7.7` PASS; `go build/vet/test` PASS; `govulncheck` PASS (0 vulnerabilidades llamadas).
+- **Hallazgo abierto**: `gosec` reporta 1 HIGH `G115` en `internal/infrastructure/security/hasher.go:126` (codigo de A-050). No se suprime ni se corrige desde A-100; requiere decision humana.
+- Estado: CI implementado; A-100 **no** se declara cerrada mientras el job de seguridad este en rojo y mientras sigan pendientes controles de fases posteriores (DAST, licencias, I-100).

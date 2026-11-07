@@ -113,10 +113,10 @@ func TestPRGatePolicyAndDeployDecoupling(t *testing.T) {
 
 	// 5. Desacoplamiento de autorización de despliegue
 	deployAuth := system.DeployAuthorization{
-		Environment:        "production",
-		AuthorizedBy:       "Responsable Técnico Humano",
-		SeparateFromPR:     true,
-		AuthorizationDate:  time.Now(),
+		Environment:       "production",
+		AuthorizedBy:      "Responsable Técnico Humano",
+		SeparateFromPR:    true,
+		AuthorizationDate: time.Now(),
 	}
 	if err := system.ValidateDeployAuthorization(deployAuth); err != nil {
 		t.Fatalf("Autorización de despliegue desacoplada debió ser aceptada: %v", err)

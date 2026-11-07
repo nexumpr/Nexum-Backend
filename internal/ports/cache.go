@@ -32,4 +32,3 @@ type DistributedCache interface {
 	// ReleaseLock libera un lock distribuido previamente adquirido.
 	ReleaseLock(ctx context.Context, key string) error
 }
-

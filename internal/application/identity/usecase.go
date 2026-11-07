@@ -175,4 +175,3 @@ func (s *IdentityService) Authenticate(ctx context.Context, userID, rawPassword 
 		},
 	}, nil
 }
-

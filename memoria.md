@@ -310,3 +310,17 @@
 - Se extrajo `run(ctx, cfg, logger)` en `cmd/server`; `main` delega y `cmd/server/main_test.go` prueba el punto de entrada real (arranque, 404, cancelación, puerto ocupado, liberación del puerto).
 - Log de arranque corregido: ya no afirma éxito antes de escuchar; la prueba verifica la ausencia de "éxito" y de datos sensibles.
 - Evidencia: `go test ./cmd/server/...` 2 PASS, `go test ./...` PASS, binario vivo con `/health` 200 y `/api/v1/nope` 404.
+### A-100 CI funcional (2026-11-06)
+
+- Gate `GATE_H08A_HOTFIX_A100_CI_GO` aprobado; rama `fix/h08a-a100-ci-go` desde main 10f6327.
+- `.github/workflows/go-backend.yml`: jobs calidad, seguridad, secretos y SBOM; herramientas fijadas (govulncheck 1.9.0, gosec 2.30.0, gitleaks 8.30.1, syft 1.57.0); sin AWS/Docker/secretos.
+- Local: actionlint PASS, go build/vet/test PASS, govulncheck PASS.
+- Bloqueo nuevo D-10: gosec HIGH G115 en `internal/infrastructure/security/hasher.go:126` (A-050). No se suprime; requiere decision humana (fix acotado o exclusion justificada).
+- A-100: allowlist por ruta de gitleaks reemplazada por baseline revisado (16 falsos positivos historicos); una credencial nueva en esas rutas ya se detecta (probado con ficheros sinteticos en %TEMP%).
+### Hotfix A-050 — D-10 (2026-11-06)
+
+- Gate `GATE_H08A_HOTFIX_A050_G115` aprobado; rama `fix/h08a-a050-gosec-g115` desde main 10f6327.
+- Causa real: `VerifyPassword` aceptaba memoria/iteraciones/paralelismo y longitud de digest desde el hash almacenado sin acotar (agotamiento de recursos + G115).
+- Correccion: guardas de politica y longitud antes de Argon2; longitud del digest desde constantes uint32; sin `#nosec`.
+- gosec PASS, govulncheck PASS, go build/vet/test PASS; 7 grupos de pruebas nuevas.
+- CI Go no aplicable en este PR hasta integrar A-100 (dependencia de bootstrap registrada).
