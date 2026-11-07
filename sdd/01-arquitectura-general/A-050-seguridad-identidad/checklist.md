@@ -36,3 +36,12 @@
 | Pruebas Go / HTTP reales | PASS (local) | Ejecutado en Windows nativo vía `go test -v ./...` |
 | AWS/Redis/2 instancias/despliegue real | NOT_RUN | Se concretan H05, se ejecutan H08 cloud |
 | Costo cero y permisos de cuenta AWS | PENDIENTE H05 | Bloquea H05 si no viable |
+
+### Hotfix D-10
+
+- [x] Parametros Argon2 acotados antes de derivar la clave (anti-DoS).
+- [x] Longitud de digest validada contra constantes uint32 (G115 resuelto sin exclusion).
+- [x] Compatibilidad con hashes canonicos existentes.
+- [x] Rechazo rapido de entradas peligrosas y ausencia de panicos.
+- [x] gosec y govulncheck PASS.
+- [ ] CI Go en este PR — no disponible hasta integrar A-100 (bootstrap).
