@@ -14,3 +14,6 @@
 *.service text eol=lf
 *.ps1 text eol=lf
 *.go text eol=lf
+*.toml text eol=lf
+*.tftpl text eol=lf
+*.sh text eol=lf

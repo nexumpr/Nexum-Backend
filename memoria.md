@@ -331,3 +331,35 @@
 - Rutas normativas `/api/v1/health/live` y `/ready` conectadas al HealthRegistry real; liveness independiente de servicios; readiness 503 en apagado, sin dependencias, con fallo o timeout.
 - `run()` conecta el registro y marca BeginShutdown antes del drenado; probes heredados delegados (compatibilidad documentada).
 - Sin dependencias reales registradas: readiness 503 por diseno hasta I-040/I-050.
+
+### I-030 — ratificación D2 y enmienda normativa (2026-11-06)
+
+- El responsable concedió `RATIFICO_D2_PARA_I030`, con alcance **exclusivo**: registrar la decisión TLS y resolver la contradicción del DRAFT de I-030. No autoriza Terraform, merge, despliegue, gasto ni otras specs.
+- Conflicto resuelto: `spec.md` I-030 exigía listener HTTPS:443 con ACM público y dominio propio; D2 fija CloudFront HTTPS (`*.cloudfront.net`) → VPC Origin → **ALB interno HTTP:80** → 2 instancias Go HTTP:8080.
+- Instrumento: `sdd/_control/H08/RFC-005-ENMIENDA_I030_TLS_D2.md`. La política `opencode.json` **deniega editar** `sdd/**/spec.md` y `sdd/**/plan.md`; no se eludió (R-021). El cuerpo original permanece intacto y la precedencia queda en el RFC.
+- Actualizados con evidencia: `tasks.md` (T-030-01/02 RESUELTOS por D2; T-030-03..06 diseño cerrado; T-030-90 con R-02 RESOLVED y R-01/R-03 OPEN; T-030-10..16 bloqueadas), `checklist.md`, `GATE_H08I_I030.md` (v0.2.0 `D2_RATIFICADA`) y este estado.
+- D-01 (rutas de salud no registradas) **cerrado** por PR #21 (`3de4fc6`): el target group podrá usar `/api/v1/health/live`. `/ready` seguirá en 503 por diseño y **no** sirve como health check.
+- Límite de seguridad aceptado y escrito: el tramo CloudFront→ALB es privado de red sin TLS de aplicación; no es TLS extremo a extremo.
+- Rama `feat/h08i-i030-balanceo-https` sincronizada con `main` `3de4fc6` mediante merge normal (sin force push). Sin recursos AWS, sin `terraform plan/apply`, sin PR todavía.
+- Pendiente de decisión humana: `APRUEBO_GATE_I030_LOCAL` para escribir y validar el módulo `balanceo` localmente.
+
+### I-030 — implementación local del balanceo (2026-11-06)
+
+- Gate `APRUEBO_GATE_I030_LOCAL` concedido. Implementado **sólo** en local; `terraform plan/apply/destroy` no se ejecutaron y no existe ningún recurso AWS (coste 0.0000 USD).
+- `infra/terraform/modules/balanceo`: ALB `internal`, target group 8080/HTTP/instance con matcher 200 y health check `/api/v1/health/live` (30/5/2/3), listener HTTP:80, `aws_autoscaling_attachment` al ASG de I-020, `aws_cloudfront_vpc_origin` (`http-only`), distribución `redirect-to-https` con `Managed-CachingDisabled` + `Managed-AllViewer` y 7 métodos REST. Sin ACM, Route 53, 443, NAT, IPv4 públicas ni WAF.
+- El SG del ALB se reutiliza de I-010 (no se duplica); preconditions para 2 zonas, región us-east-2, SG distintos y rechazo de `/ready` como health check.
+- Proveedor AWS elevado a `~> 5.72` (mínimo para `aws_cloudfront_vpc_origin`); lock permanece en 5.100.0.
+- Pruebas: 32 estáticas de contrato (`tests/infra/terraform`) y 8 de alineación FinOps; `fmt -check` 0, `init -backend=false` OK, `validate` Success. Requisitos oficiales de VPC Origins verificados (IGW adjunto, subred privada con IPv4 libre, prefix list, us-east-2 soportada).
+- **Hallazgo H-01 (abierto):** con `cloudfront_default_certificate = true` AWS fija la security policy en **TLSv1**; no se puede usar TLSv1.2_2021 sin certificado propio/dominio. No se declara TLS 1.2+. Requiere aceptación humana antes del Gate de despliegue (`RFC-005` §8).
+- CI Terraform no existe aún (dueño: I-080); no se suprime el requisito, se registra como dependencia.
+- **Incidente 5 (CI, escaneo de secretos):** `gitleaks` falló con 1 hallazgo `generic-api-key` en `BASELINE_SHA256.json` (línea del digest de `RFC-004-SECRETOS_BOOTSTRAP.md`; la palabra «SECRETOS» de la ruta hacía que el hash pareciera un valor). El baseline no lo cubre porque compara commit/línea/columnas exactos y el manifiesto se reescribe en cada cambio SDD. Solución: `[[allowlists]]` global acotada a la ruta exacta del manifiesto **y** a la línea exacta con digest de 64 hex; se comprobó con `gitleaks dir` sobre una credencial sintética que la detección sigue activa (2 hallazgos) y que el repositorio queda en «no leaks found».
+
+### I-030 — correcciones de auditoría externa (2026-11-07)
+
+- **Defecto 1 (confirmado y corregido): `origin.domain_name` usaba el ARN del VPC origin.** La documentación oficial de CloudFront define el origin domain como «el nombre DNS del recurso» (ejemplo ELB `*.elb.amazonaws.com`) y el recurso `VpcOrigin` **no** expone campo `DomainName`: sólo `Arn`, `Id`, `Status`, `CreatedTime`, `LastModifiedTime` y `VpcOriginEndpointConfig`. Se corrigió a `domain_name = aws_lb.principal.dns_name`, conservando `vpc_origin_config { vpc_origin_id = aws_cloudfront_vpc_origin.alb.id }`. Habría fallado en el primer `apply` real.
+- **Defecto 2 (vulnerabilidad real, confirmada y corregida): allowlist de gitleaks en modo OR.** En gitleaks v8.30.1, una allowlist **global** con condición por defecto (OR) ejecuta `checkCommitOrPathAllowed`, que descarta **todos** los hallazgos de una ruta coincidente sin evaluar el patrón. La excepción pasa a estar **dentro de la regla `generic-api-key`**, con `condition = "AND"` (ruta exacta del manifiesto **y** línea exacta con digest de 64 hex) y sin allowlist global.
+- **Demostración con credenciales sintéticas** (entorno temporal aislado, nunca versionado, ambas en modo git y dir):
+  - AND endurecida: 3 hallazgos → credencial sintética **dentro** de `sdd/_control/H07/BASELINE_SHA256.json`, credencial fuera del manifiesto (`generic-api-key`) y token sintético (`github-pat`). El digest legítimo del RFC-004 **no** se reporta.
+  - OR global (config anterior): 2 hallazgos → la credencial sintética dentro del manifiesto **quedaba oculta** y sólo se detectaban las externas.
+- **H-01 sigue abierto y sin aceptar:** no se ha decidido en nombre del responsable. Con el certificado por defecto AWS fija la security policy en **TLSv1**; los clientes modernos negocian TLS 1.2/1.3, pero la política mínima configurada no es TLS 1.2. Bloquea la autorización de despliegue hasta decisión humana específica.
+- Pruebas estructurales nuevas en `tests/infra/terraform/test_balanceo_contrato.py` (análisis por bloques con conteo de llaves, no búsqueda de cadenas) y `herramientas/tests/test_gitleaks_config.py` (configuración mínima verificable sin red).
