@@ -19,13 +19,20 @@
 
 ### Decisiones técnicas
 
-- [ ] `INF-050-01` **Servicio:** diseño justificado, referencias, supuestos y evidencia trazable.
-- [ ] `INF-050-02` **Topología:** diseño justificado, referencias, supuestos y evidencia trazable.
-- [ ] `INF-050-03` **Red:** diseño justificado, referencias, supuestos y evidencia trazable.
+- [x] `INF-050-01` **Servicio:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — ElastiCache Redis OSS `cache.t4g.micro` (decisión de I-000, ADR `ADR_REDIS_PROVEEDOR.md`); no es evidencia AWS.
+- [x] `INF-050-02` **Topología:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — 1 nodo sin réplicas ni Multi-AZ; SPOF declarado y `alta_disponibilidad = false`.
+- [x] `INF-050-03` **Red:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — subnet group privado de I-010, SG de I-010, TLS + cifrado en reposo, usuario RBAC dedicado y **`default` sustituido por uno deshabilitado (`off ~* -@all`)**.
 - [ ] `INF-050-04` **Objetivos:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — TTL/versión/HMAC y rate limiting son de la aplicación (A-080); la caché aporta `volatile-lru`.
 - [ ] `INF-050-05` **Fallo:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — DynamoDB como verdad y fail-close en A-080; sin snapshots por diseño.
 - [ ] `INF-050-06` **Prueba compartida:** diseño justificado, referencias, supuestos y evidencia trazable.
-- [ ] `INF-050-07` **Costo:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — `NOT_RUN`: requiere AWS; el endpoint y SG compartidos habilitan la prueba.
+- [x] `INF-050-07` **Costo:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — 17.2800 USD/45 d (1080 × 0.016), sin partidas nuevas.
 
 ### Pruebas y cobertura de diseño
 
@@ -48,3 +55,16 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+### Gate de implementación local I-050 (2026-11-07)
+
+- [x] `APRUEBO_GATE_I050_LOCAL` concedido explícitamente.
+- [x] ADR de proveedor (`ADR_REDIS_PROVEEDOR.md`) con alternativas y trazabilidad a I-000.
+- [x] Módulo `infra/terraform/modules/redis` escrito y compuesto en `envs/h08i`.
+- [x] `fmt -check`, `init -backend=false` y `validate` ejecutados con salida real (Success).
+- [x] 34 pruebas de contrato + 8 de alineación FinOps en verde.
+- [x] Usuario RBAC de aplicación con ACL restringida y contraseña fuera del repositorio.
+- [x] **Usuario `default` de ElastiCache sustituido** por uno deshabilitado (`off ~* -@all`, `no-password-required`) y añadido al grupo; el grupo contiene sólo aplicación + default desactivado.
+- [ ] PR único revisado; merge y despliegue requieren autorización humana independiente.
+- [ ] Verificación real en AWS (nodo, TLS, RBAC, invalidation entre nodos): `NOT_RUN`.
+- [ ] Entrega del secreto RBAC resuelta (RFC-004 + endpoint `secretsmanager` en ventana): **bloqueo de despliegue**.

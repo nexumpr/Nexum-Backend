@@ -14,8 +14,9 @@
 | H08-I / I-010 | IMPLEMENTED_LOCAL_NOT_DEPLOYED | Módulo `red` validado (`fmt`/`validate`); AWS NOT_RUN |
 | H08-I / I-020 | IMPLEMENTED_LOCAL_NOT_DEPLOYED | Módulo `computo` (2 ARM64, cpu_credits standard) y bootstrap systemd; AWS NOT_RUN; despliegue bloqueado por RFC-004 |
 | H08-I / I-030 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #22 MERGED (merge `cc19a77b14d73f4a146baa899a2febe677c267fa`); ALB interno + CloudFront VPC origin validados y fusionados; H-01, RFC-004, readiness 503, CI Terraform (I-080) y verificación AWS siguen abiertos; AWS NOT_RUN |
-| H08-I / I-040 | **IMPLEMENTADO_LOCAL — PR PENDIENTE** | `APRUEBO_GATE_I040_LOCAL` 2026-11-07; tabla única `NEXUM_CORE_<ENV>` (PAY_PER_REQUEST, GSI1, TTL `expiresAt`, SSE, PITR), `fmt`/`validate` y 33 pruebas locales; GSI2 opt-in sin scheduler; AWS NOT_RUN |
-| H08-I / I-050..I-150; H08-E / E001..E075 | NOT_AUTHORIZED | Gates por spec futuros; despliegue requiere autorización humana independiente |
+| H08-I / I-040 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #24 MERGED (merge `51e01f6eae37d548b3b790a967859ff314ed6bc7`); tabla única `NEXUM_CORE_<ENV>`, GSI1, TTL `expiresAt`, SSE, PITR y matriz de accesos validados; GSI2 opt-in; AWS NOT_RUN |
+| H08-I / I-050 | **IMPLEMENTADO_LOCAL — PR PENDIENTE** | `APRUEBO_GATE_I050_LOCAL` 2026-11-07; ElastiCache Redis OSS `cache.t4g.micro` 1 nodo, TLS + RBAC, subnet group privado, sin backups; ADR de proveedor trazado a I-000; AWS NOT_RUN |
+| H08-I / I-060..I-150; H08-E / E001..E075 | NOT_AUTHORIZED | Gates por spec futuros; despliegue requiere autorización humana independiente |
 
 El Gate H08-A se registra en `sdd/_control/H08/GATE_H06_H07_H08A_RATIFICACION.md`. Shell con ASK **no** es un sandbox: el usuario revisa cada orden. El registro de `main` debe seguir limpio; los cambios de H08-A se publican como PR y pasan checks.
 
