@@ -126,13 +126,17 @@ resource "aws_elasticache_parameter_group" "redis" {
 #
 # Política: se parte de `-@all` y se conceden sólo las categorías que A-080 exige
 # (lecturas, escrituras, TTL/keyspace, scripts Lua para rate limiting atómico,
-# transacciones y comandos de conexión). Se bloquean además KEYS/SCAN/RANDOMKEY,
-# que permiten recorrer el espacio de claves sin necesidad funcional.
+# transacciones y comandos de conexión). Los nombres de categoría son los de
+# `ACL CAT` de Redis OSS (nótese `transaction` en singular). Se deniegan además
+# comandos peligrosos que llegan incluidas en @read/@write/@keyspace y que la
+# caché no necesita: recorrido de claves (KEYS/SCAN/RANDOMKEY), restauración de
+# valores serializados (RESTORE, permite envenenar la caché), MIGRATE (permitiría
+# exfiltrar datos a otro servidor Redis) y SORT (acceso indirecto por BY/GET).
 resource "aws_elasticache_user" "aplicacion" {
   user_id       = "${var.proyecto}-app"
   user_name     = "${var.proyecto}-app"
   engine        = "redis"
-  access_string = "on ~nexum:* -@all +@read +@write +@keyspace +@scripting +@transactions +@connection -keys -scan -randomkey"
+  access_string = "on ~nexum:* -@all +@read +@write +@keyspace +@scripting +@transaction +@connection -keys -scan -randomkey -restore -migrate -sort"
 
   authentication_mode {
     type      = "password"

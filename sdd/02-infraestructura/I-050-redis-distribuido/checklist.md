@@ -62,7 +62,7 @@
 - [x] ADR de proveedor (`ADR_REDIS_PROVEEDOR.md`) con alternativas y trazabilidad a I-000.
 - [x] Módulo `infra/terraform/modules/redis` escrito y compuesto en `envs/h08i`.
 - [x] `fmt -check`, `init -backend=false` y `validate` ejecutados con salida real (Success).
-- [x] 27 pruebas de contrato + 8 de alineación FinOps en verde.
+- [x] 34 pruebas de contrato + 8 de alineación FinOps en verde.
 - [x] Usuario RBAC de aplicación con ACL restringida y contraseña fuera del repositorio.
 - [x] **Usuario `default` de ElastiCache sustituido** por uno deshabilitado (`off ~* -@all`, `no-password-required`) y añadido al grupo; el grupo contiene sólo aplicación + default desactivado.
 - [ ] PR único revisado; merge y despliegue requieren autorización humana independiente.

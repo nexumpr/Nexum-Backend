@@ -62,7 +62,7 @@ declara alta disponibilidad y no se introduce KMS propio (el cifrado en reposo l
 | `terraform fmt -check -recursive` | exit 0 |
 | `terraform init -backend=false` (`TF_DATA_DIR` externo) | OK, lock 5.100.0 sin cambios |
 | `terraform validate` | **Success** |
-| `tests/infra/terraform` | 158 pruebas OK (27 de contrato I-050) |
+| `tests/infra/terraform` | 165 pruebas OK (34 de contrato I-050) |
 | `tests/infra/finops` | 193 pruebas OK (8 nuevas de alineación I-050) |
 | `validar_sdd_integral.py --check-git` | PASS |
 | `validar_h06.py` | PASS (75 operaciones) |
@@ -97,11 +97,11 @@ permanecía en el grupo: riesgo de acceso anónimo con permisos totales si el cl
 | Política | `off ~* -@all` (usuario deshabilitado, sin comandos) |
 | Autenticación | `no-password-required` (no introduce un secreto adicional ni acceso anónimo útil) |
 | Grupo | contiene **exactamente dos identidades**: aplicación (con contraseña) y `default` desactivado |
-| ACL de aplicación | endurecida de `+@all -@admin -@dangerous` a `-@all` + `+@read +@write +@keyspace +@scripting +@transactions +@connection`, con `-keys -scan -randomkey` |
+| ACL de aplicación | endurecida de `+@all -@admin -@dangerous` a `-@all` + `+@read +@write +@keyspace +@scripting +@transaction +@connection`, con `-keys -scan -randomkey -restore -migrate -sort` |
 
 **Compatibilidad con A-080 (verificada por categoría):** lecturas y escrituras (`@read`/`@write`), TTL e
 invalidación (`DEL`/`EXPIRE`/`TTL` en `@keyspace`), rate limiting atómico (Lua en `@scripting`), transacciones
-(`MULTI`/`EXEC` en `@transactions`) y handshake de cliente (`PING`/`SELECT`/`HELLO`/`CLIENT` en `@connection`).
+(`MULTI`/`EXEC` en `@transaction`) y handshake de cliente (`PING`/`SELECT`/`HELLO`/`CLIENT` en `@connection`).
 Se bloquean `KEYS`, `SCAN` y `RANDOMKEY`, que permiten recorrer el espacio de claves sin necesidad funcional.
 Ningún contrato de A-080 se modifica.
 
@@ -111,3 +111,18 @@ reintroduce la dependencia de **RFC-004** para ese secreto. No se declara la vul
 hasta verificarlo con `describe-users`/`ACL LIST` en el Gate de despliegue.
 
 **Coste:** usuarios y grupos de usuarios de ElastiCache **no** se facturan; no hay partida nueva.
+
+### 7.1 Categoría ACL inválida corregida (2026-11-07)
+
+La primera versión de la ACL usaba `+@transactions`. La lista oficial de `ACL CAT` de Redis OSS 7.x devuelve la
+categoría en **singular: `transaction`** (`redis.io/docs/latest/commands/acl-cat/`). `terraform validate` **no**
+valida la semántica del access string, así que el error sólo habría aparecido al crear el usuario en AWS.
+
+- Corregido a `+@transaction`.
+- Ampliadas las denegaciones explícitas a comandos peligrosos alcanzables por `@read`/`@write`/`@keyspace` y no
+  necesarios para una caché: `-keys -scan -randomkey` (recorrido), `-restore` (envenenamiento con valores
+  serializados), `-migrate` (exfiltración a otro servidor Redis) y `-sort` (acceso indirecto por `BY`/`GET`).
+- Nueva prueba de regresión `ACLDeAplicacion` que extrae las categorías del access string y las contrasta con la
+  lista oficial, rechaza `@transactions` y cualquier categoría inventada, y exige las categorías de A-080.
+- **Comprobación de servicio real pendiente:** no hay Redis local ni AWS autorizada, así que la validación es
+  estática contra la documentación oficial. Se verificará con `describe-users`/`ACL LIST` en el Gate de despliegue.

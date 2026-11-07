@@ -88,15 +88,16 @@ class Seguridad(unittest.TestCase):
         """Mínimo privilegio: -@all + categorías necesarias; sin admin/dangerous."""
         usuario = self.recursos[("aws_elasticache_user", "aplicacion")]
         self.assertIn(
-            'access_string = "on ~nexum:* -@all +@read +@write +@keyspace +@scripting +@transactions +@connection -keys -scan -randomkey"',
+            'access_string = "on ~nexum:* -@all +@read +@write +@keyspace +@scripting +@transaction +@connection -keys -scan -randomkey -restore -migrate -sort"',
             usuario,
         )
         self.assertNotIn("+@all", usuario)
         self.assertNotIn("+@admin", usuario)
         self.assertNotIn("+@dangerous", usuario)
+        self.assertNotIn("@transactions", usuario)
         # Categorías que A-080 necesita: lecturas, escrituras, TTL/keyspace,
         # scripts (rate limiting atómico), transacciones y conexión.
-        for categoria in ("+@read", "+@write", "+@keyspace", "+@scripting", "+@transactions", "+@connection"):
+        for categoria in ("+@read", "+@write", "+@keyspace", "+@scripting", "+@transaction", "+@connection"):
             self.assertIn(categoria, usuario)
         # El prefijo del ACL debe coincidir con el espacio de claves real (A-080).
         claves = _leer(RAIZ / "internal" / "domain" / "cache" / "keys.go")
@@ -224,6 +225,95 @@ class UsuarioDefaultDeshabilitado(unittest.TestCase):
                 "aws_elasticache_replication_group",
             },
         )
+
+
+# Categorías ACL oficiales de Redis OSS 7.x (`ACL CAT`): las del núcleo, sin los
+# módulos opcionales (json/search/…) que ElastiCache no expone. `all` es además un
+# pseudo-grupo aceptado por Redis en `+@all`/`-@all`.
+CATEGORIAS_REDIS_7 = frozenset(
+    {
+        "keyspace", "read", "write", "set", "sortedset", "list", "hash", "string",
+        "bitmap", "hyperloglog", "geo", "stream", "pubsub", "admin", "fast", "slow",
+        "blocking", "dangerous", "connection", "transaction", "scripting",
+    }
+)
+PSEUDO_CATEGORIAS = frozenset({"all"})
+
+
+def categorias_de_acl(access_string: str) -> tuple[set[str], set[str]]:
+    """Separa categorías concedidas/denegadas y comandos sueltos de un access string.
+
+    Devuelve (categorias, comandos). Las categorías se devuelven sin el prefijo
+    `@` y en minúsculas; los comandos sueltos sin el `+`/`-`.
+    """
+
+    categorias: set[str] = set()
+    comandos: set[str] = set()
+    for token in access_string.split():
+        if token.startswith("@") or token[1:2] == "@":
+            categorias.add(token.lstrip("+-@").lower())
+        elif token[:1] in "+-" and not token.startswith("~"):
+            comandos.add(token[1:].lower())
+    return categorias, comandos
+
+
+def categorias_invalidas(access_string: str) -> set[str]:
+    """Categorías declaradas que no existen en Redis OSS 7.x."""
+    categorias, _ = categorias_de_acl(access_string)
+    return {c for c in categorias if c not in CATEGORIAS_REDIS_7 | PSEUDO_CATEGORIAS}
+
+
+class ACLDeAplicacion(unittest.TestCase):
+    """La ACL debe usar categorías reales de Redis OSS 7.x.
+
+    `terraform validate` NO valida la semántica del access string: un nombre
+    inexistente (p. ej. `@transactions` frente a `@transaction`) sólo fallaría al
+    crear el usuario en AWS. Estas pruebas cierran ese hueco.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.main = _leer(MODULO / "main.tf")
+        cls.recursos = recursos(cls.main)
+        cls.cuerpo = cls.recursos[("aws_elasticache_user", "aplicacion")]
+        cls.access = atributos(cls.cuerpo)["access_string"].strip('"')
+
+    def test_categorias_pertenecen_a_redis_oss_7(self) -> None:
+        self.assertEqual(categorias_invalidas(self.access), set())
+
+    def test_transacciones_en_singular(self) -> None:
+        """Regresión: `@transactions` no existe en Redis y rompería el apply."""
+        categorias, _ = categorias_de_acl(self.access)
+        self.assertIn("transaction", categorias)
+        self.assertNotIn("transactions", categorias)
+        self.assertNotIn("@transactions", self.access)
+
+    def test_detector_rechaza_categorias_inexistentes(self) -> None:
+        self.assertEqual(categorias_invalidas("on ~* +@transactions"), {"transactions"})
+        self.assertEqual(categorias_invalidas("on ~* +@transaction"), set())
+        self.assertEqual(categorias_invalidas("on ~* +@inventada -@otra"), {"inventada", "otra"})
+
+    def test_categorias_requeridas_por_a080(self) -> None:
+        categorias, _ = categorias_de_acl(self.access)
+        for requerida in ("read", "write", "keyspace", "scripting", "transaction", "connection"):
+            self.assertIn(requerida, categorias)
+
+    def test_sin_permisos_administrativos(self) -> None:
+        self.assertNotIn("+@all", self.access)
+        for prohibida in ("admin", "dangerous"):
+            self.assertNotIn(prohibida, categorias_de_acl(self.access)[0])
+        # Nunca se concede todo y se recorta después: se parte de -@all.
+        self.assertTrue(self.access.startswith("on ~nexum:* -@all"), self.access)
+
+    def test_comandos_peligrosos_denegados(self) -> None:
+        _, comandos = categorias_de_acl(self.access)
+        for denegado in ("keys", "scan", "randomkey", "restore", "migrate", "sort"):
+            self.assertIn(denegado, comandos, f"{denegado} debe estar denegado explícitamente")
+        self.assertNotIn("keys", categorias_de_acl(self.access)[0])
+
+    def test_espacio_de_claves_nexum(self) -> None:
+        self.assertIn("~nexum:*", self.access)
+        self.assertNotIn("~*", self.access.replace("~nexum:*", ""))
 
 
 class ComposicionDelEntorno(unittest.TestCase):
