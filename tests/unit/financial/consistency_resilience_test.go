@@ -57,7 +57,7 @@ func TestEquitableSplitCentsAndSaturation(t *testing.T) {
 		// Meta A solo necesita 20 centavos para llegar a su objetivo (Target: 100, Saved: 80)
 		// Meta B necesita 200 centavos (Target: 200, Saved: 0)
 		goals := []domainFinancial.GoalTarget{
-			{GoalID: "goal-a", CurrentSavedCents: 80, TargetCents: 100},  // Capacidad restante: 20
+			{GoalID: "goal-a", CurrentSavedCents: 80, TargetCents: 100}, // Capacidad restante: 20
 			{GoalID: "goal-b", CurrentSavedCents: 0, TargetCents: 200},  // Capacidad restante: 200
 		}
 

@@ -174,12 +174,12 @@ func TestDecimalMoneyContract(t *testing.T) {
 
 	t.Run("Rechazo_de_formatos_decimales_incorrectos", func(t *testing.T) {
 		invalidFormats := []string{
-			`"123"`,      // sin punto ni decimales
-			`"123.4"`,    // solo un decimal
-			`"123.456"`,  // tres decimales
-			`"abc"`,      // letras
-			`"123.4a"`,   // alfanumérico
-			`""`,         // vacío
+			`"123"`,     // sin punto ni decimales
+			`"123.4"`,   // solo un decimal
+			`"123.456"`, // tres decimales
+			`"abc"`,     // letras
+			`"123.4a"`,  // alfanumérico
+			`""`,        // vacío
 		}
 
 		for _, inv := range invalidFormats {

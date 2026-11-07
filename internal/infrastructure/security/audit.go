@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	awsKeyRegex    = regexp.MustCompile(`(?i)(AKIA[0-9A-Z]{16})`)
+	awsKeyRegex     = regexp.MustCompile(`(?i)(AKIA[0-9A-Z]{16})`)
 	privateKeyRegex = regexp.MustCompile(`-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----`)
 	jwtTokenRegex   = regexp.MustCompile(`eyJ[A-Za-z0-9-_]+\.eyJ[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+`)
 )
@@ -71,4 +71,3 @@ func ValidateReleaseGate(manifest ReleaseManifest) error {
 	}
 	return nil
 }
-

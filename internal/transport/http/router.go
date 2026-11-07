@@ -10,11 +10,11 @@ import (
 
 // Router gestiona el enrutamiento versionado de la API (/api/v1) y códigos de estado REST (A-030 §2.1, AC-A-030-01).
 type Router struct {
-	mu           sync.RWMutex
-	routes       map[string]map[string]http.Handler // [path][method]handler
-	isReady      bool
-	probeMux     *http.ServeMux
-	apiPrefix    string
+	mu        sync.RWMutex
+	routes    map[string]map[string]http.Handler // [path][method]handler
+	isReady   bool
+	probeMux  *http.ServeMux
+	apiPrefix string
 }
 
 // NewRouter crea un enrutador con soporte estricto de métodos, 404 no enumerable y 405 Method Not Allowed.
@@ -103,4 +103,3 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 3. Ruta no encontrada: emitir 404 estructurado no enumerable
 	httputil.WriteError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "el recurso solicitado no existe")
 }
-

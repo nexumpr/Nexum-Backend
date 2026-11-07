@@ -142,4 +142,3 @@ func (r *MemoryRepository) Query(ctx context.Context, tableName string, input po
 
 	return &ports.QueryResult{Items: results}, nil
 }
-

@@ -298,6 +298,13 @@
 - RFC-004 ampliado (IAM, rotacion, auditoria, SSE-S3, costes, compromiso) y sigue PROPUESTO. Bloqueo de despliegue vigente.
 - Pruebas: 76 Terraform, 11 systemd, 167 FinOps, 18 permisos; fmt/init/validate PASS.
 
+### A-100 CI funcional (2026-11-06)
+
+- Gate `GATE_H08A_HOTFIX_A100_CI_GO` aprobado; rama `fix/h08a-a100-ci-go` desde main 10f6327.
+- `.github/workflows/go-backend.yml`: jobs calidad, seguridad, secretos y SBOM; herramientas fijadas (govulncheck 1.9.0, gosec 2.30.0, gitleaks 8.30.1, syft 1.57.0); sin AWS/Docker/secretos.
+- Local: actionlint PASS, go build/vet/test PASS, govulncheck PASS.
+- Bloqueo nuevo D-10: gosec HIGH G115 en `internal/infrastructure/security/hasher.go:126` (A-050). No se suprime; requiere decision humana (fix acotado o exclusion justificada).
+- A-100: allowlist por ruta de gitleaks reemplazada por baseline revisado (16 falsos positivos historicos); una credencial nueva en esas rutas ya se detecta (probado con ficheros sinteticos en %TEMP%).
 ### Hotfix A-050 — D-10 (2026-11-06)
 
 - Gate `GATE_H08A_HOTFIX_A050_G115` aprobado; rama `fix/h08a-a050-gosec-g115` desde main 10f6327.

@@ -13,9 +13,9 @@ import (
 type contextKey string
 
 const (
-	TraceParentHeader           = "traceparent"
-	RequestIDHeader             = "x-request-id"
-	traceContextKey  contextKey = "nexum-trace-context"
+	TraceParentHeader            = "traceparent"
+	RequestIDHeader              = "x-request-id"
+	traceContextKey   contextKey = "nexum-trace-context"
 )
 
 // TraceSpan encapsula el identificador de rastreo W3C y metadatos de span local.
@@ -129,4 +129,3 @@ func generateRandomHex(byteCount int) string {
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
-

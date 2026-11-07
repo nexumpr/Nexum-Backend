@@ -139,4 +139,3 @@ func ValidateEmail(email string) (string, error) {
 	}
 	return clean, nil
 }
-

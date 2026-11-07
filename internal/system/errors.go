@@ -21,4 +21,3 @@ var (
 	// ErrInvalidNodeTopology se produce cuando no se respeta la exigencia de 2 nodos independientes en produccion.
 	ErrInvalidNodeTopology = errors.New("topologia invalida: se requieren al menos dos nodos simultaneos en produccion")
 )
-

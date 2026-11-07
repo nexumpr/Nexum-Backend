@@ -89,4 +89,3 @@ func TestDomainLayerImportRules(t *testing.T) {
 
 	t.Logf("Auditoría de Clean Architecture Superada: %d archivos en internal/domain auditados con 0 violaciones de imports.", scannedFiles)
 }
-

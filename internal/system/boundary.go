@@ -56,4 +56,3 @@ func (v *BoundaryValidator) ValidateSystemTopology(meta types.SystemMetadata) er
 
 	return nil
 }
-

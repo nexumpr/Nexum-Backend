@@ -28,7 +28,8 @@ func NewRateLimiter(cache *MemoryDistributedCache) *RateLimiter {
 
 // CheckLimit verifica si una acción dentro de una clase de endpoint está permitida para un sujeto (IP o usuario).
 // failClosed: si es true (ej: login), ante fallo de Redis deniega el acceso con 503 para evitar bypass (A-080 §2.5).
-//             si es false (ej: GET catálogos), degrada permitiendo la petición (fail-open).
+//
+//	si es false (ej: GET catálogos), degrada permitiendo la petición (fail-open).
 func (rl *RateLimiter) CheckLimit(
 	ctx context.Context,
 	endpointClass string,
@@ -59,4 +60,3 @@ func (rl *RateLimiter) CheckLimit(
 	}
 	return true, rem, 0, nil
 }
-

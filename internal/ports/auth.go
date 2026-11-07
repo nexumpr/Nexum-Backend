@@ -46,4 +46,3 @@ type TokenProvider interface {
 	// GenerateRefreshToken genera un token criptográfico de alta entropía para rotación de sesión.
 	GenerateRefreshToken(ctx context.Context) (string, error)
 }
-

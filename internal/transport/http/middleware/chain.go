@@ -13,4 +13,3 @@ func Chain(h http.Handler, middlewares ...Middleware) http.Handler {
 	}
 	return h
 }
-

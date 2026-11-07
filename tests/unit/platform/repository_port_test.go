@@ -151,4 +151,3 @@ func TestNoSQLAndCachePortContracts(t *testing.T) {
 		}
 	})
 }
-

@@ -235,4 +235,3 @@ func TestStructuredLogsRedactionAndSanitization(t *testing.T) {
 
 	t.Logf("AC-A-090-03 Verificado: Logs estructurados redactan PII y secretos con trazabilidad W3C inyectada.")
 }
-
