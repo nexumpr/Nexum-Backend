@@ -30,6 +30,53 @@ var DefaultArgon2Params = Argon2Params{
 	KeyLength:   32,
 }
 
+// Guardas anti-DoS aplicadas a los parámetros que llegan dentro del hash
+// almacenado. Los valores por defecto de A-050 (m=64 MiB, t=3, p=2, keyLen=32)
+// caen dentro de estos límites; ampliarlos exige revisión de A-050 (RFC), no un
+// cambio silencioso aquí.
+const (
+	minMemoryKiB         uint32 = 8 * 1024   // 8 MiB
+	maxMemoryKiB         uint32 = 256 * 1024 // 256 MiB
+	minIterations        uint32 = 1
+	maxIterations        uint32 = 10
+	minParallelism       uint8  = 1
+	maxParallelism       uint8  = 16
+	minSaltBytes                = 8
+	maxSaltBytes                = 64
+	maxEncodedHashLength        = 4096
+)
+
+// allowedKeyLengths evita la conversión int->uint32: la longitud del digest se
+// valida contra constantes ya tipadas (corrige gosec G115 sin exclusiones).
+var allowedKeyLengths = map[int]uint32{
+	16: 16,
+	24: 24,
+	32: 32,
+	48: 48,
+	64: 64,
+}
+
+// validateArgon2Parameters rechaza parámetros peligrosos ANTES de invocar Argon2,
+// evitando agotamiento de memoria/CPU con hashes manipulados.
+func validateArgon2Parameters(memory, iterations uint32, parallelism uint8, saltLen, digestLen int) error {
+	if memory < minMemoryKiB || memory > maxMemoryKiB {
+		return errors.New("parametros de argon2 fuera de rango: memoria")
+	}
+	if iterations < minIterations || iterations > maxIterations {
+		return errors.New("parametros de argon2 fuera de rango: iteraciones")
+	}
+	if parallelism < minParallelism || parallelism > maxParallelism {
+		return errors.New("parametros de argon2 fuera de rango: paralelismo")
+	}
+	if saltLen < minSaltBytes || saltLen > maxSaltBytes {
+		return errors.New("sal de argon2 con longitud invalida")
+	}
+	if _, ok := allowedKeyLengths[digestLen]; !ok {
+		return errors.New("digest de argon2 con longitud invalida")
+	}
+	return nil
+}
+
 // Argon2Hasher implementa el puerto ports.PasswordHasher usando el algoritmo Argon2id.
 type Argon2Hasher struct {
 	params Argon2Params
@@ -87,6 +134,11 @@ func (h *Argon2Hasher) VerifyPassword(password, encodedHash string) (bool, error
 		return false, ports.ErrInvalidPassword
 	}
 
+	// Cota de entrada antes de parsear: un hash legítimo es mucho más corto.
+	if len(encodedHash) > maxEncodedHashLength {
+		return false, ports.ErrInvalidPassword
+	}
+
 	parts := strings.Split(encodedHash, "$")
 	if len(parts) != 6 {
 		return false, ports.ErrInvalidPassword
@@ -117,13 +169,20 @@ func (h *Argon2Hasher) VerifyPassword(password, encodedHash string) (bool, error
 		return false, ports.ErrInvalidPassword
 	}
 
+	// Validación de política y longitudes ANTES de derivar la clave: evita
+	// agotamiento de recursos y la conversión insegura int->uint32 (G115).
+	if err := validateArgon2Parameters(memory, iterations, parallelism, len(salt), len(expectedHash)); err != nil {
+		return false, err
+	}
+	keyLen := allowedKeyLengths[len(expectedHash)]
+
 	computedHash := argon2.IDKey(
 		[]byte(password),
 		salt,
 		iterations,
 		memory,
 		parallelism,
-		uint32(len(expectedHash)),
+		keyLen,
 	)
 
 	if subtle.ConstantTimeCompare(expectedHash, computedHash) == 1 {

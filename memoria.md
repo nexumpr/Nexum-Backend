@@ -305,3 +305,10 @@
 - Local: actionlint PASS, go build/vet/test PASS, govulncheck PASS.
 - Bloqueo nuevo D-10: gosec HIGH G115 en `internal/infrastructure/security/hasher.go:126` (A-050). No se suprime; requiere decision humana (fix acotado o exclusion justificada).
 - A-100: allowlist por ruta de gitleaks reemplazada por baseline revisado (16 falsos positivos historicos); una credencial nueva en esas rutas ya se detecta (probado con ficheros sinteticos en %TEMP%).
+### Hotfix A-050 — D-10 (2026-11-06)
+
+- Gate `GATE_H08A_HOTFIX_A050_G115` aprobado; rama `fix/h08a-a050-gosec-g115` desde main 10f6327.
+- Causa real: `VerifyPassword` aceptaba memoria/iteraciones/paralelismo y longitud de digest desde el hash almacenado sin acotar (agotamiento de recursos + G115).
+- Correccion: guardas de politica y longitud antes de Argon2; longitud del digest desde constantes uint32; sin `#nosec`.
+- gosec PASS, govulncheck PASS, go build/vet/test PASS; 7 grupos de pruebas nuevas.
+- CI Go no aplicable en este PR hasta integrar A-100 (dependencia de bootstrap registrada).
