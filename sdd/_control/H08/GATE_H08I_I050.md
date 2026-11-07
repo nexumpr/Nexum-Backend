@@ -25,7 +25,9 @@ endpoints de negocio, cambios a los 75 contratos, aprobar RFC-004 o H-01, ni fus
 Existe elección ratificada: I-000 (D6, «SKU Redis» `CUMPLIDA_CON_EVIDENCIA`) fija **ElastiCache Redis OSS
 `cache.t4g.micro`** con precio `VERIFIED_AWS`. Por tanto **se implementa esa alternativa** y se produce el ADR
 comparativo exigido por I-050 §6 (`ADR_REDIS_PROVEEDOR.md`), que descarta Valkey, serverless, MemoryDB y la
-instancia autogestionada con motivo y coste.
+instancia autogestionada con motivo y coste. La **matriz ADR obligatoria** (disponibilidad, seguridad, coste 45
+días, plan Free, recuperación, compatibilidad SDD y riesgos por alternativa) está en su §6; el coste elegido es
+**17.2800 USD + 0.1000 de transferencia inter-AZ**, ya presupuestado en I-000.
 
 ## 3. Decisiones de implementación (trazadas a la spec)
 

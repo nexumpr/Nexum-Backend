@@ -58,3 +58,24 @@ edita `spec.md` (política `edit` denegada y sin RFC) ni se altera I-000: se dej
 Nada se ha desplegado. Si se prefiere otra alternativa, el cambio se limita a
 `infra/terraform/modules/redis/main.tf` (variable `motor`/topología) **antes** de cualquier `apply`, y requeriría
 una nueva ADR con recotización. No hay recurso AWS creado que deshacer.
+
+## 6. Matriz ADR obligatoria (comparativa completa)
+
+Precios tomados **solo** del catálogo `infra/finops/precios_us-east-2.json` (`estado_global:
+VERIFIED_AWS_PARCIAL`); ninguna cifra se inventa y ninguna oferta de créditos *pendientes* se cuenta como saldo.
+
+| ALTERNATIVA | DISPONIBILIDAD | SEGURIDAD | COSTO 45 DÍAS | FREE PLAN | RECUPERACIÓN | COMPATIBILIDAD SDD | RIESGOS |
+|---|---|---|---|---|---|---|---|
+| **A. ElastiCache Redis OSS, 1 nodo `cache.t4g.micro`** *(elegida)* | 1 AZ, **sin réplica ni Multi-AZ** → punto único de fallo declarado; el servicio parchea y mantiene el motor | TLS + cifrado en reposo + RBAC dedicado + SG privado de I-010; sin puerto público | **17.2800 USD** (1080 h × 0.016) + **0.1000** de transferencia inter-AZ presupuestada = **17.3800** | Sin asignación gratuita permanente de ElastiCache; cubierto por los 120 USD del plan Free | Sin backups (`retention 0`); RTO = repoblar caché desde DynamoDB; sin pérdida de dato financiero | **Total**: Redis OSS real, compartido por los 2 nodos, TTL/rate-limit (A-080) | SPOF; coste por hora sin tráfico; token RBAC depende de RFC-004 |
+| **B. Redis OSS autogestionado en EC2 dedicada** | 1 instancia → SPOF, salvo replicación manual; **no puede vivir en el ASG** (se reemplaza y se pierde servicio) | Parcheo, TLS, AUTH y hardening a cargo del equipo; misma red privada posible | **≈10.0320 USD** (0.0084 × 1080 = 9.0720 + EBS gp3 8 GB × 0.08 × 1.5 = 0.9600), **sin** contar snapshots ni tiempo de operación | La franquicia mensual de `t4g.micro` ya la consumen las 2 instancias de I-020 (1440 h/mes > 750 h); la 3.ª instancia se factura | RDB/AOF + snapshots EBS manuales; recuperación y verificación manuales | Técnicamente posible, pero exige una **tercera instancia no autorizada ni presupuestada** y operación continua | Deriva de presupuesto, fallos por parcheo/versión, pérdida de caché en reemplazos, carga operativa |
+| **C. ElastiCache Valkey** | Igual que A | Igual que A | Tarifa distinta; **0.0128 USD/nodo-hora citada en I-050 §8 es fuente secundaria `NOT_VERIFIED`**, no usada aquí | Igual que A (sin franquicia) | Igual que A | **No cumple**: el SDD exige Redis OSS; cambiarlo requiere ADR humano | Cambio normativo sin ratificación |
+| **D. ElastiCache Serverless** | Gestión de capacidad automática | TLS/RBAC disponibles | **No modelado**: se factura por ECPU/GB, métrica que I-000 no presupuestó | Sin franquicia; cubierto por créditos pero con predicción peor | Sin backups gestionados en el modelo usado | Funcional, pero incompatible con presupuesto fijo de 45 días | Sobrecoste impredecible; requiere recotización |
+| **E. MemoryDB** | Durable, réplica gestionada | TLS + ACL | **No está en el catálogo** (`NOT_VERIFIED`); estructuralmente superior a ElastiCache | Sin franquicia | Durabilidad real (no es caché) | No aporta nada al rol de caché del SDD | Coste fuera de presupuesto; propósito distinto |
+
+**Supuestos explícitos:** 45 días = 1080 h; 1 nodo; sin réplicas; sin snapshots de Redis; transferencia inter-AZ
+de 10 GB ya incluida en la partida `REDIS_INTERAZ`; precios del catálogo con fecha 2026-11-06; **no** se asume
+ninguna de las cuatro actividades de créditos adicionales (20 USD cada una) porque **no están acreditadas**.
+
+**Descartes justificados:** C por requisito normativo; D y E por coste no modelado; B por introducir una tercera
+instancia no autorizada, fuera-del-presupuesto y con carga operativa, además de no poder residir en el ASG sin
+perder el servicio.
