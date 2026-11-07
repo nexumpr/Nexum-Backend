@@ -363,3 +363,12 @@
   - OR global (config anterior): 2 hallazgos → la credencial sintética dentro del manifiesto **quedaba oculta** y sólo se detectaban las externas.
 - **H-01 sigue abierto y sin aceptar:** no se ha decidido en nombre del responsable. Con el certificado por defecto AWS fija la security policy en **TLSv1**; los clientes modernos negocian TLS 1.2/1.3, pero la política mínima configurada no es TLS 1.2. Bloquea la autorización de despliegue hasta decisión humana específica.
 - Pruebas estructurales nuevas en `tests/infra/terraform/test_balanceo_contrato.py` (análisis por bloques con conteo de llaves, no búsqueda de cadenas) y `herramientas/tests/test_gitleaks_config.py` (configuración mínima verificable sin red).
+
+### I-030 — cierre post-merge (2026-11-07)
+
+- **PR #22 MERGED** (`2026-11-07T06:33:25Z`). HEAD autorizado `121a75c4d18f87b5b8a735e86c0ee4cc5cf77969` mediante `AUTORIZO_MERGE_PR_22_HEAD_121a75c`, verificado con `--match-head-commit` antes de fusionar. Merge commit y `main` actual: **`cc19a77b14d73f4a146baa899a2febe677c267fa`**.
+- CI del PR: 5/5 verde (Go, análisis estático, gitleaks, SBOM, SDD). CI de `main` en `cc19a77`: Go Backend CI **SUCCESS** y SDD documental **SUCCESS**.
+- Estado de I-030: **INTEGRADO_MAIN — NO DESPLEGADO** (`INFRA_NOT_DEPLOYED`, `AWS_NOT_RUN`). No se declara `AWS_DEPLOYED`, `AWS_VERIFIED`, `PRODUCTION_READY` ni `FINOPS_GARANTIZADO`.
+- Este cierre es **documental**: corrige afirmaciones que seguían diciendo «PR pendiente»/«sin PR» en `ESTADO_Y_GATES.md`, este archivo, el Gate I-030, `tasks.md` y `checklist.md`. No se tocó Terraform, Go, OpenAPI ni workflows.
+- Recordatorio de gobierno: el merge exigió autorización humana vinculada a PR y HEAD exactos (A-110: `feature → PR → checks → aprobación → merge`; R-004: la aprobación identifica entrega, hash, alcance y excepciones). Una autorización anticipada no sustituye esa identificación.
+- Riesgos que permanecen sin aceptar: H-01 (TLSv1 por certificado por defecto), RFC-004 (secretos de bootstrap), readiness 503 hasta I-040/I-050, CI de Terraform pendiente (I-080), verificación AWS real y condición presupuestaria de I-000.

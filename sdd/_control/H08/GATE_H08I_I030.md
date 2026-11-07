@@ -5,9 +5,9 @@
 | Documento | `sdd/_control/H08/GATE_H08I_I030.md` |
 | Fecha | 2026-11-06 |
 | Spec | `sdd/02-infraestructura/I-030-balanceo-https/` (v0.2.0 por enmienda) |
-| Estado | **IMPLEMENTADO_LOCAL — PR PENDIENTE; DESPLIEGUE NO AUTORIZADO** |
+| Estado | **INTEGRADO_MAIN — NO DESPLEGADO** |
 | Precondición | I-020 cerrada (PR #17 `10f6327`); hotfixes A-030/A-050/A-090/A-100 en `main` `3de4fc6` |
-| Rama | `feat/h08i-i030-balanceo-https` (sincronizada con `main`; sin PR creado) |
+| Rama | `feat/h08i-i030-balanceo-https` — fusionada en `main` con **PR #22** (merge `cc19a77b14d73f4a146baa899a2febe677c267fa`) |
 | Enmienda | `sdd/_control/H08/RFC-005-ENMIENDA_I030_TLS_D2.md` |
 
 ## Historial del Gate
@@ -17,6 +17,7 @@
 | v0.1.0 | `PROPUESTO` | Gate propuesto; conflicto TLS D2 vs DRAFT documentado, sin resolver |
 | v0.2.0 | `D2_RATIFICADA` | Ratificación humana `RATIFICO_D2_PARA_I030`; conflicto resuelto por RFC-005. Sigue **sin** autorizar implementación |
 | v0.3.0 | `IMPLEMENTADO_LOCAL` | `APRUEBO_GATE_I030_LOCAL` concedida 2026-11-06; módulo `balanceo` escrito y validado localmente. Sin AWS, sin PR aún |
+| v1.0.0 | `INTEGRADO_MAIN` | PR **#22** MERGED (HEAD autorizado `121a75c`, merge `cc19a77`) tras correcciones de auditoría externa; CI del PR y de `main` en verde. **No desplegado** |
 
 ## 1. Conflicto normativo — RESUELTO por ratificación
 
@@ -100,7 +101,7 @@ Gate aparte.
 |---|---|---|
 | `RATIFICO_D2_PARA_I030` | **CONCEDIDA** 2026-11-06 | Sólo decisión normativa + ajustes documentales |
 | `APRUEBO_GATE_I030_LOCAL` | **CONCEDIDA** 2026-11-06 | Autorizó escribir/validar I-030 localmente; no despliega ni fusiona |
-| Autorización de merge | **PENDIENTE** | Requiere PR, checks verdes y frase humana específica |
+| Autorización de merge | **CONCEDIDA** 2026-11-07 — `AUTORIZO_MERGE_PR_22_HEAD_121a75c` (PR #22, HEAD `121a75c`); merge `cc19a77` |
 | Autorización de despliegue AWS | **NO SOLICITADA** | Gate independiente y separado |
 
 ## 9. Registro de implementación local (2026-11-06)
@@ -150,3 +151,21 @@ El repositorio completo queda en «no leaks found».
 
 **H-01 no se acepta aquí:** sigue bloqueando la autorización de despliegue hasta decisión humana específica.
 `AWS_NOT_RUN`; `terraform plan/apply/destroy` no ejecutados.
+
+## 11. Cierre post-merge (2026-11-07)
+
+| Campo | Valor |
+|---|---|
+| PR | **#22 MERGED** (`2026-11-07T06:33:25Z`) |
+| HEAD autorizado | `121a75c4d18f87b5b8a735e86c0ee4cc5cf77969` (`AUTORIZO_MERGE_PR_22_HEAD_121a75c`) |
+| Merge commit / `main` | `cc19a77b14d73f4a146baa899a2febe677c267fa` |
+| CI del PR | 5/5 verde (Go, análisis estático, gitleaks, SBOM, SDD) |
+| CI de `main` | Go Backend CI **SUCCESS** · SDD documental **SUCCESS** |
+| Estado | `INTEGRADO_MAIN` · `INFRA_NOT_DEPLOYED` · `AWS_NOT_RUN` |
+
+**Lo que este cierre NO declara:** `AWS_DEPLOYED`, `AWS_VERIFIED`, `PRODUCTION_READY`, `FINOPS_GARANTIZADO`.
+Ningún recurso AWS existe; la verificación real de VPC Origins, health checks y failover sigue pendiente.
+
+**Riesgos conservados (ninguno aceptado aquí):** H-01 (security policy TLSv1 con certificado por defecto),
+RFC-004 (secretos del bootstrap), readiness 503 hasta I-040/I-050, CI de Terraform inexistente (I-080),
+verificación AWS pendiente y condición presupuestaria de I-000 (113.0613 / 118.5613 USD/45 d ≤ 120.0000).
