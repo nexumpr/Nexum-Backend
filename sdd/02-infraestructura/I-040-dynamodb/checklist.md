@@ -19,14 +19,22 @@
 
 ### Decisiones técnicas
 
-- [ ] `INF-040-01` **Tabla principal:** diseño justificado, referencias, supuestos y evidencia trazable.
-- [ ] `INF-040-02` **Entidades y claves:** diseño justificado, referencias, supuestos y evidencia trazable.
+- [x] `INF-040-01` **Tabla principal:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — implementada `NEXUM_CORE_<ENV>`, `PAY_PER_REQUEST`, `PK`/`SK` (S), SSE, protection por entorno (2026-11-07). No es evidencia AWS.
+- [x] `INF-040-02` **Entidades y claves:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — prefijos de A-060 ya implementados en Go y verificados contra la matriz H05.
 - [ ] `INF-040-03` **Rutas de acceso:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — pertenece a la aplicación (A-040/A-060); la tabla no habilita Scan.
 - [ ] `INF-040-04` **Unicidad y consistencia:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — `EMAIL#<sha256>/OWNER` y transacciones viven en la app (A-060/A-070).
 - [ ] `INF-040-05` **Dinero y tiempo:** diseño justificado, referencias, supuestos y evidencia trazable.
-- [ ] `INF-040-06` **TTL y privacidad:** diseño justificado, referencias, supuestos y evidencia trazable.
-- [ ] `INF-040-07` **Índices concretos:** diseño justificado, referencias, supuestos y evidencia trazable.
-- [ ] `INF-040-08` **Infra Terraform futuro:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — `int64` centavos y UTC en A-070; sin floats en la tabla.
+- [x] `INF-040-06` **TTL y privacidad:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — `ttl` sobre `expiresAt`, habilitado; TTL eventual documentado.
+- [x] `INF-040-07` **Índices concretos:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — `GSI1` justificado (E027–E031); `GSI2` opt-in porque no hay worker programado confirmado.
+- [x] `INF-040-08` **Infra Terraform futuro:** diseño justificado, referencias, supuestos y evidencia trazable.
+  — `aws_dynamodb_table` + TTL + SSE + PITR + tags, GSI enumerados sin omisiones.
 
 ### Pruebas y cobertura de diseño
 
@@ -49,3 +57,12 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+### Gate de implementación local I-040 (2026-11-07)
+
+- [x] `APRUEBO_GATE_I040_LOCAL` concedido explícitamente.
+- [x] Módulo `infra/terraform/modules/dynamodb` escrito y compuesto en `envs/h08i`.
+- [x] `fmt -check`, `init -backend=false` y `validate` ejecutados con salida real (Success).
+- [x] 23 pruebas de contrato + 10 de alineación FinOps en verde.
+- [ ] PR único revisado; merge y despliegue requieren autorización humana independiente.
+- [ ] Verificación real en AWS (tabla, TTL, PITR, consultas sin Scan): `NOT_RUN`.

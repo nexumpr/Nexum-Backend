@@ -97,3 +97,35 @@ variable "cloudfront_price_class" {
   type        = string
   default     = "PriceClass_100"
 }
+
+# --- I-040: DynamoDB ---------------------------------------------------------
+
+variable "dynamodb_nombre_tabla" {
+  description = "Nombre base de la tabla única de A-060 (el módulo añade el entorno)"
+  type        = string
+  default     = "NEXUM_CORE"
+}
+
+variable "dynamodb_atributo_ttl" {
+  description = "Atributo TTL epoch seconds fijado por la matriz física H05"
+  type        = string
+  default     = "expiresAt"
+}
+
+variable "dynamodb_pitr_habilitado" {
+  description = "PITR presupuestado en I-000 (DDB_PITR)"
+  type        = bool
+  default     = true
+}
+
+variable "dynamodb_proteccion_borrado" {
+  description = "Deletion protection; desactivada en h08i para permitir teardown autorizado"
+  type        = bool
+  default     = false
+}
+
+variable "dynamodb_habilitar_gsi2" {
+  description = "GSI2 para workers programados (E057–E060); desactivado si no hay scheduler confirmado"
+  type        = bool
+  default     = false
+}
