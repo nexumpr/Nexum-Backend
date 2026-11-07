@@ -129,3 +129,17 @@ variable "dynamodb_habilitar_gsi2" {
   type        = bool
   default     = false
 }
+
+# --- I-050: Redis OSS compartido --------------------------------------------
+
+variable "redis_password_aplicacion" {
+  description = <<-EOT
+    Contraseña del usuario RBAC de Redis. Sensible y sin valor por defecto: en
+    I-050 no hay despliegue y ningún secreto se versiona. En despliegue llegará
+    por el mecanismo aprobado (RFC-004, aún PROPUESTO) o por variable de entorno
+    fuera del repositorio.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = ""
+}

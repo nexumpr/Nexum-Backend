@@ -5,7 +5,7 @@
 | Documento | `sdd/_control/H08/GATE_H08I_I040.md` |
 | Fecha | 2026-11-07 |
 | Spec | `sdd/02-infraestructura/I-040-dynamodb/` (v0.1.0 DRAFT; implementación conforme a la matriz física H05 y A-060) |
-| Estado | **AUTORIZADO_LOCAL — IMPLEMENTADO_LOCAL (sin AWS)** |
+| Estado | **INTEGRADO_MAIN — NO DESPLEGADO** (PR #24 MERGED, merge `51e01f6eae37d548b3b790a967859ff314ed6bc7`) |
 | Precondición | I-030 cerrada: PR #22 y cierre documental PR #23; `main` `9b2e4ac` |
 | Rama | `feat/h08i-i040-dynamodb` |
 | Autorización | `APRUEBO_GATE_I040_LOCAL` (2026-11-07) |

@@ -83,7 +83,27 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 
 ### T-050-99 — Ratificación de la especificación
 
-- **Estado:** REVIEW pendiente.
+- **Estado:** **IMPLEMENTADO_LOCAL 2026-11-07** (Gate `APRUEBO_GATE_I050_LOCAL`); falta el Gate de despliegue AWS.
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+## Implementación H08-I (2026-11-07) — no reescribe el estado H05
+
+Gate `APRUEBO_GATE_I050_LOCAL`; registro en `sdd/_control/H08/GATE_H08I_I050.md` y ADR de proveedor en
+`sdd/_control/H08/ADR_REDIS_PROVEEDOR.md`. Rama `feat/h08i-i050-redis`. `AWS_NOT_RUN`.
+
+| Tarea | Estado real | Evidencia |
+|---|---|---|
+| T-050-01 Servicio | **IMPLEMENTADO_LOCAL** | `aws_elasticache_replication_group` engine `redis` 7.1; decisión heredada de I-000 (SKU `VERIFIED_AWS`), no elegida en I-050 |
+| T-050-02 Topología | **IMPLEMENTADO_LOCAL** | 1 nodo `cache.t4g.micro`, sin réplicas, sin Multi-AZ; precondition impide failover con un nodo; salida `alta_disponibilidad = false` |
+| T-050-03 Red | **IMPLEMENTADO_LOCAL** | Subnet group con las 2 subredes de I-010; SG de I-010 (6379 sólo desde backend); TLS + cifrado en reposo obligatorios; RBAC dedicado con contraseña sensible |
+| T-050-04 Objetivos | **APP (A-080)** | TTL/versión/HMAC en claves y rate limiting atómico viven en la aplicación; la caché aporta política `volatile-lru` |
+| T-050-05 Fallo | **APP (A-080) + DISEÑO** | DynamoDB es la verdad; sin snapshots; fail-close/degradación por operación en el cliente |
+| T-050-06 Prueba compartida | **NOT_RUN** | Requiere AWS; el endpoint único y el SG compartido hacen posible la prueba desde ambos nodos |
+| T-050-07 Costo | **PRESUPUESTADO** | 17.2800 USD/45 d (1080 × 0.016), sin partidas nuevas; réplicas exigirían recotización |
+| T-050-90 Riesgos | **CLASIFICADOS** | R01 mitigado parcialmente (motor/precio verificados, creación `NOT_RUN`), R02 no aplicable, R03 resuelto en diseño, R04 en A-080; SPOF declarado |
+| T-050-99 Ratificación | **IMPLEMENTADO_LOCAL** | Gate registrado; despliegue y merge requieren autorización específica |
+
+**Bloqueo de despliegue registrado:** la contraseña RBAC debe entregarse por un mecanismo aprobado; RFC-004 sigue
+PROPUESTO y el endpoint `secretsmanager` de I-010 sólo existe en ventana de mantenimiento.

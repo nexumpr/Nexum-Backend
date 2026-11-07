@@ -164,3 +164,34 @@ output "dynamodb" {
     estado_despliegue  = module.dynamodb.estado_despliegue
   }
 }
+
+# --- I-050: Redis OSS compartido -------------------------------------------
+
+module "redis" {
+  source = "../../modules/redis"
+
+  proyecto = "nexum"
+  entorno  = var.entorno
+  region   = var.region
+
+  subnet_ids    = module.red.subredes_privadas
+  sg_redis_id   = module.red.security_groups["redis"]
+  sg_backend_id = module.red.security_groups["backend"]
+
+  password_aplicacion = var.redis_password_aplicacion
+}
+
+output "redis" {
+  description = "Endpoint compartido, topología, seguridad y política de caché"
+  value = {
+    replication_group_id = module.redis.replication_group_id
+    endpoint             = module.redis.endpoint_primario
+    puerto               = module.redis.puerto
+    motor                = module.redis.motor
+    topologia            = module.redis.topologia
+    seguridad            = module.redis.seguridad
+    cache                = module.redis.cache
+    red                  = module.redis.red
+    estado_despliegue    = module.redis.estado_despliegue
+  }
+}
