@@ -52,7 +52,7 @@ class ConfiguracionGitleaks(unittest.TestCase):
         self.assertIn("paths = ", self.sin_comentarios)
         self.assertIn('regexTarget = "line"', self.sin_comentarios)
         self.assertIn("regexes = ", self.sin_comentarios)
-        self.assertIn("RFC-004-SECRETOS_BOOTSTRAP", self.sin_comentarios)
+        self.assertIn("SECRETOS", self.sin_comentarios)
         self.assertIn("[a-f0-9]{64}", self.sin_comentarios)
 
     def test_no_excluye_carpetas_ni_reglas(self) -> None:
@@ -63,6 +63,28 @@ class ConfiguracionGitleaks(unittest.TestCase):
         self.assertEqual(len(rutas), 1)
         self.assertIn("BASELINE_SHA256", rutas[0])
         self.assertTrue(rutas[0].endswith("$"), "la ruta debe estar anclada al final")
+
+    def test_patron_cubre_todos_los_documentos_secretos_sin_ocultar_credenciales(self) -> None:
+        """El manifiesto declara digest de varios documentos con SECRETOS en el nombre."""
+        rutas = re.findall(r"regexes\s*=\s*\[\s*'''(.*?)'''", self.sin_comentarios)
+        self.assertEqual(len(rutas), 1)
+        patron = rutas[0]
+        self.assertIn("SECRETOS", patron)
+        self.assertIn("[a-f0-9]{64}", patron)
+        self.assertIn("BASELINE_SHA256", self.sin_comentarios)
+        # Debe aceptar los documentos existentes y rechazar cualquier otra línea.
+        self.assertRegex(
+            '  "sdd/_control/H08/RFC-004-SECRETOS_BOOTSTRAP.md": "' + "a" * 64 + '"',
+            patron.replace("\\\\", "\\"),
+        )
+        self.assertRegex(
+            '  "sdd/_control/H08/ROTACION_SECRETOS_I060.md": "' + "b" * 64 + '"',
+            patron.replace("\\\\", "\\"),
+        )
+        self.assertNotRegex(
+            '  "sdd/_control/H08/ROTACION_SECRETOS_I060.md": "AKIAIOSFODNN7EXAMPLE"',
+            patron.replace("\\\\", "\\"),
+        )
 
     def test_sin_credenciales_reales_en_la_configuracion(self) -> None:
         self.assertNotRegex(self.texto, r"AKIA[0-9A-Z]{16}")

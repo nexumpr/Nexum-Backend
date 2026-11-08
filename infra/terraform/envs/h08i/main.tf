@@ -70,7 +70,7 @@ module "computo" {
 
   puerto_backend = var.puerto_backend
 
-  iam_instance_profile_name = var.iam_instance_profile_name
+  iam_instance_profile_name = module.iam.runtime_instance_profile_name
   root_volume_gb            = var.root_volume_gb
   artefacto_s3_uri          = var.artefacto_s3_uri
   artefacto_sha256          = var.artefacto_sha256
@@ -145,6 +145,49 @@ module "dynamodb" {
   pitr_habilitado    = var.dynamodb_pitr_habilitado
   proteccion_borrado = var.dynamodb_proteccion_borrado
   habilitar_gsi2     = var.dynamodb_habilitar_gsi2
+}
+
+# --- I-060: IAM runtime + trust-only OIDC contracts ------------------------
+
+module "iam" {
+  source = "../../modules/iam"
+
+  proyecto = "nexum"
+  entorno  = var.entorno
+
+  dynamodb_table_arn = module.dynamodb.table_arn
+  dynamodb_index_arns = [
+    for index_name in keys(module.dynamodb.indices) :
+    "${module.dynamodb.table_arn}/index/${index_name}"
+  ]
+  dynamodb_gsi2_enabled = var.dynamodb_habilitar_gsi2
+
+  # Los objetos exactos esperan I-080; los log groups/sink los define I-110.
+  # Listas vacías significan que NO se concede acceso S3/CloudWatch.
+  artifact_object_arns      = var.iam_artifact_object_arns
+  cloudwatch_log_group_arns = var.iam_cloudwatch_log_group_arns
+
+  # Provider OIDC existente, environment y SCP no se verifican ni mutan en I-060.
+  github_oidc_provider_arn    = var.iam_github_oidc_provider_arn
+  enable_ci_validation_role   = var.iam_enable_ci_validation_role
+  ci_environment_protected    = var.iam_ci_environment_protected
+  enable_plan_oidc_role       = var.iam_enable_plan_oidc_role
+  enable_apply_oidc_role      = var.iam_enable_apply_oidc_role
+  apply_environment_protected = var.iam_apply_environment_protected
+}
+
+output "iam" {
+  description = "Instance profile runtime, permisos mínimos, y límites SCP/OIDC/secretos"
+  value = {
+    runtime_role_name        = module.iam.runtime_role_name
+    runtime_instance_profile = module.iam.runtime_instance_profile_name
+    runtime_permissions      = module.iam.runtime_permissions
+    oidc                     = module.iam.oidc
+    scp_state                = module.iam.scp_state
+    secret_state             = module.iam.secret_state
+    state_and_workflows      = module.iam.state_and_workflows
+    estado_despliegue        = module.iam.estado_despliegue
+  }
 }
 
 output "dynamodb" {

@@ -5,7 +5,7 @@
 | Documento | `sdd/_control/H08/GATE_H08I_I050.md` |
 | Fecha | 2026-11-07 |
 | Spec | `sdd/02-infraestructura/I-050-redis-distribuido/` (v0.1.0 DRAFT; implementación según I-000 + A-080) |
-| Estado | **AUTORIZADO_LOCAL — IMPLEMENTADO_LOCAL (sin AWS)** |
+| Estado | **INTEGRADO_MAIN — NO DESPLEGADO** (PR #25 MERGED, merge `8c314015dcd065f9188bde239be26ddf76cfc1c1`) |
 | Precondición | I-040 integrada: PR #24 MERGED, `main` `51e01f6` |
 | Rama | `feat/h08i-i050-redis` |
 | Autorización | `APRUEBO_GATE_I050_LOCAL` (2026-11-07) |
@@ -126,3 +126,16 @@ valida la semántica del access string, así que el error sólo habría aparecid
   lista oficial, rechaza `@transactions` y cualquier categoría inventada, y exige las categorías de A-080.
 - **Comprobación de servicio real pendiente:** no hay Redis local ni AWS autorizada, así que la validación es
   estática contra la documentación oficial. Se verificará con `describe-users`/`ACL LIST` en el Gate de despliegue.
+
+## 11. Cierre post-merge (2026-11-07)
+
+| Campo | Valor |
+|---|---|
+| PR | **#25 MERGED** (2026-11-07T22:51:29Z) |
+| HEAD autorizado | `d83ab806103a1f07e9f07bd52814517120979aac` |
+| Merge / main | `8c314015dcd065f9188bde239be26ddf76cfc1c1` |
+| Estado | `INTEGRADO_MAIN` · `INFRA_NOT_DEPLOYED` · `AWS_NOT_RUN` |
+| CI de main | Go Backend CI SUCCESS · SDD documental SUCCESS |
+| Pendiente | Gate de despliegue AWS, RFC-004 (secreto RBAC y mecanismo de bootstrap), H-01, CI Terraform (I-080), verificacion real del default deshabilitado y de la ACL |
+
+No se declara `AWS_DEPLOYED`, `AWS_VERIFIED`, `PRODUCTION_READY` ni `FINOPS_GARANTIZADO`.
