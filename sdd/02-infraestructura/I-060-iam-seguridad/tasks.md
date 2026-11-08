@@ -78,3 +78,18 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+## Implementacion H08-I (2026-11-07)
+
+Gate APRUEBO_GATE_I060_LOCAL registrado en sdd/_control/H08/GATE_H08I_I060.md. Rama feat/h08i-i060-iam-seguridad. AWS_NOT_RUN: no se creo ningun recurso IAM ni se consulto AWS. Estado H05 conservado arriba sin reescritura.
+
+- T-060-01 Identidades: IMPLEMENTADO_LOCAL. Rol EC2 runtime + instance profile en infra/terraform/modules/iam, consumido por I-020; roles CI/plan/apply como trust-only.
+- T-060-02 SCP: NO_VERIFICADO (AWS_SCP_NOT_VERIFIED, sin consultas a Organizations ni policy simulator).
+- T-060-03 Secretos: BLOQUEADO por RFC-004; sin permisos Secret Manager/SSM/KMS (ver ROTACION_SECRETOS_I060.md y Gate 4.2).
+- T-060-04 Least privilege: IMPLEMENTADO_LOCAL. Politica DynamoDB por tabla/indices con LeadingKeys; sin Scan/Batch/administracion (MATRIZ_IAM_SCP.md).
+- T-060-05 GitHub OIDC: DECLARADO_LOCAL / NO ACTIVO. Subjects inmutables exactos (owner 349666511, repo 1447636433), aud=sts.amazonaws.com; provider ARN vacio => roles no instanciados (TRUST_OIDC_I060.md).
+- T-060-06 Auditoria: IMPLEMENTADO_LOCAL. Matrices de permisos, trust y secretos/rotacion; sin ARN completos ni credenciales.
+- T-060-90 Riesgos: CLASIFICADOS. SCP y OIDC reales NOT_VERIFIED; state/secretos BLOCKED; sin recursos AWS.
+- T-060-99 Ratificacion: IMPLEMENTADO_LOCAL. Gate registrado; merge y despliegue requieren autorizacion especifica separada.
+
+Pruebas: 18 de contrato en tests/infra/terraform/test_iam_contrato.py (183 en la suite Terraform). fmt -check, init -backend=false y validate en verde. CI Terraform sigue NOT_IMPLEMENTED (I-080).

@@ -48,12 +48,6 @@ variable "etiquetas" {
 
 # --- I-020: cómputo ---------------------------------------------------------
 
-variable "iam_instance_profile_name" {
-  description = "Instance profile real definido por I-060 (no se crea aquí)"
-  type        = string
-  default     = "PENDIENTE-I-060"
-}
-
 variable "root_volume_gb" {
   description = "Volumen raíz por instancia (presupuesto: 15 GB x2)"
   type        = number
@@ -142,4 +136,54 @@ variable "redis_password_aplicacion" {
   type        = string
   sensitive   = true
   default     = ""
+}
+
+# --- I-060: IAM / OIDC ------------------------------------------------------
+
+variable "iam_artifact_object_arns" {
+  description = "ARN exactos de los dos objetos S3 de I-020; vacío mientras I-080 no defina bucket y keys"
+  type        = list(string)
+  default     = []
+}
+
+variable "iam_cloudwatch_log_group_arns" {
+  description = "ARN exactos de log groups de I-110; vacío hasta que esa spec defina un sink"
+  type        = list(string)
+  default     = []
+}
+
+variable "iam_github_oidc_provider_arn" {
+  description = "ARN existente/verificado de token.actions.githubusercontent.com; no se consulta ni crea en I-060"
+  type        = string
+  default     = ""
+}
+
+variable "iam_enable_ci_validation_role" {
+  description = "Activa role trust-only CI tras verificar provider y environment protegido"
+  type        = bool
+  default     = false
+}
+
+variable "iam_ci_environment_protected" {
+  description = "Confirmación externa de protection del environment ci-validation en GitHub"
+  type        = bool
+  default     = false
+}
+
+variable "iam_enable_plan_oidc_role" {
+  description = "Activa role trust-only plan; permisos de state/backend pertenecen a I-070"
+  type        = bool
+  default     = true
+}
+
+variable "iam_enable_apply_oidc_role" {
+  description = "Activa role trust-only apply; permanece desactivado hasta Gate de despliegue"
+  type        = bool
+  default     = false
+}
+
+variable "iam_apply_environment_protected" {
+  description = "Confirmación externa de protection del environment aws-deploy en GitHub"
+  type        = bool
+  default     = false
 }
