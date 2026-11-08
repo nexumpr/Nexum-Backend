@@ -435,3 +435,21 @@
 - Defecto B corregido: cualquier tipo que no empezara por aws_ se aceptaba como local. Ahora denegacion por defecto: solo AWS y terraform_data.validacion_bootstrap; el resto produce PROVEEDOR_NO_AUTORIZADO.
 - Defecto C corregido: se exige recuperacion completa; si falta una direccion AWS prevista se reporta IMPORT_FALTANTE. Plan malformado falla cerrado.
 - Pruebas: 49 de contrato I-070 (245 en la suite Terraform). AWS_NOT_RUN: sin plan real ni recursos.
+
+
+### I-070: cierre post-merge (2026-11-08)
+
+- PR #27 MERGED (merge `21eb9cb540e4d4a39a0851a2c3f730fd78a0846f`), HEAD autorizado `d31d4745367afea9a1cfb672b12f928378208155` verificado con --match-head-commit. CI del PR 5/5; CI de main: Go Backend CI y SDD documental SUCCESS.
+- Estado: INTEGRADO_MAIN - NO DESPLEGADO. AWS_NOT_RUN, INFRA_NOT_DEPLOYED, coste 0.0000 USD. Sin migracion de state, sin import, sin recursos.
+- Riesgos abiertos sin cambios: AWS_SCP_NOT_VERIFIED, RFC-004 PROPUESTO, contrasena Redis en state, OIDC/environments NOT_VERIFIED, H-01, CI Terraform (I-080), Redis sin HA, readiness 503.
+
+### I-080: CI Backend implementado en local (2026-11-08)
+
+- Gate `APRUEBO_GATE_I080_LOCAL` registrado en sdd/_control/H08/GATE_H08I_I080.md; rama feat/h08i-i080-ci-backend; base main 21eb9cb.
+- Workflow .github/workflows/go-backend.yml con seis jobs: calidad (gofmt, vet, staticcheck, build -trimpath -buildvcs, test, -race, cobertura dominio >=80%), seguridad (go mod verify, inventario, govulncheck, gosec), secretos (gitleaks), iac (terraform fmt/init -backend=false/validate + contratos + FinOps), contratos (OpenAPI H06 y herramientas) y cadena-suministro (SBOM).
+- Acciones fijadas por SHA de commit; herramientas Go por version exacta; Terraform 1.16.6; sin AWS, sin Docker, sin secretos, permissions contents: read.
+- Nueva herramienta herramientas/cobertura_dominio.py (deduplica bloques por localizacion, umbral 80, falla cerrado) y 7 pruebas. Cobertura de dominio local: 92.0% (cache 100, dynamo 100, identity 100, financial 84, money 93.8).
+- Tests nuevos de dominio para elevar cobertura: tests/unit/cache/keys_test.go, tests/unit/dynamo/keys_test.go y tests/unit/domain/user_accessors_test.go.
+- Contrato CI: tests/infra/ci/test_ci_contract.py (22 pruebas). Documentos MATRIZ_JOBS_CI.md, GATES_PR.md y REPORTE_EVIDENCIA_CI.md.
+- Branch protection: PENDIENTE_APLICACION_HUMANA (mutacion remota no autorizada); el JSON y el comando quedan documentados.
+- AWS_NOT_RUN: ejecucion real del workflow pendiente del PR; IMPLEMENTADO_LOCAL no es CI verde.

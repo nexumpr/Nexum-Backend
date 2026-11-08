@@ -117,3 +117,13 @@ La revisión con ejecución directa reprodujo tres defectos en `evaluar_recupera
 
 Además, un plan malformado o incompleto falla cerrado (`PLAN_MALFORMADO`). Pruebas de contrato I-070: **49** con
 modelo de `resource_changes` (fixtures sintéticos, no un plan real). `AWS_NOT_RUN`.
+
+## 9. Cierre post-merge (2026-11-08)
+
+- PR **#27 MERGED** con HEAD autorizado `d31d4745367afea9a1cfb672b12f928378208155`, verificado con
+  `--match-head-commit` antes de fusionar. Merge commit y `main`: `21eb9cb540e4d4a39a0851a2c3f730fd78a0846f`.
+- CI del PR: 5/5 verde. CI de `main` en `21eb9cb`: Go Backend CI y SDD documental **SUCCESS**.
+- Estado: **INTEGRADO_MAIN — NO DESPLEGADO** (`AWS_NOT_RUN`, `INFRA_NOT_DEPLOYED`, coste 0.0000 USD).
+  Sin `apply`, sin migración de state, sin import y sin recursos creados.
+- Bloqueos sin cambios: `AWS_SCP_NOT_VERIFIED`, RFC-004 PROPUESTO, contraseña Redis en state, OIDC y
+  environments GitHub `NOT_VERIFIED`, H-01, Redis sin HA y readiness 503 hasta dependencias reales.

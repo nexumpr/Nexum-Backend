@@ -1,12 +1,13 @@
 name: Go Backend CI
 
-# CI funcional del Backend Go (A-100 / A-110).
+# CI funcional del Backend Go (A-100 / A-110 / I-080).
 # Sin AWS, sin Docker, sin secretos productivos, sin despliegue.
-# Herramientas fijadas a versiones verificadas con `go list -m -versions`.
+# Acciones fijadas por SHA de commit y herramientas Go por versión exacta.
+# Contrato: sdd/_control/H08/MATRIZ_JOBS_CI.md y GATES_PR.md.
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'release/**']
   push:
     branches: [main]
 
@@ -24,15 +25,15 @@ jobs:
   calidad:
     name: Formato, vet, build y pruebas
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
 
       - name: Setup Go (version del go.mod)
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
@@ -49,8 +50,11 @@ jobs:
       - name: go vet
         run: go vet ./...
 
-      - name: go build
-        run: go build ./...
+      - name: staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
+
+      - name: go build reproducible (-trimpath -buildvcs)
+        run: go build -trimpath -buildvcs=true ./...
 
       - name: go test
         run: go test ./... -count=1 -timeout 240s
@@ -58,18 +62,31 @@ jobs:
       - name: go test -race (cmd y unitarios)
         run: go test -race ./cmd/... ./tests/unit/... -count=1 -timeout 420s
 
+      - name: Cobertura del dominio (umbral 80%)
+        run: |
+          go test ./tests/... -coverpkg=all -coverprofile=coverage.out -count=1 -timeout 600s
+          python3 herramientas/cobertura_dominio.py coverage.out --umbral 80
+
+      - name: Publicar cobertura
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cobertura-${{ github.sha }}
+          path: coverage.out
+          retention-days: 7
+          if-no-files-found: error
+
   seguridad:
     name: Analisis estatico y vulnerabilidades
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
 
       - name: Setup Go (version del go.mod)
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
@@ -77,11 +94,22 @@ jobs:
       - name: Verificar integridad de modulos
         run: go mod verify
 
+      - name: Inventario de dependencias
+        run: go list -m all > dependencias.txt
+
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
       - name: gosec (sin exclusiones)
         run: go run github.com/securego/gosec/v2/cmd/gosec@v2.30.0 -quiet ./...
+
+      - name: Publicar inventario de dependencias
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dependencias-${{ github.sha }}
+          path: dependencias.txt
+          retention-days: 7
+          if-no-files-found: error
 
   secretos:
     name: Escaneo de secretos
@@ -89,13 +117,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout (historial completo para el escaneo)
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
@@ -106,18 +134,83 @@ jobs:
             detect --source . --config .gitleaks.toml \
             --baseline-path .gitleaks-baseline.json --no-banner --redact --exit-code 1
 
+  iac:
+    name: Validacion Terraform e IaC
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Terraform (version fijada)
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.16.6
+          terraform_wrapper: false
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive infra/terraform
+
+      - name: bootstrap init -backend=false
+        working-directory: infra/terraform/bootstrap
+        env:
+          TF_DATA_DIR: ${{ runner.temp }}/tf-bootstrap
+        run: terraform init -backend=false -input=false
+
+      - name: bootstrap validate
+        working-directory: infra/terraform/bootstrap
+        env:
+          TF_DATA_DIR: ${{ runner.temp }}/tf-bootstrap
+        run: terraform validate
+
+      - name: entorno init -backend=false
+        working-directory: infra/terraform/envs/h08i
+        env:
+          TF_DATA_DIR: ${{ runner.temp }}/tf-env
+        run: terraform init -backend=false -input=false
+
+      - name: entorno validate
+        working-directory: infra/terraform/envs/h08i
+        env:
+          TF_DATA_DIR: ${{ runner.temp }}/tf-env
+        run: terraform validate
+
+      - name: Pruebas de contrato Terraform e IaC
+        run: python3 -m unittest discover -s tests/infra/terraform
+
+      - name: Regresion FinOps de infraestructura
+        run: python3 -m unittest discover -s tests/infra/finops
+
+  contratos:
+    name: Contratos OpenAPI y herramientas
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Validacion OpenAPI H06
+        run: python3 sdd/03-endpoints/herramientas/validar_h06.py
+
+      - name: Pruebas de herramientas y validadores
+        run: python3 -m unittest discover -s herramientas/tests
+
   cadena-suministro:
     name: SBOM de dependencias
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
 
       - name: Setup Go (version del go.mod)
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
@@ -128,9 +221,9 @@ jobs:
             dir:. -o spdx-json=sbom.spdx.json -q
 
       - name: Publicar SBOM como artefacto
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: sbom-spdx
+          name: sbom-spdx-${{ github.sha }}
           path: sbom.spdx.json
           retention-days: 7
           if-no-files-found: error

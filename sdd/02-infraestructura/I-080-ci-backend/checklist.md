@@ -46,3 +46,10 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+- [x] Workflow CI de seis jobs con acciones por SHA y herramientas por version exacta.
+- [x] Cobertura de dominio medida con herramientas/cobertura_dominio.py (umbral 80%; 92.0% local).
+- [x] Terraform fmt/init -backend=false/validate y contratos IaC en CI, sin backend remoto.
+- [x] OpenAPI H06, herramientas, SBOM e inventario de dependencias en CI.
+- [x] GATES_PR.md con seis checks y branch protection documentada como PENDIENTE_APLICACION_HUMANA.
+- [ ] Ejecucion real del workflow sobre el PR: pendiente; no declarar CI verde antes.

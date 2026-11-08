@@ -17,8 +17,9 @@
 | H08-I / I-040 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #24 MERGED (merge `51e01f6eae37d548b3b790a967859ff314ed6bc7`); tabla única `NEXUM_CORE_<ENV>`, GSI1, TTL `expiresAt`, SSE, PITR y matriz de accesos validados; GSI2 opt-in; AWS NOT_RUN |
 | H08-I / I-050 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #25 MERGED (merge `8c314015dcd065f9188bde239be26ddf76cfc1c1`); ElastiCache Redis OSS `cache.t4g.micro` 1 nodo, TLS + RBAC con `default` deshabilitado, ACL `@transaction`, subnet group privado, sin backups; AWS NOT_RUN; secreto RBAC bloqueado por RFC-004/state |
 | H08-I / I-060 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #26 MERGED (merge `c8e37a78efaa1c9ddc0e412b2b96d465eec4911b`); rol/instance profile runtime con DynamoDB exacto (Query en tabla e índices, LeadingKeys + Null:false); roles OIDC trust-only condicionales; `AWS_SCP_NOT_VERIFIED`; secretos `BLOCKED_RFC004` |
-| H08-I / I-070 | **IMPLEMENTADO_LOCAL — PR PENDIENTE** | `APRUEBO_GATE_I070_LOCAL` 2026-11-08; raíz `bootstrap` (bucket de state S3 versionado/SSE-S3/privado + tabla lock `LockID`) validada en local; backend remoto y `apply` NO ejecutados; AWS NOT_RUN |
-| H08-I / I-080..I-150; H08-E / E001..E075 | NOT_AUTHORIZED | Gates por spec futuros; despliegue requiere autorización humana independiente |
+| H08-I / I-070 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #27 MERGED (merge `21eb9cb540e4d4a39a0851a2c3f730fd78a0846f`); raíz `bootstrap` con state S3 versionado/SSE-S3/privado y locking nativo `use_lockfile` (sin tabla DynamoDB); backend remoto y `apply` NO ejecutados; AWS NOT_RUN |
+| H08-I / I-080 | **IMPLEMENTADO_LOCAL — PR PENDIENTE** | `APRUEBO_GATE_I080_LOCAL` 2026-11-08; workflow CI de seis jobs, cobertura de dominio ≥ 80 %, Terraform en CI, OpenAPI, SBOM y gates de PR; branch protection `PENDIENTE_APLICACION_HUMANA`; ejecución real pendiente del PR; AWS NOT_RUN |
+| H08-I / I-090..I-150; H08-E / E001..E075 | NOT_AUTHORIZED | Gates por spec futuros; despliegue requiere autorización humana independiente |
 
 El Gate H08-A se registra en `sdd/_control/H08/GATE_H06_H07_H08A_RATIFICACION.md`. Shell con ASK **no** es un sandbox: el usuario revisa cada orden. El registro de `main` debe seguir limpio; los cambios de H08-A se publican como PR y pasan checks.
 

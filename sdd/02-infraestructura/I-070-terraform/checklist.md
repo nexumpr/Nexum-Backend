@@ -70,3 +70,4 @@
 
 - [x] Evaluador corregido: duplicidad por (proveedor, tipo, id), denegacion por defecto de proveedores y exigencia de importaciones completas (IMPORT_FALTANTE).
 - [x] 49 pruebas de contrato I-070 (245 en la suite Terraform).
+- [x] PR #27 MERGED (merge 21eb9cb540e4d4a39a0851a2c3f730fd78a0846f); estado INTEGRADO_MAIN - NO DESPLEGADO.
