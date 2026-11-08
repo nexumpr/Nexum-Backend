@@ -44,8 +44,10 @@ ni inicio de I-110. No modifica I-060, I-080, I-090 ni sus contratos.
   `X-Forwarded-For` sin proxy validado; el limitador distribuido no está cableado y no hay Redis real ni
   dos nodos. Probado localmente y caracterizado; **no corregido** (pertenece a A-030/A-080). No se declara
   `RATE_LIMIT_DISTRIBUTED_VERIFIED`.
-- **DAST**: el harness sólo prepara plan con evidencia de Gate dentro de `sdd/_control/H08/` (frase, host
-  y caducidad vigente). Hoy no existe: `DAST_BLOCKED_AUTHORIZATION` y `NOT_RUN`.
+- **DAST**: el harness sólo prepara un plan **técnico**; un archivo local con `APRUEBO_GATE_DAST` es
+  evidencia candidata, no autorización. Sin verificación de procedencia por el gobierno de Gates devuelve
+  `DAST_BLOCKED_AUTHORIZATION`; `--fecha` sólo funciona en modo prueba con `NEXUM_TEST_MODE=1`. Hoy
+  `DAST = NOT_RUN / BLOCKED_AUTHORIZATION`.
 - **Escáner IaC**: análisis textual; expresiones dinámicas se reportan como `*_NO_VERIFICABLE`, no PASS.
 - **WAF/H-01/readiness/RFC-004** siguen abiertos bajo sus especificaciones.
 - `AWS_NOT_RUN`: ningún control se declara verificado en cloud.

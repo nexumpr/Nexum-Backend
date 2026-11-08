@@ -63,3 +63,7 @@
 - [x] Defectos A-030/A-080 caracterizados y registrados; sin declarar rate limit distribuido verificado.
 - [x] Harness DAST sin autorizacion simulada; requiere evidencia de Gate real; NOT_RUN.
 - [x] Limites del analisis estatico documentados; Trivy sigue como escaner principal.
+
+- [x] Fixture secure/exposed demuestra que un bucket sin cifrado no se oculta por referencias ajenas.
+- [x] Fixture ingress privado + egress publico no declara ingreso publico; ingress publico si falla.
+- [x] DAST sin autorizacion falsificable por archivo/fecha; modo prueba aislado.

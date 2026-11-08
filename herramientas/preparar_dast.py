@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -111,11 +112,16 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--alcance", required=True, help="rutas separadas por coma")
     parser.add_argument("--evidencia-autorizacion", type=Path, default=None)
     parser.add_argument("--raiz-control", type=Path, default=Path("sdd/_control/H08"))
-    parser.add_argument("--fecha", type=str, default=None, help="fecha de referencia YYYY-MM-DD")
+    parser.add_argument("--fecha", type=str, default=None, help="sólo en modo prueba")
+    parser.add_argument("--modo-prueba", action="store_true", help="permite fecha simulada en tests aislados")
     parser.add_argument("--salida", type=Path, default=None)
     args = parser.parse_args(argv)
+    modo_prueba = args.modo_prueba and os.environ.get("NEXUM_TEST_MODE") == "1"
+    if args.fecha and not modo_prueba:
+        print("DAST_PLAN_FAIL: --fecha sólo se admite con NEXUM_TEST_MODE=1 y --modo-prueba")
+        return 2
     try:
-        hoy = dt.date.fromisoformat(args.fecha) if args.fecha else dt.date.today()
+        hoy = dt.date.fromisoformat(args.fecha) if args.fecha and modo_prueba else dt.date.today()
     except ValueError:
         print("DAST_PLAN_FAIL: fecha invalida")
         return 2
@@ -136,6 +142,11 @@ def main(argv: list[str]) -> int:
         for problema in problemas:
             print(" -", problema)
         return 1
+    if not modo_prueba:
+        # Un archivo local con la frase no acredita aprobación humana: el gobierno
+        # de Gates debe verificar su procedencia antes de atribuir autorización.
+        print("DAST_BLOCKED_AUTHORIZATION: evidencia candidata no verificada por el gobierno de Gates")
+        return 1
     plan = {
         "herramienta": "zap-api-scan",
         "objetivo": args.objetivo,
@@ -143,11 +154,11 @@ def main(argv: list[str]) -> int:
         "datos": "sinteticos",
         "ventana": {"inicio": args.ventana_inicio, "fin": args.ventana_fin},
         "rps": args.rps,
-        "estado": "PLAN_AUTORIZADO_NO_EJECUTADO",
+        "estado": "PLAN_TECNICO_PREPARADO_NO_AUTORIZADO",
     }
     if args.salida is not None:
         args.salida.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("DAST_PLAN_PASS: plan autorizado preparado; ejecución sigue requiriendo operador y ventana")
+    print("DAST_PLAN_PASS: plan técnico preparado en modo prueba; no autoriza ni ejecuta")
     return 0
 
 

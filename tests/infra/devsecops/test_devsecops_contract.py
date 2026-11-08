@@ -167,7 +167,8 @@ class DocumentacionDeSeguridad(unittest.TestCase):
     def test_harness_dast_exige_evidencia_verificable(self) -> None:
         texto = _leer(RAIZ / "herramientas" / "preparar_dast.py")
         for marca in ("APRUEBO_GATE_DAST", "EVIDENCIA_FUERA_DE_CONTROL", "EVIDENCIA_CADUCADA",
-                      "PLAN_AUTORIZADO_NO_EJECUTADO", "GATE_DAST_AUSENTE"):
+                      "PLAN_TECNICO_PREPARADO_NO_AUTORIZADO", "GATE_DAST_AUSENTE",
+                      "NEXUM_TEST_MODE", "no verificada por el gobierno"):
             self.assertIn(marca, texto, marca)
         self.assertNotIn("permitir-remoto", texto)
 

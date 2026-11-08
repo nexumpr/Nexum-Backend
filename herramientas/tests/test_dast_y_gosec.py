@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -58,7 +59,7 @@ class FixtureGosec(unittest.TestCase):
 
 
 class HarnessDAST(unittest.TestCase):
-    def _run(self, evidencia: str | None = EVIDENCIA, **cambios: str) -> subprocess.CompletedProcess:
+    def _run(self, evidencia: str | None = EVIDENCIA, modo_prueba: bool = True, **cambios: str) -> subprocess.CompletedProcess:
         control = _control(evidencia)
         valores = {
             "--objetivo": "http://127.0.0.1:8080",
@@ -69,29 +70,49 @@ class HarnessDAST(unittest.TestCase):
             "--rps": "2",
             "--alcance": "/api/v1/health,/api/v1/auth",
             "--raiz-control": str(control),
-            "--fecha": "2026-11-08",
         }
         if evidencia is not None:
             valores["--evidencia-autorizacion"] = str(control / "GATE_DAST.md")
+        if modo_prueba:
+            valores["--modo-prueba"] = ""
+            valores["--fecha"] = "2026-11-08"
         valores.update(cambios)
         argumentos = [sys.executable, str(DAST)]
         for clave, valor in valores.items():
-            argumentos += [clave, valor]
-        return subprocess.run(argumentos, capture_output=True, text=True, timeout=60)
+            argumentos.append(clave)
+            if valor:
+                argumentos.append(valor)
+        entorno = dict(os.environ)
+        if modo_prueba:
+            entorno["NEXUM_TEST_MODE"] = "1"
+        else:
+            entorno.pop("NEXUM_TEST_MODE", None)
+        return subprocess.run(argumentos, capture_output=True, text=True, timeout=60, env=entorno)
 
-    def test_plan_autorizado_se_prepara_sin_ejecutar(self) -> None:
+    def test_plan_tecnico_en_modo_prueba_no_autoriza(self) -> None:
         salida = Path(tempfile.mkdtemp(prefix="dast-")) / "plan.json"
         r = self._run(**{"--salida": str(salida)})
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("DAST_PLAN_PASS", r.stdout)
         plan = json.loads(salida.read_text(encoding="utf-8"))
-        self.assertEqual(plan["estado"], "PLAN_AUTORIZADO_NO_EJECUTADO")
+        self.assertEqual(plan["estado"], "PLAN_TECNICO_PREPARADO_NO_AUTORIZADO")
         self.assertEqual(plan["datos"], "sinteticos")
+
+    def test_evidencia_local_no_autoriza_operativamente(self) -> None:
+        r = self._run(modo_prueba=False)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("DAST_BLOCKED_AUTHORIZATION", r.stdout)
+        self.assertIn("no verificada por el gobierno", r.stdout)
 
     def test_sin_evidencia_queda_bloqueado(self) -> None:
         r = self._run(evidencia=None)
         self.assertEqual(r.returncode, 1)
         self.assertIn("DAST_BLOCKED_AUTHORIZATION", r.stdout)
+
+    def test_fecha_sin_modo_prueba_se_rechaza(self) -> None:
+        r = self._run(modo_prueba=False, **{"--fecha": "2026-11-08"})
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("sólo se admite con NEXUM_TEST_MODE=1", r.stdout)
 
     def test_evidencia_fuera_de_control_se_rechaza(self) -> None:
         fuera = _archivo(EVIDENCIA)

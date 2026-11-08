@@ -35,11 +35,12 @@ release inmutable (`releases/<release_id>/...`), `If-None-Match: *` y digest en 
   cabeceras, cuerpo > 1 MB, rate limit 429 local, caracterización de defectos A-030 (local + XFF) y
   coordinación simulada de A-080 con caché en memoria.
 - `go test ./...`: suites de dominio, transporte, seguridad y plataforma.
-- `herramientas/tests`: escáner IaC (12 casos, con multi-bucket, SG `cidr_ipv4/ipv6`, IAM en listas y fallo
-  de Git), prueba negativa de gosec, harness DAST (13 casos) y validadores.
-- `herramientas/preparar_dast.py`: prepara un plan DAST **sólo** si existe un documento de Gate dentro de
-  `sdd/_control/H08/` con `APRUEBO_GATE_DAST`, el host y caducidad vigente; objetivo aislado, datos
-  sintéticos, ventana ≤ 4 h, RPS ≤ 5. No ejecuta nada. Hoy devuelve `DAST_BLOCKED_AUTHORIZATION`.
+- `herramientas/tests`: escáner IaC (15 casos, con multi-bucket, ingress/egress, SG `cidr_ipv4/ipv6`, IAM en
+  listas y fallo de Git), prueba negativa de gosec, harness DAST (15 casos) y validadores.
+- `herramientas/preparar_dast.py`: un archivo con `APRUEBO_GATE_DAST` es **evidencia candidata**, no
+  autorización. Sin verificación de procedencia por el gobierno de Gates devuelve
+  `DAST_BLOCKED_AUTHORIZATION`; `--fecha` sólo opera en modo prueba (`NEXUM_TEST_MODE=1`). Mantiene
+  objetivo aislado, datos sintéticos, ventana ≤ 4 h y RPS ≤ 5. No ejecuta nada.
 - **Límite de rate limiting:** la prueba de dos "nodos" comparte caché en memoria; no es Redis real ni
   dos instancias AWS. `RATE_LIMIT_DISTRIBUTED_VERIFIED` no se declara.
 

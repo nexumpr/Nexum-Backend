@@ -100,3 +100,7 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - Rate limiting (2026-11-08): se caracteriza el defecto A-030 (middleware local por instancia y XFF confiado) y se prueba coordinacion simulada de A-080 con cache en memoria. El limitador distribuido no esta cableado; Redis real y 2 nodos NOT_RUN. D-100-01/D-100-02 registrados; no se declara RATE_LIMIT_DISTRIBUTED_VERIFIED.
 - DAST (2026-11-08): el harness exige evidencia de Gate dentro de sdd/_control/H08 con frase, host y caducidad; --permitir-remoto eliminado. Sin evidencia -> BLOCKED_AUTHORIZATION. 13 pruebas.
 - Pruebas: 18 de contrato DevSecOps, 12 IaC y 13 DAST/gosec.
+
+- Correccion definitiva (2026-11-08): analisis IaC por bloques con emparejamiento de llaves; cifrado solo si el bloque SSE referencia el bucket y declara sse_algorithm valido; asociaciones ajenas y expresiones dinamicas no protegen. Ingress/egress separados por tipo y sub-bloque; comentarios ignorados. Fixtures de secure/exposed y ingress privado/egress publico. 15 pruebas.
+- DAST: la evidencia local es candidata, no autorizacion; sin verificacion de procedencia por Gates -> BLOCKED_AUTHORIZATION. --fecha solo en modo prueba con NEXUM_TEST_MODE=1; plan tecnico PLAN_TECNICO_PREPARADO_NO_AUTORIZADO. 15 pruebas.
+- Pruebas: 18 de contrato DevSecOps, 15 IaC y 15 DAST/gosec.
