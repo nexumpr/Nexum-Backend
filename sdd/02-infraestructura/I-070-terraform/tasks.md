@@ -92,3 +92,12 @@ Gate APRUEBO_GATE_I070_LOCAL registrado en sdd/_control/H08/GATE_H08I_I070.md. R
 - T-070-99 Ratificacion: IMPLEMENTADO_LOCAL. Gate registrado; merge y primer apply requieren autorizacion separada.
 
 Pruebas: 22 de contrato en tests/infra/terraform/test_terraform_backend_contrato.py (218 en la suite); incluye politica IAM de state/tflock y casos negativos. fmt/init/validate OK en bootstrap y entorno.
+
+### Cierre I-070: custodia y recuperacion del state de bootstrap (2026-11-08)
+
+- Hueco corregido: el runbook cubria recuperacion del state de runtime, pero no del state propio del bootstrap (creado en local antes de existir el bucket).
+- RUNBOOK_IAC.md 2-4: custodia cifrada fuera del repo con SHA-256 y serial/lineage, prohibicion de state en Git/artifacts, migracion a la clave bootstrap/terraform.tfstate con init -migrate-state autorizado, verificacion de lineage/serial/recursos y plan de cero cambios, y recuperacion por importacion con Spec=I-070-terraform sin recrear el bucket.
+- Separacion por clave: bootstrap/terraform.tfstate y envs/h08i/terraform.tfstate, cada uno con su .tflock; sin tabla DynamoDB.
+- Pruebas: 29 de contrato I-070 (225 en la suite), incluidas separacion de states, prohibicion de migracion sin Gate y ausencia de state en Git/artifacts.
+- FinOps: sin buckets ni recursos adicionales; se mantiene SSE-S3, retencion de versiones 30 dias (cambiarla exigiria decision) y prevent_destroy.
+- AWS_NOT_RUN: ninguna migracion ni import ejecutado.

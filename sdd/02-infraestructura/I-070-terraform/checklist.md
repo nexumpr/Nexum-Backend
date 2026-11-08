@@ -58,3 +58,5 @@
 - [ ] Aplicacion real del bootstrap y activacion del backend: requieren Gate de infraestructura y credenciales humanas.
 - [ ] PR unico revisado; merge y primer apply requieren autorizacion humana independiente.
 - [x] 22 pruebas de contrato I-070 (218 en la suite).
+- [x] Custodia y migracion del state del bootstrap documentadas (RUNBOOK_IAC.md 2-4), con separacion por clave y recuperacion por importacion.
+- [x] 29 pruebas de contrato I-070 (225 en la suite).

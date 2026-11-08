@@ -407,3 +407,8 @@
 - Pruebas: 16 de contrato (212 en la suite Terraform); fmt, init -backend=false y validate OK en bootstrap y entorno.
 - Riesgos: SSE-S3 sin revocacion criptografica inmediata (limite declarado), coste real del state y del lock no medido, AWS_SCP_NOT_VERIFIED, permisos plan/apply siguen en I-080/I-090, RFC-004/H-01 y contrasena Redis en state sin cambios.
 - Pendiente: PR unico, autorizacion de merge por PR+HEAD y Gate de infraestructura para el primer apply del bootstrap.
+### I-070: custodia del state de bootstrap (2026-11-08)
+
+- Corregido el hueco de recuperacion del state propio del bootstrap: custodia cifrada fuera del repositorio con SHA-256 y serial/lineage, migracion posterior a bootstrap/terraform.tfstate con init -migrate-state autorizado, verificacion de cero cambios y recuperacion por importacion (Spec=I-070-terraform) sin recrear el bucket.
+- Separacion por clave: bootstrap/terraform.tfstate y envs/h08i/terraform.tfstate, cada uno con su .tflock; sin tabla DynamoDB.
+- Pruebas: 29 de contrato I-070 (225 en la suite). FinOps sin recursos nuevos; retencion de versiones 30 dias sin cambios.

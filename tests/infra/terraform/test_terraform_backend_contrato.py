@@ -1,4 +1,4 @@
-"""Pruebas estructurales de I-070 (bootstrap S3, locking nativo y condiciones IaC).
+﻿"""Pruebas estructurales de I-070 (bootstrap S3, locking nativo y condiciones IaC).
 
 No consultan AWS ni ejecutan plan/apply. Verifican protecciones del state, el
 mecanismo de locking declarado (S3 `use_lockfile`, sin DynamoDB) y el contrato IAM
@@ -201,6 +201,68 @@ class DocumentosObligatorios(unittest.TestCase):
         self.assertIn("force-unlock", texto)
         self.assertIn("prevent_destroy", texto)
         self.assertIn("auto-approve", texto)
+
+
+
+class RecuperacionDelStateDeBootstrap(unittest.TestCase):
+    """Custodia y recuperación del state PROPIO del bootstrap (INF-070-02/04)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.runbook = _leer(RAIZ / "sdd" / "_control" / "H08" / "RUNBOOK_IAC.md")
+        cls.blueprint = _leer(RAIZ / "sdd" / "_control" / "H08" / "BLUEPRINT_MODULOS_TF.md")
+        cls.bootstrap_main = _leer(BOOTSTRAP / "main.tf")
+        cls.gitignore = _leer(RAIZ / ".gitignore")
+
+    def test_procedimiento_de_custodia_y_migracion_existe(self) -> None:
+        for ancla in (
+            "Custodia del state local del bootstrap",
+            "Migración del state de bootstrap a backend persistente",
+            "Recuperación si se pierde el state del bootstrap",
+            "Migración del state",
+        ):
+            self.assertIn(ancla, self.runbook)
+
+    def test_states_separados_por_clave_distinta(self) -> None:
+        self.assertIn("bootstrap/terraform.tfstate", self.runbook)
+        self.assertIn("envs/h08i/terraform.tfstate", self.runbook)
+        self.assertIn('key          = "envs/h08i/terraform.tfstate"', _leer(ENV / "backend.tf.example"))
+        # El bootstrap no lleva backend hasta que el bucket existe (sin circularidad).
+        self.assertNotRegex(self.bootstrap_main, r'backend\s+"s3"')
+        self.assertIn("dependencia\ncircular", self.runbook.replace("  ", " "))
+
+    def test_state_nunca_en_git_ni_en_artifacts(self) -> None:
+        self.assertIn("*.tfstate", self.gitignore)
+        self.assertIn("*.tfstate.*", self.gitignore)
+        self.assertIn("GitHub Actions artifacts", self.runbook)
+        self.assertIn("no adjuntar", self.runbook.lower())
+        self.assertNotIn("terraform.tfstate\")", self.runbook)
+
+    def test_migracion_requiere_autorizacion_y_no_es_automatica(self) -> None:
+        for prohibido in ("-auto-approve",):
+            self.assertIn(prohibido, self.runbook)
+        self.assertIn("init -migrate-state", self.runbook)
+        self.assertIn("autorización humana", self.runbook)
+        self.assertNotIn("terraform apply -auto-approve", self.runbook)
+
+    def test_recuperacion_por_import_sin_recrear(self) -> None:
+        self.assertIn("import", self.runbook)
+        self.assertIn("nunca por recreación", self.runbook)
+        self.assertIn("cero cambios", self.runbook)
+        self.assertIn("Spec = \"I-070-terraform\"", self.runbook)
+
+    def test_preserva_use_lockfile_y_no_anade_dynamodb(self) -> None:
+        self.assertIn("use_lockfile", self.runbook)
+        self.assertNotIn("dynamodb_table", self.runbook)
+        tipos = {t for t, _ in recursos(self.bootstrap_main)}
+        self.assertNotIn("aws_dynamodb_table", tipos)
+
+    def test_politica_iam_de_state_sigue_vigente(self) -> None:
+        texto = _leer(POLICY)
+        self.assertIn("tflock", texto)
+        self.assertIn("DenyStateDeletion", texto)
+        gate = _leer(RAIZ / "sdd" / "_control" / "H08" / "GATE_H08I_I070.md")
+        self.assertIn("Permisos IAM de state/lock", gate)
 
 
 if __name__ == "__main__":

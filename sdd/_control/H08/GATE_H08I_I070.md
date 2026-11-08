@@ -1,4 +1,4 @@
-# Gate H08-I — I-070 `terraform` (implementación local)
+﻿# Gate H08-I — I-070 `terraform` (implementación local)
 
 | Campo | Valor |
 |---|---|
@@ -24,7 +24,7 @@ del entorno, los documentos de blueprint/matriz/runbook y sus pruebas.
 | INF-070-01 Roots y módulos | `infra/terraform/bootstrap` (state/lock) + módulos existentes red/computo/balanceo/dynamodb/redis/iam documentados en `BLUEPRINT_MODULOS_TF.md` | IMPLEMENTADO_LOCAL |
 | INF-070-02 State | Bucket S3 versionado, SSE-S3, Block Public Access, ownership `BucketOwnerEnforced`, política que exige TLS, lifecycle de versiones no actuales; `prevent_destroy` | IMPLEMENTADO_LOCAL; aplicación `NOT_RUN` |
 | INF-070-03 Plan y lock | Locking **nativo de S3** (`use_lockfile = true`, Terraform >= 1.10) en la plantilla de backend; **sin** tabla DynamoDB (deprecada); `init -backend=false` es lo único autorizado | IMPLEMENTADO_LOCAL |
-| INF-070-04 Drift | `prevent_destroy` en el bucket de state; runbook de `refresh-only`, locks huérfanos, recuperación por versiones y rollback con revisión humana | DOCUMENTADO |
+| INF-070-04 Drift y recuperación | `prevent_destroy` en el bucket; runbook de `refresh-only`, **custodia y migración del state del bootstrap**, locks huérfanos, recuperación por versiones e **importación** sin recrear, y rollback con revisión humana | DOCUMENTADO |
 | INF-070-05 Secuencia | bootstrap → red → IAM → DynamoDB → Redis → cómputo/balanceo → observabilidad → DNS; destrucción inversa | DOCUMENTADO en `RUNBOOK_IAC.md` |
 | INF-070-06 Condiciones | Sin `-auto-approve`, sin credenciales en repo, sin deploy desde PR no confiable, sin destroy masivo por ahorro | DOCUMENTADO y probado |
 

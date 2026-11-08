@@ -1,4 +1,4 @@
-# I-070 — Matriz de recursos, state y coste
+﻿# I-070 — Matriz de recursos, state y coste
 
 | Campo | Valor |
 |---|---|
@@ -22,7 +22,20 @@
 HashiCorp y una tabla adicional sería un recurso no presupuestado. El lock vive en
 `envs/h08i/terraform.tfstate.tflock` dentro del mismo bucket.
 
-## 2. Permisos IAM necesarios (diseño, no aplicado)
+## 2. Separación de states y custodia del bootstrap
+
+| State | Clave en el bucket | Lock | Custodia |
+|---|---|---|---|
+| Bootstrap (crea el bucket) | `bootstrap/terraform.tfstate` tras la migración | `bootstrap/terraform.tfstate.tflock` | Copia cifrada fuera del repo con SHA-256 y `serial`/`lineage`; sin backend hasta que el bucket exista |
+| Runtime h08i | `envs/h08i/terraform.tfstate` | `envs/h08i/terraform.tfstate.tflock` | Backend S3 con `use_lockfile` |
+| Pre-migración del bootstrap | `infra/terraform/bootstrap/terraform.tfstate` local | — | Cifrado, dos copias, nunca en Git ni en artifacts |
+
+El bootstrap **no** declara `backend` mientras el bucket no exista (evita dependencia circular). Tras verificarlo, su
+state se migra a la clave `bootstrap/...` con `init -migrate-state` autorizado. La pérdida del state del bootstrap se
+resuelve por **importación** con un `plan` de cero cambios, nunca recreando el bucket. Procedimiento completo en
+`RUNBOOK_IAC.md` §2–§4.
+
+## 3. Permisos IAM necesarios (diseño, no aplicado)
 
 Contrato en `infra/terraform/policies/terraform-state-access.json.tftpl` (plantilla con `${state_bucket}` y
 `${state_key}`); su forma exacta se valida en `tests/infra/terraform/test_terraform_backend_contrato.py`.
@@ -37,14 +50,14 @@ Contrato en `infra/terraform/policies/terraform-state-access.json.tftpl` (planti
 No se concede `s3:*`, ni acceso al bucket completo, ni `dynamodb:*`. Estos permisos se asignarán a los roles
 de plan/apply cuando I-080/I-090 los definan; I-060 sólo aporta trust OIDC y `iam:PassRole` acotado.
 
-## 3. Qué NO se crea aquí
+## 4. Qué NO se crea aquí
 
 - No se crea la tabla de negocio `NEXUM_CORE` (I-040) ni Redis (I-050).
 - No se crean roles/políticas IAM (I-060) ni workflows (I-080/I-090).
 - No se crea CMK de KMS ni tabla de lock DynamoDB.
 - No se activa el backend del entorno: la plantilla `.example` está inactiva.
 
-## 4. Riesgos abiertos
+## 5. Riesgos abiertos
 
 | Riesgo | Estado |
 |---|---|
