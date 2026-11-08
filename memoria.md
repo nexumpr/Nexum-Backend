@@ -397,3 +397,41 @@
 - **Cerrado 2026-11-07:** PR **#25 MERGED** (HEAD autorizado `d83ab80`, merge **`8c314015dcd065f9188bde239be26ddf76cfc1c1`**). Estado: **INTEGRADO_MAIN — NO DESPLEGADO**; CI de `main` en `8c31401`: Go Backend CI y SDD documental SUCCESS. No se abre PR sólo para el estado.
 - **Endurecimiento RBAC (2026-11-07):** ElastiCache crea automáticamente un usuario `default` (`on ~* +@all`) en todos los grupos y no permite borrarlo (documentación oficial RBAC). Como el módulo sólo declaraba el usuario de aplicación, el `default` permisivo permanecía. Corrección: `aws_elasticache_user.default_deshabilitado` con `user_name = "default"`, `access_string = "off ~* -@all"` y `no-password-required`, añadido al grupo (que queda con exactamente dos identidades). ACL de aplicación endurecida a `-@all +@read +@write +@keyspace +@scripting +@transaction +@connection -keys -scan -randomkey -restore -migrate -sort`, verificada por categoría contra A-080. Sin coste añadido (usuarios y grupos no se facturan). Verificación real en AWS `NOT_RUN`; si el servicio rechazara `no-password-required`, el fallback (default con contraseña fuerte) reabre la dependencia de RFC-004. No se declara la vulnerabilidad cerrada en producción.
 - **Categoría ACL inválida corregida (2026-11-07):** la ACL usaba `+@transactions`; la lista oficial de `ACL CAT` (Redis OSS 7.x) nombra la categoría en singular, `transaction`. `terraform validate` no valida la semántica del access string, así que el error sólo habría aparecido al crear el usuario en AWS. Corregido y cubierto por 7 pruebas nuevas que extraen las categorías, las contrastan con la lista oficial y rechazan tanto `@transactions` como cualquier categoría inventada. Se añadieron denegaciones explícitas `-restore -migrate -sort` por envenenamiento/exfiltración. Comprobación con servicio real pendiente (`describe-users`/`ACL LIST` en el Gate de despliegue).
+
+### I-070: Terraform backend bootstrap (2026-11-08)
+
+- Gate APRUEBO_GATE_I070_LOCAL concedido y registrado en sdd/_control/H08/GATE_H08I_I070.md. Rama feat/h08i-i070-terraform. AWS_NOT_RUN: el bootstrap no se ha aplicado.
+- infra/terraform/bootstrap: bucket de state con versionado, SSE-S3 (sin CMK por coste no presupuestado), Block Public Access, ownership BucketOwnerEnforced, politica que deniega s3 sin TLS, lifecycle de versiones no actuales y prevent_destroy; tabla DynamoDB nexum-h08i-tf-lock con LockID on-demand, SSE, sin PITR ni backups y prevent_destroy.
+- Backend remoto NO activo: envs/h08i sigue sin bloque backend y backend.tf.example documenta la activacion tras aplicar el bootstrap con Gate humano.
+- Documentos: BLUEPRINT_MODULOS_TF.md, MATRIZ_RECURSOS_STATE.md y RUNBOOK_IAC.md (secuencia, drift, rollback, prohibiciones).
+- Pruebas: 16 de contrato (212 en la suite Terraform); fmt, init -backend=false y validate OK en bootstrap y entorno.
+- Riesgos: SSE-S3 sin revocacion criptografica inmediata (limite declarado), coste real del state y del lock no medido, AWS_SCP_NOT_VERIFIED, permisos plan/apply siguen en I-080/I-090, RFC-004/H-01 y contrasena Redis en state sin cambios.
+- Pendiente: PR unico, autorizacion de merge por PR+HEAD y Gate de infraestructura para el primer apply del bootstrap.
+### I-070: custodia del state de bootstrap (2026-11-08)
+
+- Corregido el hueco de recuperacion del state propio del bootstrap: custodia cifrada fuera del repositorio con SHA-256 y serial/lineage, migracion posterior a bootstrap/terraform.tfstate con init -migrate-state autorizado, verificacion de cero cambios y recuperacion por importacion (Spec=I-070-terraform) sin recrear el bucket.
+- Separacion por clave: bootstrap/terraform.tfstate y envs/h08i/terraform.tfstate, cada uno con su .tflock; sin tabla DynamoDB.
+- Pruebas: 29 de contrato I-070 (225 en la suite). FinOps sin recursos nuevos; retencion de versiones 30 dias sin cambios.
+
+
+### I-070: correccion de revision (custodia, importacion, inventario) - 2026-11-08
+
+- Defecto 1 corregido: el runbook ordenaba mover el unico state operativo del bootstrap antes de migrarlo, dejando init -migrate-state sin archivo. Ahora el original permanece en infra/terraform/bootstrap/ y se duplica una copia cifrada con SHA-256 verificado y lineage/serial registrados. Se retira la copia local solo tras migracion y lectura de recuperacion comprobadas.
+- Defecto 2 corregido: el criterio de aceptacion de importacion ya no usa contadores globales (que confundian terraform_data local con infraestructura AWS). Se evalua por direccion y proveedor: AWS_CREATE = 0, AWS_UPDATE_UNAUTHORIZED = 0, AWS_REPLACE = 0, AWS_DESTROY = 0, imports solo previstos y sin duplicados; las operaciones locales de terraform_data se revisan aparte. El apply sigue requiriendo Gate humano.
+- Defecto 3 corregido: el inventario se deriva del codigo; hoy son 8 direcciones (7 AWS + terraform_data.validacion_bootstrap), no un numero historico fijo. Sin tabla DynamoDB de locking; use_lockfile se mantiene.
+- Pruebas: 33 de contrato I-070 (229 en la suite Terraform). AWS_NOT_RUN: sin migracion, import ni recursos creados.
+
+
+### I-070: criterio de recuperacion por direccion y proveedor (rev4) - 2026-11-08
+
+- Defecto corregido: exigir 0 to add en la recuperacion bloqueaba una recuperacion valida, porque terraform_data.validacion_bootstrap se recrea en el nuevo state como recurso local (create) sin crear infraestructura AWS.
+- RUNBOOK_IAC.md 4: criterio por direccion y proveedor (AWS_CREATE = 0, AWS_UPDATE_UNAUTHORIZED = 0, AWS_REPLACE = 0, AWS_DESTROY = 0; IMPORTS solo previstos y sin duplicados; TERRAFORM_DATA operaciones locales esperadas y justificadas). No se usan los contadores globales del resumen; ejemplo con 7 to import + 1 to add local. Prohibido eliminar recursos del codigo para conseguir ceros.
+- Pruebas: 47 de contrato I-070 (243 en la suite Terraform), con evaluador determinista sobre planes sinteticos y casos A-L. AWS_NOT_RUN: sin plan real, migracion ni recursos.
+
+
+### I-070: correccion del evaluador de recuperacion (rev5) - 2026-11-08
+
+- Defecto A corregido: falso IMPORT_DUPLICADO al compartir el nombre del bucket entre aws_s3_bucket y aws_s3_bucket_versioning. La clave de duplicidad pasa a (proveedor, tipo, id); se permite el id compartido entre tipos y se rechaza el mismo recurso en dos direcciones del mismo tipo, ademas de DIRECCION_DUPLICADA.
+- Defecto B corregido: cualquier tipo que no empezara por aws_ se aceptaba como local. Ahora denegacion por defecto: solo AWS y terraform_data.validacion_bootstrap; el resto produce PROVEEDOR_NO_AUTORIZADO.
+- Defecto C corregido: se exige recuperacion completa; si falta una direccion AWS prevista se reporta IMPORT_FALTANTE. Plan malformado falla cerrado.
+- Pruebas: 49 de contrato I-070 (245 en la suite Terraform). AWS_NOT_RUN: sin plan real ni recursos.

@@ -4,21 +4,18 @@
 # gestionan con un baseline revisado (`.gitleaks-baseline.json`), que suprime
 # hallazgos concretos y sigue detectando credenciales nuevas.
 #
-# Excepción acotada (I-030, 2026-11-06; endurecida 2026-11-07, ampliada 2026-11-07):
-# el manifiesto de integridad contiene líneas del tipo
-#   "sdd/_control/H08/RFC-004-SECRETOS_BOOTSTRAP.md": "<sha256>"
-#   "sdd/_control/H08/ROTACION_SECRETOS_I060.md": "<sha256>"
-# y la regla `generic-api-key` las interpreta como clave/valor por la palabra
-# «SECRETOS» del nombre del documento. El patrón admite cualquier documento de
-# control cuyo nombre contenga SECRETOS, pero exige la ruta exacta del manifiesto
-# y la forma exacta de línea con digest de 64 hex.
+# Excepción acotada (I-030, 2026-11-06; endurecida 2026-11-07; generalizada 2026-11-08):
+# `BASELINE_SHA256.json` es un manifiesto generado en el que **todas** las entradas
+# tienen la forma `"<ruta>": "<sha256>"`. La regla `generic-api-key` interpreta
+# algunas de esas líneas como clave/valor cuando la ruta contiene palabras como
+# «SECRETOS» o «access» (p. ej. RFC-004-SECRETOS_BOOTSTRAP.md o
+# terraform-state-access.json.tftpl) y el valor es un digest de 64 hex.
 #
 # La excepción se declara DENTRO de la regla `generic-api-key` (no global) y exige
-# `condition = "AND"`: deben cumplirse a la vez la ruta exacta del manifiesto y la
-# forma exacta de esa línea con un digest de 64 hex. Con la condición por defecto
-# («OR») bastaba la ruta para ignorar *todos* los hallazgos del archivo
-# (`checkCommitOrPathAllowed`, gitleaks v8.30.1); con «AND» sólo se descartan esas
-# líneas concretas y cualquier otra credencial del mismo archivo se detecta.
+# `condition = "AND"`: ruta exacta del manifiesto **y** línea con el formato exacto
+# `"<ruta>": "<64 hex>"`. No se excluye ninguna otra regla ni ningún otro archivo,
+# y un valor que no sea un SHA-256 de 64 hex sigue generando hallazgo. Además el
+# validador SDD recalcula cada hash: un valor arbitrario rompería la integridad.
 
 [extend]
 useDefault = true
@@ -27,8 +24,8 @@ useDefault = true
 id = "generic-api-key"
 
 [[rules.allowlists]]
-description = "Digest SHA-256 de documentos de control con SECRETOS en el nombre, dentro del manifiesto de integridad (no son credenciales)"
+description = "Entradas del manifiesto de integridad: ruta + digest SHA-256 de 64 hex, no credenciales"
 condition = "AND"
 paths = ['''^sdd/_control/H07/BASELINE_SHA256\.json$''']
 regexTarget = "line"
-regexes = ['''"sdd/_control/H08/[A-Za-z0-9_.-]*SECRETOS[A-Za-z0-9_.-]*\.md":\s*"[a-f0-9]{64}"''']
+regexes = ['''^\s*"[A-Za-z0-9_./\\-]+":\s*"[a-f0-9]{64}"\s*,?$''']

@@ -5,7 +5,7 @@
 | Documento | `sdd/_control/H08/GATE_H08I_I060.md` |
 | Fecha | 2026-11-07 |
 | Spec | `sdd/02-infraestructura/I-060-iam-seguridad/` (v0.1.0 DRAFT; spec/plan no modificados) |
-| Estado | **APRUEBO_GATE_I060_LOCAL REGISTRADO — IMPLEMENTADO_LOCAL PARCIAL (sin AWS)** |
+| Estado | **INTEGRADO_MAIN — NO DESPLEGADO** (PR #26 MERGED, merge `c8e37a78efaa1c9ddc0e412b2b96d465eec4911b`) |
 | Main base | `8c314015dcd065f9188bde239be26ddf76cfc1c1` |
 | Rama | `feat/h08i-i060-iam-seguridad` |
 | Autorización | `APRUEBO_GATE_I060_LOCAL` (mensaje humano independiente, 2026-11-07) |

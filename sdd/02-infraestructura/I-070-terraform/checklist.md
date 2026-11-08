@@ -1,4 +1,4 @@
-# I-070-terraform — IaC Terraform: stacks, state, drift y seguridad
+﻿# I-070-terraform — IaC Terraform: stacks, state, drift y seguridad
 
 | Campo | Valor |
 |---|---|
@@ -46,3 +46,27 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+### Gate de implementacion local I-070 (2026-11-08)
+
+- [x] APRUEBO_GATE_I070_LOCAL concedido y registrado.
+- [x] Bootstrap declarado: bucket de state versionado, cifrado, privado y protegido.
+- [x] prevent_destroy en el state y politica que exige TLS; contrato IAM de state/tflock disenado.
+- [x] Backend remoto NO activado; plantilla .example inactiva y documentada.
+- [x] fmt -check, init -backend=false y validate del bootstrap y del entorno en verde.
+- [x] Locking nativo de S3 (use_lockfile, Terraform >= 1.10); sin tabla DynamoDB.
+- [ ] Aplicacion real del bootstrap y activacion del backend: requieren Gate de infraestructura y credenciales humanas.
+- [ ] PR unico revisado; merge y primer apply requieren autorizacion humana independiente.
+- [x] 22 pruebas de contrato I-070 (218 en la suite).
+- [x] Custodia y migracion del state del bootstrap documentadas (RUNBOOK_IAC.md 2-4), con separacion por clave y recuperacion por importacion.
+- [x] 29 pruebas de contrato I-070 (225 en la suite).
+- [x] Corregida la secuencia de custodia/migracion: el state original no se mueve antes de migrar; respaldo cifrado verificado por SHA-256.
+- [x] Criterio de importacion por direccion y proveedor (AWS_CREATE/UPDATE_UNAUTHORIZED/REPLACE/DESTROY = 0; terraform_data local evaluado aparte); sustituye al criterio de contadores globales.
+- [x] Inventario declarativo de 8 direcciones (7 AWS + terraform_data), sin cifras historicas fijas.
+- [x] 33 pruebas de contrato I-070 (229 en la suite Terraform).
+
+- [x] Criterio de recuperacion por direccion y proveedor documentado y probado (AWS_CREATE/UPDATE_UNAUTHORIZED/REPLACE/DESTROY = 0; terraform_data local aparte).
+- [x] 47 pruebas de contrato I-070 (243 en la suite Terraform), con evaluador determinista de planes sinteticos.
+
+- [x] Evaluador corregido: duplicidad por (proveedor, tipo, id), denegacion por defecto de proveedores y exigencia de importaciones completas (IMPORT_FALTANTE).
+- [x] 49 pruebas de contrato I-070 (245 en la suite Terraform).

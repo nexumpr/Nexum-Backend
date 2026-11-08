@@ -1,0 +1,27 @@
+# I-070 — Backend remoto del entorno h08i (PLANTILLA, NO ACTIVA).
+#
+# Este archivo no lo lee Terraform (sufijo .example). Se activa renombrándolo a
+# `backend.tf` SÓLO después de:
+#   1. Aplicar `infra/terraform/bootstrap` con credenciales humanas y Gate propio.
+#   2. Verificar por lectura el bucket creado y su versionado/cifrado.
+#   3. Obtener autorización humana para el primer `terraform init` con backend real.
+#
+# Mientras siga como .example, la validación local usa
+# `terraform init -backend=false` con TF_DATA_DIR externo, que es lo autorizado.
+#
+# Locking: nativo de S3 (`use_lockfile = true`), disponible desde Terraform 1.10.
+# El locking con DynamoDB está deprecado por HashiCorp y no se usa.
+# El objeto de lock es `<key>.tflock`; IAM requiere GetObject/PutObject/DeleteObject
+# sobre ese objeto y NO requiere DeleteObject sobre el state principal.
+#
+# Los valores provienen de los outputs del bootstrap; no se hardcodean credenciales.
+
+terraform {
+  backend "s3" {
+    bucket       = "NEXUM_H08I_TFSTATE_PENDIENTE_BOOTSTRAP"
+    key          = "envs/h08i/terraform.tfstate"
+    region       = "us-east-2"
+    encrypt      = true
+    use_lockfile = true
+  }
+}

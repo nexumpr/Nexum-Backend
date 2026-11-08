@@ -1,5 +1,8 @@
 terraform {
-  required_version = ">= 1.4.0, < 2.0.0"
+  # 1.10 es el mínimo que soporta locking nativo de S3 (`use_lockfile`), que es el
+  # mecanismo vigente; el locking con DynamoDB está deprecado. Terraform instalado
+  # en el entorno: 1.16.6.
+  required_version = ">= 1.10.0, < 2.0.0"
 
   required_providers {
     aws = {
