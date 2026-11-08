@@ -95,3 +95,8 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - DAST: harness preparar_dast.py valida objetivo aislado, autorizacion por host, datos sinteticos, ventana <=4h, RPS <=5 y alcance; sin APRUEBO_GATE_DAST devuelve BLOCKED_AUTHORIZATION y no genera plan.
 - Supply chain: se documenta checksum SHA-256 vs firma criptografica (no hay firma); sustitucion prevenida por release inmutable + If-None-Match + digest en LT.
 - Pruebas: 15 de contrato DevSecOps, 7 IaC, 10 DAST/gosec.
+
+- Correccion de escaner IaC (2026-11-08): cifrado evaluado por bucket (no indicador global), SG con cidr_blocks/ipv6_cidr_blocks/cidr_ipv4/cidr_ipv6, IAM wildcard escalar y en listas, y GIT_CHECK_FAILED si git no puede verificar. Expresiones dinamicas -> S3_CIFRADO_NO_VERIFICABLE (no PASS). 12 pruebas.
+- Rate limiting (2026-11-08): se caracteriza el defecto A-030 (middleware local por instancia y XFF confiado) y se prueba coordinacion simulada de A-080 con cache en memoria. El limitador distribuido no esta cableado; Redis real y 2 nodos NOT_RUN. D-100-01/D-100-02 registrados; no se declara RATE_LIMIT_DISTRIBUTED_VERIFIED.
+- DAST (2026-11-08): el harness exige evidencia de Gate dentro de sdd/_control/H08 con frase, host y caducidad; --permitir-remoto eliminado. Sin evidencia -> BLOCKED_AUTHORIZATION. 13 pruebas.
+- Pruebas: 18 de contrato DevSecOps, 12 IaC y 13 DAST/gosec.

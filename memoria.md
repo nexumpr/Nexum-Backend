@@ -502,3 +502,5 @@
 - Pruebas: 13 de contrato DevSecOps y 7 del escaner. AWS_NOT_RUN; DAST NOT_RUN.
 
 - I-100 ampliacion (2026-11-08): matriz T-01..T-22 y relacion E001-E075 (75 documentados, 0 endpoints); gosec acotado a produccion con fixture negativo G404 y helper; harness DAST preparar_dast.py con objetivo aislado/datos sinteticos/ventana/RPS y BLOCKED_AUTHORIZATION sin Gate; checksum SHA-256 distinto de firma. 15 pruebas de contrato, 7 IaC y 10 DAST/gosec.
+
+- I-100 correccion final (2026-11-08): escaner IaC por bucket (multi-bucket), SG cidr_ipv4/ipv6, IAM wildcard en listas y GIT_CHECK_FAILED; dinamicos como S3_CIFRADO_NO_VERIFICABLE. Rate limiting: D-100-01 (A-030 local + XFF sin proxy) y D-100-02 (A-080 no cableado; Redis real y 2 nodos NOT_RUN); no se declara RATE_LIMIT_DISTRIBUTED_VERIFIED. DAST: evidencia de Gate obligatoria dentro de sdd/_control/H08 y sin --permitir-remoto; BLOCKED_AUTHORIZATION. 18 pruebas de contrato, 12 IaC y 13 DAST/gosec.

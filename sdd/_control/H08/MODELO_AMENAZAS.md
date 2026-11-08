@@ -58,7 +58,7 @@ endpoint), **PENDIENTE** (requiere endpoint o AWS), **BLOQUEADO** (decisión/Gat
 | T-07 | S3 | Carrera de idempotencia | A-070 | lock atómico por clave/usuario | N: 20 concurrentes → 1 procede | `TestIdempotenciaConcurrenteYConflictos` | Alta | Backend | IMPLEMENTADO |
 | T-08 | S3 | Acceso a recursos de terceros | E001–E075 | propiedad por usuario en claves y casos de uso | P: aislamiento de idempotencia por usuario | `TestIdempotencia...` | Crítica | Backend | PARCIAL |
 | T-09 | S1 | DoS por body | A-010/A-040 | `MaxBytesReader` 1 MB, JSON estricto | N: cuerpo > 1 MB rechazado | `TestBodyGrandeSeRechaza` | Media | Backend | IMPLEMENTADO |
-| T-10 | S1 | Fuerza bruta / rate | A-080 | rate limit distribuido, 429 + Retry-After | N: tercera petición → 429 | `TestRateLimiter...` | Alta | Backend | IMPLEMENTADO |
+| T-10 | S1 | Fuerza bruta / rate | A-030/A-080 | middleware HTTP local por IP; limitador distribuido existe como componente pero **no está cableado** en el servidor | P: 429 local; N: dos instancias permiten 2× y XFF rota evade | `TestRateLimiter...`, `TestCaracterizaDefecto...`, `TestInfra...` | Alta | Backend/Sec | **PARCIAL — defecto A-030/A-080** |
 | T-11 | S1 | CORS abierto | A-030 | allowlist explícita, sin wildcard | N: origen no autorizado sin ACAO | `TestCORS...` | Media | Backend | IMPLEMENTADO |
 | T-12 | S1 | Cabeceras débiles | A-030 | nosniff, DENY, HSTS, no-store | P: cabeceras presentes | `TestCabecerasDeSeguridad` | Baja | Backend | IMPLEMENTADO |
 | T-13 | S2 | Origen no-CloudFront | I-030/I-010 | ALB interno, SG a prefix list, sin IPv4 pública | P: contrato Terraform; N: SG público (escáner IaC) | `tests/infra/terraform` | Alta | Infra | IMPLEMENTADO (diseño) |
@@ -71,6 +71,16 @@ endpoint), **PENDIENTE** (requiere endpoint o AWS), **BLOQUEADO** (decisión/Gat
 | T-20 | S6 | Borrado de cuenta incompleto | GOV-07/E-specs | borrado lógico y revocación; cascada pendiente de endpoints | P: estado DELETED; N: no implementado a nivel datos | `tests/unit/domain` | Alta | Backend | PENDIENTE |
 | T-21 | S5 | Escaneo ofensivo accidental | I-100 | DAST sólo con Gate, objetivo aislado, datos sintéticos | N: harness sin Gate → BLOCKED | `test_dast_y_gosec` | Alta | Sec | IMPLEMENTADO (sin ejecutar) |
 | T-22 | S4 | Dependencia comprometida | I-080/I-100 | govulncheck, SBOM, acciones por SHA | P: CI; N: CVE simulada en pruebas de política | CI + criterios | Alta | Sec | IMPLEMENTADO |
+
+### 3.1.1 Defectos externos registrados (no corregidos en I-100)
+
+| ID | Spec | Defecto verificado | Evidencia | Severidad | Impacto | Gate requerido |
+|---|---|---|---|---|---|---|
+| D-100-01 | A-030 | El middleware HTTP cuenta en memoria por instancia y usa `X-Forwarded-For` sin validar proxy confiable | `TestCaracterizaDefectoHTTPRateLimitLocalYConfiaXFF` (2 instancias permiten 4; XFF rota evade) | Alta | Bypass de rate limit con cabecera falsificada y falta de coordinación | Gate/RFC de A-030 |
+| D-100-02 | A-080 | El limitador distribuido existe como componente pero **no está cableado** en el servidor; no hay Redis real ni prueba entre dos nodos | Búsqueda de `NewRateLimiter`/`CheckLimit` sin uso en `cmd`/`internal`; `TestInfraRateLimitCoordinaPorCacheCompartida` sólo simula con caché en memoria | Alta | Fuerza bruta distribuida no mitigada en runtime real | Gate de despliegue + RFC de A-080 |
+
+`RATE_LIMIT_DISTRIBUTED_VERIFIED` **no se declara**: sólo hay seguridad local probada y coordinación
+simulada por caché. Redis real y dos instancias AWS siguen `NOT_RUN`.
 
 ### 3.2 Relación con E001–E075
 
@@ -86,4 +96,10 @@ endpoint se registra como `NOT_IMPLEMENTED / NOT_RUN` y no se declara probado.
 - DAST no se ejecuta: requiere entorno aislado autorizado, datos sintéticos y ventana (INF-100-04).
 - WAF ausente bajo RFC-006 (temporal); H-01 (TLSv1 en el borde) abierto.
 - La verificación de identidad de proceso en instancias sigue bloqueada (I-090).
+- **Rate limiting**: probado localmente (429 en una instancia). La coordinación entre nodos sólo está
+  simulada con caché en memoria; Redis real y dos instancias AWS `NOT_RUN`. `X-Forwarded-For` se confía
+  sin validar proxy (D-100-01). No se declara `RATE_LIMIT_DISTRIBUTED_VERIFIED`.
+- **Escáner IaC propio**: análisis textual; no resuelve variables, módulos externos ni expresiones
+  dinámicas. Cuando no puede asociar cifrado/regla, reporta `*_NO_VERIFICABLE` en lugar de asumir PASS.
+  Trivy sigue siendo el escáner principal.
 - `AWS_NOT_RUN`: ningún control de este modelo se declara verificado en cloud.

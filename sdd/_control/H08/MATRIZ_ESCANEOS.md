@@ -16,7 +16,8 @@
 | Lint estático | staticcheck `v0.8.2` | `./...` | cualquier hallazgo | Ejecutado en CI |
 | Secretos | gitleaks `v8.30.1` + baseline revisado | historial completo | cualquier secreto | Ejecutado en CI |
 | IaC (políticas) | Trivy `0.76.2` con HIGH/CRITICAL | `infra/terraform` | HIGH/CRITICAL | Ejecutado en CI |
-| IaC (reglas SDD) | `herramientas/verificar_iac_devsecops.py` | SG públicos, IAM wildcard, S3 sin cifrado, `force_destroy`, ACL pública, state rastreado | cualquier hallazgo | Ejecutado en CI |
+| IaC (reglas SDD) | `herramientas/verificar_iac_devsecops.py` | SG públicos (`cidr_blocks`/`cidr_ipv4`/`cidr_ipv6`), IAM wildcard escalar y en listas, cifrado **por bucket**, `force_destroy`, ACL pública, state rastreado; falla cerrado si Git no puede verificar | cualquier hallazgo | Ejecutado en CI |
+| Rate limiting | Go tests de middleware y limitador | 429 local, coordinación simulada por caché y defectos A-030/A-080 | fallo de test | Ejecutado en CI; **no** acredita Redis real |
 | SBOM | syft `v1.57.0` (SPDX JSON) | árbol de dependencias | n/a (evidencia) | Ejecutado en CI |
 | Supply chain | acciones fijadas por SHA de commit + SHA-256 del binario + S3 `If-None-Match` | workflows y release | cualquier desviación | Verificado por contrato |
 
@@ -31,12 +32,16 @@ release inmutable (`releases/<release_id>/...`), `If-None-Match: *` y digest en 
 
 - `go test ./tests/security/...`: JWT manipulado/`alg=none`/expirado, 401 sin token, contexto verificado,
   logout, replay de refresh, concurrencia de idempotencia, conflicto 409, aislamiento por usuario, CORS,
-  cabeceras, cuerpo > 1 MB y rate limit 429.
+  cabeceras, cuerpo > 1 MB, rate limit 429 local, caracterización de defectos A-030 (local + XFF) y
+  coordinación simulada de A-080 con caché en memoria.
 - `go test ./...`: suites de dominio, transporte, seguridad y plataforma.
-- `herramientas/tests`: escáner IaC (7 casos), prueba negativa de gosec, harness DAST (7 casos) y validadores.
-- `herramientas/preparar_dast.py`: prepara un plan DAST (objetivo aislado, autorización por host, datos
-  sintéticos, ventana ≤ 4 h, RPS ≤ 5, alcance) y **no ejecuta** nada. Sin `APRUEBO_GATE_DAST` devuelve
-  `DAST_BLOCKED_AUTHORIZATION`.
+- `herramientas/tests`: escáner IaC (12 casos, con multi-bucket, SG `cidr_ipv4/ipv6`, IAM en listas y fallo
+  de Git), prueba negativa de gosec, harness DAST (13 casos) y validadores.
+- `herramientas/preparar_dast.py`: prepara un plan DAST **sólo** si existe un documento de Gate dentro de
+  `sdd/_control/H08/` con `APRUEBO_GATE_DAST`, el host y caducidad vigente; objetivo aislado, datos
+  sintéticos, ventana ≤ 4 h, RPS ≤ 5. No ejecuta nada. Hoy devuelve `DAST_BLOCKED_AUTHORIZATION`.
+- **Límite de rate limiting:** la prueba de dos "nodos" comparte caché en memoria; no es Redis real ni
+  dos instancias AWS. `RATE_LIMIT_DISTRIBUTED_VERIFIED` no se declara.
 
 ## 3. Pruebas NO ejecutadas (requieren Gate)
 

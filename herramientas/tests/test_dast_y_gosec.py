@@ -20,6 +20,20 @@ def _archivo(texto: str) -> Path:
     return ruta
 
 
+def _control(evidencia: str | None) -> Path:
+    raiz = Path(tempfile.mkdtemp(prefix="gate-dast-"))
+    if evidencia is not None:
+        (raiz / "GATE_DAST.md").write_text(evidencia, encoding="utf-8")
+    return raiz
+
+
+EVIDENCIA = """# Gate DAST
+Estado: APRUEBO_GATE_DAST
+Objetivo: 127.0.0.1
+Caduca el **2026-12-31**
+"""
+
+
 class FixtureGosec(unittest.TestCase):
     def _run(self, codigo: int, texto: str) -> subprocess.CompletedProcess:
         return subprocess.run(
@@ -44,7 +58,8 @@ class FixtureGosec(unittest.TestCase):
 
 
 class HarnessDAST(unittest.TestCase):
-    def _run(self, **cambios: str) -> subprocess.CompletedProcess:
+    def _run(self, evidencia: str | None = EVIDENCIA, **cambios: str) -> subprocess.CompletedProcess:
+        control = _control(evidencia)
         valores = {
             "--objetivo": "http://127.0.0.1:8080",
             "--autorizacion": "AUTORIZO_DAST_127.0.0.1",
@@ -53,30 +68,50 @@ class HarnessDAST(unittest.TestCase):
             "--ventana-fin": "2026-11-10T12:00:00",
             "--rps": "2",
             "--alcance": "/api/v1/health,/api/v1/auth",
-            "--gate": "APRUEBO_GATE_DAST",
+            "--raiz-control": str(control),
+            "--fecha": "2026-11-08",
         }
+        if evidencia is not None:
+            valores["--evidencia-autorizacion"] = str(control / "GATE_DAST.md")
         valores.update(cambios)
         argumentos = [sys.executable, str(DAST)]
         for clave, valor in valores.items():
             argumentos += [clave, valor]
         return subprocess.run(argumentos, capture_output=True, text=True, timeout=60)
 
-    def test_plan_valido_se_prepara_sin_ejecutar(self) -> None:
+    def test_plan_autorizado_se_prepara_sin_ejecutar(self) -> None:
         salida = Path(tempfile.mkdtemp(prefix="dast-")) / "plan.json"
         r = self._run(**{"--salida": str(salida)})
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("DAST_PLAN_PASS", r.stdout)
         plan = json.loads(salida.read_text(encoding="utf-8"))
-        self.assertEqual(plan["estado"], "PLAN_PREPARADO_NO_EJECUTADO")
+        self.assertEqual(plan["estado"], "PLAN_AUTORIZADO_NO_EJECUTADO")
         self.assertEqual(plan["datos"], "sinteticos")
 
-    def test_sin_gate_queda_bloqueado(self) -> None:
-        r = self._run(**{"--gate": ""})
+    def test_sin_evidencia_queda_bloqueado(self) -> None:
+        r = self._run(evidencia=None)
         self.assertEqual(r.returncode, 1)
         self.assertIn("DAST_BLOCKED_AUTHORIZATION", r.stdout)
 
-    def test_objetivo_publico_sin_permiso_falla(self) -> None:
-        r = self._run(**{"--objetivo": "https://ejemplo.com", "--autorizacion": "AUTORIZO_DAST_ejemplo.com"})
+    def test_evidencia_fuera_de_control_se_rechaza(self) -> None:
+        fuera = _archivo(EVIDENCIA)
+        r = self._run(**{"--evidencia-autorizacion": str(fuera)})
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("EVIDENCIA_FUERA_DE_CONTROL", r.stdout)
+
+    def test_evidencia_caducada_se_rechaza(self) -> None:
+        r = self._run(**{"--fecha": "2027-01-01"})
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("EVIDENCIA_CADUCADA", r.stdout)
+
+    def test_evidencia_sin_frase_se_rechaza(self) -> None:
+        r = self._run(evidencia="Objetivo: 127.0.0.1\nCaduca el **2026-12-31**\n")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("EVIDENCIA_SIN_FRASE_GATE", r.stdout)
+
+    def test_objetivo_publico_falla(self) -> None:
+        evidencia = "Estado: APRUEBO_GATE_DAST\nObjetivo: ejemplo.com\nCaduca el **2026-12-31**\n"
+        r = self._run(evidencia=evidencia, **{"--objetivo": "https://ejemplo.com", "--autorizacion": "AUTORIZO_DAST_ejemplo.com"})
         self.assertEqual(r.returncode, 1)
         self.assertIn("OBJETIVO_NO_AISLADO", r.stdout)
 

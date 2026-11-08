@@ -84,12 +84,16 @@ class EscanerIaCPropio(unittest.TestCase):
         cls.texto = _leer(IAC)
 
     def test_reglas_exigidas_por_el_sdd(self) -> None:
-        for regla in ("SG_PUBLICO", "IAM_WILDCARD", "S3_SIN_CIFRADO", "FORCE_DESTROY", "ACL_PUBLICA", "TFSTATE_RASTREADO"):
+        for regla in ("SG_PUBLICO", "IAM_WILDCARD", "S3_SIN_CIFRADO", "S3_CIFRADO_NO_VERIFICABLE",
+                      "FORCE_DESTROY", "ACL_PUBLICA", "TFSTATE_RASTREADO", "GIT_CHECK_FAILED"):
             self.assertIn(regla, self.texto, regla)
+        for variante in ("cidr_ipv4", "cidr_ipv6", "ipv6_cidr_blocks"):
+            self.assertIn(variante, self.texto, variante)
 
     def test_falla_cerrado(self) -> None:
         self.assertIn("IAC_DEVSECOPS_FAIL", self.texto)
-        self.assertIn('return 1', self.texto)
+        self.assertIn("return 1", self.texto)
+        self.assertIn("S3_CIFRADO_NO_VERIFICABLE", self.texto)
 
 
 class DocumentacionDeSeguridad(unittest.TestCase):
@@ -114,6 +118,23 @@ class DocumentacionDeSeguridad(unittest.TestCase):
         self.assertIn("E001–E075", texto)
         self.assertIn("NOT_IMPLEMENTED / NOT_RUN", texto)
         self.assertIn("No hay endpoints HTTP implementados", texto)
+
+    def test_modelo_registra_defectos_a030_a080(self) -> None:
+        texto = _leer(AMENAZAS)
+        self.assertIn("D-100-01", texto)
+        self.assertIn("D-100-02", texto)
+        self.assertIn("X-Forwarded-For", texto)
+        self.assertIn("no está cableado", texto)
+        self.assertIn("RATE_LIMIT_DISTRIBUTED_VERIFIED", texto)
+        self.assertIn("no se declara", texto.lower())
+
+    def test_tests_de_rate_limit_distinguen_local_y_simulado(self) -> None:
+        ruta = RAIZ / "tests" / "security" / "rate_limit_test.go"
+        self.assertTrue(ruta.is_file())
+        texto = _leer(ruta)
+        self.assertIn("TestCaracterizaDefectoHTTPRateLimitLocalYConfiaXFF", texto)
+        self.assertIn("TestInfraRateLimitCoordinaPorCacheCompartida", texto)
+        self.assertIn("NO demuestra Redis real", texto)
 
     def test_matriz_declara_ejecutado_y_not_run(self) -> None:
         texto = _leer(MATRIZ)
@@ -142,6 +163,13 @@ class DocumentacionDeSeguridad(unittest.TestCase):
         self.assertIn("NOT_RUN", texto)
         self.assertIn("No se declara", texto)
         self.assertIn("DAST", texto)
+
+    def test_harness_dast_exige_evidencia_verificable(self) -> None:
+        texto = _leer(RAIZ / "herramientas" / "preparar_dast.py")
+        for marca in ("APRUEBO_GATE_DAST", "EVIDENCIA_FUERA_DE_CONTROL", "EVIDENCIA_CADUCADA",
+                      "PLAN_AUTORIZADO_NO_EJECUTADO", "GATE_DAST_AUSENTE"):
+            self.assertIn(marca, texto, marca)
+        self.assertNotIn("permitir-remoto", texto)
 
 
 class PruebasAdversariales(unittest.TestCase):

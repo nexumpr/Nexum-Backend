@@ -58,3 +58,8 @@
 - [x] Prueba negativa de gosec (G404) y de IaC; deteccion demostrada, no solo cero hallazgos.
 - [x] Harness DAST con salvaguardas; DAST real NOT_RUN/BLOCKED_AUTHORIZATION.
 - [x] Checksum vs firma documentado; sustitucion de artefactos prevenida por inmutabilidad y digest.
+
+- [x] Escaner IaC por bucket, variantes de SG, IAM en listas y fallo de Git cerrado; dinamicos como NO_VERIFICABLE.
+- [x] Defectos A-030/A-080 caracterizados y registrados; sin declarar rate limit distribuido verificado.
+- [x] Harness DAST sin autorizacion simulada; requiere evidencia de Gate real; NOT_RUN.
+- [x] Limites del analisis estatico documentados; Trivy sigue como escaner principal.
