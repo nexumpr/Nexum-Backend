@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Spec | `sdd/02-infraestructura/I-080-ci-backend` |
-| Estado | `CI_VERDE_EN_PR` — ejecución real sobre `6497915f4c8e8d90a1f7f60c7f67d6353c6a69e0` |
+| Estado | `CI_VERDE_EN_PR` — seis jobs + SDD en verde sobre `7a9448a806217b22c6f60e2aa8dd3fe2675a218b`; escáner IaC añadido en la corrección posterior |
 | AWS | `NOT_RUN` — este workflow no invoca AWS ni despliega |
 | Fecha | 2026-11-08 |
 
@@ -14,6 +14,8 @@
 - Acciones de terceros fijadas por SHA de commit; herramientas Go por versión exacta.
 - Cobertura del dominio con umbral 80 % mediante `herramientas/cobertura_dominio.py`.
 - Validación Terraform local en CI (`fmt`, `init -backend=false`, `validate`) y pruebas de contrato.
+- Escaneo de seguridad IaC con Trivy `0.76.2` (HIGH/CRITICAL, `--exit-code 1`) y prueba negativa con
+  fixture aislado; excepciones acotadas en `.trivyignore.yaml` con justificación por ID y ruta.
 - Artefactos nombrados con `github.sha` (cobertura, dependencias, SBOM).
 - Documentos de gobierno: `MATRIZ_JOBS_CI.md` y `GATES_PR.md`.
 
@@ -39,6 +41,27 @@ dominio superó el umbral en la ejecución (`COBERTURA_DOMINIO_PASS`).
 Nota: si el HEAD del PR cambia (documentación o correcciones), la evidencia debe reasociarse al nuevo
 SHA; este registro no se extrapola a commits posteriores.
 
+### 2.1 Escaneo de seguridad IaC — ejecución real local
+
+| Campo | Valor |
+|---|---|
+| Herramienta | Trivy `0.76.2` (release oficial de Aqua Security) |
+| Comando | `trivy config --severity HIGH,CRITICAL --ignorefile .trivyignore.yaml --exit-code 1 infra/terraform` |
+| Resultado | **PASS** con las tres excepciones documentadas; cualquier otro hallazgo HIGH/CRITICAL falla |
+| Prueba negativa | `tests/fixtures/iac/inseguro` → Trivy exit **1**, 6 hallazgos HIGH (AWS-0086/0087/0091/0092/0093/0132) y `FIXTURE_IAC_PASS` |
+| CI | El job `iac` instala Trivy con `aquasecurity/setup-trivy` fijado por SHA y ejecuta ambos pasos en cada PR |
+
+Hallazgos HIGH/CRITICAL sobre `infra/terraform` y su tratamiento:
+
+| ID | Severidad | Archivo | Tratamiento |
+|---|---|---|---|
+| `AWS-0054` | CRITICAL | `modules/balanceo/main.tf` | Excepción D2/RFC-005: ALB interno HTTP tras CloudFront HTTPS; no es TLS extremo a extremo y H-01 sigue abierto |
+| `AWS-0132` | HIGH | `bootstrap/main.tf` | Límite I-070: SSE-S3 sin CMK por coste KMS no presupuestado |
+| `AWS-0011` | HIGH | `modules/balanceo/main.tf` | **PENDIENTE_DE_DECISION_I030**: WAF no presupuestado en I-000; riesgo abierto, no resuelto |
+
+`TERRAFORM_VALIDATE` acredita sintaxis/configuración válida; no sustituye el escáner. El escáner no usa
+credenciales AWS ni backend remoto y no ejecuta `plan`/`apply`.
+
 ## 3. Cobertura local observada (no es evidencia de CI)
 
 Medición local con `go test ./tests/... -coverpkg=all` y deduplicación por bloque:
@@ -54,9 +77,23 @@ Medición local con `go test ./tests/... -coverpkg=all` y deduplicación por blo
 
 La cifra se recalcula en cada ejecución de CI; la tabla es una referencia del entorno local.
 
-## 4. Límites
+## 4. Clasificación de pruebas: ejecutado vs pendiente de servicios reales
+
+| Ámbito | Qué se valida realmente | Estado |
+|---|---|---|
+| Dominio Go (money, financial, identity, cache, dynamo keys) | Unitarias con datos deterministas; sin red | **EJECUTADO** |
+| Contratos OpenAPI 3.1 | Validación estática del documento y rutas | **EJECUTADO** |
+| Adaptadores en memoria (DynamoDB/Redis simulados) | Contratos de puertos y concurrencia local | **EJECUTADO** (no es integración cloud) |
+| Terraform (fmt/validate + Trivy + contratos) | Configuración, seguridad estática y contratos | **EJECUTADO** (sin AWS) |
+| DynamoDB real | Persistencia, índices físicos, transacciones reales | **PENDIENTE** — I-040/I-090 y Gate de despliegue |
+| Redis real | RBAC, TTL, invalidación entre nodos | **PENDIENTE** — I-050/I-090 y Gate de despliegue |
+| HTTP extremo a extremo en AWS | Balanceo, TLS, 2 nodos | **PENDIENTE** — I-030/I-090; `AWS_NOT_RUN` |
+
+No se declara integración cloud `PASS` a partir de mocks o adaptadores en memoria.
+
+## 5. Límites
 
 - `terraform validate` no acredita infraestructura desplegada.
 - El SBOM no sustituye pruebas de seguridad dinámicas.
 - La cobertura de sentencias no mide comportamiento en producción.
-- Branch protection sigue `PENDIENTE_APLICACION_HUMANA`.
+- Branch protection: **BLOQUEADO_PLAN_GITHUB** (HTTP 403 verificado en repositorio privado).

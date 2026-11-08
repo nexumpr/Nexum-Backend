@@ -23,7 +23,7 @@ cambios de branch protection en el repositorio, ni iniciar I-090.
 
 | Requisito | Evidencia | Estado |
 |---|---|---|
-| INF-080-01 Eventos | `pull_request` a `main`/`release/**` y `push` a `main`; `gofmt`, `go vet`, `staticcheck`, `govulncheck`, `go test -race`, cobertura ≥ 80 %, `gosec`, gitleaks, dependencias, contrato OpenAPI H06 e IaC; acciones por SHA y herramientas por versión exacta | IMPLEMENTADO_LOCAL |
+| INF-080-01 Eventos | `pull_request` a `main`/`release/**` y `push` a `main`; `gofmt`, `go vet`, `staticcheck`, `govulncheck`, `go test -race`, cobertura ≥ 80 %, `gosec`, gitleaks, dependencias, contrato OpenAPI H06, Terraform (`fmt`/`init -backend=false`/`validate`) y **escaneo de seguridad IaC real con Trivy HIGH/CRITICAL y prueba negativa**; acciones por SHA y herramientas por versión exacta | IMPLEMENTADO_LOCAL |
 | INF-080-02 PR | `GATES_PR.md`: seis checks requeridos, revisión obligatoria, sin force push, artefactos por `github.sha`; aplicación de branch protection **PENDIENTE_APLICACION_HUMANA** | DOCUMENTADO |
 | INF-080-03 Seguridad CI | `permissions: contents: read`; sin `pull_request_target`, sin secretos, sin credenciales cloud, sin Docker | IMPLEMENTADO_LOCAL |
 | INF-080-04 Pruebas | Cobertura de dominio 92 % local (umbral 80 %); pruebas de contrato Terraform/FinOps, OpenAPI y herramientas en CI; sin servicios cloud | IMPLEMENTADO_LOCAL |
@@ -42,6 +42,10 @@ cambios de branch protection en el repositorio, ni iniciar I-090.
 - **Sin AWS**: no se invoca cuenta, no se lee state remoto y no se crea ningún recurso.
 - **OIDC y credenciales de release** pertenecen a I-090 y a su Gate.
 - **Cobertura**: mide sentencias del dominio; no sustituye pruebas de integración AWS/Redis/HTTP.
+- **Escáner IaC**: Trivy `0.76.2` con severidad HIGH/CRITICAL y `--exit-code 1`. Tres excepciones
+  acotadas en `.trivyignore.yaml` (ID + ruta + justificación, sin comodines): `AWS-0054` (D2/RFC-005,
+  H-01 abierto), `AWS-0132` (límite SSE-S3 de I-070) y `AWS-0011` (**PENDIENTE_DE_DECISION_I030**:
+  CloudFront sin WAF; coste no presupuestado). Cualquier otro hallazgo HIGH/CRITICAL bloquea.
 
 ## 4. Verificación local
 

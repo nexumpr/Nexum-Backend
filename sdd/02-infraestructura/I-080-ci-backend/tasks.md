@@ -91,4 +91,11 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - T-080-90 Riesgos: R01/R02/R03 registrados en la matriz; sin cambio de alcance.
 - T-080-99 Ratificacion: implementacion local con Gate APRUEBO_GATE_I080_LOCAL; merge y aplicacion de branch protection requieren autorizacion separada.
 - Pruebas: 22 de contrato CI; cobertura herramienta 7; suite Terraform 245; Go build/vet/test PASS.
-- AWS_NOT_RUN: sin ejecucion real de workflow, sin AWS, sin despliegue.
+- AWS_NOT_RUN: sin AWS ni despliegue; ejecucion real de CI verificada en PR #28.
+
+### Correccion INF-080-01: escaner IaC real (2026-11-08)
+
+- Anadido Trivy 0.76.2 (setup-trivy v0.3.1 fijado por SHA) al job iac: `trivy config --severity HIGH,CRITICAL --ignorefile .trivyignore.yaml --exit-code 1 infra/terraform`. Sin AWS, sin Docker, sin state remoto ni plan/apply.
+- Prueba negativa real: fixture aislado tests/fixtures/iac/inseguro (fuera de infra/terraform) detectado con exit 1 y 6 hallazgos HIGH; herramientas/verificar_fixture_iac.py exige exit 1 y hallazgo HIGH/CRITICAL real.
+- Excepciones acotadas por ID y ruta en .trivyignore.yaml con justificacion: AWS-0054 (D2/RFC-005, H-01 abierto), AWS-0132 (SSE-S3 I-070) y AWS-0011 (PENDIENTE_DE_DECISION_I030: WAF no presupuestado). Sin comodines ni allowlist global.
+- Pruebas: 28 de contrato CI (+6) y 49 de herramientas (+8); sin cambios en logica de negocio.

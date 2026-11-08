@@ -164,6 +164,61 @@ class TrabajosObligatorios(unittest.TestCase):
             self.assertNotIn(prohibido, self.texto)
 
 
+class EscaneoIaCReal(unittest.TestCase):
+    """INF-080-01: escaneo de seguridad IaC independiente de `terraform validate`."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.texto = _sin_comentarios(_leer(WORKFLOW))
+        cls.bloque = cls.texto.split("jobs:", 1)[1]
+        cls.ignore = _leer(RAIZ / ".trivyignore.yaml")
+        cls.fixture = RAIZ / "tests" / "fixtures" / "iac" / "inseguro" / "main.tf"
+
+    def test_workflow_instala_y_ejecuta_trivy(self) -> None:
+        self.assertRegex(self.texto, r"aquasecurity/setup-trivy@[0-9a-f]{40}")
+        self.assertIn("trivy config", self.bloque)
+        self.assertIn("version: v0.76.2", self.bloque)
+
+    def test_escanea_los_roots_y_modulos_terraform(self) -> None:
+        self.assertIn("infra/terraform", self.bloque)
+        self.assertIn("--severity HIGH,CRITICAL", self.bloque)
+        self.assertIn("--exit-code 1", self.bloque)
+
+    def test_usa_excepciones_acotadas_no_globales(self) -> None:
+        self.assertIn("--ignorefile .trivyignore.yaml", self.bloque)
+        self.assertNotIn("--ignore-policy", self.bloque)
+        ids = re.findall(r"(?m)^\s*-\s+id:\s*(\S+)\s*$", self.ignore)
+        self.assertEqual(set(ids), {"AWS-0011", "AWS-0132", "AWS-0054"}, ids)
+        self.assertEqual(len(re.findall(r"(?m)^\s*statement:", self.ignore)), 3)
+        self.assertNotIn('"*"', self.ignore)
+        self.assertNotIn("id: *", self.ignore)
+        self.assertNotIn("AVD-", self.ignore)
+
+    def test_el_escaneo_no_se_sustituye_por_terraform_validate(self) -> None:
+        self.assertIn("terraform validate", self.bloque)
+        self.assertIn("trivy config", self.bloque)
+        # El job falla si Trivy encuentra HIGH/CRITICAL; no hay soft-fail.
+        self.assertNotIn("continue-on-error", self.texto)
+        self.assertNotIn("--exit-code 0", self.bloque)
+
+    def test_prueba_negativa_con_fixture_aislado(self) -> None:
+        self.assertIn("tests/fixtures/iac/inseguro", self.bloque)
+        self.assertIn("verificar_fixture_iac.py", self.bloque)
+        self.assertTrue(self.fixture.is_file())
+        contenido = _leer(self.fixture)
+        self.assertIn('acl    = "public-read"', contenido)
+        self.assertIn("block_public_acls       = false", contenido)
+        # El fixture no vive bajo la infraestructura desplegable.
+        self.assertNotIn("infra/terraform", self.fixture.as_posix())
+
+    def test_sin_credenciales_aws_en_el_escaneo(self) -> None:
+        inicio = self.bloque.index("Instalar Trivy")
+        fin = self.bloque.index("Pruebas de contrato Terraform")
+        tramo = self.bloque[inicio:fin]
+        for prohibido in ("secrets.", "AWS_ACCESS_KEY", "AWS_SECRET", "configure-aws-credentials", "id-token"):
+            self.assertNotIn(prohibido, tramo)
+
+
 class DocumentosDeGobierno(unittest.TestCase):
     def test_gates_pr_declara_checks_y_estado_bloqueado(self) -> None:
         texto = _leer(GATES)

@@ -21,9 +21,26 @@
 | `calidad` | Formato, vet, build y pruebas | `gofmt -l`, `go vet`, `staticcheck`, `go build -trimpath -buildvcs=true`, `go test`, `go test -race`, cobertura de dominio ≥ 80 % | Go de `go.mod`; staticcheck `v0.8.2`; `herramientas/cobertura_dominio.py` | Sí |
 | `seguridad` | Analisis estatico y vulnerabilidades | `go mod verify`, inventario `go list -m all`, `govulncheck`, `gosec` sin exclusiones | govulncheck `v1.9.0`; gosec `v2.30.0` | Sí |
 | `secretos` | Escaneo de secretos | gitleaks sobre historial completo con baseline revisado | gitleaks `v8.30.1` | Sí |
-| `iac` | Validacion Terraform e IaC | `fmt -check`, `init -backend=false`, `validate` (bootstrap y `envs/h08i`), contrato Terraform e IaC, regresión FinOps | Terraform `1.16.6`; pruebas Python del repo | Sí |
+| `iac` | Validacion Terraform e IaC | `fmt -check`, `init -backend=false`, `validate` (bootstrap y `envs/h08i`), **escaneo de seguridad Trivy HIGH/CRITICAL con prueba negativa**, contrato Terraform e IaC, regresión FinOps | Terraform `1.16.6`; Trivy `0.76.2` vía setup-trivy `v0.3.1` | Sí |
 | `contratos` | Contratos OpenAPI y herramientas | Validación OpenAPI H06; pruebas de herramientas y validadores | Python del runner | Sí |
 | `cadena-suministro` | SBOM de dependencias | SBOM SPDX y publicación como artefacto | syft `v1.57.0` | Sí |
+
+### 2.1 Escaneo de seguridad IaC (INF-080-01)
+
+El job `iac` ejecuta un escáner independiente de configuraciones inseguras, además de `terraform validate`:
+
+- **Trivy `0.76.2`** (`config`) sobre `infra/terraform` (roots y módulos), severidad **HIGH/CRITICAL** y
+  `--exit-code 1`. Instalado con `aquasecurity/setup-trivy` fijado por SHA de commit.
+- **Prueba negativa**: el mismo escáner analiza `tests/fixtures/iac/inseguro` (fixture público y aislado,
+  fuera de la infraestructura desplegable) y `herramientas/verificar_fixture_iac.py` exige exit 1 y al
+  menos un hallazgo HIGH/CRITICAL real. Un fallo por ruta o JSON inválido no se acepta como detección.
+- **Excepciones acotadas** en `.trivyignore.yaml`: sólo tres IDs y rutas concretas, cada uno con
+  justificación. No hay allowlist global ni `*`.
+  - `AWS-0054` (HTTP en ALB interno): decisión D2 ratificada en RFC-005; H-01 sigue abierto.
+  - `AWS-0132` (S3 sin CMK): límite declarado de I-070 por coste KMS no presupuestado.
+  - `AWS-0011` (CloudFront sin WAF): **PENDIENTE_DE_DECISION_I030**; WAF tiene coste no incluido en
+    I-000 y su incorporación exige RFC/recotización. Se registra como riesgo abierto, no como resuelto.
+- Cualquier hallazgo HIGH/CRITICAL distinto de esas tres excepciones **hace fallar el job**.
 
 ## 3. Artefactos
 

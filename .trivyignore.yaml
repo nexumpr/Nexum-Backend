@@ -1,0 +1,31 @@
+# Excepciones ACOTADAS del escáner IaC (Trivy config, severidad HIGH/CRITICAL).
+#
+# No es una allowlist global: cada entrada identifica un único ID de política y una
+# ruta concreta, y lleva justificación. Cualquier otro hallazgo HIGH/CRITICAL hace
+# fallar el job. Revisar en cada Gate de infraestructura.
+misconfigurations:
+  - id: AWS-0054
+    paths:
+      - "modules/balanceo/main.tf"
+    statement: >-
+      D2 ratificada por el responsable (RFC-005-ENMIENDA_I030_TLS_D2): CloudFront
+      termina HTTPS y el tramo CloudFront -> VPC Origin -> ALB interno es HTTP
+      privado de red. No es TLS extremo a extremo; H-01 sigue ABIERTO y la decisión
+      pertenece a I-030, no a I-080.
+
+  - id: AWS-0132
+    paths:
+      - "bootstrap/main.tf"
+    statement: >-
+      I-070: el state usa SSE-S3 (AES256) en lugar de CMK de KMS porque una CMK
+      tiene coste fijo no presupuestado en I-000. Límite declarado y aceptado con
+      condiciones en el Gate I-070; sin revocación criptográfica inmediata.
+
+  - id: AWS-0011
+    paths:
+      - "modules/balanceo/main.tf"
+    statement: >-
+      PENDIENTE_DE_DECISION_I030: CloudFront sin AWS WAF. WAF tiene coste mensual
+      no incluido en I-000 y su incorporación exige RFC/recotización. Se registra
+      como riesgo abierto; no se declara resuelto. Esta excepción no autoriza
+      ignorar WAF en producción ni sustituye una decisión humana.

@@ -454,3 +454,10 @@
 - Branch protection: BLOQUEADO_PLAN_GITHUB. Verificado por lectura: HTTP 403 en repositorio privado («Upgrade to GitHub Pro or make this repository public»); no se cambia de plan ni se declara proteccion activa.
 - Ejecucion real verificada en PR #28 (run 42458688828) y SDD (run 42458688876); no se extrapola a HEADs posteriores.
 - Evidencia PR #28: run Go Backend CI 42458688828 y run documental 42458688876 sobre SHA 6497915f4c8e8d90a1f7f60c7f67d6353c6a69e0; seis jobs y `validar` en pass. Cobertura de dominio en la ejecucion: COBERTURA_DOMINIO_PASS (92.0% local). Branch protection verificada como no disponible: HTTP 403 en repositorio privado (BLOQUEADO_PLAN_GITHUB); no se cambia de plan.
+
+### I-080: escaner IaC real y hallazgos (2026-11-08)
+
+- INF-080-01 corregido: Trivy 0.76.2 (setup-trivy v0.3.1 por SHA) escanea infra/terraform con severidad HIGH/CRITICAL y exit 1. terraform validate ya no se presenta como escaneo de seguridad.
+- Prueba negativa end-to-end: fixture tests/fixtures/iac/inseguro (fuera de infra) detectado con exit 1 y 6 HIGH (AWS-0086/0087/0091/0092/0093/0132); herramientas/verificar_fixture_iac.py rechaza exit distinto de 1 o ausencia de HIGH/CRITICAL.
+- Hallazgos reales sobre infra: AWS-0054 CRITICAL (ALB interno HTTP; D2/RFC-005, H-01 abierto), AWS-0132 HIGH (SSE-S3 sin CMK; limite I-070) y AWS-0011 HIGH (CloudFront sin WAF; PENDIENTE_DE_DECISION_I030 por coste no presupuestado). Excepciones acotadas por ID+ruta con justificacion en .trivyignore.yaml; cualquier otro HIGH/CRITICAL bloquea.
+- Pruebas: 28 de contrato CI y 49 de herramientas. AWS_NOT_RUN; sin cambios de arquitectura ni IAM; sin Docker.

@@ -51,5 +51,7 @@
 - [x] Cobertura de dominio medida con herramientas/cobertura_dominio.py (umbral 80%; 92.0% local).
 - [x] Terraform fmt/init -backend=false/validate y contratos IaC en CI, sin backend remoto.
 - [x] OpenAPI H06, herramientas, SBOM e inventario de dependencias en CI.
-- [x] GATES_PR.md con seis checks y branch protection documentada como PENDIENTE_APLICACION_HUMANA.
+- [x] GATES_PR.md con seis checks y branch protection documentada como BLOQUEADO_PLAN_GITHUB (403 verificado).
 - [x] Ejecucion real del workflow sobre el PR #28: run 42458688828, SHA 6497915, seis jobs + SDD en pass (2026-11-08).
+- [x] Escaner IaC real (Trivy 0.76.2, HIGH/CRITICAL, exit 1) con prueba negativa sobre fixture aislado y excepciones acotadas justificadas.
+- [x] Clasificacion ejecutado vs pendiente de servicios reales documentada; sin declarar integracion cloud por mocks.
