@@ -47,3 +47,10 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+- [x] Workflow CD manual con entorno protegido, autorizacion ligada al SHA, artefacto verificado y sin credenciales estaticas.
+- [x] Guardas de 2 nodos sanos antes/despues, MinHealthyPercentage=100, health HTTPS 200 y rollback a LT previa.
+- [x] POLITICA_RELEASES.md, PLAN_ROLLBACK.md y EVIDENCIA_DEPLOY.md (NOT_RUN).
+- [x] Binario binario-<sha> publicado por CI para promocion.
+- [ ] Entorno aws-deploy con revisores, rol OIDC y CD_HABILITADO: PENDIENTE_APLICACION_HUMANA; sin ellos el preflight falla.
+- [ ] Ejecucion real y ensayo de rollback: NOT_RUN (requieren Gate AWS).

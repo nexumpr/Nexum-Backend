@@ -78,3 +78,15 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+
+### Implementacion H08 (2026-11-08)
+
+- T-090-01 Matriz de versiones: IMPLEMENTADO_LOCAL en POLITICA_RELEASES.md (SemVer vX.Y.Z, /api/v1, release vX.Y.Z+sha12, digest y SBOM del mismo run).
+- T-090-02 Aprobacion: IMPLEMENTADO_LOCAL. cd-backend.yml solo workflow_dispatch en main, entorno aws-deploy, CD_HABILITADO=true, frase AUTORIZO_DESPLIEGUE_<sha> y confirmar=SI; sin main->deploy.
+- T-090-03 Despliegue seguro: IMPLEMENTADO_LOCAL. Instance refresh MinHealthyPercentage=100, aborta sin 2 InService y 2 healthy antes/despues, rollback a LT previa.
+- T-090-04 Pruebas HTTP: IMPLEMENTADO_LOCAL. GET https /api/v1/health/live con curl --fail --proto https y exigencia de 200.
+- T-090-05 Fallos y rollback: DOCUMENTADO en PLAN_ROLLBACK.md; rollback de app independiente del esquema, migraciones backwards compatible, no borrar state ni datos.
+- T-090-06 Cierre: DOCUMENTADO en EVIDENCIA_DEPLOY.md con estado NOT_RUN y campos de release, autorizador, 2 targets, coste y errores.
+- Cambio habilitador I-080: go-backend.yml publica binario-<sha> linux/arm64 con SHA-256; no altera checks ni umbrales.
+- Pruebas: 21 de contrato CD y 10 de autorizacion; AWS_NOT_RUN.

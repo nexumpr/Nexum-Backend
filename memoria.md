@@ -466,3 +466,17 @@
 - Trivy real post-aprobacion: exit 0 con las tres excepciones autorizadas; la prueba negativa sigue exigiendo exit 1 + HIGH/CRITICAL.
 - Vigencia automatizada (2026-11-08): herramientas/verificar_vigencia_rfc006.py en el job iac falla si RFC-006 no esta APROBADA, revocada, caducada (2026-12-02), con fechas RFC/ignore distintas o si existe Gate de despliegue AWS aprobado; 10 pruebas unitarias. CI puede pasar con excepcion autorizada, pero el riesgo WAF sigue pendiente para despliegue.
 - Pruebas: 29 de contrato CI y 59 de herramientas.
+
+
+### I-080: cierre post-merge (2026-11-08)
+
+- PR #28 MERGED (merge 4262972e5d423a01ba8be89642fa423e6a764003), HEAD autorizado f2393a3adb721e6705b0ab5e9177aaac17f582cb verificado con --match-head-commit. CI del PR 7/7; CI de main: Go Backend CI y SDD documental SUCCESS.
+- Estado INTEGRADO_MAIN - NO DESPLEGADO. RFC-006 aprobada (AWS-0011 temporal hasta 2026-12-02); branch protection BLOQUEADO_PLAN_GITHUB; AWS_NOT_RUN.
+
+### I-090: CD Backend implementado en local (2026-11-08)
+
+- Gate APRUEBO_GATE_I090_LOCAL registrado en sdd/_control/H08/GATE_H08I_I090.md; rama feat/h08i-i090-cd-backend; base main 4262972.
+- .github/workflows/cd-backend.yml: solo workflow_dispatch en main; entorno aws-deploy; CD_HABILITADO=true; frase AUTORIZO_DESPLIEGUE_<sha>; confirmar=SI; descarga binario-<sha> y sbom-spdx-<sha> de un run de CI; verifica SHA-256; OIDC sin credenciales estaticas; instance refresh MinHealthyPercentage=100; aborta sin 2 InService y 2 healthy antes/despues; health HTTPS /api/v1/health/live; evidencia y rollback a LT previa.
+- go-backend.yml publica binario-<sha> linux/arm64 con dist/binario.sha256 (cambio habilitador; sin alterar checks).
+- Documentos POLITICA_RELEASES.md, PLAN_ROLLBACK.md y EVIDENCIA_DEPLOY.md (NOT_RUN). Entorno aws-deploy (total_count 0), rol OIDC y CD_HABILITADO PENDIENTE_APLICACION_HUMANA: el preflight falla cerrado.
+- Pruebas: 21 de contrato CD y 10 de autorizacion. AWS_NOT_RUN; sin terraform apply/destroy ni Docker.
