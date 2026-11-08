@@ -128,3 +128,8 @@ Pruebas: 22 de contrato en tests/infra/terraform/test_terraform_backend_contrato
 - Plan malformado o incompleto falla cerrado (PLAN_MALFORMADO). El modelo de pruebas sigue la estructura de resource_changes de terraform show -json, sin presentarse como plan real.
 - Pruebas: 49 de contrato I-070 (245 en la suite Terraform).
 - AWS_NOT_RUN: sin plan real, migracion, import ni recursos creados.
+
+### Cierre post-merge (2026-11-08)
+
+- PR #27 MERGED (merge 21eb9cb540e4d4a39a0851a2c3f730fd78a0846f) con HEAD autorizado d31d4745367afea9a1cfb672b12f928378208155 verificado con --match-head-commit. CI del PR 5/5; CI de main SUCCESS.
+- Estado INTEGRADO_MAIN - NO DESPLEGADO. AWS_NOT_RUN: sin apply, migracion, import ni recursos.

@@ -46,3 +46,15 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+- [x] Workflow CI de seis jobs con acciones por SHA y herramientas por version exacta.
+- [x] Cobertura de dominio medida con herramientas/cobertura_dominio.py (umbral 80%; 92.0% local).
+- [x] Terraform fmt/init -backend=false/validate y contratos IaC en CI, sin backend remoto.
+- [x] OpenAPI H06, herramientas, SBOM e inventario de dependencias en CI.
+- [x] GATES_PR.md con seis checks y branch protection documentada como BLOQUEADO_PLAN_GITHUB (403 verificado).
+- [x] Ejecucion real del workflow sobre el PR #28: run 42458688828, SHA 6497915, seis jobs + SDD en pass (2026-11-08).
+- [x] Escaner IaC real (Trivy 0.76.2, HIGH/CRITICAL, exit 1) con prueba negativa sobre fixture aislado y excepciones acotadas para AWS-0054 y AWS-0132.
+- [x] AWS-0011 (CloudFront sin WAF) autorizado temporalmente por RFC-006 (APRUEBO_RFC_006_WAF_TEMPORAL); excepcion acotada con caducidad 2026-12-02.
+- [x] Decision humana sobre RFC-006 concedida; el job iac vuelve a verde sin silenciar el escaner.
+- [x] Vigencia de RFC-006 automatizada en CI (caducidad, revocacion, discrepancias y Gate AWS); la excepcion no sobrevive a su autorizacion.
+- [x] Clasificacion ejecutado vs pendiente de servicios reales documentada; sin declarar integracion cloud por mocks.

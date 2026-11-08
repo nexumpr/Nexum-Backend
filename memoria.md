@@ -435,3 +435,34 @@
 - Defecto B corregido: cualquier tipo que no empezara por aws_ se aceptaba como local. Ahora denegacion por defecto: solo AWS y terraform_data.validacion_bootstrap; el resto produce PROVEEDOR_NO_AUTORIZADO.
 - Defecto C corregido: se exige recuperacion completa; si falta una direccion AWS prevista se reporta IMPORT_FALTANTE. Plan malformado falla cerrado.
 - Pruebas: 49 de contrato I-070 (245 en la suite Terraform). AWS_NOT_RUN: sin plan real ni recursos.
+
+
+### I-070: cierre post-merge (2026-11-08)
+
+- PR #27 MERGED (merge `21eb9cb540e4d4a39a0851a2c3f730fd78a0846f`), HEAD autorizado `d31d4745367afea9a1cfb672b12f928378208155` verificado con --match-head-commit. CI del PR 5/5; CI de main: Go Backend CI y SDD documental SUCCESS.
+- Estado: INTEGRADO_MAIN - NO DESPLEGADO. AWS_NOT_RUN, INFRA_NOT_DEPLOYED, coste 0.0000 USD. Sin migracion de state, sin import, sin recursos.
+- Riesgos abiertos sin cambios: AWS_SCP_NOT_VERIFIED, RFC-004 PROPUESTO, contrasena Redis en state, OIDC/environments NOT_VERIFIED, H-01, CI Terraform (I-080), Redis sin HA, readiness 503.
+
+### I-080: CI Backend implementado en local (2026-11-08)
+
+- Gate `APRUEBO_GATE_I080_LOCAL` registrado en sdd/_control/H08/GATE_H08I_I080.md; rama feat/h08i-i080-ci-backend; base main 21eb9cb.
+- Workflow .github/workflows/go-backend.yml con seis jobs: calidad (gofmt, vet, staticcheck, build -trimpath -buildvcs, test, -race, cobertura dominio >=80%), seguridad (go mod verify, inventario, govulncheck, gosec), secretos (gitleaks), iac (terraform fmt/init -backend=false/validate + contratos + FinOps), contratos (OpenAPI H06 y herramientas) y cadena-suministro (SBOM).
+- Acciones fijadas por SHA de commit; herramientas Go por version exacta; Terraform 1.16.6; sin AWS, sin Docker, sin secretos, permissions contents: read.
+- Nueva herramienta herramientas/cobertura_dominio.py (deduplica bloques por localizacion, umbral 80, falla cerrado) y 7 pruebas. Cobertura de dominio local: 92.0% (cache 100, dynamo 100, identity 100, financial 84, money 93.8).
+- Tests nuevos de dominio para elevar cobertura: tests/unit/cache/keys_test.go, tests/unit/dynamo/keys_test.go y tests/unit/domain/user_accessors_test.go.
+- Contrato CI: tests/infra/ci/test_ci_contract.py (22 pruebas). Documentos MATRIZ_JOBS_CI.md, GATES_PR.md y REPORTE_EVIDENCIA_CI.md.
+- Branch protection: BLOQUEADO_PLAN_GITHUB. Verificado por lectura: HTTP 403 en repositorio privado («Upgrade to GitHub Pro or make this repository public»); no se cambia de plan ni se declara proteccion activa.
+- Ejecucion real verificada en PR #28 (run 42458688828) y SDD (run 42458688876); no se extrapola a HEADs posteriores.
+- Evidencia PR #28: run Go Backend CI 42458688828 y run documental 42458688876 sobre SHA 6497915f4c8e8d90a1f7f60c7f67d6353c6a69e0; seis jobs y `validar` en pass. Cobertura de dominio en la ejecucion: COBERTURA_DOMINIO_PASS (92.0% local). Branch protection verificada como no disponible: HTTP 403 en repositorio privado (BLOQUEADO_PLAN_GITHUB); no se cambia de plan.
+
+### I-080: escaner IaC real y hallazgos (2026-11-08)
+
+- INF-080-01 corregido: Trivy 0.76.2 (setup-trivy v0.3.1 por SHA) escanea infra/terraform con severidad HIGH/CRITICAL y exit 1. terraform validate ya no se presenta como escaneo de seguridad.
+- Prueba negativa end-to-end: fixture tests/fixtures/iac/inseguro (fuera de infra) detectado con exit 1 y 6 HIGH (AWS-0086/0087/0091/0092/0093/0132); herramientas/verificar_fixture_iac.py rechaza exit distinto de 1 o ausencia de HIGH/CRITICAL.
+- Hallazgos reales sobre infra: AWS-0054 CRITICAL (ALB interno HTTP; D2/RFC-005, H-01 abierto), AWS-0132 HIGH (SSE-S3 sin CMK; limite I-070) y AWS-0011 HIGH (CloudFront sin WAF).
+- Correccion de gobierno (2026-11-08): AWS-0011 carecia de autorizacion normativa. Se retira de .trivyignore.yaml; Trivy real devuelve 1 hallazgo HIGH (AWS-0011) y exit 1. RFC-006 (sdd/_control/H08/RFC-006-EXCEPCION_WAF_I030.md) queda PROPUESTO - NO APROBADO con riesgo, controles compensatorios, condiciones de despliegue, caducidad 2026-12-02/Gate AWS, alternativas y coste indicativo NOT_VERIFIED.
+- Estado: I-080 BLOQUEADO_RFC_006; job iac en rojo y PR #28 no fusionable hasta APRUEBO_RFC_006_WAF_TEMPORAL, WAF con recotizacion o alternativa formal. No se declara IAC_SCAN PASS. Sin cambios de arquitectura, IAM ni AWS.
+- Aprobacion recibida (2026-11-08): APRUEBO_RFC_006_WAF_TEMPORAL. RFC-006 APROBADA con alcance temporal: excepcion AWS-0011 reincorporada en .trivyignore.yaml (ID+ruta, expired_at 2026-12-02), controles compensatorios, condiciones de despliegue y riesgo residual. No autoriza WAF ni AWS; el despliegue sigue bloqueado por RFC-004, H-01 y RFC-006 5.
+- Trivy real post-aprobacion: exit 0 con las tres excepciones autorizadas; la prueba negativa sigue exigiendo exit 1 + HIGH/CRITICAL.
+- Vigencia automatizada (2026-11-08): herramientas/verificar_vigencia_rfc006.py en el job iac falla si RFC-006 no esta APROBADA, revocada, caducada (2026-12-02), con fechas RFC/ignore distintas o si existe Gate de despliegue AWS aprobado; 10 pruebas unitarias. CI puede pasar con excepcion autorizada, pero el riesgo WAF sigue pendiente para despliegue.
+- Pruebas: 29 de contrato CI y 59 de herramientas.
