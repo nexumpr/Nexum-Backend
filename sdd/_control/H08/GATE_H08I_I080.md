@@ -32,10 +32,13 @@ cambios de branch protection en el repositorio, ni iniciar I-090.
 
 ## 3. Límites y bloqueos
 
-- **Branch protection no aplicada**: es una mutación de configuración remota y requiere autorización
-  humana específica. Se documenta el JSON y el comando; no se ejecuta.
-- **Ejecución real del workflow**: los checks se verifican en el PR de I-080; `IMPLEMENTADO_LOCAL` no
-  es `CI verde` hasta que exista un run asociado al SHA.
+- **Branch protection no aplicada**: `gh api .../branches/main/protection` devuelve **HTTP 403**
+  («Upgrade to GitHub Pro or make this repository public») en el plan actual del repositorio privado. No se
+  declara protección activa, no se cambia de plan y no se genera cargo; el procedimiento queda documentado
+  en `GATES_PR.md` §0. Los checks de CI sí se ejecutan y se exigen por revisión humana.
+- **Ejecución real del workflow**: verificada en PR #28, run 42458688828, SHA
+  `6497915f4c8e8d90a1f7f60c7f67d6353c6a69e0`, con los seis jobs en `pass` y `validar` en `pass`. La
+  evidencia se detalla en `REPORTE_EVIDENCIA_CI.md` §2; si cambia el HEAD, debe reasociarse.
 - **Sin AWS**: no se invoca cuenta, no se lee state remoto y no se crea ningún recurso.
 - **OIDC y credenciales de release** pertenecen a I-090 y a su Gate.
 - **Cobertura**: mide sentencias del dominio; no sustituye pruebas de integración AWS/Redis/HTTP.

@@ -451,5 +451,6 @@
 - Nueva herramienta herramientas/cobertura_dominio.py (deduplica bloques por localizacion, umbral 80, falla cerrado) y 7 pruebas. Cobertura de dominio local: 92.0% (cache 100, dynamo 100, identity 100, financial 84, money 93.8).
 - Tests nuevos de dominio para elevar cobertura: tests/unit/cache/keys_test.go, tests/unit/dynamo/keys_test.go y tests/unit/domain/user_accessors_test.go.
 - Contrato CI: tests/infra/ci/test_ci_contract.py (22 pruebas). Documentos MATRIZ_JOBS_CI.md, GATES_PR.md y REPORTE_EVIDENCIA_CI.md.
-- Branch protection: PENDIENTE_APLICACION_HUMANA (mutacion remota no autorizada); el JSON y el comando quedan documentados.
-- AWS_NOT_RUN: ejecucion real del workflow pendiente del PR; IMPLEMENTADO_LOCAL no es CI verde.
+- Branch protection: BLOQUEADO_PLAN_GITHUB. Verificado por lectura: HTTP 403 en repositorio privado («Upgrade to GitHub Pro or make this repository public»); no se cambia de plan ni se declara proteccion activa.
+- Ejecucion real verificada en PR #28 (run 42458688828) y SDD (run 42458688876); no se extrapola a HEADs posteriores.
+- Evidencia PR #28: run Go Backend CI 42458688828 y run documental 42458688876 sobre SHA 6497915f4c8e8d90a1f7f60c7f67d6353c6a69e0; seis jobs y `validar` en pass. Cobertura de dominio en la ejecucion: COBERTURA_DOMINIO_PASS (92.0% local). Branch protection verificada como no disponible: HTTP 403 en repositorio privado (BLOQUEADO_PLAN_GITHUB); no se cambia de plan.

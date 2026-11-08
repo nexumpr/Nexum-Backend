@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Spec | `sdd/02-infraestructura/I-080-ci-backend` |
-| Estado | `IMPLEMENTADO_LOCAL`; ejecución real en CI **pendiente de este PR**; AWS `NOT_RUN` |
+| Estado | `CI_VERDE_EN_PR`; ejecución real en PR #28 (run 42458688828) sobre `6497915f4c8e8d90a1f7f60c7f67d6353c6a69e0`; AWS `NOT_RUN` |
 | Workflow | `.github/workflows/go-backend.yml` |
 | Herramientas | Acciones fijadas por SHA de commit; herramientas Go por versión exacta |
 
@@ -50,6 +50,10 @@ registro público; no accede a state remoto ni a la cuenta.
 
 ## 6. Límites declarados
 
+- Ejecución real verificada en PR #28 (run 42458688828): los seis jobs y `validar` en `pass` sobre
+  `6497915f4c8e8d90a1f7f60c7f67d6353c6a69e0`.
+- Branch protection: **BLOQUEADO_PLAN_GITHUB**. `gh api .../branches/main/protection` devuelve HTTP 403
+  en el repositorio privado; no se activa ni se simula. Detalle en `GATES_PR.md` §0.
 - La validación `terraform validate` acredita configuración válida, **no** infraestructura desplegada.
 - El SBOM y los artefactos no sustituyen pruebas de runtime AWS.
 - La cobertura mide sentencias del dominio con `-coverpkg=all` y deduplicación por bloque; no mide

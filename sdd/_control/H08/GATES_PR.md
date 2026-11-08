@@ -3,8 +3,20 @@
 | Campo | Valor |
 |---|---|
 | Spec | `sdd/02-infraestructura/I-080-ci-backend` (INF-080-02, INF-080-03, INF-080-05) |
-| Estado de branch protection | **PENDIENTE_APLICACION_HUMANA** (requiere mutación de configuración del repositorio) |
+| Estado de branch protection | **BLOQUEADO_PLAN_GITHUB** — verificado por lectura el 2026-11-08: HTTP 403 «Upgrade to GitHub Pro or make this repository public» |
+| Repositorio | Privado (`nexumpr/Nexum-Backend`, `private`) |
 | Workflow | `.github/workflows/go-backend.yml` |
+
+## 0. Verificación real de capacidades (solo lectura)
+
+`gh api repos/nexumpr/Nexum-Backend/branches/main/protection` devuelve **HTTP 403**:
+«Upgrade to GitHub Pro or make this repository public to enable this feature».
+
+Consecuencia: en el plan actual **no es posible configurar branch protection ni required status checks**.
+No se declara protección activa, no se cambia de plan y no se genera ningún cargo. Los checks de CI sí
+funcionan y se exigen por revisión humana y por el proceso de merge autorizado. El procedimiento de
+activación queda preparado para cuando exista un plan que lo permita o una decisión humana de
+visibilidad/plan.
 
 ## 1. Checks requeridos
 

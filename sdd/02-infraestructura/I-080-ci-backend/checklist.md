@@ -52,4 +52,4 @@
 - [x] Terraform fmt/init -backend=false/validate y contratos IaC en CI, sin backend remoto.
 - [x] OpenAPI H06, herramientas, SBOM e inventario de dependencias en CI.
 - [x] GATES_PR.md con seis checks y branch protection documentada como PENDIENTE_APLICACION_HUMANA.
-- [ ] Ejecucion real del workflow sobre el PR: pendiente; no declarar CI verde antes.
+- [x] Ejecucion real del workflow sobre el PR #28: run 42458688828, SHA 6497915, seis jobs + SDD en pass (2026-11-08).

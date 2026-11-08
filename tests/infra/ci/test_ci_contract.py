@@ -165,11 +165,12 @@ class TrabajosObligatorios(unittest.TestCase):
 
 
 class DocumentosDeGobierno(unittest.TestCase):
-    def test_gates_pr_declara_checks_y_estado_pendiente(self) -> None:
+    def test_gates_pr_declara_checks_y_estado_bloqueado(self) -> None:
         texto = _leer(GATES)
         for nombre in JOBS.values():
             self.assertIn(nombre, texto, nombre)
-        self.assertIn("PENDIENTE_APLICACION_HUMANA", texto)
+        self.assertIn("BLOQUEADO_PLAN_GITHUB", texto)
+        self.assertIn("HTTP 403", texto)
         self.assertIn("allow_force_pushes", texto)
         self.assertIn('"allow_force_pushes": false', texto)
         self.assertIn("required_approving_review_count", texto)
@@ -183,12 +184,13 @@ class DocumentosDeGobierno(unittest.TestCase):
             self.assertIn(artefacto, texto)
         self.assertIn("NOT_RUN", texto)
 
-    def test_reporte_no_declara_pass_sin_ejecucion(self) -> None:
+    def test_reporte_vincula_evidencia_a_un_sha(self) -> None:
         texto = _leer(REPORTE)
-        self.assertIn("IMPLEMENTADO_LOCAL", texto)
-        self.assertIn("pendiente", texto.lower())
-        self.assertIn("No se declara `PASS`", texto)
+        self.assertIn("CI_VERDE_EN_PR", texto)
+        self.assertIn("42458688828", texto)
+        self.assertIn("6497915f4c8e8d90a1f7f60c7f67d6353c6a69e0", texto)
         self.assertIn("NOT_RUN", texto)
+        self.assertIn("si el head del pr cambia", texto.lower())
 
 
 if __name__ == "__main__":
