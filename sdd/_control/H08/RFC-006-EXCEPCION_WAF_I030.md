@@ -115,3 +115,6 @@ residual sigue siendo del responsable y no se declara mitigado.
 - Cualquier otro HIGH/CRITICAL sigue haciendo fallar el escáner.
 - La aprobación no se renueva por silencio: al vencer §6, la excepción debe eliminarse o renovarse con
   nueva decisión humana.
+- **Comprobación automatizada:** `herramientas/verificar_vigencia_rfc006.py` falla si la RFC no está
+  APROBADA, si está revocada, si se supera la caducidad, si las fechas RFC/ignore difieren o si existe un
+  Gate de despliegue AWS aprobado. CI no puede usar la excepción fuera de su autorización.

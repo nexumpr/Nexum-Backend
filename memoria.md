@@ -464,4 +464,5 @@
 - Estado: I-080 BLOQUEADO_RFC_006; job iac en rojo y PR #28 no fusionable hasta APRUEBO_RFC_006_WAF_TEMPORAL, WAF con recotizacion o alternativa formal. No se declara IAC_SCAN PASS. Sin cambios de arquitectura, IAM ni AWS.
 - Aprobacion recibida (2026-11-08): APRUEBO_RFC_006_WAF_TEMPORAL. RFC-006 APROBADA con alcance temporal: excepcion AWS-0011 reincorporada en .trivyignore.yaml (ID+ruta, expired_at 2026-12-02), controles compensatorios, condiciones de despliegue y riesgo residual. No autoriza WAF ni AWS; el despliegue sigue bloqueado por RFC-004, H-01 y RFC-006 5.
 - Trivy real post-aprobacion: exit 0 con las tres excepciones autorizadas; la prueba negativa sigue exigiendo exit 1 + HIGH/CRITICAL.
-- Pruebas: 29 de contrato CI y 49 de herramientas.
+- Vigencia automatizada (2026-11-08): herramientas/verificar_vigencia_rfc006.py en el job iac falla si RFC-006 no esta APROBADA, revocada, caducada (2026-12-02), con fechas RFC/ignore distintas o si existe Gate de despliegue AWS aprobado; 10 pruebas unitarias. CI puede pasar con excepcion autorizada, pero el riesgo WAF sigue pendiente para despliegue.
+- Pruebas: 29 de contrato CI y 59 de herramientas.

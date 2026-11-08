@@ -49,7 +49,8 @@ SHA; este registro no se extrapola a commits posteriores.
 | Comando | `trivy config --severity HIGH,CRITICAL --ignorefile .trivyignore.yaml --exit-code 1 infra/terraform` |
 | Resultado | **PASS** con las tres excepciones autorizadas (AWS-0054/RFC-005, AWS-0132/Gate I-070, AWS-0011/RFC-006); cualquier otro HIGH/CRITICAL falla |
 | Prueba negativa | `tests/fixtures/iac/inseguro` → Trivy exit **1**, 6 hallazgos HIGH y `FIXTURE_IAC_PASS` |
-| CI | El job `iac` ejecuta ambos pasos; con la excepción de RFC-006 vuelve a verde en el nuevo HEAD |
+| CI | El job `iac` ejecuta ambos pasos y la comprobación de vigencia `verificar_vigencia_rfc006.py`; con la excepción de RFC-006 vuelve a verde en el nuevo HEAD |
+| Vigencia | Automatizada: falla si la RFC no está aprobada, está revocada, caduca, las fechas difieren o existe Gate de despliegue AWS |
 
 Hallazgos HIGH/CRITICAL sobre `infra/terraform` y su tratamiento:
 

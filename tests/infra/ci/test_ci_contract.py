@@ -232,6 +232,11 @@ class EscaneoIaCReal(unittest.TestCase):
         # El fixture no vive bajo la infraestructura desplegable.
         self.assertNotIn("infra/terraform", self.fixture.as_posix())
 
+    def test_vigencia_rfc006_automatizada(self) -> None:
+        self.assertIn("verificar_vigencia_rfc006.py", self.bloque)
+        self.assertIn("Caduca el **2026-12-02**", _leer(RAIZ / "sdd" / "_control" / "H08" / "RFC-006-EXCEPCION_WAF_I030.md"))
+        self.assertIn("expired_at: 2026-12-02T00:00:00Z", self.ignore)
+
     def test_sin_credenciales_aws_en_el_escaneo(self) -> None:
         inicio = self.bloque.index("Instalar Trivy")
         fin = self.bloque.index("Pruebas de contrato Terraform")

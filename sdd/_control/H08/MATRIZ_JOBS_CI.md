@@ -43,6 +43,10 @@ El job `iac` ejecuta un escáner independiente de configuraciones inseguras, ade
     `2026-12-02` (registrada también como `expired_at` en el ignore). No autoriza desplegar AWS ni
     implementar WAF; al caducar, el escáner vuelve a fallar.
 - Cualquier hallazgo HIGH/CRITICAL distinto de las tres excepciones autorizadas **hace fallar el job**.
+- **Vigencia automatizada**: `herramientas/verificar_vigencia_rfc006.py` se ejecuta en el job `iac` y falla
+  si la RFC-006 no está `APROBADA`, si está revocada, si la fecha actual supera la caducidad, si la
+  caducidad de la RFC y la de `.trivyignore.yaml` no coinciden o si existe un Gate de despliegue AWS
+  aprobado. La excepción no puede sobrevivir a su autorización.
 
 ## 3. Artefactos
 

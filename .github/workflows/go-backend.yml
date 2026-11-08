@@ -202,6 +202,9 @@ jobs:
             tests/fixtures/iac/inseguro || rc=$?
           python3 herramientas/verificar_fixture_iac.py "$RUNNER_TEMP/trivy-fixture.json" "$rc"
 
+      - name: Vigencia de la excepcion RFC-006
+        run: python3 herramientas/verificar_vigencia_rfc006.py
+
       - name: Pruebas de contrato Terraform e IaC
         run: python3 -m unittest discover -s tests/infra/terraform
 

@@ -56,4 +56,5 @@
 - [x] Escaner IaC real (Trivy 0.76.2, HIGH/CRITICAL, exit 1) con prueba negativa sobre fixture aislado y excepciones acotadas para AWS-0054 y AWS-0132.
 - [x] AWS-0011 (CloudFront sin WAF) autorizado temporalmente por RFC-006 (APRUEBO_RFC_006_WAF_TEMPORAL); excepcion acotada con caducidad 2026-12-02.
 - [x] Decision humana sobre RFC-006 concedida; el job iac vuelve a verde sin silenciar el escaner.
+- [x] Vigencia de RFC-006 automatizada en CI (caducidad, revocacion, discrepancias y Gate AWS); la excepcion no sobrevive a su autorizacion.
 - [x] Clasificacion ejecutado vs pendiente de servicios reales documentada; sin declarar integracion cloud por mocks.
