@@ -212,17 +212,26 @@ jobs:
             --bucket "$ARTIFACT_BUCKET" --release-id "$IN_RELEASE_ID" \
             --sha256 "$IN_DIGEST" --version "$IN_LT_VERSION"
 
-      - name: Publicar binario en S3 y verificar checksum
+      - name: Publicar binario en S3 de forma inmutable
         run: |
           test -n "$ARTIFACT_BUCKET" || { echo "ARTIFACT_DELIVERY_BLOCKED: falta ARTIFACT_BUCKET"; exit 1; }
           CLAVE="releases/$IN_RELEASE_ID/nexum-backend-linux-arm64"
+          PUT=0
           aws s3api put-object \
             --bucket "$ARTIFACT_BUCKET" --key "$CLAVE" \
             --body release/nexum-backend-linux-arm64 \
-            --checksum-algorithm SHA256 > put.json
+            --checksum-algorithm SHA256 \
+            --if-none-match "*" > put.json || PUT=$?
+          HEAD=0
           aws s3api head-object --bucket "$ARTIFACT_BUCKET" --key "$CLAVE" \
-            --checksum-mode ENABLED > cabeza.json
-          python3 herramientas/verificar_objeto_s3.py cabeza.json --sha256 "$IN_DIGEST"
+            --checksum-mode ENABLED > cabeza.json || HEAD=$?
+          if [ "$HEAD" -eq 0 ] && [ -f cabeza.json ]; then
+            python3 herramientas/decidir_publicacion_s3.py \
+              --put-exit "$PUT" --cabeza cabeza.json --sha256 "$IN_DIGEST"
+          else
+            python3 herramientas/decidir_publicacion_s3.py \
+              --put-exit "$PUT" --sha256 "$IN_DIGEST"
+          fi
 
       - name: Comprobar 2 nodos sanos antes de mutar
         run: |
@@ -357,18 +366,55 @@ jobs:
             --auto-scaling-group-name "$ASG_NAME" > refreshes.json
           python3 herramientas/decidir_rollback.py refreshes.json --salida rollback.json
           ACCION=$(jq -r '.accion' rollback.json)
-          if [ "$ACCION" = "CANCELAR_Y_ESPERAR" ]; then
-            aws autoscaling cancel-instance-refresh --auto-scaling-group-name "$ASG_NAME"
-            for _ in $(seq 1 40); do
-              ESTADO=$(aws autoscaling describe-instance-refreshes \
-                --auto-scaling-group-name "$ASG_NAME" \
-                --query 'InstanceRefreshes[0].Status' --output text)
-              case "$ESTADO" in
-                Cancelled|Failed|Successful) break ;;
-              esac
-              sleep 15
-            done
-          fi
+          REFRESH_ID=$(jq -r '.refresh_id // empty' rollback.json)
+          case "$ACCION" in
+            ROLLBACK_EN_PROGRESO)
+              echo "Ya hay un rollback en progreso: $REFRESH_ID; se espera su resultado"
+              ESPERANDO=1
+              for _ in $(seq 1 40); do
+                aws autoscaling describe-instance-refreshes \
+                  --auto-scaling-group-name "$ASG_NAME" > refreshes-actual.json
+                RES=$(python3 herramientas/estado_refresh.py refreshes-actual.json \
+                  --id "$REFRESH_ID" --espera recuperacion)
+                case "$RES" in
+                  RECUPERACION_OK) ESPERANDO=0; break ;;
+                  RECUPERACION_FALLIDA) echo "ROLLBACK_FAILED: rollback previo fallido"; exit 1 ;;
+                  ESPERAR) sleep 15 ;;
+                  *) echo "ROLLBACK_BLOCKED_ACTIVE_REFRESH estado=$RES"; exit 1 ;;
+                esac
+              done
+              if [ "$ESPERANDO" -ne 0 ]; then
+                echo "ROLLBACK_BLOCKED_ACTIVE_REFRESH: timeout esperando rollback previo"
+                exit 1
+              fi
+              ;;
+            CANCELAR_Y_ESPERAR)
+              aws autoscaling cancel-instance-refresh --auto-scaling-group-name "$ASG_NAME"
+              CONFIRMADO=""
+              for _ in $(seq 1 40); do
+                aws autoscaling describe-instance-refreshes \
+                  --auto-scaling-group-name "$ASG_NAME" > refreshes-actual.json
+                RES=$(python3 herramientas/estado_refresh.py refreshes-actual.json \
+                  --id "$REFRESH_ID" --espera cancelacion)
+                case "$RES" in
+                  CANCELADO_OK|YA_TERMINADO) CONFIRMADO=1; break ;;
+                  ESPERAR|ROLLBACK_EN_PROGRESO) sleep 15 ;;
+                  *) echo "ROLLBACK_BLOCKED_ACTIVE_REFRESH estado=$RES"; exit 1 ;;
+                esac
+              done
+              if [ -z "$CONFIRMADO" ]; then
+                echo "ROLLBACK_BLOCKED_ACTIVE_REFRESH: timeout esperando cancelacion"
+                exit 1
+              fi
+              ;;
+            PROCEDER)
+              echo "Sin refresh activo incompatible; se procede con el rollback"
+              ;;
+            *)
+              echo "ROLLBACK_BLOCKED_ACTIVE_REFRESH: accion desconocida $ACCION"
+              exit 1
+              ;;
+          esac
           # Mantener max 3 mientras se recupera: no restaurar 2 antes.
           aws autoscaling update-auto-scaling-group \
             --auto-scaling-group-name "$ASG_NAME" --max-size 3
@@ -378,20 +424,35 @@ jobs:
           aws autoscaling start-instance-refresh \
             --auto-scaling-group-name "$ASG_NAME" \
             --strategy Rolling \
-            --preferences '{"MinHealthyPercentage":100,"MaxHealthyPercentage":150,"InstanceWarmup":120}'
+            --preferences '{"MinHealthyPercentage":100,"MaxHealthyPercentage":150,"InstanceWarmup":120}' > inicio-rollback.json
+          REFRESH_RB=$(jq -r '.InstanceRefreshId' inicio-rollback.json)
+          OK=""
           for _ in $(seq 1 60); do
-            ESTADO=$(aws autoscaling describe-instance-refreshes \
-              --auto-scaling-group-name "$ASG_NAME" \
-              --query 'InstanceRefreshes[0].Status' --output text)
-            case "$ESTADO" in
-              Successful) break ;;
-              Failed|Cancelled|RollbackFailed) echo "ROLLBACK_FAILED estado=$ESTADO"; exit 1 ;;
+            aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name "$ASG_NAME" > refreshes-rb.json
+            RES=$(python3 herramientas/estado_refresh.py refreshes-rb.json \
+              --id "$REFRESH_RB" --espera recuperacion)
+            case "$RES" in
+              RECUPERACION_OK) OK=1; break ;;
+              RECUPERACION_FALLIDA) echo "ROLLBACK_FAILED: estado=$RES"; exit 1 ;;
+              ESPERAR) sleep 30 ;;
+              *) echo "ROLLBACK_FAILED: estado desconocido $RES"; exit 1 ;;
             esac
-            sleep 30
           done
+          if [ -z "$OK" ]; then
+            echo "ROLLBACK_FAILED: timeout esperando recuperacion; max_size=3 conservado"
+            exit 1
+          fi
+          aws autoscaling describe-auto-scaling-groups \
+            --auto-scaling-group-names "$ASG_NAME" > asg-rollback.json
+          python3 herramientas/estado_asg.py asg-rollback.json \
+            --minimo 2 --nodos 2 --salida estado-rollback.json
+          VERSION=$(jq -r '.launch_template_version' estado-rollback.json)
+          test "$VERSION" = "$LT_ANTERIOR" || { echo "ROLLBACK_FAILED: LT no restaurada ($VERSION != $LT_ANTERIOR)"; exit 1; }
           SALUDABLES=$(aws elbv2 describe-target-health --target-group-arn "$TG_ARN" \
             --query 'TargetHealthDescriptions' --output json \
             | jq '[.[] | select(.TargetHealth.State=="healthy")] | length')
-          test "$SALUDABLES" -eq 2
+          test "$SALUDABLES" -eq 2 || { echo "ROLLBACK_FAILED: targets=$SALUDABLES"; exit 1; }
           aws autoscaling update-auto-scaling-group \
             --auto-scaling-group-name "$ASG_NAME" --max-size 2
+          echo "ROLLBACK_OK: version previa restaurada con 2 nodos sanos"

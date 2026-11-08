@@ -136,11 +136,16 @@ class PromocionYAutorizacion(unittest.TestCase):
         self.assertIn("ARTIFACT_BUCKET", self.texto)
         self.assertIn("ARTIFACT_DELIVERY_BLOCKED", self.texto)
         self.assertIn("s3api put-object", self.texto)
-        self.assertIn("s3api head-object", self.texto)
-        self.assertIn("verificar_objeto_s3.py", self.texto)
+        self.assertIn('--if-none-match "*"', self.texto)
+        self.assertIn("decidir_publicacion_s3.py", self.texto)
         self.assertIn("verificar_lt_release.py", self.texto)
         self.assertIn("verificar_instancias_release.py", self.texto)
         self.assertIn("--launch-template LaunchTemplateName=\"$LT_NAME\",Version=\"$IN_LT_VERSION\"", self.texto)
+
+    def test_inmutabilidad_s3_sin_sobrescritura(self) -> None:
+        self.assertIn("ARTIFACT_IMMUTABILITY", _leer(RAIZ / "herramientas" / "decidir_publicacion_s3.py"))
+        self.assertNotIn("s3api delete-object", self.texto)
+        self.assertNotIn("--force", self.texto)
 
     def test_verifica_run_de_ci_verde(self) -> None:
         self.assertIn("verificar_run_ci.py", self.texto)
@@ -223,8 +228,8 @@ class DespliegueSanoyRollback(unittest.TestCase):
         cls.texto = _sin_comentarios(_leer(CD))
 
     def test_exige_dos_nodos_sanos_antes_y_despues(self) -> None:
-        self.assertEqual(self.texto.count("estado_asg.py"), 2)
-        self.assertEqual(self.texto.count("--nodos 2"), 2)
+        self.assertEqual(self.texto.count("estado_asg.py"), 3)
+        self.assertEqual(self.texto.count("--nodos 2"), 3)
         self.assertGreaterEqual(self.texto.count("select(.TargetHealth.State==\"healthy\")"), 2)
         self.assertGreaterEqual(self.texto.count('test "$SALUDABLES" -eq 2'), 2)
 
@@ -246,10 +251,17 @@ class DespliegueSanoyRollback(unittest.TestCase):
         self.assertIn("LT_ANTERIOR", self.texto)
         self.assertIn('--launch-template LaunchTemplateName="$LT_NAME",Version="$LT_ANTERIOR"', self.texto)
         self.assertIn("cancel-instance-refresh", self.texto)
-        self.assertIn("decidir_rollback.py", self.texto)
+        self.assertIn("estado_refresh.py", self.texto)
+        self.assertIn("REFRESH_ID", self.texto)
+        self.assertIn("ROLLBACK_BLOCKED_ACTIVE_REFRESH", self.texto)
+        self.assertIn("ROLLBACK_FAILED", self.texto)
+        self.assertIn("inicio-rollback.json", self.texto)
+        self.assertIn("test \"$VERSION\" = \"$LT_ANTERIOR\"", self.texto)
         self.assertNotIn('Version="${{ inputs.lt_version_previa }}"', self.texto)
-        # No se restaura max 2 antes del refresh de rollback.
+        # No se usa el JSON inicial ni el primer refresh de la lista para autorizar el rollback.
         rollback = self.texto.split("Rollback seguro", 1)[1]
+        self.assertNotIn("InstanceRefreshes[0]", rollback)
+        # No se restaura max 2 antes del refresh de rollback.
         self.assertLess(rollback.index("--max-size 3"), rollback.index("--max-size 2"))
 
     def test_evidencia_con_sha(self) -> None:

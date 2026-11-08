@@ -49,8 +49,17 @@ cambiar de plan, gastar ni iniciar I-100.
   `s3:PutObject` del rol de deploy (I-060: `iam_artifact_object_arns` vacío) y (b) una versión del
   Launch Template creada con el release por I-020/I-070 (Terraform, Gate propio). El CD sube el objeto y
   verifica el LT, pero no crea el LT ni modifica I-020/I-060.
+- **Inmutabilidad S3**: la publicación usa `If-None-Match: *`; un objeto existente sólo se reutiliza si su
+  checksum coincide. Diferencia → `ARTIFACT_IMMUTABILITY_FAIL`, sin sobrescribir ni borrar. Permisos
+  necesarios (`s3:PutObject`/`GetObject` sobre `releases/*`) siguen pendientes en I-060.
+- **Rollback**: identifica el `InstanceRefreshId`, consulta AWS en cada iteración, distingue
+  `RollbackInProgress`, exige estado terminal confirmado y falla con `ROLLBACK_BLOCKED_ACTIVE_REFRESH`
+  (cancelación) o `ROLLBACK_FAILED` (recuperación/timeout) conservando `max=3`. `max=2` sólo se restaura
+  tras verificar LT previa y 2 targets sanos.
 - **Identidad efectiva del release**: se verifica que las 2 instancias `InService` tengan UserData con la
-  URI y digest del release; no basta con `InService`.
+  URI y digest del release; no basta con `InService`. La UserData es evidencia de configuración, no prueba
+  de que el proceso ejecuta el binario; la identidad efectiva en runtime sigue bloqueada hasta disponer de
+  un mecanismo fiable y de AWS real (`DEPLOYED_VERIFIED` no se declara).
 - **Ejecución real**: `NOT_RUN`. El workflow no se ha lanzado; no hay despliegue ni coste.
 - **Rollback**: documentado, no ensayado (`AWS_NOT_RUN`).
 - Siguen abiertos RFC-004, H-01, RFC-006 (WAF, caduca 2026-12-02), Redis sin HA y readiness 503.

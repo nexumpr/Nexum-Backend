@@ -17,6 +17,13 @@ ACTIVOS = {"Pending", "InProgress", "Cancelling", "Baking"}
 
 def decidir(datos: dict) -> dict:
     refreshes = datos.get("InstanceRefreshes") or []
+    en_rollback = [r for r in refreshes if r.get("Status") == "RollbackInProgress"]
+    if en_rollback:
+        return {
+            "accion": "ROLLBACK_EN_PROGRESO",
+            "refresh_id": en_rollback[0].get("InstanceRefreshId"),
+            "estado": "RollbackInProgress",
+        }
     activos = [r for r in refreshes if r.get("Status") in ACTIVOS]
     if activos:
         return {

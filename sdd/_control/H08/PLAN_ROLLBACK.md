@@ -21,16 +21,20 @@ El workflow aborta y ejecuta rollback si:
    cambio; sin ese marcador no se toca AWS.
 2. **Capturar antes de mutar**: versión real del Launch Template y `max_size` desde AWS (no se confía en
    el input `lt_version_previa`; si se aporta, debe coincidir con la real o se aborta).
-3. **Cancelar el refresh activo**: si `describe-instance-refreshes` muestra `Pending`, `InProgress`,
-   `Cancelling` o `Baking`, se ejecuta `cancel-instance-refresh` y se espera estado terminal. No se lanza
-   un segundo refresh incompatible.
+3. **Cancelar el refresh activo**: se identifica el `InstanceRefreshId` concreto. Si está en `Pending`,
+   `InProgress`, `Cancelling` o `Baking`, se ejecuta `cancel-instance-refresh` y se consulta AWS en cada
+   iteración, comprobando el **mismo ID** hasta estado terminal (`Cancelled`/`Failed`/`Successful`). Si en
+   el timeout no hay confirmación → `ROLLBACK_BLOCKED_ACTIVE_REFRESH`, se conserva `max=3` y no se lanza
+   otro refresh. Si el estado es `RollbackInProgress` se distingue y se espera su resultado; no se
+   cancela ni se solapa otro refresh.
 4. **Mantener capacidad**: `max_size` permanece en **3** durante la recuperación; **no** se restaura a 2
    antes del refresh de rollback.
 5. Aplicar la **versión previa real** del Launch Template y lanzar el refresh con
-   `MinHealthyPercentage=100` y `MaxHealthyPercentage=150`.
-6. Esperar `Successful`; si `Failed`/`Cancelled`/`RollbackFailed` → `ROLLBACK_FAILED`, se conserva
-   `max_size=3` para intervención autorizada y no se declara recuperación.
-7. Verificar 2 targets `healthy` y que las instancias arrancaron con la configuración previa.
+   `MinHealthyPercentage=100` y `MaxHealthyPercentage=150`, guardando su `InstanceRefreshId`.
+6. Esperar con un indicador explícito de éxito: sólo `Successful`/`RollbackSuccessful` confirman;
+   `Failed`/`Cancelled`/`RollbackFailed` o estado desconocido → `ROLLBACK_FAILED`; timeout →
+   `ROLLBACK_FAILED` con `max=3` conservado.
+7. Verificar la versión del LT aplicada, 2 targets `healthy` y la configuración previa.
 8. Sólo entonces restaurar `max_size=2` y registrar la evidencia del rollback.
 9. **Nunca** se revierten tablas, índices, TTL ni datos DynamoDB: el rollback de aplicación es
    independiente del de esquema.

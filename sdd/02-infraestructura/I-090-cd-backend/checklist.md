@@ -66,3 +66,8 @@
 - [x] Rollback con captura real de LT, cancelacion de refresh activo, capacidad conservada y ROLLBACK_FAILED.
 - [x] Readiness 200 obligatoria; sin variable de conveniencia.
 - [ ] ARTIFACT_DELIVERY desbloqueada: requiere bucket/permiso I-060 y version LT de I-020 con Gate.
+
+- [x] Rollback con ID de refresh concreto, estado terminal confirmado y timeout explicito (ROLLBACK_BLOCKED_ACTIVE_REFRESH / ROLLBACK_FAILED).
+- [x] max=3 conservado durante fallo; max=2 solo tras verificar LT previa y 2 targets sanos.
+- [x] Publicacion S3 con If-None-Match y reutilizacion solo con checksum identico; sin sobrescritura.
+- [x] Pruebas de estado de refresh, timeout, RollbackInProgress, S3 existente/nuevo/distinto y release mutable.

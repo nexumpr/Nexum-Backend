@@ -178,6 +178,12 @@ class DecisionRollback(unittest.TestCase):
         self.assertEqual(r.returncode, 0)
         self.assertIn("PROCEDE", r.stdout)
 
+    def test_rollback_en_progreso_se_distingue(self) -> None:
+        r = self._run({"InstanceRefreshes": [{"InstanceRefreshId": "r1", "Status": "RollbackInProgress"}]})
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("ROLLBACK_EN_PROGRESO", r.stdout)
+        self.assertIn('"refresh_id": "r1"', r.stdout)
+
 
 class InyeccionDeInputs(unittest.TestCase):
     def _auth(self, **extra: str) -> subprocess.CompletedProcess:
@@ -217,3 +223,78 @@ class InyeccionDeInputs(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EstadoRefresh(unittest.TestCase):
+    def _run(self, estado: str, refresh_id: str = "r1", espera: str = "recuperacion") -> subprocess.CompletedProcess:
+        datos = {"InstanceRefreshes": [{"InstanceRefreshId": "r1", "Status": estado}]}
+        return _ejecutar("estado_refresh.py", str(_json(datos)), "--id", refresh_id, "--espera", espera)
+
+    def test_refresh_activo_espera(self) -> None:
+        for estado in ("Pending", "InProgress", "Baking"):
+            r = self._run(estado)
+            self.assertEqual(r.returncode, 0)
+            self.assertIn("ESPERAR", r.stdout)
+
+    def test_rollback_en_progreso_se_distingue(self) -> None:
+        r = self._run("RollbackInProgress")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("ROLLBACK_EN_PROGRESO", r.stdout)
+
+    def test_cancelacion_confirmada(self) -> None:
+        r = self._run("Cancelled", espera="cancelacion")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("CANCELADO_OK", r.stdout)
+
+    def test_recuperacion_exitosa(self) -> None:
+        for estado in ("Successful", "RollbackSuccessful"):
+            r = self._run(estado)
+            self.assertEqual(r.returncode, 0)
+            self.assertIn("RECUPERACION_OK", r.stdout)
+
+    def test_recuperacion_fallida(self) -> None:
+        for estado in ("Failed", "RollbackFailed", "Cancelled"):
+            r = self._run(estado)
+            self.assertEqual(r.returncode, 0)
+            self.assertIn("RECUPERACION_FALLIDA", r.stdout)
+
+    def test_estado_desconocido_falla(self) -> None:
+        r = self._run("EstadoInventado")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("ESTADO_DESCONOCIDO", r.stdout)
+
+    def test_id_inexistente_falla(self) -> None:
+        r = self._run("Successful", refresh_id="otro")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("ID_NO_ENCONTRADO", r.stdout)
+
+
+class PublicacionS3(unittest.TestCase):
+    def _run(self, put_exit: int, checksum: str | None, sha: str = DIGEST) -> subprocess.CompletedProcess:
+        args = ["decidir_publicacion_s3.py", "--put-exit", str(put_exit), "--sha256", sha]
+        if checksum is not None:
+            args += ["--cabeza", str(_json({"ChecksumSHA256": checksum}))]
+        return _ejecutar(*args)
+
+    def test_objeto_nuevo_pasa(self) -> None:
+        checksum = base64.b64encode(bytes.fromhex(DIGEST)).decode()
+        r = self._run(0, checksum)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("PUBLICACION_NUEVA_OK", r.stdout)
+
+    def test_objeto_existente_mismo_digest_se_reutiliza(self) -> None:
+        checksum = base64.b64encode(bytes.fromhex(DIGEST)).decode()
+        r = self._run(255, checksum)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("REUTILIZAR_OK", r.stdout)
+
+    def test_objeto_existente_con_digest_distinto_falla(self) -> None:
+        otro = base64.b64encode(bytes.fromhex("c" * 64)).decode()
+        r = self._run(255, otro)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("ARTIFACT_IMMUTABILITY_FAIL", r.stdout)
+
+    def test_subida_fallida_sin_objeto_falla(self) -> None:
+        r = self._run(255, None)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("OBJETO_NO_VERIFICABLE", r.stdout)

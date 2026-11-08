@@ -22,7 +22,8 @@
 | Targets `healthy` antes/después | *(pendiente)* 2/2 esperado |
 | Capacidad transitoria | `max_size` 3 durante el rollout y 2 al final (obligatorio) |
 | Launch Template del release | Versión concreta que referencia `s3://<bucket>/releases/<release>/nexum-backend-linux-arm64` y su digest (BLOCKED hasta I-020/I-060) |
-| Verificación en instancias | UserData de las 2 instancias `InService` con la URI y digest del release |
+| Inmutabilidad S3 | `ARTIFACT_IMMUTABILITY_PASS` sólo con `If-None-Match: *` y checksum coincidente; sobrescritura y borrado prohibidos |
+| Verificación en instancias | UserData de las 2 instancias `InService` con la URI y digest del release (evidencia de configuración; no prueba de proceso) |
 | Health HTTP | *(pendiente)* `GET /api/v1/health/live` y `/ready` → **200 obligatorios**; 503 bloquea |
 | Rollback ejecutado | Sí/No y versión previa del Launch Template |
 | Coste observado | *(pendiente)* |

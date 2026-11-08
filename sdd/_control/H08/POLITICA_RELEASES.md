@@ -72,12 +72,18 @@ El binario no se instala por descargarlo en el runner. I-020 arranca cada instan
 no coincide. Por tanto el CD:
 
 1. exige `ARTIFACT_BUCKET` (si falta: `ARTIFACT_DELIVERY_BLOCKED`, sin mutar AWS);
-2. sube el binario a `s3://<bucket>/releases/<release_id>/nexum-backend-linux-arm64` con checksum
-   SHA256 y lo verifica con `head-object`;
-3. **no crea** el Launch Template: exige una versión concreta (`lt_version`) creada por I-020/I-070
+2. sube el binario a `s3://<bucket>/releases/<release_id>/nexum-backend-linux-arm64` con
+   **escritura condicional `If-None-Match: *`** y checksum SHA256;
+3. si el objeto ya existe, sólo se **reutiliza** cuando su `ChecksumSHA256` coincide exactamente con el
+   digest autorizado (`ARTIFACT_IMMUTABILITY_PASS: REUTILIZAR_OK`); cualquier diferencia es
+   `ARTIFACT_IMMUTABILITY_FAIL` y **no** se sobrescribe ni se borra el objeto;
+4. **no crea** el Launch Template: exige una versión concreta (`lt_version`) creada por I-020/I-070
    cuyo UserData referencie esa URI y digest; si no coincide, `LT_RELEASE_FAIL`;
-4. aplica esa versión al ASG y lanza el instance refresh;
-5. verifica la UserData de las dos instancias `InService` para confirmar que arrancaron con el release.
+5. aplica esa versión al ASG y lanza el instance refresh;
+6. verifica la UserData de las dos instancias `InService` para confirmar que arrancaron con el release.
+   La UserData es evidencia de configuración, **no** prueba definitiva de que el proceso ejecuta el
+   binario; la identidad efectiva se comprobará en el despliegue real con un mecanismo fiable y, mientras
+   no exista, se mantiene `DEPLOYED_VERIFIED` bloqueado.
 
 Dependencia bloqueante: bucket de artefactos y permiso `s3:PutObject/GetObject` para el rol de
 despliegue pertenecen a I-060/I-080 (`iam_artifact_object_arns` está vacío) y la creación de la versión

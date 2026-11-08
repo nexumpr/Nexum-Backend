@@ -104,3 +104,8 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - Correccion de rollback: no actua sin mutacion (.mutado), captura LT real (no confia en input), cancela refresh activo, mantiene max 3 durante la recuperacion, ROLLBACK_FAILED conserva capacidad y no se restaura 2 antes.
 - Readiness 200 obligatoria; 503 bloquea el despliegue y no se declara DEPLOYED_VERIFIED.
 - Pruebas: 31 de contrato CD y 21 de helpers CD (run, entorno, LT, instancias, S3, ASG, rollback e inyeccion).
+
+- Correccion de rollback (2026-11-08): se identifica el InstanceRefreshId concreto, se consulta AWS en cada iteracion y se exige estado terminal confirmado; RollbackInProgress se distingue; timeout de cancelacion -> ROLLBACK_BLOCKED_ACTIVE_REFRESH y timeout de recuperacion -> ROLLBACK_FAILED, conservando max=3. No se usa [0] ni JSON obsoleto.
+- Recuperacion: solo Successful/RollbackSuccessful confirman; se verifica LT previa aplicada y 2 targets sanos antes de restaurar max=2.
+- Inmutabilidad S3: put-object con If-None-Match "*"; objeto existente solo se reutiliza con ChecksumSHA256 coincidente; diferencia -> ARTIFACT_IMMUTABILITY_FAIL; sin sobrescritura ni borrado.
+- Pruebas: 33 de helpers CD (estado de refresh, publicacion S3, rollback, inyeccion) y 32 de contrato CD; nuevas pruebas de timeout, RollbackInProgress/Failed y S3.
