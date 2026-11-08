@@ -66,17 +66,19 @@ Tres inconsistencias del procedimiento de recuperación, corregidas dentro de I-
    la migración esté verificada; se duplica la **copia de seguridad cifrada**, con SHA-256 verificado y
    `lineage`/`serial` registrados sin contenido.
 2. **Aceptación de la importación**: se distinguía mal un plan de import de un plan sin cambios y se usaban los
-   contadores globales. Ahora se evalúa **por dirección y proveedor**: `IMPORTS` sólo de recursos AWS previstos,
-   `AWS_CREATE = 0`, `AWS_UPDATE_UNAUTHORIZED = 0`, `AWS_REPLACE = 0`, `AWS_DESTROY = 0`, sin importaciones
-   duplicadas; las operaciones locales de `terraform_data.validacion_bootstrap` se revisan aparte y no cuentan como
-   infraestructura AWS. Un reemplazo del bucket detiene el proceso.
+   contadores globales. Ahora se evalúa **por dirección y proveedor**: `IMPORTS` de **todas** las direcciones AWS
+   previstas (recuperación completa), cada recurso físico en una sola dirección del mismo tipo (un identificador
+   compartido entre tipos distintos, como el nombre del bucket en S3, es legítimo), `AWS_CREATE = 0`,
+   `AWS_UPDATE_UNAUTHORIZED = 0`, `AWS_REPLACE = 0`, `AWS_DESTROY = 0`; las operaciones locales de
+   `terraform_data.validacion_bootstrap` se revisan aparte y no cuentan como infraestructura AWS. Un reemplazo del
+   bucket detiene el proceso.
 3. **Inventario**: el runbook citaba «7 recursos»; el inventario se deriva del código y hoy son **8 direcciones**
    (7 AWS + `terraform_data.validacion_bootstrap`), sin cifras históricas fijas.
 
 No se asume que la migración incremente el `serial`; el criterio es la coincidencia de contenido, no un número.
-Pruebas de contrato I-070: **47** (243 en la suite Terraform), con un evaluador determinista sobre planes sintéticos
-(create AWS, replace, destroy, update, import duplicado, import no previsto y distinción de `terraform_data`).
-`AWS_NOT_RUN`: sin plan real, migración, import ni recursos.
+Pruebas de contrato I-070 en rev4: **47** (243 en la suite Terraform), con un evaluador determinista sobre planes
+sintéticos (create AWS, replace, destroy, update, import duplicado, import no previsto y distinción de
+`terraform_data`). `AWS_NOT_RUN`: sin plan real, migración, import ni recursos.
 
 ## 7. Rev4 — criterio de recuperación por dirección y proveedor (2026-11-08)
 
@@ -86,13 +88,32 @@ Se sustituye por evaluación **por dirección y proveedor**:
 
 | Categoría | Criterio |
 |---|---|
-| `IMPORTS` | Sólo direcciones AWS previstas; identificador real único por dirección |
+| `IMPORTS` | **Todas** las direcciones AWS previstas (recuperación completa); un identificador compartido entre tipos distintos es legítimo; dos direcciones del mismo tipo con el mismo recurso no |
 | `AWS_CREATE` | 0 |
 | `AWS_UPDATE_UNAUTHORIZED` | 0 |
 | `AWS_REPLACE` | 0 |
 | `AWS_DESTROY` | 0 |
 | `TERRAFORM_DATA` | Operaciones locales esperadas y justificadas; nunca `delete` |
+| Proveedores | Sólo AWS y `terraform_data.validacion_bootstrap`; cualquier otro recurso se rechaza por defecto |
 
 No se usan los contadores globales del resumen: un `1 to add` puede ser un `terraform_data` inocuo o un bucket AWS
 inaceptable. Prohibido eliminar recursos del código para "conseguir" ceros. El `apply` del import sigue requiriendo
 Gate humano independiente.
+
+## 8. Rev5 — defectos del evaluador corregidos (2026-11-08)
+
+La revisión con ejecución directa reprodujo tres defectos en `evaluar_recuperacion()` del test de contrato:
+
+1. **Falso `IMPORT_DUPLICADO`**: se comparaba sólo el `id`, por lo que `aws_s3_bucket.state` y
+   `aws_s3_bucket_versioning.state` —que comparten legítimamente el nombre del bucket— se rechazaban. Ahora la clave
+   de duplicidad es `(proveedor, tipo, id)`: el identificador compartido entre tipos distintos se permite y sólo se
+   rechaza el mismo recurso físico en dos direcciones del **mismo tipo**. También se detecta `DIRECCION_DUPLICADA`.
+2. **Proveedores inesperados**: todo tipo que no empezaba por `aws_` se aceptaba como local. Ahora la política es de
+   **denegación por defecto**: sólo AWS y `terraform_data.validacion_bootstrap`; cualquier otro recurso produce
+   `PROVEEDOR_NO_AUTORIZADO`.
+3. **Importaciones faltantes**: no se comprobaba la completitud. Al ser una recuperación **completa**, ahora se exige
+   cada dirección AWS prevista y se reporta `IMPORT_FALTANTE` si falta alguna. Una recuperación parcial requeriría
+   autorización y alcance propios.
+
+Además, un plan malformado o incompleto falla cerrado (`PLAN_MALFORMADO`). Pruebas de contrato I-070: **49** con
+modelo de `resource_changes` (fixtures sintéticos, no un plan real). `AWS_NOT_RUN`.

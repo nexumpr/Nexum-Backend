@@ -427,3 +427,11 @@
 - Defecto corregido: exigir 0 to add en la recuperacion bloqueaba una recuperacion valida, porque terraform_data.validacion_bootstrap se recrea en el nuevo state como recurso local (create) sin crear infraestructura AWS.
 - RUNBOOK_IAC.md 4: criterio por direccion y proveedor (AWS_CREATE = 0, AWS_UPDATE_UNAUTHORIZED = 0, AWS_REPLACE = 0, AWS_DESTROY = 0; IMPORTS solo previstos y sin duplicados; TERRAFORM_DATA operaciones locales esperadas y justificadas). No se usan los contadores globales del resumen; ejemplo con 7 to import + 1 to add local. Prohibido eliminar recursos del codigo para conseguir ceros.
 - Pruebas: 47 de contrato I-070 (243 en la suite Terraform), con evaluador determinista sobre planes sinteticos y casos A-L. AWS_NOT_RUN: sin plan real, migracion ni recursos.
+
+
+### I-070: correccion del evaluador de recuperacion (rev5) - 2026-11-08
+
+- Defecto A corregido: falso IMPORT_DUPLICADO al compartir el nombre del bucket entre aws_s3_bucket y aws_s3_bucket_versioning. La clave de duplicidad pasa a (proveedor, tipo, id); se permite el id compartido entre tipos y se rechaza el mismo recurso en dos direcciones del mismo tipo, ademas de DIRECCION_DUPLICADA.
+- Defecto B corregido: cualquier tipo que no empezara por aws_ se aceptaba como local. Ahora denegacion por defecto: solo AWS y terraform_data.validacion_bootstrap; el resto produce PROVEEDOR_NO_AUTORIZADO.
+- Defecto C corregido: se exige recuperacion completa; si falta una direccion AWS prevista se reporta IMPORT_FALTANTE. Plan malformado falla cerrado.
+- Pruebas: 49 de contrato I-070 (245 en la suite Terraform). AWS_NOT_RUN: sin plan real ni recursos.

@@ -107,8 +107,11 @@ El bootstrap gestiona pocos recursos y todos llevan tag `Spec = "I-070-terraform
    `aws_s3_bucket_ownership_controls.state`, `aws_s3_bucket_policy.state` y
    `aws_s3_bucket_lifecycle_configuration.state`, con los identificadores reales aportados por el operador.
    `terraform_data.validacion_bootstrap` no se importa desde AWS.
-3. Confirmar que cada recurso se importa **en una única dirección** y que no hay dos `import` apuntando al mismo
-   identificador real.
+3. Confirmar que cada recurso físico se administra en **una única dirección del mismo tipo**. Un mismo identificador
+   puede repetirse entre tipos distintos cuando así lo define el proveedor: en S3 el nombre del bucket identifica
+   legítimamente a `aws_s3_bucket` y a sus sub-recursos (`aws_s3_bucket_versioning`,
+   `aws_s3_bucket_server_side_encryption_configuration`, etc.). Se rechazan direcciones duplicadas y dos direcciones
+   del **mismo tipo** que importen el mismo recurso físico.
 4. Ejecutar `plan -out` (autorizado). El plan de una importación **no es un plan normal sin cambios** y **no se
    evalúa con los contadores globales del resumen**. Los totales del resumen mezclan operaciones de recursos AWS con
    operaciones locales de Terraform: al recuperar un state perdido, `terraform_data.validacion_bootstrap` puede
@@ -118,12 +121,16 @@ El bootstrap gestiona pocos recursos y todos llevan tag `Spec = "I-070-terraform
 
    | Categoría | Criterio exigido |
    |---|---|
-   | `IMPORTS` | Sólo las direcciones AWS previstas en §3.1, cada identificador real en una única dirección |
+   | `IMPORTS` | **Todas** las direcciones AWS previstas en §3.1 (recuperación **completa**), cada recurso físico en una sola dirección del mismo tipo; un identificador compartido entre tipos distintos es legítimo |
    | `AWS_CREATE` | **0** |
    | `AWS_UPDATE_UNAUTHORIZED` | **0** (ningún atributo AWS cambia sin autorización expresa) |
    | `AWS_REPLACE` | **0** (ningún recurso AWS se reemplaza) |
    | `AWS_DESTROY` | **0** |
    | `TERRAFORM_DATA` | Sólo operaciones locales esperadas y justificadas (`create` de `terraform_data` en el state nuevo; nunca una destrucción) |
+   | Proveedores | Sólo AWS y el `terraform_data` previsto; cualquier otro recurso se rechaza por defecto (`PROVEEDOR_NO_AUTORIZADO`) |
+
+   Este criterio corresponde a una recuperación **completa** del state perdido. Una recuperación parcial exigiría
+   autorización y alcance propios, y no se evalúa con esta regla.
 
    Ejemplo representativo de un plan **aceptable** (7 importaciones AWS sin cambios + el recurso local nuevo):
 
@@ -143,8 +150,11 @@ El bootstrap gestiona pocos recursos y todos llevan tag `Spec = "I-070-terraform
    - un `update` de una dirección `aws_*` no autorizado (`AWS_UPDATE_UNAUTHORIZED`);
    - un `replace`/`delete+create` de una dirección `aws_*`, en particular del bucket (`AWS_REPLACE`);
    - un `delete` de una dirección `aws_*` (`AWS_DESTROY`);
-   - una importación de una dirección no prevista, repetida o con un identificador real ya usado por otra
-     dirección (`IMPORT_DUPLICADO` / `IMPORT_NO_PREVISTO`);
+   - una importación de una dirección no prevista, de una dirección duplicada o de un recurso físico del mismo
+     tipo en dos direcciones (`IMPORT_DUPLICADO` / `IMPORT_NO_PREVISTO` / `DIRECCION_DUPLICADA`);
+   - una importación prevista que falte (`IMPORT_FALTANTE`);
+   - cualquier recurso de un proveedor no autorizado, incluido un `terraform_data` no previsto
+     (`PROVEEDOR_NO_AUTORIZADO`);
    - una destrucción de `terraform_data` (`LOCAL_DESTROY`).
 
 6. No se elimina ni se comenta ningún recurso del código para "conseguir" un contador de cero: el inventario se

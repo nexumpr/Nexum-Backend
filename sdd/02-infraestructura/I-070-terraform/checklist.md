@@ -67,3 +67,6 @@
 
 - [x] Criterio de recuperacion por direccion y proveedor documentado y probado (AWS_CREATE/UPDATE_UNAUTHORIZED/REPLACE/DESTROY = 0; terraform_data local aparte).
 - [x] 47 pruebas de contrato I-070 (243 en la suite Terraform), con evaluador determinista de planes sinteticos.
+
+- [x] Evaluador corregido: duplicidad por (proveedor, tipo, id), denegacion por defecto de proveedores y exigencia de importaciones completas (IMPORT_FALTANTE).
+- [x] 49 pruebas de contrato I-070 (245 en la suite Terraform).

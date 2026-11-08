@@ -118,3 +118,13 @@ Pruebas: 22 de contrato en tests/infra/terraform/test_terraform_backend_contrato
 - RUNBOOK_IAC.md 4: criterio por direccion y proveedor (AWS_CREATE = 0, AWS_UPDATE_UNAUTHORIZED = 0, AWS_REPLACE = 0, AWS_DESTROY = 0; IMPORTS solo previstos y sin duplicados; TERRAFORM_DATA operaciones locales esperadas y justificadas), con ejemplo que muestra 7 to import + 1 to add local. Se prohibe borrar recursos del codigo para conseguir ceros.
 - Pruebas: 47 de contrato I-070 (243 en la suite), con evaluador determinista sobre planes sinteticos y casos A-L (create AWS, replace, destroy, update, import duplicado, import no previsto, contadores globales insuficientes).
 - AWS_NOT_RUN: sin plan real, migracion, import ni recursos creados.
+
+
+### Rev5: defectos del evaluador de recuperacion (2026-11-08)
+
+- Defecto A corregido: la duplicidad de importacion ya no se compara solo por id. La clave es (proveedor, tipo, id): se permite el mismo identificador entre tipos distintos (nombre del bucket en aws_s3_bucket y sus sub-recursos) y se rechaza el mismo recurso fisico en dos direcciones del mismo tipo; tambien se detecta DIRECCION_DUPLICADA.
+- Defecto B corregido: politica de denegacion por defecto. Solo se admiten recursos AWS y terraform_data.validacion_bootstrap; cualquier otro recurso, incluido otro terraform_data, produce PROVEEDOR_NO_AUTORIZADO.
+- Defecto C corregido: recuperacion completa. Se exige la importacion de todas las direcciones AWS previstas y se reporta IMPORT_FALTANTE si falta alguna; la recuperacion parcial exigiria autorizacion y alcance propios.
+- Plan malformado o incompleto falla cerrado (PLAN_MALFORMADO). El modelo de pruebas sigue la estructura de resource_changes de terraform show -json, sin presentarse como plan real.
+- Pruebas: 49 de contrato I-070 (245 en la suite Terraform).
+- AWS_NOT_RUN: sin plan real, migracion, import ni recursos creados.
