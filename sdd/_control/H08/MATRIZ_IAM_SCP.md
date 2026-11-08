@@ -9,7 +9,7 @@
 
 | Principal | Acción | Recurso | Condición | Justificación / validación |
 |---|---|---|---|---|
-| EC2 runtime | `dynamodb:GetItem`, `PutItem`, `UpdateItem`, `DeleteItem`, `ConditionCheckItem` | ARN exacto de tabla I-040 | `dynamodb:LeadingKeys` por namespaces H06/A-060 | CAS/idempotencia; prueba estructural |
+| EC2 runtime | Get/Put/Update/Delete/ConditionCheck **y `Query`** | ARN exacto de tabla I-040 | `ForAllValues:StringLike` **y** `Null:false` sobre `dynamodb:LeadingKeys` | CRUD, CAS y consultas por PK/SK de la matriz física |
 | EC2 runtime | `dynamodb:Query` | Tabla e índices exactos habilitados | mismos namespaces; no `Scan` | Lectura particionada/GSI1; GSI2 sólo opt-in |
 | EC2 runtime | `s3:GetObject` | **Ninguno configurado**; luego ARN exactos de artefactos | `aws:SecureTransport=true` | I-020 bootstrap; bucket/keys los fija I-080; sin `ListBucket`/write |
 | EC2 runtime | `logs:CreateLogStream`, `logs:PutLogEvents` | **Ninguno configurado**; luego log groups exactos | `aws:SecureTransport=true` | Sin sink/agente aprobado; I-110 |

@@ -66,29 +66,40 @@ locals {
     "dynamodb:ConditionCheckItem",
   ]
 
-  ddb_statement_table = {
-    Sid      = "DynamoDBItemsOnApprovedTable"
-    Effect   = "Allow"
-    Action   = local.ddb_item_actions
-    Resource = [var.dynamodb_table_arn]
-    Condition = {
-      "ForAllValues:StringLike" = {
-        "dynamodb:LeadingKeys" = local.leading_key_patterns
-      }
+  # Query también se necesita sobre la partición del usuario (movimientos,
+  # presupuestos, metas, consentimientos...), no sólo sobre GSI1/GSI2. Sin esta
+  # acción, la matriz física E001–E075 devolvería AccessDenied en lecturas por PK
+  # y SK, que son el patrón dominante de A-060.
+  ddb_table_actions = concat(local.ddb_item_actions, ["dynamodb:Query"])
+
+  # `ForAllValues:StringLike` es verdadero si la clave no está presente (verdad
+  # vacua). Para exigir que TODA petición lleve dynamodb:LeadingKeys se añade
+  # `Null = {"dynamodb:LeadingKeys" = "false"}`, que exige su presencia. Ambos
+  # controles se mantienen simultáneamente.
+  leading_keys_condition = {
+    Null = {
+      "dynamodb:LeadingKeys" = "false"
     }
+    "ForAllValues:StringLike" = {
+      "dynamodb:LeadingKeys" = local.leading_key_patterns
+    }
+  }
+
+  ddb_statement_table = {
+    Sid       = "DynamoDBItemsOnApprovedTable"
+    Effect    = "Allow"
+    Action    = local.ddb_table_actions
+    Resource  = [var.dynamodb_table_arn]
+    Condition = local.leading_keys_condition
   }
 
   ddb_statement_indices = length(var.dynamodb_index_arns) > 0 ? [
     {
-      Sid      = "QueryApprovedDynamoDBIndexes"
-      Effect   = "Allow"
-      Action   = ["dynamodb:Query"]
-      Resource = var.dynamodb_index_arns
-      Condition = {
-        "ForAllValues:StringLike" = {
-          "dynamodb:LeadingKeys" = local.leading_key_patterns
-        }
-      }
+      Sid       = "QueryApprovedDynamoDBIndexes"
+      Effect    = "Allow"
+      Action    = ["dynamodb:Query"]
+      Resource  = var.dynamodb_index_arns
+      Condition = local.leading_keys_condition
     }
   ] : []
 

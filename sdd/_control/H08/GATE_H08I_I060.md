@@ -24,7 +24,7 @@ modificar otras especificaciones.
 | INF-060-01 CI/plan/apply | Trust OIDC separado; roles sin policies, condicionales a provider verificado | DECLARADO_LOCAL / NO ACTIVOS |
 | INF-060-02 SCP | Sin consulta AWS/Organizations | `AWS_SCP_NOT_VERIFIED` |
 | INF-060-03 Secretos | Sin permisos Secret Manager/SSM/KMS ni valores | `BLOCKED_RFC004` + riesgo state I-050 |
-| INF-060-04 Least privilege | Tabla/índices y LeadingKeys; S3/logs sólo con ARN exactos | IMPLEMENTADO_LOCAL |
+| INF-060-04 Least privilege | Tabla (incluye `Query` sobre PK/SK) e índices exactos con `LeadingKeys` + `Null:false`; S3/logs sólo con ARN exactos | IMPLEMENTADO_LOCAL |
 | INF-060-05 OIDC | Audiencia y subjects inmutables exactos; provider no creado ni verificado | DECLARADO_LOCAL / NOT_VERIFIED |
 | INF-060-06 Auditoría | Matrices IAM/SCP, OIDC, secretos/rotación, riesgos | IMPLEMENTADO_LOCAL |
 
@@ -34,7 +34,7 @@ Detalle en `sdd/_control/H08/MATRIZ_IAM_SCP.md`.
 
 | Principal | Acciones/recursos | Límite |
 |---|---|---|
-| EC2 runtime | Get/Put/Update/Delete/ConditionCheck sobre tabla I-040; Query tabla + índices exactos | `dynamodb:LeadingKeys` restringe namespaces; sin Scan, Batch ni administración |
+| EC2 runtime | Get/Put/Update/Delete/ConditionCheck y **Query sobre la tabla**; Query sobre ARN exactos de índices | `LeadingKeys` (`ForAllValues:StringLike`) **más** `Null:false` que exige la presencia de la clave; sin Scan, Batch ni administración |
 | EC2 → S3 | GetObject sobre ARN exactos | Lista vacía hasta I-080 fije bucket/keys; no ListBucket |
 | EC2 → Logs | CreateLogStream/PutLogEvents sobre grupos exactos | Lista vacía hasta I-110 defina sink |
 | EC2 → Redis | Ninguno | I-050 usa password RBAC, no IAM authentication |

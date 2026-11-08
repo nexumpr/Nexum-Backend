@@ -41,8 +41,8 @@ class RuntimeRole(unittest.TestCase):
         self.assertIn("iam_instance_profile", _leer(COMPUTO / "main.tf"))
 
     def test_table_policy_usa_arn_de_tabla_e_indices_exactos(self) -> None:
-        self.assertIn("Resource = [var.dynamodb_table_arn]", self.main)
-        self.assertIn("Resource = var.dynamodb_index_arns", self.main)
+        self.assertRegex(self.main, r"Resource\s+= \[var\.dynamodb_table_arn\]")
+        self.assertRegex(self.main, r"Resource\s+= var\.dynamodb_index_arns")
         self.assertIn("startswith(arn, \"${var.dynamodb_table_arn}/index/\")", self.main)
         self.assertIn("!strcontains(arn, \"*\")", self.main)
         self.assertIn('dynamodb_index_arns = [', _leer(ENV / "main.tf"))
@@ -195,6 +195,137 @@ class IntegracionYDependencias(unittest.TestCase):
         self.assertIn('default     = []', self.vars.split('variable "iam_artifact_object_arns"')[1].split("}")[0])
         self.assertIn('default     = []', self.vars.split('variable "iam_cloudwatch_log_group_arns"')[1].split("}")[0])
         self.assertIn("PENDIENTE-I080", self.vars)
+
+
+def _statement(main: str, nombre: str) -> str:
+    """Devuelve el bloque de un statement local declarado por nombre."""
+    inicio = main.index(f"{nombre} = {{")
+    nivel, pos = 0, main.index("{", inicio)
+    for i in range(pos, len(main)):
+        if main[i] == "{":
+            nivel += 1
+        elif main[i] == "}":
+            nivel -= 1
+            if nivel == 0:
+                return main[inicio : i + 1]
+    raise AssertionError(f"statement {nombre} sin cierre")
+
+
+def _leading_keys_eval(patrones: list[str], request_keys: list[str] | None) -> bool:
+    """Evalúa las dos condiciones del statement como lo haría IAM (sin AWS).
+
+    - `Null: {dynamodb:LeadingKeys: "false"}` exige que la clave exista.
+    - `ForAllValues:StringLike` es verdadero si el conjunto está vacío/ausente
+      (verdad vacua), por eso la conjunción con Null es obligatoria.
+    Devuelve True sólo si la petición satisface ambas condiciones.
+    """
+
+    if request_keys is None or len(request_keys) == 0:
+        # Null:false falla si la clave no está presente (también con conjunto vacío).
+        return False
+    for value in request_keys:
+        if not any(re.fullmatch(p.replace("*", ".*"), value) for p in patrones):
+            return False
+    return True
+
+
+class DynamoDBQueryYLeadingKeys(unittest.TestCase):
+    """Regresión de los dos defectos corregidos en I-060.
+
+    Estructura + simulación determinista de las condiciones; NO es una evaluación
+    de IAM en AWS (IAM_EFFECTIVE_VERIFIED sigue siendo falso).
+    """
+
+    PATRONES = [
+        "USER#*",
+        "EMAIL#*",
+        "SESSION#*",
+        "REFRESH#*",
+        "ONE_USE#*",
+        "LOOKUP#SESSION#*",
+        "PUBLIC#CATALOG",
+        "PUBLIC#CONTENT",
+    ]
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.main = _leer(MODULO / "main.tf")
+        cls.tabla = _statement(cls.main, "ddb_statement_table")
+        cls.indices = cls.main.split("ddb_statement_indices =", 1)[1].split("] : []", 1)[0]
+        cls.condicion = _statement(cls.main, "leading_keys_condition")
+
+    def test_query_permitido_sobre_la_tabla_exacta(self) -> None:
+        self.assertIn("Action    = local.ddb_table_actions", self.tabla)
+        self.assertIn('concat(local.ddb_item_actions, ["dynamodb:Query"])', self.main)
+        self.assertEqual(
+            self.tabla.split("Resource")[1].split("\n")[0].strip(),
+            "= [var.dynamodb_table_arn]",
+        )
+
+    def test_query_permitido_sobre_indices_exactos(self) -> None:
+        self.assertIn('Action    = ["dynamodb:Query"]', self.indices)
+        self.assertIn("Resource  = var.dynamodb_index_arns", self.indices)
+
+    def test_scan_sigue_excluido(self) -> None:
+        self.assertNotIn("dynamodb:Scan", _sin_comentarios(self.main))
+
+    def test_sin_permisos_administrativos_ni_wildcards(self) -> None:
+        for prohibido in (
+            "dynamodb:CreateTable",
+            "dynamodb:DeleteTable",
+            "dynamodb:UpdateTable",
+            "dynamodb:DescribeTable",
+            "dynamodb:ListTables",
+            "dynamodb:*",
+        ):
+            self.assertNotIn(prohibido, self.main)
+        self.assertNotRegex(self.main, r"Resource\s*=\s*\"\*\"")
+
+    def test_condiciones_leadingkeys_presentes_en_ambos_statements(self) -> None:
+        for statement in (self.tabla, self.indices):
+            self.assertIn("Condition = local.leading_keys_condition", statement)
+
+    def test_null_false_y_forallvalues_simultaneos(self) -> None:
+        self.assertIn("Null = {", self.condicion)
+        self.assertIn('"dynamodb:LeadingKeys" = "false"', self.condicion)
+        self.assertIn('"ForAllValues:StringLike" = {', self.condicion)
+        self.assertIn('"dynamodb:LeadingKeys" = local.leading_key_patterns', self.condicion)
+        self.assertIn("leading_keys_condition", self.main)
+
+    def test_namespaces_no_ampliados(self) -> None:
+        for pattern in self.PATRONES:
+            self.assertIn(f'"{pattern}"', self.main)
+        # DUE# sólo aparece en el concat condicionado por GSI2.
+        self.assertIn('var.dynamodb_gsi2_enabled ? ["DUE#*"] : []', self.main)
+        self.assertEqual(self.main.count('"DUE#*"'), 1)
+
+    def test_sin_recursos_dynamodb_fuera_de_tabla_e_indices(self) -> None:
+        recursos = re.findall(r"Resource\s*=\s*(\[?[^\n]+)", _sin_comentarios(self.main))
+        ddb = [r for r in recursos if "dynamodb" in r.lower() or "table_arn" in r or "index_arns" in r]
+        self.assertEqual(len(ddb), 2, ddb)
+
+    def test_la_politica_no_sustituye_ownership_en_go(self) -> None:
+        self.assertRegex(self.main, r"ownership")
+        claves = _leer(RAIZ / "internal" / "domain" / "dynamo" / "keys.go")
+        self.assertIn('PrefixUser      = "USER#"', claves)
+
+    def test_gsi2_deshabilitado_no_amplia_la_politica(self) -> None:
+        self.assertIn('default     = false', _leer(ENV / "variables.tf").split('variable "dynamodb_habilitar_gsi2"')[1].split("}")[0])
+        self.assertIn("var.dynamodb_gsi2_enabled ?", self.main)
+
+    def test_negativo_peticion_sin_leadingkeys_no_autoriza(self) -> None:
+        self.assertFalse(_leading_keys_eval(self.PATRONES, None))
+        self.assertFalse(_leading_keys_eval(self.PATRONES, []))
+
+    def test_negativo_namespace_no_aprobado_no_autoriza(self) -> None:
+        self.assertFalse(_leading_keys_eval(self.PATRONES, ["DUE#2026-11-07#0"]))
+        self.assertFalse(_leading_keys_eval(self.PATRONES, ["USER#abc", "ADMIN#1"]))
+        self.assertFalse(_leading_keys_eval(self.PATRONES, ["user#minusculas"]))
+
+    def test_positivo_namespaces_aprobados_autorizan(self) -> None:
+        self.assertTrue(_leading_keys_eval(self.PATRONES, ["USER#01HXYZ"]))
+        self.assertTrue(_leading_keys_eval(self.PATRONES, ["USER#1", "PUBLIC#CATALOG"]))
+        self.assertTrue(_leading_keys_eval(self.PATRONES + ["DUE#*"], ["DUE#2026-11-07#3"]))
 
 
 if __name__ == "__main__":
