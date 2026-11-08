@@ -60,3 +60,7 @@
 - [x] 22 pruebas de contrato I-070 (218 en la suite).
 - [x] Custodia y migracion del state del bootstrap documentadas (RUNBOOK_IAC.md 2-4), con separacion por clave y recuperacion por importacion.
 - [x] 29 pruebas de contrato I-070 (225 en la suite).
+- [x] Corregida la secuencia de custodia/migracion: el state original no se mueve antes de migrar; respaldo cifrado verificado por SHA-256.
+- [x] Criterio de importacion corregido: N to import con 0 add/change/replace/destroy y direcciones coincidentes con el codigo.
+- [x] Inventario declarativo de 8 direcciones (7 AWS + terraform_data), sin cifras historicas fijas.
+- [x] 33 pruebas de contrato I-070 (229 en la suite Terraform).

@@ -12,8 +12,8 @@
 
 ## 1. Alcance
 
-Implementación local del bootstrap del backend remoto (bucket de state + tabla de lock), la plantilla de backend
-del entorno, los documentos de blueprint/matriz/runbook y sus pruebas.
+Implementación local del bootstrap del backend remoto (bucket de state con locking nativo de S3), la plantilla de
+backend del entorno, los documentos de blueprint/matriz/runbook y sus pruebas.
 
 **No autoriza** AWS, `terraform plan/apply/destroy`, `init` con backend real, despliegue ni cambios de plan.
 
@@ -22,9 +22,9 @@ del entorno, los documentos de blueprint/matriz/runbook y sus pruebas.
 | Requisito | Evidencia | Estado |
 |---|---|---|
 | INF-070-01 Roots y módulos | `infra/terraform/bootstrap` (state/lock) + módulos existentes red/computo/balanceo/dynamodb/redis/iam documentados en `BLUEPRINT_MODULOS_TF.md` | IMPLEMENTADO_LOCAL |
-| INF-070-02 State | Bucket S3 versionado, SSE-S3, Block Public Access, ownership `BucketOwnerEnforced`, política que exige TLS, lifecycle de versiones no actuales; `prevent_destroy` | IMPLEMENTADO_LOCAL; aplicación `NOT_RUN` |
+| INF-070-02 State | Bucket S3 versionado, SSE-S3, Block Public Access, ownership `BucketOwnerEnforced`, política que exige TLS, lifecycle de versiones no actuales; `prevent_destroy`. Custodia del state **propio** del bootstrap: el original permanece operativo hasta migrar, respaldo cifrado fuera del repo con SHA-256/`lineage`/`serial`, e importación de recuperación con `N to import` y `0 add/change/replace/destroy` | IMPLEMENTADO_LOCAL; aplicación `NOT_RUN` |
 | INF-070-03 Plan y lock | Locking **nativo de S3** (`use_lockfile = true`, Terraform >= 1.10) en la plantilla de backend; **sin** tabla DynamoDB (deprecada); `init -backend=false` es lo único autorizado | IMPLEMENTADO_LOCAL |
-| INF-070-04 Drift y recuperación | `prevent_destroy` en el bucket; runbook de `refresh-only`, **custodia y migración del state del bootstrap**, locks huérfanos, recuperación por versiones e **importación** sin recrear, y rollback con revisión humana | DOCUMENTADO |
+| INF-070-04 Drift y recuperación | `prevent_destroy` en el bucket; runbook de `refresh-only`, custodia/migración del state del bootstrap (sin asumir incremento de `serial`), locks huérfanos, recuperación por versiones e importación planificada sin recrear, y rollback con revisión humana | DOCUMENTADO |
 | INF-070-05 Secuencia | bootstrap → red → IAM → DynamoDB → Redis → cómputo/balanceo → observabilidad → DNS; destrucción inversa | DOCUMENTADO en `RUNBOOK_IAC.md` |
 | INF-070-06 Condiciones | Sin `-auto-approve`, sin credenciales en repo, sin deploy desde PR no confiable, sin destroy masivo por ahorro | DOCUMENTADO y probado |
 
@@ -56,3 +56,20 @@ pruebas de contrato I-070; regresiones Terraform/FinOps/systemd/herramientas/Go;
 
 Merge requiere autorización humana ligada a PR y HEAD exactos (A-110/R-004). Despliegue y primer `apply` del
 bootstrap requieren Gate independiente. No se declara `AWS_DEPLOYED`, `AWS_VERIFIED` ni `PRODUCTION_READY`.
+
+## 6. Correcciones de revisión (2026-11-08, PR #27)
+
+Tres inconsistencias del procedimiento de recuperación, corregidas dentro de I-070 y sin tocar AWS:
+
+1. **Custodia/migración**: el runbook ordenaba mover el único state operativo antes de migrarlo, dejando a
+   `init -migrate-state` sin archivo que leer. Ahora el original permanece en `infra/terraform/bootstrap/` hasta que
+   la migración esté verificada; se duplica la **copia de seguridad cifrada**, con SHA-256 verificado y
+   `lineage`/`serial` registrados sin contenido.
+2. **Aceptación de la importación**: se distinguía mal un plan de import de un plan sin cambios. Ahora se exige
+   `N to import` (direcciones previstas) con `0 to add`, `0 to change`, `0 to replace` y `0 to destroy`, direcciones
+   coincidentes con el código y sin doble importación del mismo recurso; un reemplazo del bucket detiene el proceso.
+3. **Inventario**: el runbook citaba «7 recursos»; el inventario se deriva del código y hoy son **8 direcciones**
+   (7 AWS + `terraform_data.validacion_bootstrap`), sin cifras históricas fijas.
+
+No se asume que la migración incremente el `serial`; el criterio es la coincidencia de contenido, no un número.
+Pruebas de contrato I-070: **33** (229 en la suite Terraform). `AWS_NOT_RUN`: sin migración, import ni recursos.

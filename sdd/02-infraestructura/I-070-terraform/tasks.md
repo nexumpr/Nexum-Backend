@@ -96,8 +96,17 @@ Pruebas: 22 de contrato en tests/infra/terraform/test_terraform_backend_contrato
 ### Cierre I-070: custodia y recuperacion del state de bootstrap (2026-11-08)
 
 - Hueco corregido: el runbook cubria recuperacion del state de runtime, pero no del state propio del bootstrap (creado en local antes de existir el bucket).
-- RUNBOOK_IAC.md 2-4: custodia cifrada fuera del repo con SHA-256 y serial/lineage, prohibicion de state en Git/artifacts, migracion a la clave bootstrap/terraform.tfstate con init -migrate-state autorizado, verificacion de lineage/serial/recursos y plan de cero cambios, y recuperacion por importacion con Spec=I-070-terraform sin recrear el bucket.
+- RUNBOOK_IAC.md 2-4: custodia cifrada fuera del repo con SHA-256 y serial/lineage, prohibicion de state en Git/artifacts, migracion a la clave bootstrap/terraform.tfstate con init -migrate-state autorizado, verificacion de lineage/serial/recursos y plan sin cambios inesperados, y recuperacion por importacion con Spec=I-070-terraform sin recrear el bucket.
 - Separacion por clave: bootstrap/terraform.tfstate y envs/h08i/terraform.tfstate, cada uno con su .tflock; sin tabla DynamoDB.
 - Pruebas: 29 de contrato I-070 (225 en la suite), incluidas separacion de states, prohibicion de migracion sin Gate y ausencia de state en Git/artifacts.
 - FinOps: sin buckets ni recursos adicionales; se mantiene SSE-S3, retencion de versiones 30 dias (cambiarla exigiria decision) y prevent_destroy.
 - AWS_NOT_RUN: ninguna migracion ni import ejecutado.
+
+### Correccion de revision: custodia, importacion e inventario (2026-11-08)
+
+- Custodia/migracion: el state original permanece en infra/terraform/bootstrap/ hasta que la migracion este verificada; se duplica la copia de seguridad cifrada (SHA-256 verificado) y se registran lineage/serial sin contenido. No se mueve el unico state operativo antes de init -migrate-state.
+- Migracion: se compara lineage/serial/recursos con la evidencia previa y NO se asume incremento de serial; se exige plan autorizado sin cambios inesperados antes de retirar la copia local.
+- Importacion de recuperacion: criterio N to import con 0 to add, 0 to change, 0 to replace y 0 to destroy; direcciones coincidentes con el codigo, sin doble importacion y parada si se propone reemplazar el bucket. El apply del import exige Gate humano independiente.
+- Inventario: 8 direcciones declaradas (7 AWS + terraform_data.validacion_bootstrap), derivadas del codigo y no de una cifra historica. Sin tabla DynamoDB de locking.
+- Pruebas: 33 de contrato I-070 (229 en la suite Terraform).
+- AWS_NOT_RUN: sin migracion, import, plan remoto ni recursos creados.

@@ -412,3 +412,11 @@
 - Corregido el hueco de recuperacion del state propio del bootstrap: custodia cifrada fuera del repositorio con SHA-256 y serial/lineage, migracion posterior a bootstrap/terraform.tfstate con init -migrate-state autorizado, verificacion de cero cambios y recuperacion por importacion (Spec=I-070-terraform) sin recrear el bucket.
 - Separacion por clave: bootstrap/terraform.tfstate y envs/h08i/terraform.tfstate, cada uno con su .tflock; sin tabla DynamoDB.
 - Pruebas: 29 de contrato I-070 (225 en la suite). FinOps sin recursos nuevos; retencion de versiones 30 dias sin cambios.
+
+
+### I-070: correccion de revision (custodia, importacion, inventario) - 2026-11-08
+
+- Defecto 1 corregido: el runbook ordenaba mover el unico state operativo del bootstrap antes de migrarlo, dejando init -migrate-state sin archivo. Ahora el original permanece en infra/terraform/bootstrap/ y se duplica una copia cifrada con SHA-256 verificado y lineage/serial registrados. Se retira la copia local solo tras migracion y lectura de recuperacion comprobadas.
+- Defecto 2 corregido: el criterio de aceptacion de importacion ya no exige un plan generico de cero cambios; exige N to import con 0 to add, 0 to change, 0 to replace y 0 to destroy, direcciones coincidentes con el codigo y sin doble importacion. Un reemplazo del bucket detiene el proceso. El apply sigue requiriendo Gate humano.
+- Defecto 3 corregido: el inventario se deriva del codigo; hoy son 8 direcciones (7 AWS + terraform_data.validacion_bootstrap), no un numero historico fijo. Sin tabla DynamoDB de locking; use_lockfile se mantiene.
+- Pruebas: 33 de contrato I-070 (229 en la suite Terraform). AWS_NOT_RUN: sin migracion, import ni recursos creados.

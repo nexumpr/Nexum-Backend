@@ -246,23 +246,66 @@ class RecuperacionDelStateDeBootstrap(unittest.TestCase):
         self.assertNotIn("terraform apply -auto-approve", self.runbook)
 
     def test_recuperacion_por_import_sin_recrear(self) -> None:
-        self.assertIn("import", self.runbook)
+        self.assertIn("importación", self.runbook)
         self.assertIn("nunca por recreación", self.runbook)
-        self.assertIn("cero cambios", self.runbook)
+        # El plan de importación NO se confunde con un plan normal sin cambios.
+        self.assertIn("N to import", self.runbook)
+        self.assertIn("0 to add", self.runbook)
+        self.assertIn("0 to change", self.runbook)
+        self.assertIn("0 to replace", self.runbook)
+        self.assertIn("0 to destroy", self.runbook)
         self.assertIn("Spec = \"I-070-terraform\"", self.runbook)
+        self.assertIn("una única dirección", self.runbook)
+
+    def test_state_original_no_se_mueve_antes_de_migrar(self) -> None:
+        # El único state operativo debe seguir disponible para init -migrate-state.
+        self.assertIn("permanece en su ubicación operativa", self.runbook)
+        self.assertIn("lo que se duplica es la **copia de seguridad**", self.runbook.lower())
+        self.assertNotIn("Mover el archivo a un almacén cifrado", self.runbook)
+
+    def test_respaldo_cifrado_con_verificacion_de_integridad(self) -> None:
+        self.assertIn("copia de seguridad **cifrada fuera del repositorio**", self.runbook)
+        self.assertIn("SHA-256", self.runbook)
+        self.assertIn("verificar la integridad", self.runbook)
+        self.assertIn("lineage", self.runbook)
+        self.assertIn("serial", self.runbook)
+        # No se exige un serial concreto: una migración no tiene por qué incrementarlo.
+        self.assertIn("No se asume que una migración incremente", self.runbook)
+
+    def test_inventario_coincide_con_los_recursos_declarados(self) -> None:
+        direcciones = sorted(f"{t}.{n}" for t, n in recursos(self.bootstrap_main))
+        self.assertEqual(len(direcciones), 8, direcciones)
+        self.assertIn("terraform_data.validacion_bootstrap", direcciones)
+        for direccion in direcciones:
+            self.assertIn(direccion, self.runbook)
+        # El inventario es declarativo: se rechaza una cifra histórica fija.
+        self.assertIn("no de una cifra\nhistórica", self.runbook)
+        self.assertNotIn("los 7 recursos del bootstrap", self.runbook)
+
+    def test_recursos_aws_vs_terraform_data_distinguidos(self) -> None:
+        self.assertIn("7 recursos AWS", self.runbook)
+        self.assertIn("1 recurso local\n`terraform_data`", self.runbook)
 
     def test_preserva_use_lockfile_y_no_anade_dynamodb(self) -> None:
         self.assertIn("use_lockfile", self.runbook)
         self.assertNotIn("dynamodb_table", self.runbook)
         tipos = {t for t, _ in recursos(self.bootstrap_main)}
         self.assertNotIn("aws_dynamodb_table", tipos)
+        blueprint = _leer(RAIZ / "sdd" / "_control" / "H08" / "BLUEPRINT_MODULOS_TF.md")
+        self.assertIn("No hay tabla DynamoDB de lock", blueprint)
+        self.assertNotIn("aws_dynamodb_table", blueprint)
 
     def test_politica_iam_de_state_sigue_vigente(self) -> None:
         texto = _leer(POLICY)
         self.assertIn("tflock", texto)
         self.assertIn("DenyStateDeletion", texto)
+        st = {s["Sid"]: s for s in _render_politica()["Statement"]}
+        self.assertEqual(sorted(st["ReadWriteStateObjectOnly"]["Action"]), ["s3:GetObject", "s3:PutObject"])
+        self.assertIn("s3:DeleteObject", st["LockFileLifecycleOnly"]["Action"])
+        self.assertNotIn("s3:DeleteObject", st["ReadWriteStateObjectOnly"]["Action"])
         gate = _leer(RAIZ / "sdd" / "_control" / "H08" / "GATE_H08I_I070.md")
         self.assertIn("Permisos IAM de state/lock", gate)
+
 
 
 if __name__ == "__main__":

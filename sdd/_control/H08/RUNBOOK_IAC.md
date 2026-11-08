@@ -25,37 +25,74 @@ circular de un backend que aún no existe. No añadir `backend` antes del primer
 ## 2. Custodia del state local del bootstrap
 
 Tras el primer `apply`, en `infra/terraform/bootstrap/` existe `terraform.tfstate`. Ese archivo es **crítico**:
-perderlo deja los recursos del state sin trazabilidad y multiplica el riesgo de recrearlos.
+perderlo deja los recursos del state sin trazabilidad y multiplica el riesgo de recrearlos. Mientras la migración
+no esté verificada, el state **original permanece en su ubicación operativa**: es el archivo que Terraform
+necesita leer para `init -migrate-state`. Lo que se duplica es la **copia de seguridad**, no el state operativo.
 
-1. Calcular su SHA-256 y anotarlo junto a `serial`/`lineage` (sin copiar el contenido en chats, issues o PR).
-2. Mover el archivo a un almacén cifrado fuera del repositorio (volumen cifrado o gestor de secretos del
-   operador), con **dos copias** y control de acceso individual.
-3. Verificar que no queda ninguna copia en el árbol de trabajo ni en `%TEMP%` compartido.
-4. Confirmar `.gitignore`: `*.tfstate` y `*.tfstate.*` excluidos; comprobar que `git ls-files` no devuelve
-   ningún `.tfstate` y que no se ha añadido a ningún commit.
-5. No adjuntar el state a GitHub Actions artifacts, releases, correos ni documentación del proyecto.
-6. Etiquetar los recursos creados con `Spec = "I-070-terraform"` (ya declarado) para permitir inventario.
+1. Confirmar que el `apply` creó el state local y que `terraform state list` devuelve exactamente las direcciones
+   declaradas (ver §3.1); no dar por bueno un número histórico fijo.
+2. Generar una copia de seguridad **cifrada fuera del repositorio** (volumen cifrado o gestor de secretos del
+   operador) manteniendo intacto el original en `infra/terraform/bootstrap/`.
+3. Calcular el SHA-256 del respaldo, anotarlo y **verificar la integridad** recalculando el hash sobre la copia.
+4. Registrar `lineage` y `serial` (metadatos, no contenido) junto al hash y la fecha, sin exponer información
+   sensible.
+5. Mantener **dos copias** del respaldo con control de acceso individual; comprobar que no queda ninguna copia en
+   `%TEMP%` compartido ni en carpetas sincronizadas sin cifrar.
+6. Confirmar `.gitignore`: `*.tfstate` y `*.tfstate.*` excluidos; comprobar que `git ls-files` no devuelve ningún
+   `.tfstate`.
+7. No adjuntar el state a GitHub Actions artifacts, releases, correos ni documentación del proyecto.
+8. Etiquetar los recursos creados con `Spec = "I-070-terraform"` (ya declarado) para permitir inventario.
 
-**Prohibiciones:** subir el state al repositorio, compartirlo por chat, editarlo a mano, o guardarlo en una
-carpeta sincronizada sin cifrado.
+**Prohibiciones:** subir el state al repositorio, compartirlo por chat, editarlo a mano, guardarlo sin cifrado,
+**mover o eliminar el único state operativo antes de completar la migración**, o retirar `prevent_destroy` del
+bucket para facilitar una recuperación.
 
 ## 3. Migración del state de bootstrap a backend persistente
 
 Sólo después de que el bucket exista y esté verificado (versionado, SSE, Block Public Access, política TLS).
 
-1. Copia de seguridad cifrada del state local + hash (§2). Sin esa copia no se migra.
+1. Confirmar que el state local sigue en su ubicación operativa y que el respaldo cifrado de §2 está verificado.
+   Sin copia íntegra no se migra.
 2. Crear `infra/terraform/bootstrap/backend.tf` a partir de la plantilla, con `key` **distinta** de la del
    runtime: `bootstrap/terraform.tfstate` (runtime: `envs/h08i/terraform.tfstate`) y `use_lockfile = true`.
-3. `terraform init -migrate-state` con autorización humana explícita; responder al prompt de copia verificando
-   que Terraform reporta la migración al bucket/tabla esperados.
-4. Verificar: `terraform state list` (los 7 recursos del bootstrap), `serial` incrementado, `lineage` conservado
-   y `plan` (autorizado) sin cambios pendientes.
-5. Conservar la copia local cifrada como respaldo durante al menos una ventana; no borrarla en la misma sesión.
-6. Si la migración falla: no repetir a ciegas; restaurar la copia cifrada y registrar el error. Nunca borrar el
-   bucket ni el state remoto para "empezar de nuevo".
+3. Ejecutar `terraform init -migrate-state` **exclusivamente** con autorización humana futura; responder al
+   prompt de copia verificando que Terraform reporta el bucket y la clave esperados.
+4. Verificar el state remoto: `terraform state list` debe devolver **las mismas direcciones** que el inventario
+   declarado (§3.1) y ningún recurso ajeno.
+5. Comparar `lineage`, `serial` y recursos con la evidencia previa. **No se asume que una migración incremente
+   el `serial`**: el criterio es que el contenido (direcciones e identificadores) coincida, no un número
+   concreto. Si `lineage` o el conjunto de recursos difieren, detenerse y revisar antes de continuar.
+6. Ejecutar `plan` (autorizado) y exigir **ausencia de cambios de infraestructura inesperados** antes de dar la
+   migración por terminada.
+7. Sólo entonces retirar la copia operativa local, y únicamente cuando la migración **y** una lectura de
+   recuperación (§4) estén comprobadas.
+8. Conservar el respaldo cifrado conforme a la política de retención autorizada; no borrarlo en la misma sesión.
+9. Si la migración falla: no repetir a ciegas; restaurar desde el respaldo cifrado, registrar el error y no
+   borrar nunca el bucket ni el state remoto para "empezar de nuevo".
 
 Cada state tiene su propio objeto `*.tflock`; el bucket es compartido, las claves no. No hay tabla DynamoDB de
 locking (mecanismo deprecado y no presupuestado).
+
+### 3.1 Inventario declarativo (no un número fijo)
+
+El inventario se obtiene de los recursos **realmente declarados** en `infra/terraform/bootstrap`, no de una cifra
+histórica. Con la configuración actual son **8 direcciones Terraform**: 7 recursos AWS y 1 recurso local
+`terraform_data` (validación de precondiciones, no crea nada en AWS).
+
+```
+terraform_data.validacion_bootstrap
+aws_s3_bucket.state
+aws_s3_bucket_versioning.state
+aws_s3_bucket_server_side_encryption_configuration.state
+aws_s3_bucket_public_access_block.state
+aws_s3_bucket_ownership_controls.state
+aws_s3_bucket_policy.state
+aws_s3_bucket_lifecycle_configuration.state
+```
+
+Si se añade o retira un recurso en el código, el inventario cambia con él: la comprobación es
+`terraform state list` **contra el código**, nunca contra un 7/8 memorizado. Además se distingue expresamente
+entre recursos AWS y `terraform_data`, que no debe confundirse con un recurso en la nube.
 
 ## 4. Recuperación si se pierde el state del bootstrap
 
@@ -63,15 +100,28 @@ El bootstrap gestiona pocos recursos y todos llevan tag `Spec = "I-070-terraform
 **importación**, nunca por recreación.
 
 1. Inventariar por lectura autorizada: bucket, versionado, SSE, ownership, Block Public Access, política y
-   lifecycle. Compararlos con el código.
-2. Escribir bloques `import` para cada recurso (`aws_s3_bucket`, `aws_s3_bucket_versioning`,
-   `aws_s3_bucket_server_side_encryption_configuration`, `aws_s3_bucket_public_access_block`,
-   `aws_s3_bucket_ownership_controls`, `aws_s3_bucket_policy`, `aws_s3_bucket_lifecycle_configuration`) con los
-   identificadores reales aportados por el operador.
-3. Ejecutar `plan` (autorizado) y confirmar **cero cambios** antes de aceptar el import; si el plan intenta
-   reemplazar el bucket, detenerse: la importación está mal formada.
-4. `apply` del import sólo con autorización humana; jamás `-auto-approve`.
-5. Registrar lineage/serial nuevos y guardar copia cifrada del state resultante.
+   lifecycle. Compararlos con el código y con el inventario de §3.1.
+2. Escribir bloques `import` **sólo** para los recursos AWS previstos, usando la dirección exacta del código:
+   `aws_s3_bucket.state`, `aws_s3_bucket_versioning.state`,
+   `aws_s3_bucket_server_side_encryption_configuration.state`, `aws_s3_bucket_public_access_block.state`,
+   `aws_s3_bucket_ownership_controls.state`, `aws_s3_bucket_policy.state` y
+   `aws_s3_bucket_lifecycle_configuration.state`, con los identificadores reales aportados por el operador.
+   `terraform_data.validacion_bootstrap` no se importa desde AWS.
+3. Confirmar que cada recurso se importa **en una única dirección** y que no hay dos `import` apuntando al mismo
+   identificador real.
+4. Ejecutar `plan` (autorizado). El plan de una importación **no es un plan normal sin cambios**: se acepta
+   exactamente `N to import` (el número de direcciones previstas) junto con:
+
+   - **0 to add** — no se crea ningún recurso nuevo;
+   - **0 to change** — no se modifica ningún atributo no autorizado;
+   - **0 to replace** — ningún recurso se reemplaza;
+   - **0 to destroy** — no se destruye nada.
+
+   Si el plan propone **reemplazar o recrear el bucket**, detenerse: la importación está mal formada o los
+   identificadores no son los correctos.
+5. `apply` del import sólo con **Gate humano independiente**; jamás `-auto-approve`.
+6. Registrar `lineage`/`serial` resultantes y guardar copia cifrada del state nuevo; verificar después que
+   `plan` ya no propone importaciones ni cambios.
 
 Si el bucket se creó fuera de Terraform o no hay certeza de sus atributos, **no** se importa a ciegas: se
 documenta el estado real y se decide con el responsable.
@@ -109,6 +159,8 @@ documenta el estado real y se decide con el responsable.
 - Publicar state, credenciales, ARN completos o identificadores de cuenta.
 - Cambiar Free → Paid o activar servicios no presupuestados.
 - Retirar `prevent_destroy` del bucket de state para "facilitar" una migración o recuperación.
+- Mover o borrar el state local operativo antes de que la migración esté verificada; o borrar el bucket/state
+  para corregir un lock huérfano.
 
 ## 10. Evidencia a registrar
 

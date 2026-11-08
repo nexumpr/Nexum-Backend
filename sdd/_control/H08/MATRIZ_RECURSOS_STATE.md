@@ -8,8 +8,13 @@
 
 ## 1. Recursos del bootstrap
 
+El inventario se deriva del código, no de una cifra histórica. Con la configuración actual son **8 direcciones
+Terraform**: 7 recursos AWS y 1 `terraform_data` local (validación de precondiciones, sin recurso en la nube). Si el
+código cambia, el inventario cambia con él.
+
 | Recurso | Configuración | Protección | Coste I-000 |
 |---|---|---|---|
+| `terraform_data.validacion_bootstrap` | Precondiciones de nombre DNS, región y sufijo de cuenta | No crea nada en AWS | 0 |
 | `aws_s3_bucket.state` | Nombre único; `prevent_destroy` | No se destruye por ahorro | Línea `S3_STATE` 3 GB-mes |
 | `aws_s3_bucket_versioning.state` | `Enabled` | Recupera versiones sobrescritas | Incluido en la línea S3 |
 | `aws_s3_bucket_server_side_encryption_configuration` | SSE-S3 AES256 | Sin CMK: sin revocación criptográfica inmediata (límite declarado) | 0 (SSE-S3 sin coste) |
@@ -26,14 +31,15 @@ HashiCorp y una tabla adicional sería un recurso no presupuestado. El lock vive
 
 | State | Clave en el bucket | Lock | Custodia |
 |---|---|---|---|
-| Bootstrap (crea el bucket) | `bootstrap/terraform.tfstate` tras la migración | `bootstrap/terraform.tfstate.tflock` | Copia cifrada fuera del repo con SHA-256 y `serial`/`lineage`; sin backend hasta que el bucket exista |
+| Bootstrap (crea el bucket) | `bootstrap/terraform.tfstate` tras la migración | `bootstrap/terraform.tfstate.tflock` | Respaldo cifrado fuera del repo con SHA-256 y `serial`/`lineage`; sin backend hasta que el bucket exista |
 | Runtime h08i | `envs/h08i/terraform.tfstate` | `envs/h08i/terraform.tfstate.tflock` | Backend S3 con `use_lockfile` |
-| Pre-migración del bootstrap | `infra/terraform/bootstrap/terraform.tfstate` local | — | Cifrado, dos copias, nunca en Git ni en artifacts |
+| Pre-migración del bootstrap | `infra/terraform/bootstrap/terraform.tfstate` local | — | El original **permanece en su ubicación operativa** hasta migrar; la copia cifrada va fuera del repo y nunca a Git ni a artifacts |
 
 El bootstrap **no** declara `backend` mientras el bucket no exista (evita dependencia circular). Tras verificarlo, su
-state se migra a la clave `bootstrap/...` con `init -migrate-state` autorizado. La pérdida del state del bootstrap se
-resuelve por **importación** con un `plan` de cero cambios, nunca recreando el bucket. Procedimiento completo en
-`RUNBOOK_IAC.md` §2–§4.
+state se migra a la clave `bootstrap/...` con `init -migrate-state` autorizado, comparando `lineage`/`serial`/recursos
+sin asumir que el serial aumente. La pérdida del state del bootstrap se resuelve por **importación**: el plan debe
+mostrar `N to import` y `0 to add` / `0 to change` / `0 to replace` / `0 to destroy`, nunca recreando el bucket.
+Procedimiento completo en `RUNBOOK_IAC.md` §2–§4.
 
 ## 3. Permisos IAM necesarios (diseño, no aplicado)
 
@@ -63,7 +69,7 @@ de plan/apply cuando I-080/I-090 los definan; I-060 sólo aporta trust OIDC y `i
 |---|---|
 | State sin CMK propia | **ACEPTADO_CON_LIMITE** (declarado; revocación criptográfica no inmediata) |
 | Coste real del state no medido | `NOT_VERIFIED`; dentro de la línea S3 de I-000 |
-| Lock huérfano tras caída de una ejecución | Procedimiento en `RUNBOOK_IAC.md` §4; requiere autorización para `force-unlock` |
+| Lock huérfano tras caída de una ejecución | Procedimiento en `RUNBOOK_IAC.md` §6; requiere autorización para `force-unlock` |
 | `prevent_destroy` bloquea `destroy` del bootstrap | Intencional: retirar el state exige autorización humana y edición explícita |
 | SCP/IAM reales | `AWS_SCP_NOT_VERIFIED` |
 | Terraform < 1.10 en CI futuro | `required_version >= 1.10.0`; CI de I-080 debe fijar versión |
