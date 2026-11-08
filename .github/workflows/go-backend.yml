@@ -74,8 +74,8 @@ jobs:
       - name: go test
         run: go test ./... -count=1 -timeout 240s
 
-      - name: go test -race (cmd y unitarios)
-        run: go test -race ./cmd/... ./tests/unit/... -count=1 -timeout 420s
+      - name: go test -race (cmd, unitarios y seguridad)
+        run: go test -race ./cmd/... ./tests/unit/... ./tests/security/... -count=1 -timeout 480s
 
       - name: Cobertura del dominio (umbral 80%)
         run: |
@@ -115,8 +115,15 @@ jobs:
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
-      - name: gosec (sin exclusiones)
-        run: go run github.com/securego/gosec/v2/cmd/gosec@v2.30.0 -quiet ./...
+      - name: gosec (sin exclusiones, código de producción)
+        run: go run github.com/securego/gosec/v2/cmd/gosec@v2.30.0 -quiet ./cmd/... ./internal/... ./pkg/...
+
+      - name: gosec detecta el fixture vulnerable (prueba negativa)
+        run: |
+          RC=0
+          go run github.com/securego/gosec/v2/cmd/gosec@v2.30.0 -quiet \
+            ./tests/fixtures/security/gosecinseguro > gosec-fixture.txt 2>&1 || RC=$?
+          python3 herramientas/verificar_fixture_gosec.py gosec-fixture.txt "$RC"
 
       - name: Publicar inventario de dependencias
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -205,6 +212,18 @@ jobs:
             --ignorefile .trivyignore.yaml \
             --exit-code 1 \
             infra/terraform
+
+      - name: Escaneo DevSecOps de IaC (SG/IAM/S3/state)
+        run: python3 herramientas/verificar_iac_devsecops.py --json iac-devsecops.json
+
+      - name: Publicar hallazgos DevSecOps de IaC
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: iac-devsecops-${{ github.sha }}
+          path: iac-devsecops.json
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Prueba negativa del escaner IaC
         run: |
