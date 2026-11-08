@@ -46,3 +46,10 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+- [x] Threat model con 6 superficies, STRIDE y riesgos priorizados.
+- [x] Criterios de severidad, bloqueo y excepciones por RFC firmada.
+- [x] SAST/SCA, secretos, SBOM, Trivy y escaner IaC propio ejecutados en CI.
+- [x] Pruebas adversariales en tests/security y en go test -race.
+- [ ] DAST: NOT_RUN; requiere entorno aislado autorizado (Gate AWS/I-140).
+- [ ] Dependency Review/Dependabot: PENDIENTE_DE_DISPONIBILIDAD.

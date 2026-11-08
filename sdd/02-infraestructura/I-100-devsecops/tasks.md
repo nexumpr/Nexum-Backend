@@ -78,3 +78,14 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+
+### Implementacion H08 (2026-11-08)
+
+- T-100-01 Threat model: IMPLEMENTADO_LOCAL en MODELO_AMENAZAS.md con 6 superficies, STRIDE, IDOR/replay/money/SSRF y riesgos residuales.
+- T-100-02 SAST/SCA: IMPLEMENTADO_LOCAL. gosec, govulncheck y staticcheck en CI; criterios HIGH/CRITICAL y RFC en CRITERIOS_VULNERABILIDADES.md. Dependency Review PENDIENTE_DE_DISPONIBILIDAD.
+- T-100-03 Secrets/SBOM: IMPLEMENTADO_LOCAL. gitleaks con baseline acotado, SBOM SPDX por SHA y acciones fijadas.
+- T-100-04 DAST: NOT_RUN. Procedimiento y limites documentados; requiere entorno aislado, datos sinteticos y autorizacion.
+- T-100-05 IaC: IMPLEMENTADO_LOCAL. Trivy HIGH/CRITICAL + herramientas/verificar_iac_devsecops.py (SG publico, IAM wildcard, S3 sin cifrado, force_destroy, ACL publica, state rastreado) en el job iac.
+- T-100-06 Pruebas adversariales: IMPLEMENTADO_LOCAL. tests/security/adversarial_test.go con JWT, sesion/replay, idempotencia concurrente, CORS, cabeceras, body y rate limit; incluido en go test y -race.
+- Pruebas: 13 de contrato DevSecOps y 7 del escaner IaC. AWS_NOT_RUN.

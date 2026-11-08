@@ -486,3 +486,17 @@
 - I-090 correccion profunda (2026-11-08): se distinguio runner de instancia. El CD sube el binario a S3 y exige un Launch Template de I-020 con URI+digest, verificando la UserData de las 2 instancias InService; ARTIFACT_DELIVERY sigue BLOCKED por bucket/permiso I-060 y version LT de I-020. Inputs por env sin interpolacion en run; 31 pruebas de contrato y 21 de helpers (incluye inyeccion, S3, LT, instancias, ASG y rollback). Rollback: sin mutacion no actua, captura LT real, cancela refresh activo, mantiene max 3 durante recuperacion y restaura 2 solo al final. Readiness 200 obligatoria; 503 bloquea.
 
 - I-090 correccion final (2026-11-08): rollback con InstanceRefreshId concreto, consulta AWS por iteracion, distincion de RollbackInProgress y terminal obligatorio; timeout de cancelacion -> ROLLBACK_BLOCKED_ACTIVE_REFRESH, timeout de recuperacion -> ROLLBACK_FAILED, max=3 conservado y max=2 solo tras LT previa + 2 targets sanos. S3 con If-None-Match "*" y reutilizacion solo con checksum identico (ARTIFACT_IMMUTABILITY_FAIL en caso contrario). 33 pruebas de helpers y 32 de contrato CD.
+
+
+### I-090: cierre post-merge (2026-11-08)
+
+- PR #29 MERGED (merge a67ea4b929e3ca5a9fe246f68f852931e516eb5d), HEAD autorizado 9471d5f9a7595dec2de57703169bc42802fc62eb verificado con --match-head-commit. CI del PR 7/7; CI de main: Go Backend CI y SDD documental SUCCESS.
+- Estado INTEGRADO_MAIN - NO DESPLEGADO; workflow CD con 0 ejecuciones; ARTIFACT_DELIVERY bloqueado por I-060/I-020; AWS_NOT_RUN.
+
+### I-100: DevSecOps implementado en local (2026-11-08)
+
+- Gate APRUEBO_GATE_I100_LOCAL registrado en sdd/_control/H08/GATE_H08I_I100.md; rama feat/h08i-i100-devsecops; base main a67ea4b.
+- Documentos MODELO_AMENAZAS.md (6 superficies, STRIDE, IDOR/replay/money/SSRF, ventana residual de access token), MATRIZ_ESCANEOS.md (ejecutado vs NOT_RUN, DAST pendiente) y CRITERIOS_VULNERABILIDADES.md (severidades, RFC, falsos positivos).
+- herramientas/verificar_iac_devsecops.py: SG publico, IAM wildcard, S3 sin cifrado, force_destroy, ACL publica y tfstate rastreado; conectado al job iac con artefacto iac-devsecops-<sha>.
+- tests/security/adversarial_test.go: JWT manipulado/alg none/expirado, 401, logout/replay, idempotencia concurrente y 409, aislamiento por usuario, CORS, cabeceras, body >1MB y 429; incluido en go test y go test -race.
+- Pruebas: 13 de contrato DevSecOps y 7 del escaner. AWS_NOT_RUN; DAST NOT_RUN.
