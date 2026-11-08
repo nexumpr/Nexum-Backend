@@ -78,3 +78,17 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+## Implementacion H08-I (2026-11-08)
+
+Gate APRUEBO_GATE_I070_LOCAL registrado en sdd/_control/H08/GATE_H08I_I070.md. Rama feat/h08i-i070-terraform. AWS_NOT_RUN: el bootstrap no se ha aplicado.
+- T-070-01 Roots y modulos: IMPLEMENTADO_LOCAL. Raiz bootstrap (state/lock) mas modulos existentes; blueprint en BLUEPRINT_MODULOS_TF.md.
+- T-070-02 State: IMPLEMENTADO_LOCAL. Bucket versionado, SSE-S3, Block Public Access, ownership enforced, politica TLS, lifecycle y prevent_destroy. Aplicacion NOT_RUN.
+- T-070-03 Plan y lock: IMPLEMENTADO_LOCAL. Tabla LockID on-demand con prevent_destroy; backend.tf.example inactivo; solo init -backend=false autorizado.
+- T-070-04 Drift: DOCUMENTADO. prevent_destroy y runbook de refresh-only con revision humana; sin correccion automatica.
+- T-070-05 Secuencia: DOCUMENTADO. bootstrap, red, IAM, DynamoDB, Redis, computo/balanceo, observabilidad y DNS; destruccion inversa.
+- T-070-06 Condiciones: DOCUMENTADO y probado. Sin auto-approve, sin credenciales, sin deploy desde PR, sin destroy masivo.
+- T-070-90 Riesgos: CLASIFICADOS. Sin CMK (limite declarado), state no medido, SCP NOT_VERIFIED, backend inactivo.
+- T-070-99 Ratificacion: IMPLEMENTADO_LOCAL. Gate registrado; merge y primer apply requieren autorizacion separada.
+
+Pruebas: 16 de contrato en tests/infra/terraform/test_terraform_backend_contrato.py (212 en la suite). fmt/init/validate OK en bootstrap y entorno.

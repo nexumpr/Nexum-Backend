@@ -46,3 +46,14 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+### Gate de implementacion local I-070 (2026-11-08)
+
+- [x] APRUEBO_GATE_I070_LOCAL concedido y registrado.
+- [x] Bootstrap declarado: bucket de state versionado, cifrado, privado y protegido; tabla de lock on-demand.
+- [x] prevent_destroy en state y lock; politica que exige TLS.
+- [x] Backend remoto NO activado; plantilla .example inactiva y documentada.
+- [x] fmt -check, init -backend=false y validate del bootstrap y del entorno en verde.
+- [x] 16 pruebas de contrato I-070 (212 en la suite).
+- [ ] Aplicacion real del bootstrap y activacion del backend: requieren Gate de infraestructura y credenciales humanas.
+- [ ] PR unico revisado; merge y primer apply requieren autorizacion humana independiente.
