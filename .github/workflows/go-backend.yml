@@ -56,6 +56,21 @@ jobs:
       - name: go build reproducible (-trimpath -buildvcs)
         run: go build -trimpath -buildvcs=true ./...
 
+      - name: Binario linux/arm64 para release
+        run: |
+          mkdir -p dist
+          GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=true \
+            -o dist/nexum-backend-linux-arm64 ./cmd/server
+          sha256sum dist/nexum-backend-linux-arm64 | tee dist/binario.sha256
+
+      - name: Publicar binario para release
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: binario-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+          if-no-files-found: error
+
       - name: go test
         run: go test ./... -count=1 -timeout 240s
 

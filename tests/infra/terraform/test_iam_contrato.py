@@ -175,6 +175,16 @@ class GitHubOIDC(unittest.TestCase):
     def test_workflows_do_not_request_oidc_or_aws_credentials(self) -> None:
         for workflow in (RAIZ / ".github" / "workflows").glob("*.yml"):
             text = _leer(workflow)
+            if workflow.name == "cd-backend.yml":
+                # I-090: OIDC permitido SOLO en el despliegue manual con entorno protegido.
+                self.assertIn("workflow_dispatch:", text)
+                self.assertIn("environment: aws-deploy", text)
+                self.assertIn("id-token: write", text)
+                self.assertNotIn("pull_request:", text)
+                self.assertNotIn("push:", text)
+                self.assertNotIn("AWS_ACCESS_KEY_ID", text)
+                self.assertNotIn("AWS_SECRET_ACCESS_KEY", text)
+                continue
             self.assertNotIn("id-token: write", text)
             self.assertNotIn("aws-actions/configure-aws-credentials", text)
 

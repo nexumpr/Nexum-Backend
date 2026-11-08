@@ -47,3 +47,27 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+- [x] Workflow CD manual con entorno protegido, autorizacion ligada al SHA, artefacto verificado y sin credenciales estaticas.
+- [x] Guardas de 2 nodos sanos antes/despues, MinHealthyPercentage=100, health HTTPS 200 y rollback a LT previa.
+- [x] POLITICA_RELEASES.md, PLAN_ROLLBACK.md y EVIDENCIA_DEPLOY.md (NOT_RUN).
+- [x] Binario binario-<sha> publicado por CI para promocion.
+- [ ] Entorno aws-deploy con revisores, rol OIDC y CD_HABILITADO: PENDIENTE_APLICACION_HUMANA; sin ellos el preflight falla.
+- [ ] Ejecucion real y ensayo de rollback: NOT_RUN (requieren Gate AWS).
+
+- [x] Preflight verifica run de CI verde y SHA/repositorio/rama, no solo existencia del artefacto.
+- [x] Entorno protegido verificado por API y confirmacion explicita; falla cerrado sin revisores.
+- [x] Capacidad transitoria max 3 y restauracion a 2 en exito y rollback, con coste documentado y BLOCKED si no cabe.
+- [x] Readiness configurable y no declarada por defecto; health live obligatorio.
+- [x] Simulador local de despliegue/rollback con pruebas de capacidad, salud y HTTP.
+
+- [x] Entrega del binario verificada en S3 y en la UserData de las instancias; LT del release obligatorio.
+- [x] Inputs por variables de entorno, sin interpolacion en scripts y con pruebas de inyeccion.
+- [x] Rollback con captura real de LT, cancelacion de refresh activo, capacidad conservada y ROLLBACK_FAILED.
+- [x] Readiness 200 obligatoria; sin variable de conveniencia.
+- [ ] ARTIFACT_DELIVERY desbloqueada: requiere bucket/permiso I-060 y version LT de I-020 con Gate.
+
+- [x] Rollback con ID de refresh concreto, estado terminal confirmado y timeout explicito (ROLLBACK_BLOCKED_ACTIVE_REFRESH / ROLLBACK_FAILED).
+- [x] max=3 conservado durante fallo; max=2 solo tras verificar LT previa y 2 targets sanos.
+- [x] Publicacion S3 con If-None-Match y reutilizacion solo con checksum identico; sin sobrescritura.
+- [x] Pruebas de estado de refresh, timeout, RollbackInProgress, S3 existente/nuevo/distinto y release mutable.

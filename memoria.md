@@ -466,3 +466,23 @@
 - Trivy real post-aprobacion: exit 0 con las tres excepciones autorizadas; la prueba negativa sigue exigiendo exit 1 + HIGH/CRITICAL.
 - Vigencia automatizada (2026-11-08): herramientas/verificar_vigencia_rfc006.py en el job iac falla si RFC-006 no esta APROBADA, revocada, caducada (2026-12-02), con fechas RFC/ignore distintas o si existe Gate de despliegue AWS aprobado; 10 pruebas unitarias. CI puede pasar con excepcion autorizada, pero el riesgo WAF sigue pendiente para despliegue.
 - Pruebas: 29 de contrato CI y 59 de herramientas.
+
+
+### I-080: cierre post-merge (2026-11-08)
+
+- PR #28 MERGED (merge 4262972e5d423a01ba8be89642fa423e6a764003), HEAD autorizado f2393a3adb721e6705b0ab5e9177aaac17f582cb verificado con --match-head-commit. CI del PR 7/7; CI de main: Go Backend CI y SDD documental SUCCESS.
+- Estado INTEGRADO_MAIN - NO DESPLEGADO. RFC-006 aprobada (AWS-0011 temporal hasta 2026-12-02); branch protection BLOQUEADO_PLAN_GITHUB; AWS_NOT_RUN.
+
+### I-090: CD Backend implementado en local (2026-11-08)
+
+- Gate APRUEBO_GATE_I090_LOCAL registrado en sdd/_control/H08/GATE_H08I_I090.md; rama feat/h08i-i090-cd-backend; base main 4262972.
+- .github/workflows/cd-backend.yml: solo workflow_dispatch en main; entorno aws-deploy; CD_HABILITADO=true; frase AUTORIZO_DESPLIEGUE_<sha>; confirmar=SI; descarga binario-<sha> y sbom-spdx-<sha> de un run de CI; verifica SHA-256; OIDC sin credenciales estaticas; instance refresh MinHealthyPercentage=100; aborta sin 2 InService y 2 healthy antes/despues; health HTTPS /api/v1/health/live; evidencia y rollback a LT previa.
+- go-backend.yml publica binario-<sha> linux/arm64 con dist/binario.sha256 (cambio habilitador; sin alterar checks).
+- Documentos POLITICA_RELEASES.md, PLAN_ROLLBACK.md y EVIDENCIA_DEPLOY.md (NOT_RUN). Entorno aws-deploy (total_count 0), rol OIDC y CD_HABILITADO PENDIENTE_APLICACION_HUMANA: el preflight falla cerrado.
+- Pruebas: 21 de contrato CD y 10 de autorizacion. AWS_NOT_RUN; sin terraform apply/destroy ni Docker.
+
+- I-090 correccion de alcance (2026-11-08): preflight verifica run de CI verde (helper verificar_run_ci.py) y entorno protegido por API (verificar_entorno_protegido.py), fallando cerrado antes de OIDC. Capacidad transitoria max 2->3 y restauracion a 2 (coste ~0.0084 USD/h no medido; BLOCKED si no cabe). Readiness solo obligatoria con READINESS_REQUIRED. Simulador determinista con 9 pruebas; 29 de contrato CD y 11 de autorizacion.
+
+- I-090 correccion profunda (2026-11-08): se distinguio runner de instancia. El CD sube el binario a S3 y exige un Launch Template de I-020 con URI+digest, verificando la UserData de las 2 instancias InService; ARTIFACT_DELIVERY sigue BLOCKED por bucket/permiso I-060 y version LT de I-020. Inputs por env sin interpolacion en run; 31 pruebas de contrato y 21 de helpers (incluye inyeccion, S3, LT, instancias, ASG y rollback). Rollback: sin mutacion no actua, captura LT real, cancela refresh activo, mantiene max 3 durante recuperacion y restaura 2 solo al final. Readiness 200 obligatoria; 503 bloquea.
+
+- I-090 correccion final (2026-11-08): rollback con InstanceRefreshId concreto, consulta AWS por iteracion, distincion de RollbackInProgress y terminal obligatorio; timeout de cancelacion -> ROLLBACK_BLOCKED_ACTIVE_REFRESH, timeout de recuperacion -> ROLLBACK_FAILED, max=3 conservado y max=2 solo tras LT previa + 2 targets sanos. S3 con If-None-Match "*" y reutilizacion solo con checksum identico (ARTIFACT_IMMUTABILITY_FAIL en caso contrario). 33 pruebas de helpers y 32 de contrato CD.

@@ -78,3 +78,34 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+
+### Implementacion H08 (2026-11-08)
+
+- T-090-01 Matriz de versiones: IMPLEMENTADO_LOCAL en POLITICA_RELEASES.md (SemVer vX.Y.Z, /api/v1, release vX.Y.Z+sha12, digest y SBOM del mismo run).
+- T-090-02 Aprobacion: IMPLEMENTADO_LOCAL. cd-backend.yml solo workflow_dispatch en main, entorno aws-deploy, CD_HABILITADO=true, frase AUTORIZO_DESPLIEGUE_<sha> y confirmar=SI; sin main->deploy.
+- T-090-03 Despliegue seguro: IMPLEMENTADO_LOCAL. Instance refresh MinHealthyPercentage=100, aborta sin 2 InService y 2 healthy antes/despues, rollback a LT previa.
+- T-090-04 Pruebas HTTP: IMPLEMENTADO_LOCAL. GET https /api/v1/health/live con curl --fail --proto https y exigencia de 200.
+- T-090-05 Fallos y rollback: DOCUMENTADO en PLAN_ROLLBACK.md; rollback de app independiente del esquema, migraciones backwards compatible, no borrar state ni datos.
+- T-090-06 Cierre: DOCUMENTADO en EVIDENCIA_DEPLOY.md con estado NOT_RUN y campos de release, autorizador, 2 targets, coste y errores.
+- Cambio habilitador I-080: go-backend.yml publica binario-<sha> linux/arm64 con SHA-256; no altera checks ni umbrales.
+- Pruebas: 21 de contrato CD y 10 de autorizacion; AWS_NOT_RUN.
+
+- Verificacion de run de CI (2026-11-08): preflight consulta la API del run y exige status completed, conclusion success, head_sha y repositorio/rama autorizados (herramientas/verificar_run_ci.py).
+- Entorno protegido (2026-11-08): ENVIRONMENT_PROTECTION_CONFIRMED=aws-deploy y lectura de la API del entorno; sin required_reviewers o sin permiso de lectura, falla cerrado antes de OIDC (herramientas/verificar_entorno_protegido.py).
+- Capacidad transitoria: max_size 2->3 durante el rollout y restauracion a 2 en exito y rollback; coste ~0.0084 USD/h no medido; si no cabe, BLOCKED.
+- Readiness: /api/v1/health/ready solo obligatoria con READINESS_REQUIRED=true; por defecto 503 documentado, no declarado.
+- Simulador determinista herramientas/simular_despliegue.py (ABORTAR/ROLLBACK/DESPLEGAR, max_final=2) con 9 pruebas.
+- Pruebas: 29 de contrato CD, 11 de autorizacion, 10 de run/entorno, 9 de simulador.
+
+- Correccion de entrega (2026-11-08): el CD sube el binario a s3://<bucket>/releases/<release>/ y verifica checksum SHA256; exige una version del Launch Template creada por I-020 con URI+digest y verifica la UserData de las 2 instancias InService. ARTIFACT_DELIVERY = BLOCKED por bucket/permiso I-060 y version LT de I-020; el CD no modifica esas specs.
+- Correccion de inputs: los workflow_dispatch se transportan por variables de entorno; prohibido interpolar ${{ inputs }} en run; pruebas con metacaracteres y sustituciones.
+- Correccion de rollout: MaxHealthyPercentage=150, aplicacion del LT del release, verificacion de release efectivo y restauracion de max 2 solo al final.
+- Correccion de rollback: no actua sin mutacion (.mutado), captura LT real (no confia en input), cancela refresh activo, mantiene max 3 durante la recuperacion, ROLLBACK_FAILED conserva capacidad y no se restaura 2 antes.
+- Readiness 200 obligatoria; 503 bloquea el despliegue y no se declara DEPLOYED_VERIFIED.
+- Pruebas: 31 de contrato CD y 21 de helpers CD (run, entorno, LT, instancias, S3, ASG, rollback e inyeccion).
+
+- Correccion de rollback (2026-11-08): se identifica el InstanceRefreshId concreto, se consulta AWS en cada iteracion y se exige estado terminal confirmado; RollbackInProgress se distingue; timeout de cancelacion -> ROLLBACK_BLOCKED_ACTIVE_REFRESH y timeout de recuperacion -> ROLLBACK_FAILED, conservando max=3. No se usa [0] ni JSON obsoleto.
+- Recuperacion: solo Successful/RollbackSuccessful confirman; se verifica LT previa aplicada y 2 targets sanos antes de restaurar max=2.
+- Inmutabilidad S3: put-object con If-None-Match "*"; objeto existente solo se reutiliza con ChecksumSHA256 coincidente; diferencia -> ARTIFACT_IMMUTABILITY_FAIL; sin sobrescritura ni borrado.
+- Pruebas: 33 de helpers CD (estado de refresh, publicacion S3, rollback, inyeccion) y 32 de contrato CD; nuevas pruebas de timeout, RollbackInProgress/Failed y S3.
