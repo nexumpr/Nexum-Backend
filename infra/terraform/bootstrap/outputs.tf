@@ -8,25 +8,24 @@ output "bucket_state_arn" {
   value       = aws_s3_bucket.state.arn
 }
 
-output "lock_table" {
-  description = "Tabla de locking de Terraform"
-  value       = aws_dynamodb_table.lock.name
-}
-
-output "lock_table_arn" {
-  description = "ARN de la tabla de locking"
-  value       = aws_dynamodb_table.lock.arn
-}
-
 output "configuracion_backend" {
-  description = "Bloque backend que debe usarse tras aplicar el bootstrap con Gate humano"
+  description = "Bloque backend S3 que debe usarse tras aplicar el bootstrap con Gate humano"
   value = {
-    bucket         = aws_s3_bucket.state.id
-    key            = "envs/${var.entorno}/terraform.tfstate"
-    region         = var.region
-    dynamodb_table = aws_dynamodb_table.lock.name
-    encrypt        = true
-    use_lockfile   = false
+    bucket       = aws_s3_bucket.state.id
+    key          = "envs/${var.entorno}/terraform.tfstate"
+    region       = var.region
+    encrypt      = true
+    use_lockfile = true
+  }
+}
+
+output "locking" {
+  description = "Mecanismo de locking declarado"
+  value = {
+    mecanismo          = "S3 nativo (use_lockfile)"
+    requiere_terraform = ">= 1.10.0"
+    dynamodb_lock      = "NO; deprecado por HashiCorp y no presupuestado"
+    archivo_lock       = "envs/${var.entorno}/terraform.tfstate.tflock"
   }
 }
 

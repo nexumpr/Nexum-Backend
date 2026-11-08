@@ -1,23 +1,24 @@
-# I-070 — Bootstrap del backend remoto de Terraform.
+# I-070 — Bootstrap del backend remoto de Terraform (state en S3).
 #
-# AWS_NOT_RUN. Este root NO se ha aplicado: sólo declara el bucket de state y la
-# tabla de lock. Se ejecuta con credenciales humanas en un Gate de infraestructura
+# AWS_NOT_RUN. Este root NO se ha aplicado: sólo declara el bucket de state y sus
+# protecciones. Se ejecuta con credenciales humanas en un Gate de infraestructura
 # independiente, nunca desde CI de PR.
 #
-# Decisiones y límites:
+# Decisiones (verificadas contra la documentación oficial del backend S3):
 #  - State cifrado con SSE-S3 (AES256): evita el coste fijo de una CMK de KMS, que
-#    no está presupuestado en I-000. Se documenta el límite: sin CMK no hay
-#    revocación criptográfica inmediata.
+#    no está presupuestado en I-000. Límite declarado: sin CMK no hay revocación
+#    criptográfica inmediata.
 #  - Versionado + lifecycle de versiones no actuales: permite recuperar un state
 #    sobrescrito sin acumular coste indefinido.
 #  - Bloqueo público total y política que exige TLS.
-#  - Locking con tabla DynamoDB on-demand (`LockID`), PITR y backups desactivados:
-#    la tabla sólo guarda locks efímeros.
-#  - `prevent_destroy` en bucket y tabla: el state no se destruye por ahorro.
+#  - Locking NATIVO de S3 (`use_lockfile = true`, Terraform >= 1.10). El locking
+#    basado en DynamoDB está deprecado por HashiCorp, por lo que NO se crea tabla
+#    de lock ni se concede dynamodb:* para state.
+#  - `prevent_destroy` en el bucket: el state no se destruye por ahorro.
 #  - State real jamás en Git: `.gitignore` excluye `*.tfstate*` y `.terraform/`.
 
 terraform {
-  required_version = ">= 1.4.0, < 2.0.0"
+  required_version = ">= 1.10.0, < 2.0.0"
 
   required_providers {
     aws = {
@@ -27,18 +28,16 @@ terraform {
   }
 
   # Sin bloque backend: este root usa state local sólo durante el bootstrap
-  # humano y nunca se commitea. El state del runtime vive en el bucket creado aquí.
+  # humano y nunca se commitea. El state del runtime vivirá en el bucket creado aquí.
 }
 
 locals {
   nombre_bucket = coalesce(var.bucket_state_nombre, "${var.proyecto}-${var.entorno}-tfstate-${var.sufijo_cuenta}")
-  nombre_lock   = "${var.proyecto}-${var.entorno}-tf-lock"
 }
 
 resource "terraform_data" "validacion_bootstrap" {
   input = {
     bucket = local.nombre_bucket
-    lock   = local.nombre_lock
     region = var.region
   }
 
@@ -150,35 +149,4 @@ resource "aws_s3_bucket_lifecycle_configuration" "state" {
       days_after_initiation = 7
     }
   }
-}
-
-# Tabla de locking de Terraform (state locking). No es la tabla de negocio
-# NEXUM_CORE de I-040: sólo almacena el atributo LockID.
-resource "aws_dynamodb_table" "lock" {
-  name         = local.nombre_lock
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
-
-  attribute {
-    name = "LockID"
-    type = "S"
-  }
-
-  # Sin PITR ni backups: los locks son efímeros y no contienen datos de negocio.
-  point_in_time_recovery {
-    enabled = false
-  }
-
-  server_side_encryption {
-    enabled = true
-  }
-
-  lifecycle {
-    prevent_destroy = true
-  }
-
-  tags = merge({
-    Name = local.nombre_lock
-    Spec = "I-070-terraform"
-  }, var.etiquetas)
 }

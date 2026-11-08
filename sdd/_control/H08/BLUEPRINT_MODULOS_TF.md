@@ -11,17 +11,25 @@
 
 ```
 infra/terraform/
-  bootstrap/            # bucket de state + tabla de lock (se aplica primero, Gate humano)
-  envs/h08i/            # runtime: red, computo, balanceo, dynamodb, redis, iam
-    backend.tf.example  # plantilla del backend remoto; NO activa
+  bootstrap/                    # bucket de state (S3, versionado, SSE-S3, prevent_destroy)
+  envs/h08i/                    # runtime: red, computo, balanceo, dynamodb, redis, iam
+    backend.tf.example          # plantilla del backend S3 con use_lockfile; NO activa
   modules/
-    red/                # VPC, subredes privadas, SGs, endpoints, NACL
-    computo/            # LT + ASG (2 x t4g.micro), systemd, bootstrap
-    balanceo/           # ALB interno, TG, CloudFront VPC origin
-    dynamodb/           # tabla unica NEXUM_CORE_<ENV>, GSI1, TTL, PITR
-    redis/              # ElastiCache Redis OSS, RBAC, TLS
-    iam/                # rol runtime, politicas, trust OIDC condicional
+    red/                        # VPC, subredes privadas, SGs, endpoints, NACL
+    computo/                    # LT + ASG (2 x t4g.micro), systemd, bootstrap
+    balanceo/                   # ALB interno, TG, CloudFront VPC origin
+    dynamodb/                   # tabla unica NEXUM_CORE_<ENV>, GSI1, TTL, PITR
+    redis/                      # ElastiCache Redis OSS, RBAC, TLS
+    iam/                        # rol runtime, politicas, trust OIDC condicional
+  policies/                     # contrato IAM de acceso al state y .tflock (plantilla)
 ```
+
+**Mapeo con el SDD histórico:** `INF-070-01` menciona `infra/terraform/environments/dev`. La composición vigente
+usa `infra/terraform/envs/h08i`, ratificada por los Gates H08-I; se conserva para no duplicar raíces ni crear dos
+states para los mismos recursos. `dev` queda como nombre histórico, no se crea.
+
+**Locking:** nativo de S3 (`use_lockfile = true`, Terraform >= 1.10). No hay tabla DynamoDB de lock: ese mecanismo
+está deprecado por HashiCorp y supondría un recurso no presupuestado.
 
 ## 2. Dependencias entre raíces y módulos
 
