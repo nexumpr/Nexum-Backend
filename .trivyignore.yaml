@@ -3,11 +3,6 @@
 # No es una allowlist global: cada entrada identifica un único ID de política y una
 # ruta concreta, y lleva justificación. Cualquier otro hallazgo HIGH/CRITICAL hace
 # fallar el job. Revisar en cada Gate de infraestructura.
-#
-# AWS-0011 (CloudFront sin WAF) NO está exento: carece de autorización normativa.
-# Su aceptación temporal se propone en
-# sdd/_control/H08/RFC-006-EXCEPCION_WAF_I030.md (estado PROPUESTO — NO APROBADO).
-# Hasta que exista aprobación humana explícita, el escaneo falla con AWS-0011.
 misconfigurations:
   - id: AWS-0054
     paths:
@@ -26,3 +21,15 @@ misconfigurations:
       tiene coste fijo no presupuestado en I-000. Límite declarado como
       ACEPTADO_CON_LIMITE en el Gate I-070 y su matriz de state; sin revocación
       criptográfica inmediata.
+
+  - id: AWS-0011
+    paths:
+      - "modules/balanceo/main.tf"
+    expired_at: 2026-12-02T00:00:00Z
+    statement: >-
+      RFC-006-EXCEPCION_WAF_I030 APROBADA el 2026-11-08 con
+      APRUEBO_RFC_006_WAF_TEMPORAL. Aceptación TEMPORAL del riesgo HIGH de operar
+      CloudFront sin WAF: coste WAF no presupuestado en I-000, controles
+      compensatorios existentes, caducidad 2026-12-02 o Gate de despliegue AWS.
+      No autoriza desplegar AWS ni implementar WAF. Al caducar, Trivy vuelve a
+      fallar y se requiere nueva decisión humana.

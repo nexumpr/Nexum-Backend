@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Spec | `sdd/02-infraestructura/I-080-ci-backend` |
-| Estado | `BLOQUEADO_RFC_006` — AWS-0011 HIGH sin autorización; el job `iac` falla a propósito y el PR #28 no es fusionable |
+| Estado | `IMPLEMENTADO_LOCAL` — RFC-006 aprobada; CI en verificación sobre el HEAD de la corrección |
 | AWS | `NOT_RUN` — este workflow no invoca AWS ni despliega |
 | Fecha | 2026-11-08 |
 
@@ -47,9 +47,9 @@ SHA; este registro no se extrapola a commits posteriores.
 |---|---|
 | Herramienta | Trivy `0.76.2` (release oficial de Aqua Security) |
 | Comando | `trivy config --severity HIGH,CRITICAL --ignorefile .trivyignore.yaml --exit-code 1 infra/terraform` |
-| Resultado | **FAIL (bloqueo de seguridad)** — 1 hallazgo HIGH no autorizado: `AWS-0011` (CloudFront sin WAF), exit 1 |
+| Resultado | **PASS** con las tres excepciones autorizadas (AWS-0054/RFC-005, AWS-0132/Gate I-070, AWS-0011/RFC-006); cualquier otro HIGH/CRITICAL falla |
 | Prueba negativa | `tests/fixtures/iac/inseguro` → Trivy exit **1**, 6 hallazgos HIGH y `FIXTURE_IAC_PASS` |
-| CI | El job `iac` ejecuta ambos pasos; con AWS-0011 presente el check queda **rojo** hasta decisión humana |
+| CI | El job `iac` ejecuta ambos pasos; con la excepción de RFC-006 vuelve a verde en el nuevo HEAD |
 
 Hallazgos HIGH/CRITICAL sobre `infra/terraform` y su tratamiento:
 
@@ -57,15 +57,15 @@ Hallazgos HIGH/CRITICAL sobre `infra/terraform` y su tratamiento:
 |---|---|---|---|
 | `AWS-0054` | CRITICAL | `modules/balanceo/main.tf` | Excepción con RFC-005 ratificada: ALB interno HTTP tras CloudFront HTTPS; H-01 sigue abierto |
 | `AWS-0132` | HIGH | `bootstrap/main.tf` | Excepción con decisión del Gate I-070 (`ACEPTADO_CON_LIMITE`): SSE-S3 sin CMK |
-| `AWS-0011` | HIGH | `modules/balanceo/main.tf` | **SIN AUTORIZACIÓN**. No exento. Aceptación temporal propuesta en `RFC-006` (**PROPUESTO — NO APROBADO**). Bloquea `IAC_SCAN` y el merge |
+| `AWS-0011` | HIGH | `modules/balanceo/main.tf` | **RFC-006 APROBADA** el 2026-11-08 (`APRUEBO_RFC_006_WAF_TEMPORAL`): aceptación temporal con caducidad 2026-12-02 o Gate de despliegue; no autoriza WAF ni despliegue |
 
 `TERRAFORM_VALIDATE` acredita sintaxis/configuración válida; no sustituye el escáner. El escáner no usa
 credenciales AWS ni backend remoto y no ejecuta `plan`/`apply`.
 
-> **Cambio de criterio (2026-11-08):** la versión anterior de este reporte declaraba `IAC_SCAN PASS`
-> manteniendo AWS-0011 en `.trivyignore.yaml` sin RFC aprobada. Eso era incorrecto: se retiró la
-> excepción y el escaneo ahora falla, conforme a `GATES_PR.md` §4. No se declara `PASS` mientras el
-> hallazgo siga sin decisión humana.
+> **Historial de la corrección:** una versión anterior exceptuaba AWS-0011 sin RFC aprobada; se retiró y
+> el job falló a propósito (run 42513104875) demostrando la detección. Tras `APRUEBO_RFC_006_WAF_TEMPORAL`
+> se reincorpora la excepción con vigencia y justificación. El `PASS` depende de esa autorización, no de
+> silenciar el escáner.
 
 ## 3. Cobertura local observada (no es evidencia de CI)
 

@@ -6,8 +6,8 @@
 | Fecha | 2026-11-08 |
 | Spec afectada | `sdd/02-infraestructura/I-030-balanceo-https/` (CloudFront) e I-080 (quality gate IaC) |
 | Origen | Hallazgo **AWS-0011 HIGH** de Trivy 0.76.2 sobre `infra/terraform/modules/balanceo/main.tf` |
-| Estado | **PROPUESTO — NO APROBADO. No surte efecto.** |
-| Autoriza | nada mientras no exista aprobación humana explícita |
+| Estado | **APROBADA (2026-11-08)** — aceptación temporal del riesgo AWS-0011. No autoriza implementar WAF ni desplegar AWS |
+| Autoriza | exceptuar AWS-0011 en el escáner IaC de I-080 mientras se cumplan las condiciones y vigencia de §5–§6 |
 | No autoriza | implementar WAF, modificar I-030, desplegar AWS, cambiar de plan ni gastar |
 
 ## 1. Hecho y ausencia de autorización previa
@@ -24,9 +24,10 @@ Revisión de autorizaciones existentes:
 | `I-030 tasks.md` («Sin WAF…») | Declaración de alcance del diseño local | **No**. Es una nota de alcance, no una aceptación formal de riesgo HIGH con condiciones y vigencia. |
 | `GATE_H08I_I070.md` / `MATRIZ_RECURSOS_STATE.md` | Límite SSE-S3 sin CMK | **No**. Se refiere a AWS-0132, no a WAF. |
 
-**Conclusión:** AWS-0011 **no dispone de autorización normativa válida**. La excepción que figuraba en
-`.trivyignore.yaml` era improcedente y se retira en esta corrección. Mientras esta RFC no se apruebe, el
-job `iac` **falla** con AWS-0011 y el PR #28 no puede fusionarse.
+**Conclusión:** AWS-0011 **no disponía de autorización normativa válida** en el momento del hallazgo. La
+excepción que figuraba en `.trivyignore.yaml` era improcedente y se retiró. Tras la aprobación humana de
+esta RFC (§8), la excepción se reincorpora de forma **explícita, acotada y con vigencia**, y deja de ser
+una omisión de gobierno.
 
 ## 2. Motivo económico y técnico
 
@@ -91,21 +92,26 @@ Sin (1), (2) o (3), el despliegue queda **BLOQUEADO**.
 
 No se elige ninguna alternativa en esta RFC: la decisión es del responsable.
 
-## 8. Aprobación requerida
+## 8. Aprobación requerida y concedida
 
 | Control | Estado |
 |---|---|
-| `APRUEBO_RFC_006_WAF_TEMPORAL` | **PENDIENTE** — no solicitada aún / no concedida |
+| `APRUEBO_RFC_006_WAF_TEMPORAL` | **CONCEDIDA** por el responsable el **2026-11-08** |
 | Implementación de WAF | **NO AUTORIZADA** |
 | Modificación de I-030 | **NO AUTORIZADA** (requiere su propio Gate/RFC) |
 | Despliegue AWS | **BLOQUEADO** hasta resolver §5 |
 
-Frase exacta que debe emitir el responsable para aprobar esta aceptación temporal:
-`APRUEBO_RFC_006_WAF_TEMPORAL`.
+Frase emitida por el responsable: `APRUEBO_RFC_006_WAF_TEMPORAL`.
 
-## 9. Efecto inmediato mientras no se apruebe
+Alcance exacto de la aprobación: aceptar temporalmente el hallazgo AWS-0011 HIGH en el escáner IaC de
+I-080, con los controles compensatorios de §4, las condiciones de §5 y la caducidad de §6. El riesgo
+residual sigue siendo del responsable y no se declara mitigado.
 
-- `.trivyignore.yaml` **no** exime AWS-0011.
-- El job `iac` de I-080 falla con AWS-0011 HIGH y el check queda en rojo.
-- I-080 permanece `BLOQUEADO_RFC_006`; no se declara `IAC_SCAN PASS`.
-- No se modifica I-030, no se crea WAF, no se activa AWS y no se cambia el plan.
+## 9. Efecto tras la aprobación
+
+- `.trivyignore.yaml` exime AWS-0011 **solo** en `modules/balanceo/main.tf` y con referencia a esta RFC.
+- El job `iac` vuelve a verde; `IAC_SCAN` puede declararse `PASS` con la excepción documentada.
+- El despliegue AWS continúa **BLOQUEADO** hasta cumplir §5 (y resolver RFC-004 y H-01).
+- Cualquier otro HIGH/CRITICAL sigue haciendo fallar el escáner.
+- La aprobación no se renueva por silencio: al vencer §6, la excepción debe eliminarse o renovarse con
+  nueva decisión humana.

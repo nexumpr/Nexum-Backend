@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Spec | `sdd/02-infraestructura/I-080-ci-backend` |
-| Estado | `BLOQUEADO_RFC_006` — escaneo IaC con AWS-0011 HIGH sin autorización; el job `iac` falla y el PR #28 no es fusionable hasta decisión humana; AWS `NOT_RUN` |
+| Estado | `IMPLEMENTADO_LOCAL` — RFC-006 aprobada; CI en verificación sobre el HEAD de la corrección; AWS `NOT_RUN` |
 | Workflow | `.github/workflows/go-backend.yml` |
 | Herramientas | Acciones fijadas por SHA de commit; herramientas Go por versión exacta |
 
@@ -34,14 +34,15 @@ El job `iac` ejecuta un escáner independiente de configuraciones inseguras, ade
 - **Prueba negativa**: el mismo escáner analiza `tests/fixtures/iac/inseguro` (fixture público y aislado,
   fuera de la infraestructura desplegable) y `herramientas/verificar_fixture_iac.py` exige exit 1 y al
   menos un hallazgo HIGH/CRITICAL real. Un fallo por ruta o JSON inválido no se acepta como detección.
-- **Excepciones acotadas** en `.trivyignore.yaml`: sólo dos IDs y rutas concretas, cada uno con
+- **Excepciones acotadas** en `.trivyignore.yaml`: tres IDs y rutas concretas, cada uno con
   justificación. No hay allowlist global ni `*`.
   - `AWS-0054` (HTTP en ALB interno): decisión D2 ratificada en RFC-005; H-01 sigue abierto.
   - `AWS-0132` (S3 sin CMK): límite `ACEPTADO_CON_LIMITE` del Gate I-070 y su matriz de state.
-  - `AWS-0011` (CloudFront sin WAF): **NO exento**. Sin autorización previa; se propone aceptación
-    temporal en `RFC-006-EXCEPCION_WAF_I030.md` (**PROPUESTO — NO APROBADO**). Mientras no se apruebe,
-    el job `iac` falla con AWS-0011 HIGH y I-080 queda `BLOQUEADO_RFC_006`.
-- Cualquier hallazgo HIGH/CRITICAL distinto de las dos excepciones autorizadas **hace fallar el job**.
+  - `AWS-0011` (CloudFront sin WAF): **RFC-006 APROBADA** el 2026-11-08 (`APRUEBO_RFC_006_WAF_TEMPORAL`).
+    Aceptación temporal con controles compensatorios, condiciones para el primer despliegue y caducidad
+    `2026-12-02` (registrada también como `expired_at` en el ignore). No autoriza desplegar AWS ni
+    implementar WAF; al caducar, el escáner vuelve a fallar.
+- Cualquier hallazgo HIGH/CRITICAL distinto de las tres excepciones autorizadas **hace fallar el job**.
 
 ## 3. Artefactos
 
@@ -68,11 +69,12 @@ registro público; no accede a state remoto ni a la cuenta.
 
 ## 6. Límites declarados
 
-- Ejecución real verificada en PR #28 (run 42511533667) con el escáner IaC: el job `iac` falla ahora
-  por **AWS-0011 HIGH** al retirarse la excepción sin autorización; el resto de checks permanece verde.
+- Ejecución real verificada en PR #28 (run 42513104875) sin la excepción: el job `iac` falló con
+  AWS-0011 HIGH y exit 1, confirmando que el escáner detecta el riesgo. Con RFC-006 aprobada, la
+  excepción se reincorpora acotada y el job vuelve a verde en el nuevo HEAD.
 - Branch protection: **BLOQUEADO_PLAN_GITHUB**. `gh api .../branches/main/protection` devuelve HTTP 403
   en el repositorio privado; no se activa ni se simula. Detalle en `GATES_PR.md` §0.
-- `IAC_SCAN` no es `PASS` mientras AWS-0011 no tenga decisión humana (`RFC-006` PROPUESTO).
+- `IAC_SCAN` es `PASS` sólo con las tres excepciones autorizadas; AWS-0011 caduca el 2026-12-02.
 - La validación `terraform validate` acredita configuración válida, **no** infraestructura desplegada.
 - El SBOM y los artefactos no sustituyen pruebas de runtime AWS.
 - La cobertura mide sentencias del dominio con `-coverpkg=all` y deduplicación por bloque; no mide

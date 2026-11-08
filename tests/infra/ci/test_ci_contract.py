@@ -188,19 +188,19 @@ class EscaneoIaCReal(unittest.TestCase):
         self.assertIn("--ignorefile .trivyignore.yaml", self.bloque)
         self.assertNotIn("--ignore-policy", self.bloque)
         ids = re.findall(r"(?m)^\s*-\s+id:\s*(\S+)\s*$", self.ignore)
-        self.assertEqual(set(ids), {"AWS-0054", "AWS-0132"}, ids)
-        self.assertNotRegex(self.ignore, r"(?m)^\s*-\s+id:\s*AWS-0011\s*$")
-        self.assertEqual(len(re.findall(r"(?m)^\s*statement:", self.ignore)), 2)
+        self.assertEqual(set(ids), {"AWS-0011", "AWS-0054", "AWS-0132"}, ids)
+        self.assertEqual(len(re.findall(r"(?m)^\s*statement:", self.ignore)), 3)
         self.assertNotIn('"*"', self.ignore)
         self.assertNotIn("id: *", self.ignore)
         self.assertIn("RFC-006", self.ignore)
+        self.assertIn("expired_at: 2026-12-02T00:00:00Z", self.ignore)
 
-    def test_rfc006_propuesta_sin_aprobar(self) -> None:
+    def test_rfc006_aprobada_con_alcance_y_caducidad(self) -> None:
         rfc = RAIZ / "sdd" / "_control" / "H08" / "RFC-006-EXCEPCION_WAF_I030.md"
         self.assertTrue(rfc.is_file())
         texto = _leer(rfc)
         self.assertIn("AWS-0011", texto)
-        self.assertIn("PROPUESTO — NO APROBADO", texto)
+        self.assertIn("APROBADA (2026-11-08)", texto)
         self.assertIn("APRUEBO_RFC_006_WAF_TEMPORAL", texto)
         for seccion in (
             "Motivo económico y técnico",
@@ -209,11 +209,11 @@ class EscaneoIaCReal(unittest.TestCase):
             "Condiciones para el primer despliegue AWS",
             "Vigencia y caducidad",
             "Alternativas y coste",
-            "Aprobación requerida",
+            "Aprobación requerida y concedida",
         ):
             self.assertIn(seccion, texto, seccion)
-        self.assertNotIn("APROBADA 2026", texto)
-        self.assertNotIn("RATIFICADA", texto)
+        self.assertIn("No autoriza", texto)
+        self.assertIn("2026-12-02", texto)
 
     def test_el_escaneo_no_se_sustituye_por_terraform_validate(self) -> None:
         self.assertIn("terraform validate", self.bloque)
@@ -262,9 +262,9 @@ class DocumentosDeGobierno(unittest.TestCase):
 
     def test_reporte_vincula_evidencia_a_un_sha(self) -> None:
         texto = _leer(REPORTE)
-        self.assertIn("BLOQUEADO_RFC_006", texto)
-        self.assertIn("AWS-0011", texto)
+        self.assertIn("IMPLEMENTADO_LOCAL", texto)
         self.assertIn("RFC-006", texto)
+        self.assertIn("AWS-0011", texto)
         self.assertIn("42458688828", texto)
         self.assertIn("6497915f4c8e8d90a1f7f60c7f67d6353c6a69e0", texto)
         self.assertIn("NOT_RUN", texto)

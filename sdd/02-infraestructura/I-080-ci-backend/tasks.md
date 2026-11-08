@@ -97,6 +97,6 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 
 - Anadido Trivy 0.76.2 (setup-trivy v0.3.1 fijado por SHA) al job iac: `trivy config --severity HIGH,CRITICAL --ignorefile .trivyignore.yaml --exit-code 1 infra/terraform`. Sin AWS, sin Docker, sin state remoto ni plan/apply.
 - Prueba negativa real: fixture aislado tests/fixtures/iac/inseguro (fuera de infra/terraform) detectado con exit 1 y 6 hallazgos HIGH; herramientas/verificar_fixture_iac.py exige exit 1 y hallazgo HIGH/CRITICAL real.
-- Excepciones acotadas por ID y ruta en .trivyignore.yaml con justificacion: AWS-0054 (D2/RFC-005, H-01 abierto) y AWS-0132 (SSE-S3, Gate I-070). AWS-0011 (CloudFront sin WAF) NO se exime: carece de autorizacion; se propone aceptacion temporal en RFC-006 (PROPUESTO - NO APROBADO). Sin comodines ni allowlist global.
-- Bloqueo vigente: AWS-0011 HIGH hace fallar el job iac y el PR #28 no es fusionable hasta aprobar RFC-006 (APRUEBO_RFC_006_WAF_TEMPORAL), implementar WAF con recotizacion o una alternativa formal. IAC_SCAN no se declara PASS.
-- Pruebas: 29 de contrato CI (+7) y 49 de herramientas (+8); sin cambios en logica de negocio.
+- Excepciones acotadas por ID y ruta en .trivyignore.yaml con justificacion: AWS-0054 (D2/RFC-005, H-01 abierto), AWS-0132 (SSE-S3, Gate I-070) y AWS-0011 (RFC-006 APROBADA 2026-11-08 con APRUEBO_RFC_006_WAF_TEMPORAL; caducidad 2026-12-02 en expired_at). Sin comodines ni allowlist global.
+- AWS-0011 bajo aceptacion temporal: no autoriza WAF ni despliegue; el despliegue AWS sigue bloqueado por RFC-004, H-01 y RFC-006 5. Cualquier otro HIGH/CRITICAL bloquea.
+- Pruebas: 29 de contrato CI y 49 de herramientas; sin cambios en logica de negocio.

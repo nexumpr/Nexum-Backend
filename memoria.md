@@ -462,4 +462,6 @@
 - Hallazgos reales sobre infra: AWS-0054 CRITICAL (ALB interno HTTP; D2/RFC-005, H-01 abierto), AWS-0132 HIGH (SSE-S3 sin CMK; limite I-070) y AWS-0011 HIGH (CloudFront sin WAF).
 - Correccion de gobierno (2026-11-08): AWS-0011 carecia de autorizacion normativa. Se retira de .trivyignore.yaml; Trivy real devuelve 1 hallazgo HIGH (AWS-0011) y exit 1. RFC-006 (sdd/_control/H08/RFC-006-EXCEPCION_WAF_I030.md) queda PROPUESTO - NO APROBADO con riesgo, controles compensatorios, condiciones de despliegue, caducidad 2026-12-02/Gate AWS, alternativas y coste indicativo NOT_VERIFIED.
 - Estado: I-080 BLOQUEADO_RFC_006; job iac en rojo y PR #28 no fusionable hasta APRUEBO_RFC_006_WAF_TEMPORAL, WAF con recotizacion o alternativa formal. No se declara IAC_SCAN PASS. Sin cambios de arquitectura, IAM ni AWS.
+- Aprobacion recibida (2026-11-08): APRUEBO_RFC_006_WAF_TEMPORAL. RFC-006 APROBADA con alcance temporal: excepcion AWS-0011 reincorporada en .trivyignore.yaml (ID+ruta, expired_at 2026-12-02), controles compensatorios, condiciones de despliegue y riesgo residual. No autoriza WAF ni AWS; el despliegue sigue bloqueado por RFC-004, H-01 y RFC-006 5.
+- Trivy real post-aprobacion: exit 0 con las tres excepciones autorizadas; la prueba negativa sigue exigiendo exit 1 + HIGH/CRITICAL.
 - Pruebas: 29 de contrato CI y 49 de herramientas.
