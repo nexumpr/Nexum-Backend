@@ -30,7 +30,7 @@
     "AGENTS.md": "d2b849925e649f6e8fe5e96d2cd4564a7d889310836acd3baf52ee912c00db42",
     "README.md": "bd1f96bdfa372443de8eb1a6ca5b55943dbde8307aa71b834d4a8bab48358c4c",
     "constitution.md": "9534c9a61f94f952ee33e935cd3aeed4bfee51b36165380c52c4a24f80c72ea2",
-    "herramientas/tests/test_gitleaks_config.py": "f22100d74fe1397133ddd5533250a3f2f8cecbd4b293bf764efa237f652145f9",
+    "herramientas/tests/test_gitleaks_config.py": "7d38a2dbc067b7c5c1f245e7b30633df91e11e75850bdc3e3616cd199289a3bc",
     "herramientas/tests/test_h08_permissions.py": "f4e170734fe8e785e530cba17d7ebb67c20091e0ee10dc6883a4020d9a72bb70",
     "herramientas/tests/test_integridad_sdd.py": "d7095dae8616385adad27b28cf1da141142e8fc41d0823296106da2a13ce8fae",
     "herramientas/validar_sdd_integral.py": "5dda865e637b1078119503dd46025a8bf44e5398a1ce68d3e26efae520c18ba5",
