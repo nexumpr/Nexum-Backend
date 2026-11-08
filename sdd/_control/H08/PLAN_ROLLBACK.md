@@ -15,16 +15,25 @@ El workflow aborta y ejecuta rollback si:
 - tras el rollout no hay 2 nodos `InService` y 2 targets `healthy`;
 - `GET https://<api>/api/v1/health/live` no devuelve **200**.
 
-## 2. Rollback de aplicación
+## 2. Rollback de aplicación (máquina de estados)
 
-1. `aws autoscaling update-auto-scaling-group` con **`max-size 2`** (restaura la capacidad normal si el
-   rollout la había elevado a 3).
-2. `aws autoscaling update-auto-scaling-group` con la **versión previa** del Launch Template
-   (`lt_version_previa`, aportada en el `workflow_dispatch`).
-3. `start-instance-refresh` con `MinHealthyPercentage=100` e `InstanceWarmup=120`.
-4. Esperar `Successful`; si falla, detenerse y escalar al responsable.
-5. Verificar 2 nodos `InService`, 2 targets `healthy` y health HTTP 200.
-6. Registrar la evidencia del rollback (versión previa, hora, resultado).
+1. **No ejecutar rollback si no hubo mutación AWS**: el workflow crea `.mutado` justo antes del primer
+   cambio; sin ese marcador no se toca AWS.
+2. **Capturar antes de mutar**: versión real del Launch Template y `max_size` desde AWS (no se confía en
+   el input `lt_version_previa`; si se aporta, debe coincidir con la real o se aborta).
+3. **Cancelar el refresh activo**: si `describe-instance-refreshes` muestra `Pending`, `InProgress`,
+   `Cancelling` o `Baking`, se ejecuta `cancel-instance-refresh` y se espera estado terminal. No se lanza
+   un segundo refresh incompatible.
+4. **Mantener capacidad**: `max_size` permanece en **3** durante la recuperación; **no** se restaura a 2
+   antes del refresh de rollback.
+5. Aplicar la **versión previa real** del Launch Template y lanzar el refresh con
+   `MinHealthyPercentage=100` y `MaxHealthyPercentage=150`.
+6. Esperar `Successful`; si `Failed`/`Cancelled`/`RollbackFailed` → `ROLLBACK_FAILED`, se conserva
+   `max_size=3` para intervención autorizada y no se declara recuperación.
+7. Verificar 2 targets `healthy` y que las instancias arrancaron con la configuración previa.
+8. Sólo entonces restaurar `max_size=2` y registrar la evidencia del rollback.
+9. **Nunca** se revierten tablas, índices, TTL ni datos DynamoDB: el rollback de aplicación es
+   independiente del de esquema.
 
 El rollback de aplicación **no** toca DynamoDB ni el state de Terraform.
 

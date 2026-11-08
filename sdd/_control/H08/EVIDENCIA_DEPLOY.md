@@ -21,7 +21,9 @@
 | Nodos `InService` antes/después | *(pendiente)* 2/2 esperado |
 | Targets `healthy` antes/después | *(pendiente)* 2/2 esperado |
 | Capacidad transitoria | `max_size` 3 durante el rollout y 2 al final (obligatorio) |
-| Health HTTP | *(pendiente)* `GET /api/v1/health/live` → 200; readiness según `READINESS_REQUIRED` |
+| Launch Template del release | Versión concreta que referencia `s3://<bucket>/releases/<release>/nexum-backend-linux-arm64` y su digest (BLOCKED hasta I-020/I-060) |
+| Verificación en instancias | UserData de las 2 instancias `InService` con la URI y digest del release |
+| Health HTTP | *(pendiente)* `GET /api/v1/health/live` y `/ready` → **200 obligatorios**; 503 bloquea |
 | Rollback ejecutado | Sí/No y versión previa del Launch Template |
 | Coste observado | *(pendiente)* |
 | Errores | *(pendiente)* |

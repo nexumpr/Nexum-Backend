@@ -97,3 +97,10 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - Readiness: /api/v1/health/ready solo obligatoria con READINESS_REQUIRED=true; por defecto 503 documentado, no declarado.
 - Simulador determinista herramientas/simular_despliegue.py (ABORTAR/ROLLBACK/DESPLEGAR, max_final=2) con 9 pruebas.
 - Pruebas: 29 de contrato CD, 11 de autorizacion, 10 de run/entorno, 9 de simulador.
+
+- Correccion de entrega (2026-11-08): el CD sube el binario a s3://<bucket>/releases/<release>/ y verifica checksum SHA256; exige una version del Launch Template creada por I-020 con URI+digest y verifica la UserData de las 2 instancias InService. ARTIFACT_DELIVERY = BLOCKED por bucket/permiso I-060 y version LT de I-020; el CD no modifica esas specs.
+- Correccion de inputs: los workflow_dispatch se transportan por variables de entorno; prohibido interpolar ${{ inputs }} en run; pruebas con metacaracteres y sustituciones.
+- Correccion de rollout: MaxHealthyPercentage=150, aplicacion del LT del release, verificacion de release efectivo y restauracion de max 2 solo al final.
+- Correccion de rollback: no actua sin mutacion (.mutado), captura LT real (no confia en input), cancela refresh activo, mantiene max 3 durante la recuperacion, ROLLBACK_FAILED conserva capacidad y no se restaura 2 antes.
+- Readiness 200 obligatoria; 503 bloquea el despliegue y no se declara DEPLOYED_VERIFIED.
+- Pruebas: 31 de contrato CD y 21 de helpers CD (run, entorno, LT, instancias, S3, ASG, rollback e inyeccion).

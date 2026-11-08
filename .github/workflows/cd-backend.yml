@@ -1,9 +1,13 @@
 name: CD Backend (manual, con autorizacion)
 
 # I-090 — promocion manual de un artefacto verificado. NO se ejecuta en PR ni en push.
-# Requiere: workflow_dispatch, entorno protegido `aws-deploy`, variable CD_HABILITADO=true,
-# frase de autorizacion ligada al SHA y artefacto `binario-<sha>` de un run de CI verde.
-# Sin credenciales estaticas, sin terraform apply/destroy, sin Docker.
+# Requiere: workflow_dispatch en main, entorno protegido `aws-deploy` con revisores,
+# CD_HABILITADO=true, ENVIRONMENT_PROTECTION_CONFIRMED=aws-deploy, run de CI verde
+# del SHA exacto, frase AUTORIZO_DESPLIEGUE_<sha>, artefacto binario-<sha> y LT con
+# el release. Sin credenciales estaticas, sin terraform, sin Docker.
+#
+# Inputs no confiables se transportan SIEMPRE por variables de entorno y se validan
+# antes de usarse; nunca se interpolan dentro de scripts shell.
 
 on:
   workflow_dispatch:
@@ -28,9 +32,14 @@ on:
         description: "Frase exacta AUTORIZO_DESPLIEGUE_<sha>"
         required: true
         type: string
-      lt_version_previa:
-        description: "Version previa del Launch Template para rollback"
+      lt_version:
+        description: "Version del Launch Template que contiene este release (creada por I-020)"
         required: true
+        type: string
+      lt_version_previa:
+        description: "Version previa conocida (solo se usa como comprobacion; se lee la real de AWS)"
+        required: false
+        default: ""
         type: string
       confirmar:
         description: "Escribir SI para confirmar el despliegue manual"
@@ -53,6 +62,16 @@ jobs:
     permissions:
       contents: read
       actions: read
+    env:
+      IN_RELEASE_ID: ${{ inputs.release_id }}
+      IN_SHA: ${{ inputs.sha }}
+      IN_RUN_ID: ${{ inputs.run_id }}
+      IN_DIGEST: ${{ inputs.sha256_binario }}
+      IN_AUTORIZACION: ${{ inputs.autorizacion }}
+      IN_LT_VERSION: ${{ inputs.lt_version }}
+      IN_CONFIRMAR: ${{ inputs.confirmar }}
+      CD_HABILITADO: ${{ vars.CD_HABILITADO }}
+      ENV_CONFIRMADO: ${{ vars.ENVIRONMENT_PROTECTION_CONFIRMED }}
     steps:
       - name: Checkout del SHA autorizado
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -63,29 +82,33 @@ jobs:
       - name: Validar autorizacion, version y confirmacion
         run: |
           python3 herramientas/verificar_autorizacion_despliegue.py \
-            --sha "${{ inputs.sha }}" \
-            --release-id "${{ inputs.release_id }}" \
-            --frase "${{ inputs.autorizacion }}" \
-            --confirmar "${{ inputs.confirmar }}" \
-            --habilitado "${{ vars.CD_HABILITADO }}" \
-            --sha256-binario "${{ inputs.sha256_binario }}" \
+            --sha "$IN_SHA" \
+            --release-id "$IN_RELEASE_ID" \
+            --frase "$IN_AUTORIZACION" \
+            --confirmar "$IN_CONFIRMAR" \
+            --habilitado "$CD_HABILITADO" \
+            --sha256-binario "$IN_DIGEST" \
             --total-nodos 2 \
-            --lt-version "${{ inputs.lt_version_previa }}"
+            --lt-version "$IN_LT_VERSION"
 
-      - name: Verificar que el run de CI esta en verde y corresponde al SHA
+      - name: Verificar run de CI verde, del workflow y SHA autorizados
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ inputs.run_id }}
-          SHA_ESPERADO: ${{ inputs.sha }}
         run: |
-          gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" > run.json
-          python3 herramientas/verificar_run_ci.py run.json "$SHA_ESPERADO"
+          gh api "repos/${{ github.repository }}/actions/runs/$IN_RUN_ID" > run.json
+          gh api "repos/${{ github.repository }}/actions/runs/$IN_RUN_ID/artifacts" > artefactos.json
+          python3 herramientas/verificar_run_ci.py run.json "$IN_SHA" \
+            --workflow-path .github/workflows/go-backend.yml \
+            --evento push \
+            --rama main \
+            --artefactos-json artefactos.json \
+            --artefactos "binario-$IN_SHA,sbom-spdx-$IN_SHA"
 
       - name: Verificar entorno protegido con revisores (falla cerrado)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          test "${{ vars.ENVIRONMENT_PROTECTION_CONFIRMED }}" = "aws-deploy"
+          test "$ENV_CONFIRMADO" = "aws-deploy"
           gh api "repos/${{ github.repository }}/environments/aws-deploy" > entorno.json
           python3 herramientas/verificar_entorno_protegido.py entorno.json
 
@@ -100,7 +123,7 @@ jobs:
       - name: Verificar integridad del binario
         run: |
           test -f artefacto/nexum-backend-linux-arm64
-          test "$(sha256sum artefacto/nexum-backend-linux-arm64 | cut -d' ' -f1)" = "${{ inputs.sha256_binario }}"
+          test "$(sha256sum artefacto/nexum-backend-linux-arm64 | cut -d' ' -f1)" = "$IN_DIGEST"
 
       - name: Descargar SBOM del mismo run
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -119,10 +142,10 @@ jobs:
           if-no-files-found: error
 
   despliegue:
-    name: Despliegue ASG con health y rollback
+    name: Despliegue ASG con release verificado y rollback
     needs: preflight
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     environment: aws-deploy
     permissions:
       contents: read
@@ -133,6 +156,12 @@ jobs:
       LT_NAME: ${{ vars.LAUNCH_TEMPLATE_NAME }}
       TG_ARN: ${{ vars.TARGET_GROUP_ARN }}
       API_BASE_URL: ${{ vars.API_BASE_URL }}
+      ARTIFACT_BUCKET: ${{ vars.ARTIFACT_BUCKET }}
+      IN_RELEASE_ID: ${{ inputs.release_id }}
+      IN_SHA: ${{ inputs.sha }}
+      IN_DIGEST: ${{ inputs.sha256_binario }}
+      IN_LT_VERSION: ${{ inputs.lt_version }}
+      IN_LT_PREVIA: ${{ inputs.lt_version_previa }}
     steps:
       - name: Checkout del SHA autorizado
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -149,7 +178,7 @@ jobs:
       - name: Verificar integridad antes de desplegar
         run: |
           test -f release/nexum-backend-linux-arm64
-          test "$(sha256sum release/nexum-backend-linux-arm64 | cut -d' ' -f1)" = "${{ inputs.sha256_binario }}"
+          test "$(sha256sum release/nexum-backend-linux-arm64 | cut -d' ' -f1)" = "$IN_DIGEST"
 
       - name: Autenticacion OIDC sin credenciales estaticas
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -158,17 +187,49 @@ jobs:
           role-session-name: cd-backend-${{ inputs.sha }}
           aws-region: us-east-2
 
+      - name: Verificar 2 nodos sanos antes de mutar y capturar estado previo
+        run: |
+          aws autoscaling describe-auto-scaling-groups \
+            --auto-scaling-group-names "$ASG_NAME" > asg-antes.json
+          python3 herramientas/estado_asg.py asg-antes.json \
+            --minimo 2 --nodos 2 --salida estado-previo.json
+          LT_ANTERIOR=$(jq -r '.launch_template_version' estado-previo.json)
+          MAX_ANTERIOR=$(jq -r '.max_size' estado-previo.json)
+          echo "lt_anterior=$LT_ANTERIOR max_anterior=$MAX_ANTERIOR"
+          test "$MAX_ANTERIOR" -eq 2
+          if [ -n "$IN_LT_PREVIA" ] && [ "$IN_LT_PREVIA" != "$LT_ANTERIOR" ]; then
+            echo "LT_VERSION_PREVIA_NO_COINCIDE: input=$IN_LT_PREVIA real=$LT_ANTERIOR"
+            exit 1
+          fi
+          echo "LT_ANTERIOR=$LT_ANTERIOR" >> "$GITHUB_ENV"
+
+      - name: Verificar release en el Launch Template (I-020)
+        run: |
+          test -n "$ARTIFACT_BUCKET" || { echo "ARTIFACT_DELIVERY_BLOCKED: falta ARTIFACT_BUCKET"; exit 1; }
+          aws ec2 describe-launch-template-versions \
+            --launch-template-name "$LT_NAME" --versions "$IN_LT_VERSION" > lt.json
+          python3 herramientas/verificar_lt_release.py lt.json \
+            --bucket "$ARTIFACT_BUCKET" --release-id "$IN_RELEASE_ID" \
+            --sha256 "$IN_DIGEST" --version "$IN_LT_VERSION"
+
+      - name: Publicar binario en S3 y verificar checksum
+        run: |
+          test -n "$ARTIFACT_BUCKET" || { echo "ARTIFACT_DELIVERY_BLOCKED: falta ARTIFACT_BUCKET"; exit 1; }
+          CLAVE="releases/$IN_RELEASE_ID/nexum-backend-linux-arm64"
+          aws s3api put-object \
+            --bucket "$ARTIFACT_BUCKET" --key "$CLAVE" \
+            --body release/nexum-backend-linux-arm64 \
+            --checksum-algorithm SHA256 > put.json
+          aws s3api head-object --bucket "$ARTIFACT_BUCKET" --key "$CLAVE" \
+            --checksum-mode ENABLED > cabeza.json
+          python3 herramientas/verificar_objeto_s3.py cabeza.json --sha256 "$IN_DIGEST"
+
       - name: Comprobar 2 nodos sanos antes de mutar
         run: |
-          IN_SERVICE=$(aws autoscaling describe-auto-scaling-groups \
-            --auto-scaling-group-names "$ASG_NAME" \
-            --query 'AutoScalingGroups[0].Instances' --output json \
-            | jq '[.[] | select(.LifecycleState=="InService")] | length')
           SALUDABLES=$(aws elbv2 describe-target-health --target-group-arn "$TG_ARN" \
             --query 'TargetHealthDescriptions' --output json \
             | jq '[.[] | select(.TargetHealth.State=="healthy")] | length')
-          echo "InService=$IN_SERVICE healthy=$SALUDABLES"
-          test "$IN_SERVICE" -eq 2
+          echo "healthy=$SALUDABLES"
           test "$SALUDABLES" -eq 2
 
       - name: Preparar capacidad transitoria (max 3 durante el rollout)
@@ -177,18 +238,23 @@ jobs:
             --auto-scaling-group-names "$ASG_NAME" \
             --query 'AutoScalingGroups[0].MaxSize' --output text)
           echo "max_size_actual=$MAX"
-          # Con min=desired=max=2 el refresh al 100% no puede conservar 2 sanos:
-          # se necesita una tercera instancia transitoria (coste ~0.0084 USD/h).
           test "$MAX" -eq 2
+          touch .mutado
           aws autoscaling update-auto-scaling-group \
             --auto-scaling-group-name "$ASG_NAME" --max-size 3
 
-      - name: Iniciar instance refresh (min 100% healthy)
+      - name: Aplicar el Launch Template del release
+        run: |
+          aws autoscaling update-auto-scaling-group \
+            --auto-scaling-group-name "$ASG_NAME" \
+            --launch-template LaunchTemplateName="$LT_NAME",Version="$IN_LT_VERSION"
+
+      - name: Iniciar instance refresh (100% healthy, max 150%)
         run: |
           aws autoscaling start-instance-refresh \
             --auto-scaling-group-name "$ASG_NAME" \
             --strategy Rolling \
-            --preferences '{"MinHealthyPercentage":100,"InstanceWarmup":120}'
+            --preferences '{"MinHealthyPercentage":100,"MaxHealthyPercentage":150,"InstanceWarmup":120}'
 
       - name: Esperar el instance refresh
         run: |
@@ -206,25 +272,30 @@ jobs:
           echo "Timeout esperando instance refresh"
           exit 1
 
-      - name: Verificar 2 nodos sanos despues del rollout
+      - name: Verificar 2 nodos sanos y release efectivo
         run: |
-          IN_SERVICE=$(aws autoscaling describe-auto-scaling-groups \
-            --auto-scaling-group-names "$ASG_NAME" \
-            --query 'AutoScalingGroups[0].Instances' --output json \
-            | jq '[.[] | select(.LifecycleState=="InService")] | length')
+          aws autoscaling describe-auto-scaling-groups \
+            --auto-scaling-group-names "$ASG_NAME" > asg-despues.json
+          python3 herramientas/estado_asg.py asg-despues.json \
+            --minimo 2 --nodos 2 --salida estado-despues.json
           SALUDABLES=$(aws elbv2 describe-target-health --target-group-arn "$TG_ARN" \
             --query 'TargetHealthDescriptions' --output json \
             | jq '[.[] | select(.TargetHealth.State=="healthy")] | length')
-          echo "InService=$IN_SERVICE healthy=$SALUDABLES"
-          test "$IN_SERVICE" -eq 2
           test "$SALUDABLES" -eq 2
+          for ID in $(jq -r '.instance_ids[]' estado-despues.json); do
+            aws ec2 describe-instance-attribute --instance-id "$ID" \
+              --attribute userData --query 'UserData.Value' --output text
+          done > userdata.txt
+          python3 herramientas/verificar_instancias_release.py userdata.txt \
+            --bucket "$ARTIFACT_BUCKET" --release-id "$IN_RELEASE_ID" \
+            --sha256 "$IN_DIGEST" --instancias 2
 
       - name: Restaurar capacidad (max 2 tras el rollout)
         run: |
           aws autoscaling update-auto-scaling-group \
             --auto-scaling-group-name "$ASG_NAME" --max-size 2
 
-      - name: Prueba HTTP HTTPS de salud
+      - name: Prueba HTTP HTTPS de liveness
         run: |
           CODIGO=$(curl --silent --show-error --fail --proto '=https' \
             --output /dev/null --write-out '%{http_code}' \
@@ -232,8 +303,7 @@ jobs:
           echo "GET /api/v1/health/live -> $CODIGO"
           test "$CODIGO" = "200"
 
-      - name: Prueba HTTP HTTPS de readiness (obligatoria si READINESS_REQUIRED)
-        if: vars.READINESS_REQUIRED == 'true'
+      - name: Prueba HTTP HTTPS de readiness (obligatoria)
         run: |
           CODIGO=$(curl --silent --show-error --fail --proto '=https' \
             --output /dev/null --write-out '%{http_code}' \
@@ -244,21 +314,22 @@ jobs:
       - name: Registrar evidencia de despliegue
         if: success()
         run: |
-          python3 - "${{ inputs.release_id }}" "${{ inputs.sha }}" "${{ inputs.run_id }}" "${{ inputs.sha256_binario }}" <<'PY'
+          python3 - "$IN_RELEASE_ID" "$IN_SHA" "$IN_DIGEST" "$IN_LT_VERSION" "$IN_LT_PREVIA" "$GITHUB_ACTOR" <<'PY'
           import json, sys, datetime
-          release, sha, run_id, digest = sys.argv[1:5]
+          release, sha, digest, lt, lt_previa, actor = sys.argv[1:7]
           datos = {
               "release_id": release,
               "sha": sha,
-              "run_id_ci": run_id,
               "sha256_binario": digest,
-              "desplegado_por": "${{ github.actor }}",
+              "desplegado_por": actor,
               "desplegado_en": datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "entorno": "aws-deploy",
+              "lt_version": lt,
+              "lt_version_previa": lt_previa,
               "capacidad_transitoria_max": 3,
-              "readiness_requerida": "${{ vars.READINESS_REQUIRED }}",
               "http_live": "200",
-              "estado": "EJECUTADO_NO_VERIFICADO",
+              "http_ready": "200",
+              "estado": "EJECUTADO_NO_AWS_VERIFIED",
           }
           with open("evidencia-deploy.json", "w", encoding="utf-8") as f:
               json.dump(datos, f, indent=2, ensure_ascii=False)
@@ -274,15 +345,53 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      - name: Rollback a la version previa del Launch Template
-        if: failure() && inputs.lt_version_previa != ''
+      - name: Rollback seguro (cancela refresh activo, conserva capacidad)
+        if: failure()
         run: |
+          if [ ! -f .mutado ]; then
+            echo "SIN_MUTACION_AWS: no se ejecuta rollback"
+            exit 0
+          fi
+          echo "Iniciando rollback de la version previa: $LT_ANTERIOR"
+          aws autoscaling describe-instance-refreshes \
+            --auto-scaling-group-name "$ASG_NAME" > refreshes.json
+          python3 herramientas/decidir_rollback.py refreshes.json --salida rollback.json
+          ACCION=$(jq -r '.accion' rollback.json)
+          if [ "$ACCION" = "CANCELAR_Y_ESPERAR" ]; then
+            aws autoscaling cancel-instance-refresh --auto-scaling-group-name "$ASG_NAME"
+            for _ in $(seq 1 40); do
+              ESTADO=$(aws autoscaling describe-instance-refreshes \
+                --auto-scaling-group-name "$ASG_NAME" \
+                --query 'InstanceRefreshes[0].Status' --output text)
+              case "$ESTADO" in
+                Cancelled|Failed|Successful) break ;;
+              esac
+              sleep 15
+            done
+          fi
+          # Mantener max 3 mientras se recupera: no restaurar 2 antes.
           aws autoscaling update-auto-scaling-group \
-            --auto-scaling-group-name "$ASG_NAME" --max-size 2
+            --auto-scaling-group-name "$ASG_NAME" --max-size 3
           aws autoscaling update-auto-scaling-group \
             --auto-scaling-group-name "$ASG_NAME" \
-            --launch-template LaunchTemplateName="$LT_NAME",Version="${{ inputs.lt_version_previa }}"
+            --launch-template LaunchTemplateName="$LT_NAME",Version="$LT_ANTERIOR"
           aws autoscaling start-instance-refresh \
             --auto-scaling-group-name "$ASG_NAME" \
             --strategy Rolling \
-            --preferences '{"MinHealthyPercentage":100,"InstanceWarmup":120}'
+            --preferences '{"MinHealthyPercentage":100,"MaxHealthyPercentage":150,"InstanceWarmup":120}'
+          for _ in $(seq 1 60); do
+            ESTADO=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name "$ASG_NAME" \
+              --query 'InstanceRefreshes[0].Status' --output text)
+            case "$ESTADO" in
+              Successful) break ;;
+              Failed|Cancelled|RollbackFailed) echo "ROLLBACK_FAILED estado=$ESTADO"; exit 1 ;;
+            esac
+            sleep 30
+          done
+          SALUDABLES=$(aws elbv2 describe-target-health --target-group-arn "$TG_ARN" \
+            --query 'TargetHealthDescriptions' --output json \
+            | jq '[.[] | select(.TargetHealth.State=="healthy")] | length')
+          test "$SALUDABLES" -eq 2
+          aws autoscaling update-auto-scaling-group \
+            --auto-scaling-group-name "$ASG_NAME" --max-size 2

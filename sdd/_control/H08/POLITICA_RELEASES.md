@@ -60,10 +60,35 @@ el despliegue queda **BLOCKED** y se solicita decisión humana; no se reduce el 
 ## 2.2 Verificación HTTP
 
 - `GET /api/v1/health/live` → **200 obligatorio**.
-- `GET /api/v1/health/ready` con `READINESS_REQUIRED=true` → **200 obligatorio**. Hoy readiness devuelve
-  503 hasta registrar dependencias reales (I-040/I-050): por defecto la variable está ausente y el
-  workflow **registra** el estado sin declarar readiness cumplida.
+- `GET /api/v1/health/ready` → **200 obligatorio**. Mientras readiness devuelva 503 (dependencias
+  DynamoDB/Redis reales no registradas, I-040/I-050), el despliegue **falla y no se declara
+  `DEPLOYED_VERIFIED`**. No existe variable que convierta un 503 en éxito.
 - HTTPS con `curl --proto '=https' --fail`; no se acepta un 200 sin verificación de TLS.
+
+## 2.3 Entrega del binario a EC2
+
+El binario no se instala por descargarlo en el runner. I-020 arranca cada instancia descargando
+`artefacto_s3_uri` y su `sha256` embebidos en la **UserData del Launch Template**, y aborta si el digest
+no coincide. Por tanto el CD:
+
+1. exige `ARTIFACT_BUCKET` (si falta: `ARTIFACT_DELIVERY_BLOCKED`, sin mutar AWS);
+2. sube el binario a `s3://<bucket>/releases/<release_id>/nexum-backend-linux-arm64` con checksum
+   SHA256 y lo verifica con `head-object`;
+3. **no crea** el Launch Template: exige una versión concreta (`lt_version`) creada por I-020/I-070
+   cuyo UserData referencie esa URI y digest; si no coincide, `LT_RELEASE_FAIL`;
+4. aplica esa versión al ASG y lanza el instance refresh;
+5. verifica la UserData de las dos instancias `InService` para confirmar que arrancaron con el release.
+
+Dependencia bloqueante: bucket de artefactos y permiso `s3:PutObject/GetObject` para el rol de
+despliegue pertenecen a I-060/I-080 (`iam_artifact_object_arns` está vacío) y la creación de la versión
+del LT con el release pertenece a I-020/I-070 (Terraform con Gate). Sin ambas piezas,
+`ARTIFACT_DELIVERY = BLOCKED`; no se simula.
+
+## 2.4 Autenticidad del release
+
+El preflight verifica por API que el run es del workflow `.github/workflows/go-backend.yml`, evento
+`push`, rama `main`, repositorio correcto, `completed/success`, SHA exacto y que existen los artefactos
+`binario-<sha>` y `sbom-spdx-<sha>` en ese run. No se acepta cualquier run verde ni artefactos de PR.
 
 ## 3. Separación de responsabilidades
 
@@ -83,7 +108,9 @@ el despliegue queda **BLOCKED** y se solicita decisión humana; no se reduce el 
 | Proveedor OIDC | `AWS_SCP_NOT_VERIFIED` | I-060 |
 | Variable `CD_HABILITADO` | **PENDIENTE** (debe crearla el responsable) | no existe hasta configurarla |
 | Variable `ENVIRONMENT_PROTECTION_CONFIRMED` | **PENDIENTE** | sin ella el preflight falla |
-| Variable `READINESS_REQUIRED` | **AUSENTE** (readiness 503 por diseño hasta I-040/I-050) | no se declara readiness |
+| Variable `READINESS_REQUIRED` | **ELIMINADA** — readiness 200 es obligatoria; con 503 el despliegue falla | no se declara readiness |
+| Bucket de artefactos `ARTIFACT_BUCKET` | **BLOQUEADO** — no existe; I-060 no concede `s3:PutObject` (`iam_artifact_object_arns` vacío) | `ARTIFACT_DELIVERY_BLOCKED` |
+| Versión del Launch Template con el release | **BLOQUEADO** — la crea I-020/I-070 vía Terraform con Gate; el CD no la genera | `LT_RELEASE_FAIL` si no coincide |
 | Ejecución real | **NOT_RUN** | `AWS_NOT_RUN` |
 
 Mientras no existan el entorno protegido, el rol OIDC y la variable, el workflow no puede desplegar:

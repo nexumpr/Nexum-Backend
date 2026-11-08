@@ -60,3 +60,9 @@
 - [x] Capacidad transitoria max 3 y restauracion a 2 en exito y rollback, con coste documentado y BLOCKED si no cabe.
 - [x] Readiness configurable y no declarada por defecto; health live obligatorio.
 - [x] Simulador local de despliegue/rollback con pruebas de capacidad, salud y HTTP.
+
+- [x] Entrega del binario verificada en S3 y en la UserData de las instancias; LT del release obligatorio.
+- [x] Inputs por variables de entorno, sin interpolacion en scripts y con pruebas de inyeccion.
+- [x] Rollback con captura real de LT, cancelacion de refresh activo, capacidad conservada y ROLLBACK_FAILED.
+- [x] Readiness 200 obligatoria; sin variable de conveniencia.
+- [ ] ARTIFACT_DELIVERY desbloqueada: requiere bucket/permiso I-060 y version LT de I-020 con Gate.

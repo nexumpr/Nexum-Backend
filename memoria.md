@@ -482,3 +482,5 @@
 - Pruebas: 21 de contrato CD y 10 de autorizacion. AWS_NOT_RUN; sin terraform apply/destroy ni Docker.
 
 - I-090 correccion de alcance (2026-11-08): preflight verifica run de CI verde (helper verificar_run_ci.py) y entorno protegido por API (verificar_entorno_protegido.py), fallando cerrado antes de OIDC. Capacidad transitoria max 2->3 y restauracion a 2 (coste ~0.0084 USD/h no medido; BLOCKED si no cabe). Readiness solo obligatoria con READINESS_REQUIRED. Simulador determinista con 9 pruebas; 29 de contrato CD y 11 de autorizacion.
+
+- I-090 correccion profunda (2026-11-08): se distinguio runner de instancia. El CD sube el binario a S3 y exige un Launch Template de I-020 con URI+digest, verificando la UserData de las 2 instancias InService; ARTIFACT_DELIVERY sigue BLOCKED por bucket/permiso I-060 y version LT de I-020. Inputs por env sin interpolacion en run; 31 pruebas de contrato y 21 de helpers (incluye inyeccion, S3, LT, instancias, ASG y rollback). Rollback: sin mutacion no actua, captura LT real, cancela refresh activo, mantiene max 3 durante recuperacion y restaura 2 solo al final. Readiness 200 obligatoria; 503 bloquea.

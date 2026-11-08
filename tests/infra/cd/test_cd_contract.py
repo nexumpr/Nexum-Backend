@@ -44,10 +44,26 @@ class DisparadorYVersion(unittest.TestCase):
         self.assertIn("github.event_name == 'workflow_dispatch'", self.texto)
 
     def test_inputs_de_release_obligatorios(self) -> None:
-        for entrada in ("release_id", "sha", "run_id", "sha256_binario", "autorizacion", "lt_version_previa", "confirmar"):
+        for entrada in ("release_id", "sha", "run_id", "sha256_binario", "autorizacion", "lt_version", "confirmar"):
             self.assertIn(f"{entrada}:", self.texto, entrada)
             bloque = self.texto.split(f"{entrada}:", 1)[1]
             self.assertIn("required: true", bloque.split("type:", 1)[0], entrada)
+        self.assertIn("lt_version_previa:", self.texto)
+        bloque = self.texto.split("lt_version_previa:", 1)[1]
+        self.assertIn("required: false", bloque.split("type:", 1)[0])
+
+    def test_inputs_no_se_interpolan_en_scripts(self) -> None:
+        en_run = False
+        for linea in self.crudo.splitlines():
+            desnuda = linea.strip()
+            if desnuda.startswith("run:"):
+                en_run = desnuda.endswith("|")
+                continue
+            if en_run and linea.startswith("      - name:"):
+                en_run = False
+            if en_run:
+                self.assertNotIn("${{ inputs.", linea, linea)
+                self.assertNotIn("${{ github.actor }}", linea, linea)
 
     def test_concurrencia_sin_cancelar_despliegues(self) -> None:
         self.assertIn("cancel-in-progress: false", self.texto)
@@ -99,7 +115,7 @@ class PromocionYAutorizacion(unittest.TestCase):
         self.assertIn("binario-${{ inputs.sha }}", self.texto)
         self.assertIn("sbom-spdx-${{ inputs.sha }}", self.texto)
         self.assertIn("sha256sum", self.texto)
-        self.assertIn('= "${{ inputs.sha256_binario }}"', self.texto)
+        self.assertIn('= "$IN_DIGEST"', self.texto)
 
     def test_ci_publica_el_binario(self) -> None:
         self.assertIn("name: binario-${{ github.sha }}", self.ci)
@@ -108,19 +124,33 @@ class PromocionYAutorizacion(unittest.TestCase):
 
     def test_autorizacion_ligada_al_sha(self) -> None:
         self.assertIn("verificar_autorizacion_despliegue.py", self.texto)
-        self.assertIn('--frase "${{ inputs.autorizacion }}"', self.texto)
-        self.assertIn('--lt-version "${{ inputs.lt_version_previa }}"', self.texto)
+        self.assertIn('--frase "$IN_AUTORIZACION"', self.texto)
+        self.assertIn('--lt-version "$IN_LT_VERSION"', self.texto)
         ayuda = _leer(AYUDA)
         self.assertIn('f"AUTORIZO_DESPLIEGUE_{sha}"', ayuda)
         self.assertIn("CONFIRMACION_AUSENTE", ayuda)
         self.assertIn("CD_NO_HABILITADO", ayuda)
         self.assertIn("LT_VERSION_INVALIDA", ayuda)
 
+    def test_entrega_a_ec2_verificable_y_falla_cerrado(self) -> None:
+        self.assertIn("ARTIFACT_BUCKET", self.texto)
+        self.assertIn("ARTIFACT_DELIVERY_BLOCKED", self.texto)
+        self.assertIn("s3api put-object", self.texto)
+        self.assertIn("s3api head-object", self.texto)
+        self.assertIn("verificar_objeto_s3.py", self.texto)
+        self.assertIn("verificar_lt_release.py", self.texto)
+        self.assertIn("verificar_instancias_release.py", self.texto)
+        self.assertIn("--launch-template LaunchTemplateName=\"$LT_NAME\",Version=\"$IN_LT_VERSION\"", self.texto)
+
     def test_verifica_run_de_ci_verde(self) -> None:
         self.assertIn("verificar_run_ci.py", self.texto)
-        self.assertIn('actions/runs/${RUN_ID}', self.texto)
+        self.assertIn("actions/runs/$IN_RUN_ID", self.texto)
+        self.assertIn("--workflow-path .github/workflows/go-backend.yml", self.texto)
+        self.assertIn("--evento push", self.texto)
+        self.assertIn("--artefactos-json artefactos.json", self.texto)
         ayuda = _leer(RAIZ / "herramientas" / "verificar_run_ci.py")
-        for marca in ("RUN_NO_VERDE", "RUN_SHA_DISTINTO", "RUN_RAMA_NO_AUTORIZADA", "RUN_REPOSITORIO_DISTINTO"):
+        for marca in ("RUN_NO_VERDE", "RUN_SHA_DISTINTO", "RUN_RAMA_NO_AUTORIZADA", "RUN_REPOSITORIO_DISTINTO",
+                      "RUN_WORKFLOW_NO_AUTORIZADO", "RUN_EVENTO_NO_AUTORIZADO", "ARTEFACTO_FALTANTE"):
             self.assertIn(marca, ayuda)
 
     def test_verifica_entorno_protegido_falla_cerrado(self) -> None:
@@ -153,7 +183,7 @@ class CapacidadYReadiness(unittest.TestCase):
         self.assertIn("max_size_actual", self.texto)
         self.assertIn("test \"$MAX\" -eq 2", self.texto)
         # El rollback también restaura max 2.
-        rollback_step = self.texto.split("Rollback a la version previa", 1)[1]
+        rollback_step = self.texto.split("Rollback seguro", 1)[1]
         self.assertIn("--max-size 2", rollback_step)
 
     def test_documenta_coste_transitorio_y_bloqueo(self) -> None:
@@ -162,11 +192,13 @@ class CapacidadYReadiness(unittest.TestCase):
         self.assertIn("0.0084", self.politica)
         self.assertIn("BLOCKED", self.politica)
 
-    def test_readiness_configurable_y_no_silenciada(self) -> None:
+    def test_readiness_obligatoria_sin_variable_de_conveniencia(self) -> None:
         self.assertIn("/api/v1/health/ready", self.texto)
-        self.assertIn("READINESS_REQUIRED", self.texto)
-        self.assertIn('if: vars.READINESS_REQUIRED == \'true\'', self.texto)
-        self.assertIn("readiness_requerida", self.texto)
+        self.assertIn('GET /api/v1/health/ready ->', self.texto)
+        self.assertEqual(self.texto.count('test "$CODIGO" = "200"'), 2)
+        # No hay variable opcional que convierta un despliegue incompleto en exitoso.
+        self.assertNotIn("READINESS_REQUIRED", self.texto)
+        self.assertNotIn("readiness_requerida", self.texto)
 
     def test_simulador_de_rollback_y_capacidad(self) -> None:
         simulador = RAIZ / "herramientas" / "simular_despliegue.py"
@@ -191,10 +223,10 @@ class DespliegueSanoyRollback(unittest.TestCase):
         cls.texto = _sin_comentarios(_leer(CD))
 
     def test_exige_dos_nodos_sanos_antes_y_despues(self) -> None:
-        self.assertEqual(self.texto.count("select(.LifecycleState==\"InService\")"), 2)
-        self.assertEqual(self.texto.count("select(.TargetHealth.State==\"healthy\")"), 2)
-        self.assertEqual(self.texto.count('test "$IN_SERVICE" -eq 2'), 2)
-        self.assertEqual(self.texto.count('test "$SALUDABLES" -eq 2'), 2)
+        self.assertEqual(self.texto.count("estado_asg.py"), 2)
+        self.assertEqual(self.texto.count("--nodos 2"), 2)
+        self.assertGreaterEqual(self.texto.count("select(.TargetHealth.State==\"healthy\")"), 2)
+        self.assertGreaterEqual(self.texto.count('test "$SALUDABLES" -eq 2'), 2)
 
     def test_instance_refresh_conserva_capacidad(self) -> None:
         self.assertIn('"MinHealthyPercentage":100', self.texto)
@@ -207,10 +239,18 @@ class DespliegueSanoyRollback(unittest.TestCase):
         self.assertIn("--proto '=https'", self.texto)
         self.assertIn('test "$CODIGO" = "200"', self.texto)
 
-    def test_rollback_a_la_version_previa(self) -> None:
-        self.assertIn("if: failure() && inputs.lt_version_previa != ''", self.texto)
-        self.assertIn("update-auto-scaling-group", self.texto)
-        self.assertIn('Version="${{ inputs.lt_version_previa }}"', self.texto)
+    def test_rollback_seguro_ordenado(self) -> None:
+        self.assertIn("if: failure()", self.texto)
+        self.assertIn("SIN_MUTACION_AWS", self.texto)
+        self.assertIn(".mutado", self.texto)
+        self.assertIn("LT_ANTERIOR", self.texto)
+        self.assertIn('--launch-template LaunchTemplateName="$LT_NAME",Version="$LT_ANTERIOR"', self.texto)
+        self.assertIn("cancel-instance-refresh", self.texto)
+        self.assertIn("decidir_rollback.py", self.texto)
+        self.assertNotIn('Version="${{ inputs.lt_version_previa }}"', self.texto)
+        # No se restaura max 2 antes del refresh de rollback.
+        rollback = self.texto.split("Rollback seguro", 1)[1]
+        self.assertLess(rollback.index("--max-size 3"), rollback.index("--max-size 2"))
 
     def test_evidencia_con_sha(self) -> None:
         self.assertIn("evidencia-deploy-${{ inputs.sha }}", self.texto)

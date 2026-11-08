@@ -35,6 +35,8 @@ class RunCI(unittest.TestCase):
             "conclusion": "success",
             "head_sha": SHA,
             "head_branch": "main",
+            "event": "push",
+            "path": ".github/workflows/go-backend.yml",
             "repository": {"full_name": "nexumpr/Nexum-Backend"},
         }
         datos.update(cambios)
