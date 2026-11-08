@@ -109,10 +109,80 @@ class PromocionYAutorizacion(unittest.TestCase):
     def test_autorizacion_ligada_al_sha(self) -> None:
         self.assertIn("verificar_autorizacion_despliegue.py", self.texto)
         self.assertIn('--frase "${{ inputs.autorizacion }}"', self.texto)
+        self.assertIn('--lt-version "${{ inputs.lt_version_previa }}"', self.texto)
         ayuda = _leer(AYUDA)
         self.assertIn('f"AUTORIZO_DESPLIEGUE_{sha}"', ayuda)
         self.assertIn("CONFIRMACION_AUSENTE", ayuda)
         self.assertIn("CD_NO_HABILITADO", ayuda)
+        self.assertIn("LT_VERSION_INVALIDA", ayuda)
+
+    def test_verifica_run_de_ci_verde(self) -> None:
+        self.assertIn("verificar_run_ci.py", self.texto)
+        self.assertIn('actions/runs/${RUN_ID}', self.texto)
+        ayuda = _leer(RAIZ / "herramientas" / "verificar_run_ci.py")
+        for marca in ("RUN_NO_VERDE", "RUN_SHA_DISTINTO", "RUN_RAMA_NO_AUTORIZADA", "RUN_REPOSITORIO_DISTINTO"):
+            self.assertIn(marca, ayuda)
+
+    def test_verifica_entorno_protegido_falla_cerrado(self) -> None:
+        self.assertIn("verificar_entorno_protegido.py", self.texto)
+        self.assertIn("ENVIRONMENT_PROTECTION_CONFIRMED", self.texto)
+        self.assertIn("environments/aws-deploy", self.texto)
+        ayuda = _leer(RAIZ / "herramientas" / "verificar_entorno_protegido.py")
+        self.assertIn("SIN_REVISORES_OBLIGATORIOS", ayuda)
+        self.assertIn("ENTORNO_DISTINTO", ayuda)
+
+    def test_oidc_coincide_con_i060(self) -> None:
+        self.assertIn("environment: aws-deploy", self.texto)
+        iam = _leer(RAIZ / "infra" / "terraform" / "modules" / "iam" / "main.tf")
+        self.assertIn("environment:aws-deploy", iam)
+        self.assertNotIn("audience:", self.texto)
+        self.assertNotIn("AWS_ACCESS_KEY_ID", self.texto)
+        self.assertNotIn("AWS_SECRET_ACCESS_KEY", self.texto)
+
+
+class CapacidadYReadiness(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.texto = _sin_comentarios(_leer(CD))
+        cls.politica = _leer(POLITICA)
+        cls.rollback = _leer(ROLLBACK)
+
+    def test_capacidad_transitoria_max_3_y_restauracion(self) -> None:
+        self.assertIn("--max-size 3", self.texto)
+        self.assertIn("--max-size 2", self.texto)
+        self.assertIn("max_size_actual", self.texto)
+        self.assertIn("test \"$MAX\" -eq 2", self.texto)
+        # El rollback también restaura max 2.
+        rollback_step = self.texto.split("Rollback a la version previa", 1)[1]
+        self.assertIn("--max-size 2", rollback_step)
+
+    def test_documenta_coste_transitorio_y_bloqueo(self) -> None:
+        for texto in (self.politica, self.rollback):
+            self.assertIn("transitoria", texto.lower())
+        self.assertIn("0.0084", self.politica)
+        self.assertIn("BLOCKED", self.politica)
+
+    def test_readiness_configurable_y_no_silenciada(self) -> None:
+        self.assertIn("/api/v1/health/ready", self.texto)
+        self.assertIn("READINESS_REQUIRED", self.texto)
+        self.assertIn('if: vars.READINESS_REQUIRED == \'true\'', self.texto)
+        self.assertIn("readiness_requerida", self.texto)
+
+    def test_simulador_de_rollback_y_capacidad(self) -> None:
+        simulador = RAIZ / "herramientas" / "simular_despliegue.py"
+        self.assertTrue(simulador.is_file())
+        texto = _leer(simulador)
+        for marca in ("ABORTAR", "ROLLBACK", "DESPLEGAR", "MAX_SIZE_INESPERADO", "HTTP_READY_NO_200"):
+            self.assertIn(marca, texto)
+
+
+class EvidenciaIntegra(unittest.TestCase):
+    def test_evidencia_deploy_campos_requeridos(self) -> None:
+        texto = _leer(EVIDENCIA)
+        for campo in ("Release ID", "SHA completo", "Run de CI", "sha256_binario", "Autorizador", "Nodos `InService`", "Health HTTP", "Coste observado", "Rollback ejecutado"):
+            self.assertIn(campo, texto, campo)
+        self.assertIn("NOT_RUN", texto)
+        self.assertIn("No se declara `DEPLOYED_VERIFIED`", texto)
 
 
 class DespliegueSanoyRollback(unittest.TestCase):

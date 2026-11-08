@@ -17,14 +17,24 @@ El workflow aborta y ejecuta rollback si:
 
 ## 2. Rollback de aplicación
 
-1. `aws autoscaling update-auto-scaling-group` con la **versión previa** del Launch Template
+1. `aws autoscaling update-auto-scaling-group` con **`max-size 2`** (restaura la capacidad normal si el
+   rollout la había elevado a 3).
+2. `aws autoscaling update-auto-scaling-group` con la **versión previa** del Launch Template
    (`lt_version_previa`, aportada en el `workflow_dispatch`).
-2. `start-instance-refresh` con `MinHealthyPercentage=100` e `InstanceWarmup=120`.
-3. Esperar `Successful`; si falla, detenerse y escalar al responsable.
-4. Verificar 2 nodos `InService`, 2 targets `healthy` y health HTTP 200.
-5. Registrar la evidencia del rollback (versión previa, hora, resultado).
+3. `start-instance-refresh` con `MinHealthyPercentage=100` e `InstanceWarmup=120`.
+4. Esperar `Successful`; si falla, detenerse y escalar al responsable.
+5. Verificar 2 nodos `InService`, 2 targets `healthy` y health HTTP 200.
+6. Registrar la evidencia del rollback (versión previa, hora, resultado).
 
 El rollback de aplicación **no** toca DynamoDB ni el state de Terraform.
+
+## 2.1 Capacidad durante el rollout y el rollback
+
+El ASG no puede mantener 2 sanos con `max=2` mientras reemplaza instancias. El CD eleva `max` a 3
+durante el rollout (capacidad transitoria) y lo restaura a 2 al terminar **o** al entrar en rollback. El simulador local
+`herramientas/simular_despliegue.py` modela la decisión (ABORTAR/ROLLBACK/DESPLEGAR) y exige
+`max_final=2` en todos los casos; sus pruebas cubren refresh fallido, nodos insuficientes, HTTP y
+readiness.
 
 ## 3. Rollback de esquema DynamoDB
 

@@ -20,7 +20,8 @@
 | Entorno | `aws-deploy` |
 | Nodos `InService` antes/después | *(pendiente)* 2/2 esperado |
 | Targets `healthy` antes/después | *(pendiente)* 2/2 esperado |
-| Health HTTP | *(pendiente)* `GET /api/v1/health/live` → 200 |
+| Capacidad transitoria | `max_size` 3 durante el rollout y 2 al final (obligatorio) |
+| Health HTTP | *(pendiente)* `GET /api/v1/health/live` → 200; readiness según `READINESS_REQUIRED` |
 | Rollback ejecutado | Sí/No y versión previa del Launch Template |
 | Coste observado | *(pendiente)* |
 | Errores | *(pendiente)* |

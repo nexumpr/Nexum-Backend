@@ -54,3 +54,9 @@
 - [x] Binario binario-<sha> publicado por CI para promocion.
 - [ ] Entorno aws-deploy con revisores, rol OIDC y CD_HABILITADO: PENDIENTE_APLICACION_HUMANA; sin ellos el preflight falla.
 - [ ] Ejecucion real y ensayo de rollback: NOT_RUN (requieren Gate AWS).
+
+- [x] Preflight verifica run de CI verde y SHA/repositorio/rama, no solo existencia del artefacto.
+- [x] Entorno protegido verificado por API y confirmacion explicita; falla cerrado sin revisores.
+- [x] Capacidad transitoria max 3 y restauracion a 2 en exito y rollback, con coste documentado y BLOCKED si no cabe.
+- [x] Readiness configurable y no declarada por defecto; health live obligatorio.
+- [x] Simulador local de despliegue/rollback con pruebas de capacidad, salud y HTTP.

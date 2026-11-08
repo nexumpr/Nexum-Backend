@@ -90,3 +90,10 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - T-090-06 Cierre: DOCUMENTADO en EVIDENCIA_DEPLOY.md con estado NOT_RUN y campos de release, autorizador, 2 targets, coste y errores.
 - Cambio habilitador I-080: go-backend.yml publica binario-<sha> linux/arm64 con SHA-256; no altera checks ni umbrales.
 - Pruebas: 21 de contrato CD y 10 de autorizacion; AWS_NOT_RUN.
+
+- Verificacion de run de CI (2026-11-08): preflight consulta la API del run y exige status completed, conclusion success, head_sha y repositorio/rama autorizados (herramientas/verificar_run_ci.py).
+- Entorno protegido (2026-11-08): ENVIRONMENT_PROTECTION_CONFIRMED=aws-deploy y lectura de la API del entorno; sin required_reviewers o sin permiso de lectura, falla cerrado antes de OIDC (herramientas/verificar_entorno_protegido.py).
+- Capacidad transitoria: max_size 2->3 durante el rollout y restauracion a 2 en exito y rollback; coste ~0.0084 USD/h no medido; si no cabe, BLOCKED.
+- Readiness: /api/v1/health/ready solo obligatoria con READINESS_REQUIRED=true; por defecto 503 documentado, no declarado.
+- Simulador determinista herramientas/simular_despliegue.py (ABORTAR/ROLLBACK/DESPLEGAR, max_final=2) con 9 pruebas.
+- Pruebas: 29 de contrato CD, 11 de autorizacion, 10 de run/entorno, 9 de simulador.

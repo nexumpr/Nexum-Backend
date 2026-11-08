@@ -75,6 +75,11 @@ class AutorizacionDespliegue(unittest.TestCase):
         self.assertEqual(r.returncode, 1)
         self.assertIn("NODOS_INSUFICIENTES", r.stdout)
 
+    def test_lt_version_invalida_falla(self) -> None:
+        r = self._ejecutar(**{"--lt-version": "v1; rm -rf /"})
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("LT_VERSION_INVALIDA", r.stdout)
+
     def test_uso_incorrecto_devuelve_2(self) -> None:
         r = subprocess.run([sys.executable, str(SCRIPT)], capture_output=True, text=True, timeout=60)
         self.assertEqual(r.returncode, 2)

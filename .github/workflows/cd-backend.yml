@@ -69,7 +69,25 @@ jobs:
             --confirmar "${{ inputs.confirmar }}" \
             --habilitado "${{ vars.CD_HABILITADO }}" \
             --sha256-binario "${{ inputs.sha256_binario }}" \
-            --total-nodos 2
+            --total-nodos 2 \
+            --lt-version "${{ inputs.lt_version_previa }}"
+
+      - name: Verificar que el run de CI esta en verde y corresponde al SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          SHA_ESPERADO: ${{ inputs.sha }}
+        run: |
+          gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" > run.json
+          python3 herramientas/verificar_run_ci.py run.json "$SHA_ESPERADO"
+
+      - name: Verificar entorno protegido con revisores (falla cerrado)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "${{ vars.ENVIRONMENT_PROTECTION_CONFIRMED }}" = "aws-deploy"
+          gh api "repos/${{ github.repository }}/environments/aws-deploy" > entorno.json
+          python3 herramientas/verificar_entorno_protegido.py entorno.json
 
       - name: Descargar binario del run de CI
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -153,6 +171,18 @@ jobs:
           test "$IN_SERVICE" -eq 2
           test "$SALUDABLES" -eq 2
 
+      - name: Preparar capacidad transitoria (max 3 durante el rollout)
+        run: |
+          MAX=$(aws autoscaling describe-auto-scaling-groups \
+            --auto-scaling-group-names "$ASG_NAME" \
+            --query 'AutoScalingGroups[0].MaxSize' --output text)
+          echo "max_size_actual=$MAX"
+          # Con min=desired=max=2 el refresh al 100% no puede conservar 2 sanos:
+          # se necesita una tercera instancia transitoria (coste ~0.0084 USD/h).
+          test "$MAX" -eq 2
+          aws autoscaling update-auto-scaling-group \
+            --auto-scaling-group-name "$ASG_NAME" --max-size 3
+
       - name: Iniciar instance refresh (min 100% healthy)
         run: |
           aws autoscaling start-instance-refresh \
@@ -189,12 +219,26 @@ jobs:
           test "$IN_SERVICE" -eq 2
           test "$SALUDABLES" -eq 2
 
+      - name: Restaurar capacidad (max 2 tras el rollout)
+        run: |
+          aws autoscaling update-auto-scaling-group \
+            --auto-scaling-group-name "$ASG_NAME" --max-size 2
+
       - name: Prueba HTTP HTTPS de salud
         run: |
           CODIGO=$(curl --silent --show-error --fail --proto '=https' \
             --output /dev/null --write-out '%{http_code}' \
             "$API_BASE_URL/api/v1/health/live")
           echo "GET /api/v1/health/live -> $CODIGO"
+          test "$CODIGO" = "200"
+
+      - name: Prueba HTTP HTTPS de readiness (obligatoria si READINESS_REQUIRED)
+        if: vars.READINESS_REQUIRED == 'true'
+        run: |
+          CODIGO=$(curl --silent --show-error --fail --proto '=https' \
+            --output /dev/null --write-out '%{http_code}' \
+            "$API_BASE_URL/api/v1/health/ready")
+          echo "GET /api/v1/health/ready -> $CODIGO"
           test "$CODIGO" = "200"
 
       - name: Registrar evidencia de despliegue
@@ -211,6 +255,9 @@ jobs:
               "desplegado_por": "${{ github.actor }}",
               "desplegado_en": datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "entorno": "aws-deploy",
+              "capacidad_transitoria_max": 3,
+              "readiness_requerida": "${{ vars.READINESS_REQUIRED }}",
+              "http_live": "200",
               "estado": "EJECUTADO_NO_VERIFICADO",
           }
           with open("evidencia-deploy.json", "w", encoding="utf-8") as f:
@@ -230,6 +277,8 @@ jobs:
       - name: Rollback a la version previa del Launch Template
         if: failure() && inputs.lt_version_previa != ''
         run: |
+          aws autoscaling update-auto-scaling-group \
+            --auto-scaling-group-name "$ASG_NAME" --max-size 2
           aws autoscaling update-auto-scaling-group \
             --auto-scaling-group-name "$ASG_NAME" \
             --launch-template LaunchTemplateName="$LT_NAME",Version="${{ inputs.lt_version_previa }}"

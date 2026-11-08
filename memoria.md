@@ -480,3 +480,5 @@
 - go-backend.yml publica binario-<sha> linux/arm64 con dist/binario.sha256 (cambio habilitador; sin alterar checks).
 - Documentos POLITICA_RELEASES.md, PLAN_ROLLBACK.md y EVIDENCIA_DEPLOY.md (NOT_RUN). Entorno aws-deploy (total_count 0), rol OIDC y CD_HABILITADO PENDIENTE_APLICACION_HUMANA: el preflight falla cerrado.
 - Pruebas: 21 de contrato CD y 10 de autorizacion. AWS_NOT_RUN; sin terraform apply/destroy ni Docker.
+
+- I-090 correccion de alcance (2026-11-08): preflight verifica run de CI verde (helper verificar_run_ci.py) y entorno protegido por API (verificar_entorno_protegido.py), fallando cerrado antes de OIDC. Capacidad transitoria max 2->3 y restauracion a 2 (coste ~0.0084 USD/h no medido; BLOCKED si no cabe). Readiness solo obligatoria con READINESS_REQUIRED. Simulador determinista con 9 pruebas; 29 de contrato CD y 11 de autorizacion.

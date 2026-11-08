@@ -28,15 +28,42 @@ Un despliegue sólo puede iniciarse con **todas** estas condiciones:
 
 1. `workflow_dispatch` sobre `main`; nunca `push`, `pull_request` ni tag automático.
 2. Variable de repositorio `CD_HABILITADO=true` (por defecto ausente ⇒ el job no corre).
-3. Entorno `aws-deploy` con revisores obligatorios (ver §4).
+3. Entorno `aws-deploy` con revisores obligatorios (ver §4). El workflow exige además
+   `ENVIRONMENT_PROTECTION_CONFIRMED=aws-deploy` y **lee la API del entorno**: si no puede verificarlo o no
+   hay `required_reviewers`, falla cerrado antes de pedir credenciales.
 4. Frase exacta `AUTORIZO_DESPLIEGUE_<sha40>` introducida por el responsable.
 5. `confirmar=SI`.
-6. `release_id` coherente con el SHA (`vX.Y.Z+<sha12>`).
-7. Artefacto y SBOM del run de CI indicado, con SHA-256 coincidente.
-8. Dos nodos `InService` y dos targets `healthy` **antes** de mutar.
+6. `release_id` coherente con el SHA (`vX.Y.Z+<sha12>`) y `lt_version_previa` numérica.
+7. Run de CI **completado y verde**, del repositorio y del SHA exactos (verificado por API).
+8. Artefacto y SBOM del run de CI indicado, con SHA-256 coincidente.
+9. Dos nodos `InService` y dos targets `healthy` **antes** de mutar.
 
-El workflow ejecuta `herramientas/verificar_autorizacion_despliegue.py` en el preflight y falla si
-falta cualquiera de las condiciones. La aprobación del entorno es humana e independiente del merge.
+El workflow ejecuta `herramientas/verificar_autorizacion_despliegue.py`,
+`verificar_run_ci.py` y `verificar_entorno_protegido.py` en el preflight; cualquier fallo bloquea antes
+de `configure-aws-credentials`. La aprobación del entorno es humana e independiente del merge.
+
+## 2.1 Capacidad transitoria del rollout
+
+El ASG de I-020 fija `min = desired = max = 2`. Con `MinHealthyPercentage=100` no es posible reemplazar
+una instancia conservando dos targets sanos si `max` sigue en 2. Por eso el CD:
+
+1. verifica que `max_size` es exactamente 2;
+2. eleva `max_size` a **3** antes del `instance refresh`;
+3. ejecuta el refresh con `MinHealthyPercentage=100`;
+4. verifica 2 `InService` y 2 `healthy`;
+5. restaura `max_size` a **2** tras el rollout o en el rollback.
+
+Coste incremental: una instancia `t4g.micro` transitoria durante minutos. Referencia de I-020:
+~`0.0084 USD/h`; no medido (`NOT_VERIFIED`). Si el presupuesto no cubriera esa capacidad transitoria,
+el despliegue queda **BLOCKED** y se solicita decisión humana; no se reduce el mínimo de dos nodos.
+
+## 2.2 Verificación HTTP
+
+- `GET /api/v1/health/live` → **200 obligatorio**.
+- `GET /api/v1/health/ready` con `READINESS_REQUIRED=true` → **200 obligatorio**. Hoy readiness devuelve
+  503 hasta registrar dependencias reales (I-040/I-050): por defecto la variable está ausente y el
+  workflow **registra** el estado sin declarar readiness cumplida.
+- HTTPS con `curl --proto '=https' --fail`; no se acepta un 200 sin verificación de TLS.
 
 ## 3. Separación de responsabilidades
 
@@ -55,6 +82,8 @@ falta cualquiera de las condiciones. La aprobación del entorno es humana e inde
 | Rol OIDC de despliegue | **NOT_VERIFIED** | I-060 exige `apply_environment_protected=true`; no creado por defecto |
 | Proveedor OIDC | `AWS_SCP_NOT_VERIFIED` | I-060 |
 | Variable `CD_HABILITADO` | **PENDIENTE** (debe crearla el responsable) | no existe hasta configurarla |
+| Variable `ENVIRONMENT_PROTECTION_CONFIRMED` | **PENDIENTE** | sin ella el preflight falla |
+| Variable `READINESS_REQUIRED` | **AUSENTE** (readiness 503 por diseño hasta I-040/I-050) | no se declara readiness |
 | Ejecución real | **NOT_RUN** | `AWS_NOT_RUN` |
 
 Mientras no existan el entorno protegido, el rol OIDC y la variable, el workflow no puede desplegar:

@@ -25,9 +25,9 @@ cambiar de plan, gastar ni iniciar I-100.
 | Requisito | Evidencia | Estado |
 |---|---|---|
 | INF-090-01 Matriz de versiones | `POLITICA_RELEASES.md`: SemVer, `/api/v1`, release `vX.Y.Z+<sha12>`, digest y SBOM del mismo run | IMPLEMENTADO_LOCAL |
-| INF-090-02 Aprobación | `cd-backend.yml` sólo `workflow_dispatch`, entorno `aws-deploy`, `CD_HABILITADO=true`, frase `AUTORIZO_DESPLIEGUE_<sha>`, `confirmar=SI`; sin `main`→deploy | IMPLEMENTADO_LOCAL |
-| INF-090-03 Despliegue seguro | Instance refresh `MinHealthyPercentage=100`; aborta si no hay 2 `InService` y 2 `healthy`; rollback a LT previa | IMPLEMENTADO_LOCAL |
-| INF-090-04 Pruebas HTTP | `GET https://<api>/api/v1/health/live` con `curl --fail --proto '=https'`; exige 200 | IMPLEMENTADO_LOCAL |
+| INF-090-02 Aprobación | `cd-backend.yml` sólo `workflow_dispatch` sobre `main`, entorno `aws-deploy`, `CD_HABILITADO=true`, `ENVIRONMENT_PROTECTION_CONFIRMED=aws-deploy` con lectura de la API del entorno, frase `AUTORIZO_DESPLIEGUE_<sha>`, `confirmar=SI`, run de CI verde del mismo SHA y sin `main`→deploy | IMPLEMENTADO_LOCAL |
+| INF-090-03 Despliegue seguro | `max_size` 2→**3** transitorio, instance refresh `MinHealthyPercentage=100`, aborta sin 2 `InService` y 2 `healthy` antes/después, restaura `max_size=2` y rollback a LT previa | IMPLEMENTADO_LOCAL |
+| INF-090-04 Pruebas HTTP | `GET https://<api>/api/v1/health/live` = 200; readiness 200 sólo si `READINESS_REQUIRED=true` (hoy 503 por diseño); sin declarar readiness cumplida por defecto | IMPLEMENTADO_LOCAL |
 | INF-090-05 Fallos y rollback | `PLAN_ROLLBACK.md`: rollback app por LT previa; rollback de esquema independiente y compatible hacia atrás | DOCUMENTADO |
 | INF-090-06 Cierre | `EVIDENCIA_DEPLOY.md` con release, SHA, run, digest, autorizador, 2 targets, coste y errores; estado `NOT_RUN` | DOCUMENTADO |
 
@@ -37,7 +37,13 @@ cambiar de plan, gastar ni iniciar I-100.
   No existe protección configurada; `PENDIENTE_APLICACION_HUMANA`. No se crea por API.
 - **Rol OIDC de despliegue**: I-060 sólo lo crea con `apply_environment_protected=true`; no existe y
   `AWS_SCP_NOT_VERIFIED`. El workflow falla cerrado sin rol.
-- **Variable `CD_HABILITADO`**: por defecto ausente ⇒ el job no se ejecuta.
+- **Variable `CD_HABILITADO`**: por defecto ausente ⇒ el job no se ejecuta. Igual para
+  `ENVIRONMENT_PROTECTION_CONFIRMED`; sin ella el preflight falla antes de OIDC.
+- **Capacidad transitoria**: el ASG no permite 2 sanos con `max=2` durante el refresh; el CD eleva
+  temporalmente `max` a 3 y lo restaura a 2. Coste incremental no medido (`NOT_VERIFIED`, referencia
+  ~0.0084 USD/h); si el presupuesto no lo cubre, el despliegue queda `BLOCKED`.
+- **Readiness**: `/api/v1/health/ready` devuelve 503 hasta registrar dependencias reales; no se declara
+  readiness cumplida mientras `READINESS_REQUIRED` esté ausente.
 - **Ejecución real**: `NOT_RUN`. El workflow no se ha lanzado; no hay despliegue ni coste.
 - **Rollback**: documentado, no ensayado (`AWS_NOT_RUN`).
 - Siguen abiertos RFC-004, H-01, RFC-006 (WAF, caduca 2026-12-02), Redis sin HA y readiness 503.

@@ -25,6 +25,7 @@ def validar(
     habilitado: str,
     sha256_binario: str,
     total_nodos: int,
+    lt_version: str = "1",
 ) -> list[str]:
     problemas: list[str] = []
     if not PATRON_SHA.match(sha):
@@ -43,6 +44,8 @@ def validar(
         problemas.append("CD_NO_HABILITADO")
     if total_nodos < 2:
         problemas.append("NODOS_INSUFICIENTES")
+    if not re.fullmatch(r"[0-9]+", lt_version or ""):
+        problemas.append("LT_VERSION_INVALIDA")
     return problemas
 
 
@@ -55,6 +58,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--habilitado", required=True)
     parser.add_argument("--sha256-binario", required=True)
     parser.add_argument("--total-nodos", type=int, default=2)
+    parser.add_argument("--lt-version", default="1")
     args = parser.parse_args(argv)
     problemas = validar(
         args.sha,
@@ -64,6 +68,7 @@ def main(argv: list[str]) -> int:
         args.habilitado,
         args.sha256_binario,
         args.total_nodos,
+        args.lt_version,
     )
     if problemas:
         print("AUTORIZACION_DESPLIEGUE_FAIL")
