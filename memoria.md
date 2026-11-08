@@ -459,5 +459,7 @@
 
 - INF-080-01 corregido: Trivy 0.76.2 (setup-trivy v0.3.1 por SHA) escanea infra/terraform con severidad HIGH/CRITICAL y exit 1. terraform validate ya no se presenta como escaneo de seguridad.
 - Prueba negativa end-to-end: fixture tests/fixtures/iac/inseguro (fuera de infra) detectado con exit 1 y 6 HIGH (AWS-0086/0087/0091/0092/0093/0132); herramientas/verificar_fixture_iac.py rechaza exit distinto de 1 o ausencia de HIGH/CRITICAL.
-- Hallazgos reales sobre infra: AWS-0054 CRITICAL (ALB interno HTTP; D2/RFC-005, H-01 abierto), AWS-0132 HIGH (SSE-S3 sin CMK; limite I-070) y AWS-0011 HIGH (CloudFront sin WAF; PENDIENTE_DE_DECISION_I030 por coste no presupuestado). Excepciones acotadas por ID+ruta con justificacion en .trivyignore.yaml; cualquier otro HIGH/CRITICAL bloquea.
-- Pruebas: 28 de contrato CI y 49 de herramientas. AWS_NOT_RUN; sin cambios de arquitectura ni IAM; sin Docker.
+- Hallazgos reales sobre infra: AWS-0054 CRITICAL (ALB interno HTTP; D2/RFC-005, H-01 abierto), AWS-0132 HIGH (SSE-S3 sin CMK; limite I-070) y AWS-0011 HIGH (CloudFront sin WAF).
+- Correccion de gobierno (2026-11-08): AWS-0011 carecia de autorizacion normativa. Se retira de .trivyignore.yaml; Trivy real devuelve 1 hallazgo HIGH (AWS-0011) y exit 1. RFC-006 (sdd/_control/H08/RFC-006-EXCEPCION_WAF_I030.md) queda PROPUESTO - NO APROBADO con riesgo, controles compensatorios, condiciones de despliegue, caducidad 2026-12-02/Gate AWS, alternativas y coste indicativo NOT_VERIFIED.
+- Estado: I-080 BLOQUEADO_RFC_006; job iac en rojo y PR #28 no fusionable hasta APRUEBO_RFC_006_WAF_TEMPORAL, WAF con recotizacion o alternativa formal. No se declara IAC_SCAN PASS. Sin cambios de arquitectura, IAM ni AWS.
+- Pruebas: 29 de contrato CI y 49 de herramientas.

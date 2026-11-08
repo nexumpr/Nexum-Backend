@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Spec | `sdd/02-infraestructura/I-080-ci-backend` |
-| Estado | `CI_VERDE_EN_PR`; ejecución real en PR #28 (run 42458688828) sobre `6497915f4c8e8d90a1f7f60c7f67d6353c6a69e0`; AWS `NOT_RUN` |
+| Estado | `BLOQUEADO_RFC_006` — escaneo IaC con AWS-0011 HIGH sin autorización; el job `iac` falla y el PR #28 no es fusionable hasta decisión humana; AWS `NOT_RUN` |
 | Workflow | `.github/workflows/go-backend.yml` |
 | Herramientas | Acciones fijadas por SHA de commit; herramientas Go por versión exacta |
 
@@ -34,13 +34,14 @@ El job `iac` ejecuta un escáner independiente de configuraciones inseguras, ade
 - **Prueba negativa**: el mismo escáner analiza `tests/fixtures/iac/inseguro` (fixture público y aislado,
   fuera de la infraestructura desplegable) y `herramientas/verificar_fixture_iac.py` exige exit 1 y al
   menos un hallazgo HIGH/CRITICAL real. Un fallo por ruta o JSON inválido no se acepta como detección.
-- **Excepciones acotadas** en `.trivyignore.yaml`: sólo tres IDs y rutas concretas, cada uno con
+- **Excepciones acotadas** en `.trivyignore.yaml`: sólo dos IDs y rutas concretas, cada uno con
   justificación. No hay allowlist global ni `*`.
   - `AWS-0054` (HTTP en ALB interno): decisión D2 ratificada en RFC-005; H-01 sigue abierto.
-  - `AWS-0132` (S3 sin CMK): límite declarado de I-070 por coste KMS no presupuestado.
-  - `AWS-0011` (CloudFront sin WAF): **PENDIENTE_DE_DECISION_I030**; WAF tiene coste no incluido en
-    I-000 y su incorporación exige RFC/recotización. Se registra como riesgo abierto, no como resuelto.
-- Cualquier hallazgo HIGH/CRITICAL distinto de esas tres excepciones **hace fallar el job**.
+  - `AWS-0132` (S3 sin CMK): límite `ACEPTADO_CON_LIMITE` del Gate I-070 y su matriz de state.
+  - `AWS-0011` (CloudFront sin WAF): **NO exento**. Sin autorización previa; se propone aceptación
+    temporal en `RFC-006-EXCEPCION_WAF_I030.md` (**PROPUESTO — NO APROBADO**). Mientras no se apruebe,
+    el job `iac` falla con AWS-0011 HIGH y I-080 queda `BLOQUEADO_RFC_006`.
+- Cualquier hallazgo HIGH/CRITICAL distinto de las dos excepciones autorizadas **hace fallar el job**.
 
 ## 3. Artefactos
 
@@ -67,10 +68,11 @@ registro público; no accede a state remoto ni a la cuenta.
 
 ## 6. Límites declarados
 
-- Ejecución real verificada en PR #28 (run 42458688828): los seis jobs y `validar` en `pass` sobre
-  `6497915f4c8e8d90a1f7f60c7f67d6353c6a69e0`.
+- Ejecución real verificada en PR #28 (run 42511533667) con el escáner IaC: el job `iac` falla ahora
+  por **AWS-0011 HIGH** al retirarse la excepción sin autorización; el resto de checks permanece verde.
 - Branch protection: **BLOQUEADO_PLAN_GITHUB**. `gh api .../branches/main/protection` devuelve HTTP 403
   en el repositorio privado; no se activa ni se simula. Detalle en `GATES_PR.md` §0.
+- `IAC_SCAN` no es `PASS` mientras AWS-0011 no tenga decisión humana (`RFC-006` PROPUESTO).
 - La validación `terraform validate` acredita configuración válida, **no** infraestructura desplegada.
 - El SBOM y los artefactos no sustituyen pruebas de runtime AWS.
 - La cobertura mide sentencias del dominio con `-coverpkg=all` y deduplicación por bloque; no mide

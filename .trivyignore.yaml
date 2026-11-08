@@ -3,6 +3,11 @@
 # No es una allowlist global: cada entrada identifica un único ID de política y una
 # ruta concreta, y lleva justificación. Cualquier otro hallazgo HIGH/CRITICAL hace
 # fallar el job. Revisar en cada Gate de infraestructura.
+#
+# AWS-0011 (CloudFront sin WAF) NO está exento: carece de autorización normativa.
+# Su aceptación temporal se propone en
+# sdd/_control/H08/RFC-006-EXCEPCION_WAF_I030.md (estado PROPUESTO — NO APROBADO).
+# Hasta que exista aprobación humana explícita, el escaneo falla con AWS-0011.
 misconfigurations:
   - id: AWS-0054
     paths:
@@ -18,14 +23,6 @@ misconfigurations:
       - "bootstrap/main.tf"
     statement: >-
       I-070: el state usa SSE-S3 (AES256) en lugar de CMK de KMS porque una CMK
-      tiene coste fijo no presupuestado en I-000. Límite declarado y aceptado con
-      condiciones en el Gate I-070; sin revocación criptográfica inmediata.
-
-  - id: AWS-0011
-    paths:
-      - "modules/balanceo/main.tf"
-    statement: >-
-      PENDIENTE_DE_DECISION_I030: CloudFront sin AWS WAF. WAF tiene coste mensual
-      no incluido en I-000 y su incorporación exige RFC/recotización. Se registra
-      como riesgo abierto; no se declara resuelto. Esta excepción no autoriza
-      ignorar WAF en producción ni sustituye una decisión humana.
+      tiene coste fijo no presupuestado en I-000. Límite declarado como
+      ACEPTADO_CON_LIMITE en el Gate I-070 y su matriz de state; sin revocación
+      criptográfica inmediata.

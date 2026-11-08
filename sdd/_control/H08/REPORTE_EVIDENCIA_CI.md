@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Spec | `sdd/02-infraestructura/I-080-ci-backend` |
-| Estado | `CI_VERDE_EN_PR` — seis jobs + SDD en verde sobre `7a9448a806217b22c6f60e2aa8dd3fe2675a218b`; escáner IaC añadido en la corrección posterior |
+| Estado | `BLOQUEADO_RFC_006` — AWS-0011 HIGH sin autorización; el job `iac` falla a propósito y el PR #28 no es fusionable |
 | AWS | `NOT_RUN` — este workflow no invoca AWS ni despliega |
 | Fecha | 2026-11-08 |
 
@@ -47,20 +47,25 @@ SHA; este registro no se extrapola a commits posteriores.
 |---|---|
 | Herramienta | Trivy `0.76.2` (release oficial de Aqua Security) |
 | Comando | `trivy config --severity HIGH,CRITICAL --ignorefile .trivyignore.yaml --exit-code 1 infra/terraform` |
-| Resultado | **PASS** con las tres excepciones documentadas; cualquier otro hallazgo HIGH/CRITICAL falla |
-| Prueba negativa | `tests/fixtures/iac/inseguro` → Trivy exit **1**, 6 hallazgos HIGH (AWS-0086/0087/0091/0092/0093/0132) y `FIXTURE_IAC_PASS` |
-| CI | El job `iac` instala Trivy con `aquasecurity/setup-trivy` fijado por SHA y ejecuta ambos pasos en cada PR |
+| Resultado | **FAIL (bloqueo de seguridad)** — 1 hallazgo HIGH no autorizado: `AWS-0011` (CloudFront sin WAF), exit 1 |
+| Prueba negativa | `tests/fixtures/iac/inseguro` → Trivy exit **1**, 6 hallazgos HIGH y `FIXTURE_IAC_PASS` |
+| CI | El job `iac` ejecuta ambos pasos; con AWS-0011 presente el check queda **rojo** hasta decisión humana |
 
 Hallazgos HIGH/CRITICAL sobre `infra/terraform` y su tratamiento:
 
 | ID | Severidad | Archivo | Tratamiento |
 |---|---|---|---|
-| `AWS-0054` | CRITICAL | `modules/balanceo/main.tf` | Excepción D2/RFC-005: ALB interno HTTP tras CloudFront HTTPS; no es TLS extremo a extremo y H-01 sigue abierto |
-| `AWS-0132` | HIGH | `bootstrap/main.tf` | Límite I-070: SSE-S3 sin CMK por coste KMS no presupuestado |
-| `AWS-0011` | HIGH | `modules/balanceo/main.tf` | **PENDIENTE_DE_DECISION_I030**: WAF no presupuestado en I-000; riesgo abierto, no resuelto |
+| `AWS-0054` | CRITICAL | `modules/balanceo/main.tf` | Excepción con RFC-005 ratificada: ALB interno HTTP tras CloudFront HTTPS; H-01 sigue abierto |
+| `AWS-0132` | HIGH | `bootstrap/main.tf` | Excepción con decisión del Gate I-070 (`ACEPTADO_CON_LIMITE`): SSE-S3 sin CMK |
+| `AWS-0011` | HIGH | `modules/balanceo/main.tf` | **SIN AUTORIZACIÓN**. No exento. Aceptación temporal propuesta en `RFC-006` (**PROPUESTO — NO APROBADO**). Bloquea `IAC_SCAN` y el merge |
 
 `TERRAFORM_VALIDATE` acredita sintaxis/configuración válida; no sustituye el escáner. El escáner no usa
 credenciales AWS ni backend remoto y no ejecuta `plan`/`apply`.
+
+> **Cambio de criterio (2026-11-08):** la versión anterior de este reporte declaraba `IAC_SCAN PASS`
+> manteniendo AWS-0011 en `.trivyignore.yaml` sin RFC aprobada. Eso era incorrecto: se retiró la
+> excepción y el escaneo ahora falla, conforme a `GATES_PR.md` §4. No se declara `PASS` mientras el
+> hallazgo siga sin decisión humana.
 
 ## 3. Cobertura local observada (no es evidencia de CI)
 

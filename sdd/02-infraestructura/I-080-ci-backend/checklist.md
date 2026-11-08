@@ -53,5 +53,7 @@
 - [x] OpenAPI H06, herramientas, SBOM e inventario de dependencias en CI.
 - [x] GATES_PR.md con seis checks y branch protection documentada como BLOQUEADO_PLAN_GITHUB (403 verificado).
 - [x] Ejecucion real del workflow sobre el PR #28: run 42458688828, SHA 6497915, seis jobs + SDD en pass (2026-11-08).
-- [x] Escaner IaC real (Trivy 0.76.2, HIGH/CRITICAL, exit 1) con prueba negativa sobre fixture aislado y excepciones acotadas justificadas.
+- [x] Escaner IaC real (Trivy 0.76.2, HIGH/CRITICAL, exit 1) con prueba negativa sobre fixture aislado y excepciones acotadas para AWS-0054 y AWS-0132.
+- [x] AWS-0011 (CloudFront sin WAF) NO se exime sin autorizacion; RFC-006 redactada en estado PROPUESTO - NO APROBADO.
+- [ ] Decision humana sobre RFC-006 (APRUEBO_RFC_006_WAF_TEMPORAL) o alternativa; hasta entonces el job iac falla y no se fusiona.
 - [x] Clasificacion ejecutado vs pendiente de servicios reales documentada; sin declarar integracion cloud por mocks.

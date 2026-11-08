@@ -84,6 +84,9 @@ Un hallazgo alto/crítico o una prueba rota bloquea el merge. La única excepci�
 firmada** por el responsable que indique: hallazgo, causa, riesgo residual, vigencia y plan de
 corrección. La excepción se registra en el PR y no convierte el resultado en `PASS`.
 
+Estado actual: `AWS-0011` (CloudFront sin WAF) **no tiene excepción válida**. La propuesta está en
+`RFC-006-EXCEPCION_WAF_I030.md` (**PROPUESTO — NO APROBADO**); hasta su aprobación el job `iac` falla.
+
 ## 5. Seguridad del workflow
 
 - `permissions: contents: read`; sin `pull_request_target`; sin secretos en pasos de PR.

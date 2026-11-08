@@ -5,7 +5,7 @@
 | Documento | `sdd/_control/H08/GATE_H08I_I080.md` |
 | Fecha | 2026-11-08 |
 | Spec | `sdd/02-infraestructura/I-080-ci-backend/` (v0.1.0 DRAFT; spec/plan intactos) |
-| Estado | **APRUEBO_GATE_I080_LOCAL REGISTRADO — IMPLEMENTADO_LOCAL (sin AWS)** |
+| Estado | **APRUEBO_GATE_I080_LOCAL REGISTRADO — BLOQUEADO_RFC_006 (sin AWS)** |
 | Main base | `21eb9cb540e4d4a39a0851a2c3f730fd78a0846f` (PR #27, I-070) |
 | Rama | `feat/h08i-i080-ci-backend` |
 | Autorización | `APRUEBO_GATE_I080_LOCAL` (mensaje humano independiente, 2026-11-08) |
@@ -23,7 +23,7 @@ cambios de branch protection en el repositorio, ni iniciar I-090.
 
 | Requisito | Evidencia | Estado |
 |---|---|---|
-| INF-080-01 Eventos | `pull_request` a `main`/`release/**` y `push` a `main`; `gofmt`, `go vet`, `staticcheck`, `govulncheck`, `go test -race`, cobertura ≥ 80 %, `gosec`, gitleaks, dependencias, contrato OpenAPI H06, Terraform (`fmt`/`init -backend=false`/`validate`) y **escaneo de seguridad IaC real con Trivy HIGH/CRITICAL y prueba negativa**; acciones por SHA y herramientas por versión exacta | IMPLEMENTADO_LOCAL |
+| INF-080-01 Eventos | `pull_request` a `main`/`release/**` y `push` a `main`; `gofmt`, `go vet`, `staticcheck`, `govulncheck`, `go test -race`, cobertura ≥ 80 %, `gosec`, gitleaks, dependencias, contrato OpenAPI H06, Terraform (`fmt`/`init -backend=false`/`validate`) y **escaneo de seguridad IaC real con Trivy HIGH/CRITICAL y prueba negativa**; acciones por SHA y herramientas por versión exacta. **BLOQUEADO_RFC_006** por AWS-0011 HIGH sin autorización | IMPLEMENTADO_LOCAL — BLOQUEADO |
 | INF-080-02 PR | `GATES_PR.md`: seis checks requeridos, revisión obligatoria, sin force push, artefactos por `github.sha`; aplicación de branch protection **PENDIENTE_APLICACION_HUMANA** | DOCUMENTADO |
 | INF-080-03 Seguridad CI | `permissions: contents: read`; sin `pull_request_target`, sin secretos, sin credenciales cloud, sin Docker | IMPLEMENTADO_LOCAL |
 | INF-080-04 Pruebas | Cobertura de dominio 92 % local (umbral 80 %); pruebas de contrato Terraform/FinOps, OpenAPI y herramientas en CI; sin servicios cloud | IMPLEMENTADO_LOCAL |
@@ -42,10 +42,13 @@ cambios de branch protection en el repositorio, ni iniciar I-090.
 - **Sin AWS**: no se invoca cuenta, no se lee state remoto y no se crea ningún recurso.
 - **OIDC y credenciales de release** pertenecen a I-090 y a su Gate.
 - **Cobertura**: mide sentencias del dominio; no sustituye pruebas de integración AWS/Redis/HTTP.
-- **Escáner IaC**: Trivy `0.76.2` con severidad HIGH/CRITICAL y `--exit-code 1`. Tres excepciones
+- **Escáner IaC**: Trivy `0.76.2` con severidad HIGH/CRITICAL y `--exit-code 1`. Dos excepciones
   acotadas en `.trivyignore.yaml` (ID + ruta + justificación, sin comodines): `AWS-0054` (D2/RFC-005,
-  H-01 abierto), `AWS-0132` (límite SSE-S3 de I-070) y `AWS-0011` (**PENDIENTE_DE_DECISION_I030**:
-  CloudFront sin WAF; coste no presupuestado). Cualquier otro hallazgo HIGH/CRITICAL bloquea.
+  H-01 abierto) y `AWS-0132` (límite SSE-S3, Gate I-070).
+- **AWS-0011 (HIGH) sin autorización**: CloudFront sin WAF. **No** está exento. La aceptación temporal
+  se propone en `RFC-006-EXCEPCION_WAF_I030.md` (**PROPUESTO — NO APROBADO**). Mientras no exista la
+  frase humana `APRUEBO_RFC_006_WAF_TEMPORAL`, el job `iac` falla y I-080 queda `BLOQUEADO_RFC_006`;
+  no se declara `IAC_SCAN PASS` ni se fusiona el PR.
 
 ## 4. Verificación local
 
@@ -58,3 +61,8 @@ FinOps, systemd, herramientas, Go `build/vet/test` y validador SDD integral. `te
 Merge requiere autorización humana ligada a PR y HEAD exactos (A-110/R-004). No se declara
 `AWS_DEPLOYED`, `CI_VERIFIED` ni `PRODUCTION_READY` desde este documento. I-090 no se inicia sin su
 Gate.
+
+**Bloqueo vigente:** `AWS-0011` HIGH no autorizado mantiene el job `iac` en rojo y el PR #28 sin
+posibilidad de merge. Para desbloquear se requiere una de estas decisiones humanas: aprobar
+`RFC-006` (`APRUEBO_RFC_006_WAF_TEMPORAL`), autorizar la implementación de WAF con recotización, o
+una alternativa formal. No se acepta el silencio como aprobación.
