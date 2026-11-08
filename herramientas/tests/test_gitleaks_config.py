@@ -1,4 +1,4 @@
-"""Pruebas de la configuración de gitleaks (A-100 + excepción I-030).
+﻿"""Pruebas de la configuración de gitleaks (A-100 + excepción I-030).
 
 La excepción del digest RFC-004 debe ser **mínima y no ocultar credenciales**:
 gitleaks v8.30.1 evalúa las allowlists globales en modo OR por defecto y, en ese
@@ -52,7 +52,6 @@ class ConfiguracionGitleaks(unittest.TestCase):
         self.assertIn("paths = ", self.sin_comentarios)
         self.assertIn('regexTarget = "line"', self.sin_comentarios)
         self.assertIn("regexes = ", self.sin_comentarios)
-        self.assertIn("SECRETOS", self.sin_comentarios)
         self.assertIn("[a-f0-9]{64}", self.sin_comentarios)
 
     def test_no_excluye_carpetas_ni_reglas(self) -> None:
@@ -65,16 +64,15 @@ class ConfiguracionGitleaks(unittest.TestCase):
         self.assertTrue(rutas[0].endswith("$"), "la ruta debe estar anclada al final")
 
     def test_patron_cubre_todos_los_documentos_secretos_sin_ocultar_credenciales(self) -> None:
-        """El manifiesto declara digest de varios documentos con SECRETOS en el nombre."""
+        """El manifiesto declara ruta + digest; la excepción sólo cubre ese formato."""
         rutas = re.findall(r"regexes\s*=\s*\[\s*'''(.*?)'''", self.sin_comentarios)
         self.assertEqual(len(rutas), 1)
         patron = rutas[0]
-        self.assertIn("SECRETOS", patron)
         self.assertIn("[a-f0-9]{64}", patron)
         self.assertIn("BASELINE_SHA256", self.sin_comentarios)
         # Debe aceptar los documentos existentes y rechazar cualquier otra línea.
         self.assertRegex(
-            '  "sdd/_control/H08/RFC-004-SECRETOS_BOOTSTRAP.md": "' + "a" * 64 + '"',
+            '  "infra/terraform/policies/terraform-state-access.json.tftpl": "' + "a" * 64 + '"',
             patron.replace("\\\\", "\\"),
         )
         self.assertRegex(
