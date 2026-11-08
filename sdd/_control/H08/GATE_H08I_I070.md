@@ -22,7 +22,7 @@ backend del entorno, los documentos de blueprint/matriz/runbook y sus pruebas.
 | Requisito | Evidencia | Estado |
 |---|---|---|
 | INF-070-01 Roots y módulos | `infra/terraform/bootstrap` (state/lock) + módulos existentes red/computo/balanceo/dynamodb/redis/iam documentados en `BLUEPRINT_MODULOS_TF.md` | IMPLEMENTADO_LOCAL |
-| INF-070-02 State | Bucket S3 versionado, SSE-S3, Block Public Access, ownership `BucketOwnerEnforced`, política que exige TLS, lifecycle de versiones no actuales; `prevent_destroy`. Custodia del state **propio** del bootstrap: el original permanece operativo hasta migrar, respaldo cifrado fuera del repo con SHA-256/`lineage`/`serial`, e importación de recuperación con `N to import` y `0 add/change/replace/destroy` | IMPLEMENTADO_LOCAL; aplicación `NOT_RUN` |
+| INF-070-02 State | Bucket S3 versionado, SSE-S3, Block Public Access, ownership `BucketOwnerEnforced`, política que exige TLS, lifecycle de versiones no actuales; `prevent_destroy`. Custodia del state **propio** del bootstrap: el original permanece operativo hasta migrar, respaldo cifrado fuera del repo con SHA-256/`lineage`/`serial`, e importación de recuperación evaluada **por dirección y proveedor** (`AWS_CREATE/AWS_UPDATE_UNAUTHORIZED/AWS_REPLACE/AWS_DESTROY = 0`; `terraform_data` local aparte) | IMPLEMENTADO_LOCAL; aplicación `NOT_RUN` |
 | INF-070-03 Plan y lock | Locking **nativo de S3** (`use_lockfile = true`, Terraform >= 1.10) en la plantilla de backend; **sin** tabla DynamoDB (deprecada); `init -backend=false` es lo único autorizado | IMPLEMENTADO_LOCAL |
 | INF-070-04 Drift y recuperación | `prevent_destroy` en el bucket; runbook de `refresh-only`, custodia/migración del state del bootstrap (sin asumir incremento de `serial`), locks huérfanos, recuperación por versiones e importación planificada sin recrear, y rollback con revisión humana | DOCUMENTADO |
 | INF-070-05 Secuencia | bootstrap → red → IAM → DynamoDB → Redis → cómputo/balanceo → observabilidad → DNS; destrucción inversa | DOCUMENTADO en `RUNBOOK_IAC.md` |
@@ -65,11 +65,34 @@ Tres inconsistencias del procedimiento de recuperación, corregidas dentro de I-
    `init -migrate-state` sin archivo que leer. Ahora el original permanece en `infra/terraform/bootstrap/` hasta que
    la migración esté verificada; se duplica la **copia de seguridad cifrada**, con SHA-256 verificado y
    `lineage`/`serial` registrados sin contenido.
-2. **Aceptación de la importación**: se distinguía mal un plan de import de un plan sin cambios. Ahora se exige
-   `N to import` (direcciones previstas) con `0 to add`, `0 to change`, `0 to replace` y `0 to destroy`, direcciones
-   coincidentes con el código y sin doble importación del mismo recurso; un reemplazo del bucket detiene el proceso.
+2. **Aceptación de la importación**: se distinguía mal un plan de import de un plan sin cambios y se usaban los
+   contadores globales. Ahora se evalúa **por dirección y proveedor**: `IMPORTS` sólo de recursos AWS previstos,
+   `AWS_CREATE = 0`, `AWS_UPDATE_UNAUTHORIZED = 0`, `AWS_REPLACE = 0`, `AWS_DESTROY = 0`, sin importaciones
+   duplicadas; las operaciones locales de `terraform_data.validacion_bootstrap` se revisan aparte y no cuentan como
+   infraestructura AWS. Un reemplazo del bucket detiene el proceso.
 3. **Inventario**: el runbook citaba «7 recursos»; el inventario se deriva del código y hoy son **8 direcciones**
    (7 AWS + `terraform_data.validacion_bootstrap`), sin cifras históricas fijas.
 
 No se asume que la migración incremente el `serial`; el criterio es la coincidencia de contenido, no un número.
-Pruebas de contrato I-070: **33** (229 en la suite Terraform). `AWS_NOT_RUN`: sin migración, import ni recursos.
+Pruebas de contrato I-070: **47** (243 en la suite Terraform), con un evaluador determinista sobre planes sintéticos
+(create AWS, replace, destroy, update, import duplicado, import no previsto y distinción de `terraform_data`).
+`AWS_NOT_RUN`: sin plan real, migración, import ni recursos.
+
+## 7. Rev4 — criterio de recuperación por dirección y proveedor (2026-11-08)
+
+El criterio anterior `0 to add` era **imposible de satisfacer**: al recuperar un state perdido,
+`terraform_data.validacion_bootstrap` se recrea en el state nuevo como `create` local sin crear infraestructura AWS.
+Se sustituye por evaluación **por dirección y proveedor**:
+
+| Categoría | Criterio |
+|---|---|
+| `IMPORTS` | Sólo direcciones AWS previstas; identificador real único por dirección |
+| `AWS_CREATE` | 0 |
+| `AWS_UPDATE_UNAUTHORIZED` | 0 |
+| `AWS_REPLACE` | 0 |
+| `AWS_DESTROY` | 0 |
+| `TERRAFORM_DATA` | Operaciones locales esperadas y justificadas; nunca `delete` |
+
+No se usan los contadores globales del resumen: un `1 to add` puede ser un `terraform_data` inocuo o un bucket AWS
+inaceptable. Prohibido eliminar recursos del código para "conseguir" ceros. El `apply` del import sigue requiriendo
+Gate humano independiente.

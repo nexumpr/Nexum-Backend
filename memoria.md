@@ -417,6 +417,13 @@
 ### I-070: correccion de revision (custodia, importacion, inventario) - 2026-11-08
 
 - Defecto 1 corregido: el runbook ordenaba mover el unico state operativo del bootstrap antes de migrarlo, dejando init -migrate-state sin archivo. Ahora el original permanece en infra/terraform/bootstrap/ y se duplica una copia cifrada con SHA-256 verificado y lineage/serial registrados. Se retira la copia local solo tras migracion y lectura de recuperacion comprobadas.
-- Defecto 2 corregido: el criterio de aceptacion de importacion ya no exige un plan generico de cero cambios; exige N to import con 0 to add, 0 to change, 0 to replace y 0 to destroy, direcciones coincidentes con el codigo y sin doble importacion. Un reemplazo del bucket detiene el proceso. El apply sigue requiriendo Gate humano.
+- Defecto 2 corregido: el criterio de aceptacion de importacion ya no usa contadores globales (que confundian terraform_data local con infraestructura AWS). Se evalua por direccion y proveedor: AWS_CREATE = 0, AWS_UPDATE_UNAUTHORIZED = 0, AWS_REPLACE = 0, AWS_DESTROY = 0, imports solo previstos y sin duplicados; las operaciones locales de terraform_data se revisan aparte. El apply sigue requiriendo Gate humano.
 - Defecto 3 corregido: el inventario se deriva del codigo; hoy son 8 direcciones (7 AWS + terraform_data.validacion_bootstrap), no un numero historico fijo. Sin tabla DynamoDB de locking; use_lockfile se mantiene.
 - Pruebas: 33 de contrato I-070 (229 en la suite Terraform). AWS_NOT_RUN: sin migracion, import ni recursos creados.
+
+
+### I-070: criterio de recuperacion por direccion y proveedor (rev4) - 2026-11-08
+
+- Defecto corregido: exigir 0 to add en la recuperacion bloqueaba una recuperacion valida, porque terraform_data.validacion_bootstrap se recrea en el nuevo state como recurso local (create) sin crear infraestructura AWS.
+- RUNBOOK_IAC.md 4: criterio por direccion y proveedor (AWS_CREATE = 0, AWS_UPDATE_UNAUTHORIZED = 0, AWS_REPLACE = 0, AWS_DESTROY = 0; IMPORTS solo previstos y sin duplicados; TERRAFORM_DATA operaciones locales esperadas y justificadas). No se usan los contadores globales del resumen; ejemplo con 7 to import + 1 to add local. Prohibido eliminar recursos del codigo para conseguir ceros.
+- Pruebas: 47 de contrato I-070 (243 en la suite Terraform), con evaluador determinista sobre planes sinteticos y casos A-L. AWS_NOT_RUN: sin plan real, migracion ni recursos.

@@ -28,6 +28,46 @@ def _render_politica() -> dict:
     return json.loads(texto)
 
 
+def evaluar_recuperacion(cambios: list[dict], inventario_aws: set[str]) -> list[str]:
+    """Evalúa un plan de recuperación por dirección y proveedor, no por contadores globales.
+
+    Cada cambio representa una entrada de plan con `address`, `type`, `actions` y,
+    si corresponde, `importing: {"id": ...}`. Sólo es un modelo determinista para
+    las pruebas: no se ha ejecutado ningún plan real contra AWS.
+    """
+    problemas: list[str] = []
+    ids_importados: dict[str, str] = {}
+    for cambio in cambios:
+        direccion = cambio["address"]
+        tipo = cambio["type"]
+        acciones = set(cambio.get("actions", []))
+        if tipo.startswith("aws_"):
+            # replace = delete + create; se comprueba antes que las acciones simples.
+            if acciones == {"delete", "create"}:
+                problemas.append("AWS_REPLACE " + direccion)
+                continue
+            if "create" in acciones:
+                problemas.append("AWS_CREATE " + direccion)
+            if "update" in acciones:
+                problemas.append("AWS_UPDATE_UNAUTHORIZED " + direccion)
+            if "delete" in acciones:
+                problemas.append("AWS_DESTROY " + direccion)
+            importacion = cambio.get("importing")
+            if importacion:
+                if direccion not in inventario_aws:
+                    problemas.append("IMPORT_NO_PREVISTO " + direccion)
+                identificador = importacion.get("id")
+                if identificador in ids_importados:
+                    problemas.append("IMPORT_DUPLICADO " + str(identificador))
+                else:
+                    ids_importados[identificador] = direccion
+        else:
+            # Recurso local de Terraform: no es infraestructura AWS. Sólo se prohíbe destruirlo.
+            if "delete" in acciones and "create" not in acciones:
+                problemas.append("LOCAL_DESTROY " + direccion)
+    return problemas
+
+
 class BucketDeState(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -248,12 +288,15 @@ class RecuperacionDelStateDeBootstrap(unittest.TestCase):
     def test_recuperacion_por_import_sin_recrear(self) -> None:
         self.assertIn("importación", self.runbook)
         self.assertIn("nunca por recreación", self.runbook)
-        # El plan de importación NO se confunde con un plan normal sin cambios.
-        self.assertIn("N to import", self.runbook)
-        self.assertIn("0 to add", self.runbook)
-        self.assertIn("0 to change", self.runbook)
-        self.assertIn("0 to replace", self.runbook)
-        self.assertIn("0 to destroy", self.runbook)
+        # El plan de importación NO se confunde con un plan normal sin cambios ni se evalúa por contadores globales.
+        self.assertIn("por dirección y por proveedor", self.runbook)
+        self.assertIn("contadores globales del resumen", self.runbook)
+        self.assertIn("AWS_CREATE", self.runbook)
+        self.assertIn("AWS_UPDATE_UNAUTHORIZED", self.runbook)
+        self.assertIn("AWS_REPLACE", self.runbook)
+        self.assertIn("AWS_DESTROY", self.runbook)
+        self.assertIn("no** es creación de", self.runbook)
+        self.assertIn("infraestructura AWS", self.runbook)
         self.assertIn("Spec = \"I-070-terraform\"", self.runbook)
         self.assertIn("una única dirección", self.runbook)
 
@@ -306,6 +349,127 @@ class RecuperacionDelStateDeBootstrap(unittest.TestCase):
         gate = _leer(RAIZ / "sdd" / "_control" / "H08" / "GATE_H08I_I070.md")
         self.assertIn("Permisos IAM de state/lock", gate)
 
+
+
+class PlanDeRecuperacionPorDireccion(unittest.TestCase):
+    """Criterio A-L sobre estructuras de plan sintéticas y representativas.
+
+    No se ejecuta ningún plan real contra AWS: se modela el contenido que Terraform
+    produciría (por dirección y proveedor) y se verifica la regla de aceptación.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.main = _leer(BOOTSTRAP / "main.tf")
+        cls.runbook = _leer(RAIZ / "sdd" / "_control" / "H08" / "RUNBOOK_IAC.md")
+        cls.direcciones = sorted(f"{t}.{n}" for t, n in recursos(cls.main))
+        cls.local = [d for d in cls.direcciones if d.startswith("terraform_data.")]
+        cls.aws = {d for d in cls.direcciones if d.startswith("aws_")}
+        cls.aws_inventario = {d for d in cls.direcciones if d.startswith("aws_")}
+
+    def _entrada(self, direccion: str, acciones: list[str], identificador: str | None = None) -> dict:
+        tipo = direccion.split(".")[0]
+        cambio = {"address": direccion, "type": tipo, "actions": list(acciones)}
+        if identificador is not None:
+            cambio["importing"] = {"id": identificador}
+        return cambio
+
+    def _plan_aceptable(self) -> list[dict]:
+        cambios = [
+            self._entrada(d, ["no-op"], "id-real-" + d)
+            for d in sorted(self.aws)
+        ]
+        cambios += [self._entrada(d, ["create"]) for d in self.local]
+        return cambios
+
+    def _reemplazar(self, cambios: list[dict], direccion: str, acciones: list[str]) -> list[dict]:
+        resultado = [c for c in cambios if c["address"] != direccion]
+        resultado.append(self._entrada(direccion, acciones))
+        return resultado
+
+    def test_a_plan_con_imports_previstos_es_aceptable(self) -> None:
+        self.assertEqual(evaluar_recuperacion(self._plan_aceptable(), self.aws), [])
+
+    def test_b_create_de_terraform_data_no_es_creacion_aws(self) -> None:
+        solo_local = [self._entrada(d, ["create"]) for d in self.local]
+        self.assertEqual(len(solo_local), 1)
+        problemas = evaluar_recuperacion(solo_local, self.aws)
+        self.assertEqual(problemas, [])
+        self.assertFalse(any(p.startswith("AWS_") for p in problemas))
+
+    def test_bis_contadores_globales_no_bastan(self) -> None:
+        aceptable = self._plan_aceptable()
+        self.assertEqual(sum(1 for c in aceptable if c["actions"] == ["create"]), 1)
+        self.assertEqual(evaluar_recuperacion(aceptable, self.aws), [])
+        # Mismo "1 to add" global, pero ahora es un bucket AWS: debe rechazarse.
+        riesgoso = [c for c in aceptable if c["address"] != "terraform_data.validacion_bootstrap"]
+        riesgoso.append(self._entrada("aws_s3_bucket_nuevo.state", ["create"]))
+        self.assertEqual(sum(1 for c in riesgoso if c["actions"] == ["create"]), 1)
+        self.assertIn("AWS_CREATE aws_s3_bucket_nuevo.state",
+                      evaluar_recuperacion(riesgoso, self.aws))
+
+    def test_c_creacion_inesperada_de_bucket_se_rechaza(self) -> None:
+        cambios = self._plan_aceptable() + [self._entrada("aws_s3_bucket_extra.state", ["create"])]
+        problemas = evaluar_recuperacion(cambios, self.aws)
+        self.assertIn("AWS_CREATE aws_s3_bucket_extra.state", problemas)
+
+    def test_d_reemplazo_del_bucket_se_rechaza(self) -> None:
+        cambios = self._reemplazar(self._plan_aceptable(), "aws_s3_bucket.state", ["delete", "create"])
+        self.assertIn("AWS_REPLACE aws_s3_bucket.state", evaluar_recuperacion(cambios, self.aws))
+
+    def test_e_destruccion_de_recurso_aws_se_rechaza(self) -> None:
+        cambios = self._reemplazar(self._plan_aceptable(), "aws_s3_bucket_policy.state", ["delete"])
+        self.assertIn("AWS_DESTROY aws_s3_bucket_policy.state", evaluar_recuperacion(cambios, self.aws))
+
+    def test_f_modificacion_aws_no_autorizada_se_rechaza(self) -> None:
+        cambios = self._reemplazar(self._plan_aceptable(), "aws_s3_bucket_versioning.state", ["update"])
+        self.assertIn("AWS_UPDATE_UNAUTHORIZED aws_s3_bucket_versioning.state",
+                      evaluar_recuperacion(cambios, self.aws))
+
+    def test_g_importacion_duplicada_se_rechaza(self) -> None:
+        cambios = self._plan_aceptable()
+        primero = next(c["importing"]["id"] for c in cambios if c["address"] == "aws_s3_bucket.state")
+        for cambio in cambios:
+            if cambio["address"] == "aws_s3_bucket_versioning.state":
+                cambio["importing"]["id"] = primero
+        problemas = evaluar_recuperacion(cambios, self.aws)
+        self.assertTrue(any(p.startswith("IMPORT_DUPLICADO") for p in problemas), problemas)
+
+    def test_g_bis_import_no_previsto_se_rechaza(self) -> None:
+        cambios = self._plan_aceptable() + [
+            self._entrada("aws_s3_bucket.intruso", ["no-op"], "id-intruso")
+        ]
+        self.assertIn("IMPORT_NO_PREVISTO aws_s3_bucket.intruso",
+                      evaluar_recuperacion(cambios, self.aws))
+
+    def test_h_inventario_de_la_prueba_coincide_con_el_codigo(self) -> None:
+        self.assertEqual(len(self.aws), 7, sorted(self.aws))
+        self.assertEqual(len(self.local), 1, self.local)
+        self.assertEqual(len(self.direcciones), 8, self.direcciones)
+        self.assertIn("terraform_data.validacion_bootstrap", self.local)
+
+    def test_i_state_original_disponible_hasta_migrar(self) -> None:
+        self.assertIn("permanece en su ubicación operativa", self.runbook)
+        self.assertIn("init -migrate-state", self.runbook)
+
+    def test_j_respaldo_verificado_antes_de_migrar(self) -> None:
+        self.assertIn("SHA-256", self.runbook)
+        self.assertIn("verificar la integridad", self.runbook)
+        self.assertIn("Sin copia íntegra no se migra", self.runbook)
+
+    def test_k_locking_s3_sigue_activo(self) -> None:
+        self.assertIn("use_lockfile", self.runbook)
+        self.assertNotIn("dynamodb_table", self.runbook)
+
+    def test_l_iam_no_introduce_permisos_globales(self) -> None:
+        texto = _leer(POLICY)
+        self.assertNotIn('"s3:*"', texto)
+        self.assertNotIn("arn:aws:s3:::*", texto)
+        self.assertNotIn("dynamodb:", texto)
+        for st in _render_politica()["Statement"]:
+            recursos_st = st["Resource"] if isinstance(st["Resource"], list) else [st["Resource"]]
+            for recurso in recursos_st:
+                self.assertTrue(recurso.startswith("arn:aws:s3:::nexum-h08i-tfstate-ejemplo123"), recurso)
 
 
 if __name__ == "__main__":

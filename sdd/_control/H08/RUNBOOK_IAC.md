@@ -109,19 +109,52 @@ El bootstrap gestiona pocos recursos y todos llevan tag `Spec = "I-070-terraform
    `terraform_data.validacion_bootstrap` no se importa desde AWS.
 3. Confirmar que cada recurso se importa **en una única dirección** y que no hay dos `import` apuntando al mismo
    identificador real.
-4. Ejecutar `plan` (autorizado). El plan de una importación **no es un plan normal sin cambios**: se acepta
-   exactamente `N to import` (el número de direcciones previstas) junto con:
+4. Ejecutar `plan -out` (autorizado). El plan de una importación **no es un plan normal sin cambios** y **no se
+   evalúa con los contadores globales del resumen**. Los totales del resumen mezclan operaciones de recursos AWS con
+   operaciones locales de Terraform: al recuperar un state perdido, `terraform_data.validacion_bootstrap` puede
+   aparecer como `create` porque aún no existe en el nuevo state, y eso **no** es creación de infraestructura AWS.
+   El criterio se aplica **por dirección y por proveedor**, preferentemente sobre la representación estructurada
+   (`terraform show -json <plan>`) en el Gate futuro:
 
-   - **0 to add** — no se crea ningún recurso nuevo;
-   - **0 to change** — no se modifica ningún atributo no autorizado;
-   - **0 to replace** — ningún recurso se reemplaza;
-   - **0 to destroy** — no se destruye nada.
+   | Categoría | Criterio exigido |
+   |---|---|
+   | `IMPORTS` | Sólo las direcciones AWS previstas en §3.1, cada identificador real en una única dirección |
+   | `AWS_CREATE` | **0** |
+   | `AWS_UPDATE_UNAUTHORIZED` | **0** (ningún atributo AWS cambia sin autorización expresa) |
+   | `AWS_REPLACE` | **0** (ningún recurso AWS se reemplaza) |
+   | `AWS_DESTROY` | **0** |
+   | `TERRAFORM_DATA` | Sólo operaciones locales esperadas y justificadas (`create` de `terraform_data` en el state nuevo; nunca una destrucción) |
 
-   Si el plan propone **reemplazar o recrear el bucket**, detenerse: la importación está mal formada o los
-   identificadores no son los correctos.
-5. `apply` del import sólo con **Gate humano independiente**; jamás `-auto-approve`.
-6. Registrar `lineage`/`serial` resultantes y guardar copia cifrada del state nuevo; verificar después que
-   `plan` ya no propone importaciones ni cambios.
+   Ejemplo representativo de un plan **aceptable** (7 importaciones AWS sin cambios + el recurso local nuevo):
+
+   ```
+   # aws_s3_bucket.state will be imported
+       resource "aws_s3_bucket" "state" { ... }
+   Plan: 7 to import, 1 to add, 0 to change, 0 to destroy.
+   ```
+
+   Ese "1 to add" es `terraform_data.validacion_bootstrap`, un recurso **local** sin efecto en AWS. Un plan cuyo
+   `1 to add` fuera `aws_s3_bucket`, `aws_s3_bucket_policy` o cualquier otro recurso `aws_*` se **rechaza**, aunque
+   el resumen global parezca el mismo. La revisión se hace dirección por dirección.
+
+5. Rechazar el plan y detenerse si aparece cualquiera de estas condiciones:
+
+   - un `create` de una dirección `aws_*` (`AWS_CREATE`);
+   - un `update` de una dirección `aws_*` no autorizado (`AWS_UPDATE_UNAUTHORIZED`);
+   - un `replace`/`delete+create` de una dirección `aws_*`, en particular del bucket (`AWS_REPLACE`);
+   - un `delete` de una dirección `aws_*` (`AWS_DESTROY`);
+   - una importación de una dirección no prevista, repetida o con un identificador real ya usado por otra
+     dirección (`IMPORT_DUPLICADO` / `IMPORT_NO_PREVISTO`);
+   - una destrucción de `terraform_data` (`LOCAL_DESTROY`).
+
+6. No se elimina ni se comenta ningún recurso del código para "conseguir" un contador de cero: el inventario se
+   respeta tal como está declarado y la recuperación se adapta al código, no al revés.
+
+7. `apply` del import sólo con **Gate humano independiente** y revisión del plan real por el responsable; jamás
+   `-auto-approve`.
+
+8. Registrar `lineage`/`serial` resultantes y guardar copia cifrada del state nuevo; verificar después que un
+   nuevo `plan` ya no propone importaciones ni cambios AWS.
 
 Si el bucket se creó fuera de Terraform o no hay certeza de sus atributos, **no** se importa a ciegas: se
 documenta el estado real y se decide con el responsable.

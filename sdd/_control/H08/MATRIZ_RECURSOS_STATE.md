@@ -37,9 +37,10 @@ HashiCorp y una tabla adicional sería un recurso no presupuestado. El lock vive
 
 El bootstrap **no** declara `backend` mientras el bucket no exista (evita dependencia circular). Tras verificarlo, su
 state se migra a la clave `bootstrap/...` con `init -migrate-state` autorizado, comparando `lineage`/`serial`/recursos
-sin asumir que el serial aumente. La pérdida del state del bootstrap se resuelve por **importación**: el plan debe
-mostrar `N to import` y `0 to add` / `0 to change` / `0 to replace` / `0 to destroy`, nunca recreando el bucket.
-Procedimiento completo en `RUNBOOK_IAC.md` §2–§4.
+sin asumir que el serial aumente. La pérdida del state del bootstrap se resuelve por **importación**: por dirección y
+proveedor se exige `IMPORTS` sólo de recursos AWS previstos, `AWS_CREATE = 0`, `AWS_UPDATE_UNAUTHORIZED = 0`,
+`AWS_REPLACE = 0` y `AWS_DESTROY = 0`; las operaciones locales de `terraform_data` se evalúan aparte y nunca cuentan
+como infraestructura AWS. Nunca se recrea el bucket. Procedimiento completo en `RUNBOOK_IAC.md` §2–§4.
 
 ## 3. Permisos IAM necesarios (diseño, no aplicado)
 

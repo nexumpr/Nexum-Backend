@@ -106,7 +106,15 @@ Pruebas: 22 de contrato en tests/infra/terraform/test_terraform_backend_contrato
 
 - Custodia/migracion: el state original permanece en infra/terraform/bootstrap/ hasta que la migracion este verificada; se duplica la copia de seguridad cifrada (SHA-256 verificado) y se registran lineage/serial sin contenido. No se mueve el unico state operativo antes de init -migrate-state.
 - Migracion: se compara lineage/serial/recursos con la evidencia previa y NO se asume incremento de serial; se exige plan autorizado sin cambios inesperados antes de retirar la copia local.
-- Importacion de recuperacion: criterio N to import con 0 to add, 0 to change, 0 to replace y 0 to destroy; direcciones coincidentes con el codigo, sin doble importacion y parada si se propone reemplazar el bucket. El apply del import exige Gate humano independiente.
+- Importacion de recuperacion: criterio por direccion y proveedor (AWS_CREATE, AWS_UPDATE_UNAUTHORIZED, AWS_REPLACE y AWS_DESTROY = 0; imports solo previstos y sin duplicados); las operaciones locales de terraform_data se evaluan aparte y no cuentan como infraestructura AWS. El apply del import exige Gate humano independiente. (El criterio de contadores globales de la rev3 queda sustituido por la rev4.)
 - Inventario: 8 direcciones declaradas (7 AWS + terraform_data.validacion_bootstrap), derivadas del codigo y no de una cifra historica. Sin tabla DynamoDB de locking.
 - Pruebas: 33 de contrato I-070 (229 en la suite Terraform).
 - AWS_NOT_RUN: sin migracion, import, plan remoto ni recursos creados.
+
+
+### Rev4: criterio de recuperacion por direccion y proveedor (2026-11-08)
+
+- Defecto corregido: el criterio 0 to add bloqueaba una recuperacion valida, porque al recrear el state terraform_data.validacion_bootstrap aparece como create (recurso local, sin infraestructura AWS).
+- RUNBOOK_IAC.md 4: criterio por direccion y proveedor (AWS_CREATE = 0, AWS_UPDATE_UNAUTHORIZED = 0, AWS_REPLACE = 0, AWS_DESTROY = 0; IMPORTS solo previstos y sin duplicados; TERRAFORM_DATA operaciones locales esperadas y justificadas), con ejemplo que muestra 7 to import + 1 to add local. Se prohibe borrar recursos del codigo para conseguir ceros.
+- Pruebas: 47 de contrato I-070 (243 en la suite), con evaluador determinista sobre planes sinteticos y casos A-L (create AWS, replace, destroy, update, import duplicado, import no previsto, contadores globales insuficientes).
+- AWS_NOT_RUN: sin plan real, migracion, import ni recursos creados.

@@ -61,6 +61,9 @@
 - [x] Custodia y migracion del state del bootstrap documentadas (RUNBOOK_IAC.md 2-4), con separacion por clave y recuperacion por importacion.
 - [x] 29 pruebas de contrato I-070 (225 en la suite).
 - [x] Corregida la secuencia de custodia/migracion: el state original no se mueve antes de migrar; respaldo cifrado verificado por SHA-256.
-- [x] Criterio de importacion corregido: N to import con 0 add/change/replace/destroy y direcciones coincidentes con el codigo.
+- [x] Criterio de importacion por direccion y proveedor (AWS_CREATE/UPDATE_UNAUTHORIZED/REPLACE/DESTROY = 0; terraform_data local evaluado aparte); sustituye al criterio de contadores globales.
 - [x] Inventario declarativo de 8 direcciones (7 AWS + terraform_data), sin cifras historicas fijas.
 - [x] 33 pruebas de contrato I-070 (229 en la suite Terraform).
+
+- [x] Criterio de recuperacion por direccion y proveedor documentado y probado (AWS_CREATE/UPDATE_UNAUTHORIZED/REPLACE/DESTROY = 0; terraform_data local aparte).
+- [x] 47 pruebas de contrato I-070 (243 en la suite Terraform), con evaluador determinista de planes sinteticos.
