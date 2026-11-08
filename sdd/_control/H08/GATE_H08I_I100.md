@@ -26,9 +26,9 @@ ni inicio de I-110. No modifica I-060, I-080, I-090 ni sus contratos.
 | INF-100-01 Threat model | `MODELO_AMENAZAS.md`: 6 superficies (S1–S6), STRIDE, riesgos priorizados (IDOR, replay, money, SSRF) y límites | IMPLEMENTADO_LOCAL |
 | INF-100-02 SAST/SCA | gosec, govulncheck, staticcheck ya en CI; criterios HIGH/CRITICAL y RFC en `CRITERIOS_VULNERABILIDADES.md` | IMPLEMENTADO_LOCAL |
 | INF-100-03 Secrets/SBOM | gitleaks con baseline acotado, SBOM SPDX por SHA, acciones fijadas por SHA | IMPLEMENTADO_LOCAL |
-| INF-100-04 DAST | Procedimiento y alcance documentados; **NO ejecutado** (requiere entorno aislado y autorización) | NOT_RUN / BLOCKED |
+| INF-100-04 DAST | Procedimiento y **harness** `herramientas/preparar_dast.py` (objetivo aislado, autorización por host, datos sintéticos, ventana ≤ 4 h, RPS ≤ 5, alcance; no ejecuta) y **NO ejecutado** (requiere `APRUEBO_GATE_DAST` y entorno aislado) | NOT_RUN / BLOCKED_AUTHORIZATION |
 | INF-100-05 IaC | Trivy HIGH/CRITICAL + `herramientas/verificar_iac_devsecops.py` (SG público, IAM wildcard, S3 sin cifrado, `force_destroy`, ACL pública, state rastreado) en CI | IMPLEMENTADO_LOCAL |
-| INF-100-06 Pruebas adversariales | `tests/security/adversarial_test.go`: JWT manipulado/`alg=none`/expirado, 401, contexto, logout/replay, idempotencia concurrente y 409, aislamiento por usuario, CORS, cabeceras, body > 1 MB, 429 | IMPLEMENTADO_LOCAL |
+| INF-100-06 Pruebas adversariales | `tests/security/adversarial_test.go` + fixture gosec negativo: JWT manipulado/`alg=none`/expirado, 401, contexto, logout/replay, idempotencia, 409, aislamiento, CORS, cabeceras, body, 429 | IMPLEMENTADO_LOCAL |
 
 ## 3. Límites y bloqueos
 

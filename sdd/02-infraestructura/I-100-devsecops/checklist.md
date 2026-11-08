@@ -53,3 +53,8 @@
 - [x] Pruebas adversariales en tests/security y en go test -race.
 - [ ] DAST: NOT_RUN; requiere entorno aislado autorizado (Gate AWS/I-140).
 - [ ] Dependency Review/Dependabot: PENDIENTE_DE_DISPONIBILIDAD.
+
+- [x] Matriz verificable de amenazas T-01..T-22 y relacion con E001-E075 sin declarar endpoints inexistentes.
+- [x] Prueba negativa de gosec (G404) y de IaC; deteccion demostrada, no solo cero hallazgos.
+- [x] Harness DAST con salvaguardas; DAST real NOT_RUN/BLOCKED_AUTHORIZATION.
+- [x] Checksum vs firma documentado; sustitucion de artefactos prevenida por inmutabilidad y digest.

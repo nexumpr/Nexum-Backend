@@ -89,3 +89,9 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - T-100-05 IaC: IMPLEMENTADO_LOCAL. Trivy HIGH/CRITICAL + herramientas/verificar_iac_devsecops.py (SG publico, IAM wildcard, S3 sin cifrado, force_destroy, ACL publica, state rastreado) en el job iac.
 - T-100-06 Pruebas adversariales: IMPLEMENTADO_LOCAL. tests/security/adversarial_test.go con JWT, sesion/replay, idempotencia concurrente, CORS, cabeceras, body y rate limit; incluido en go test y -race.
 - Pruebas: 13 de contrato DevSecOps y 7 del escaner IaC. AWS_NOT_RUN.
+
+- Ampliacion de revision (2026-11-08): MODELO_AMENAZAS con matriz verificable T-01..T-22 (superficie, amenaza, spec/ruta, control, prueba P/N, evidencia, severidad, responsable, estado) y relacion E001-E075 (75 documentados, 0 endpoints implementados; casos futuros NOT_IMPLEMENTED/NOT_RUN).
+- SAST: gosec limitado a codigo de produccion y prueba negativa con fixture math/rand (G404) + verificar_fixture_gosec.py en CI. Prueba local del fixture NOT_RUN por bloqueo de Application Control; CI la ejecuta.
+- DAST: harness preparar_dast.py valida objetivo aislado, autorizacion por host, datos sinteticos, ventana <=4h, RPS <=5 y alcance; sin APRUEBO_GATE_DAST devuelve BLOCKED_AUTHORIZATION y no genera plan.
+- Supply chain: se documenta checksum SHA-256 vs firma criptografica (no hay firma); sustitucion prevenida por release inmutable + If-None-Match + digest en LT.
+- Pruebas: 15 de contrato DevSecOps, 7 IaC, 10 DAST/gosec.

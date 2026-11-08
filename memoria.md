@@ -500,3 +500,5 @@
 - herramientas/verificar_iac_devsecops.py: SG publico, IAM wildcard, S3 sin cifrado, force_destroy, ACL publica y tfstate rastreado; conectado al job iac con artefacto iac-devsecops-<sha>.
 - tests/security/adversarial_test.go: JWT manipulado/alg none/expirado, 401, logout/replay, idempotencia concurrente y 409, aislamiento por usuario, CORS, cabeceras, body >1MB y 429; incluido en go test y go test -race.
 - Pruebas: 13 de contrato DevSecOps y 7 del escaner. AWS_NOT_RUN; DAST NOT_RUN.
+
+- I-100 ampliacion (2026-11-08): matriz T-01..T-22 y relacion E001-E075 (75 documentados, 0 endpoints); gosec acotado a produccion con fixture negativo G404 y helper; harness DAST preparar_dast.py con objetivo aislado/datos sinteticos/ventana/RPS y BLOCKED_AUTHORIZATION sin Gate; checksum SHA-256 distinto de firma. 15 pruebas de contrato, 7 IaC y 10 DAST/gosec.

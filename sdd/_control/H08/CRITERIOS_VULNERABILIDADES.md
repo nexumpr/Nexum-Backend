@@ -52,6 +52,10 @@ despliegue real. `RFC-005` (HTTP interno CloudFront→ALB) ratificada. Ninguna o
 - El resultado se asocia al SHA evaluado; no se reutiliza para otro commit.
 - Los secretos detectados no se reproducen en logs ni issues: se rotan y se registra sólo el identificador.
 - Un escaneo saltado o no ejecutado es `NOT_RUN`, nunca `PASS`.
+- **Integridad ≠ firma:** se verifica SHA-256 y asociación binario/SBOM/commit; no hay firma
+  criptográfica (cosign/Sigstore). No se declara artefacto firmado.
+- Los escáneres tienen prueba negativa propia (fixture IaC y fixture gosec) para demostrar que detectan;
+  una ejecución con cero hallazgos no se acepta como prueba de detección.
 
 ## 6. Prohibiciones
 

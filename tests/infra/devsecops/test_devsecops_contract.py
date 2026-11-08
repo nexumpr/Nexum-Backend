@@ -38,9 +38,16 @@ class ControlesEnCI(unittest.TestCase):
     def test_sast_sca_y_lint_presentes(self) -> None:
         for herramienta in ("gosec@v2.30.0", "govulncheck@v1.9.0", "staticcheck@v0.8.2"):
             self.assertIn(herramienta, self.texto)
-        self.assertIn("gosec@v2.30.0 -quiet ./...", self.texto)
+        self.assertIn("gosec@v2.30.0 -quiet ./cmd/... ./internal/... ./pkg/...", self.texto)
         self.assertNotIn("-exclude", self.texto)
         self.assertNotIn("-nosec", self.texto)
+
+    def test_prueba_negativa_de_gosec(self) -> None:
+        self.assertIn("tests/fixtures/security/gosecinseguro", self.texto)
+        self.assertIn("verificar_fixture_gosec.py", self.texto)
+        fixture = RAIZ / "tests" / "fixtures" / "security" / "gosecinseguro" / "main.go"
+        self.assertTrue(fixture.is_file())
+        self.assertIn("math/rand", _leer(fixture))
 
     def test_secretos_y_sbom(self) -> None:
         self.assertIn("gitleaks", self.texto)
@@ -97,6 +104,17 @@ class DocumentacionDeSeguridad(unittest.TestCase):
         self.assertIn("Riesgo residual", texto)
         self.assertIn("10 min", texto)
 
+    def test_modelo_tiene_matriz_verificable_y_relacion_e001_e075(self) -> None:
+        texto = _leer(AMENAZAS)
+        self.assertIn("Matriz verificable de amenazas y controles", texto)
+        for columna in ("Superficie", "Amenaza", "Spec/ruta afectada", "Control", "Prueba (P/N)", "Evidencia", "Sev.", "Responsable", "Estado"):
+            self.assertIn(columna, texto, columna)
+        self.assertIn("T-01", texto)
+        self.assertIn("T-22", texto)
+        self.assertIn("E001–E075", texto)
+        self.assertIn("NOT_IMPLEMENTED / NOT_RUN", texto)
+        self.assertIn("No hay endpoints HTTP implementados", texto)
+
     def test_matriz_declara_ejecutado_y_not_run(self) -> None:
         texto = _leer(MATRIZ)
         for herramienta in ("gosec", "govulncheck", "staticcheck", "gitleaks", "Trivy", "syft"):
@@ -105,6 +123,9 @@ class DocumentacionDeSeguridad(unittest.TestCase):
         self.assertIn("NOT_RUN", texto)
         self.assertIn("PENDIENTE_DE_DISPONIBILIDAD", texto)
         self.assertIn("NO ejecutadas", texto)
+        self.assertIn("Checksum ≠ firma", texto)
+        self.assertIn("preparar_dast.py", texto)
+        self.assertIn("GOSEC_FIXTURE_PASS", texto)
 
     def test_criterios_de_vulnerabilidad(self) -> None:
         texto = _leer(CRITERIOS)
