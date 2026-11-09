@@ -58,6 +58,7 @@ class BucketDeArtefactos(unittest.TestCase):
                 "DenegarBorradoAlPublicador",
                 "DenegarPublicacionSinSSE",
                 "PermitirPublicacionAlPublicador",
+                "DenegarEscrituraFueraDelPrefijo",
                 "DenegarAPrincipalsNoAutorizados",
                 "DenegarListBucket",
                 "DenegarListadoDeVersionesYMultipart",
@@ -122,6 +123,26 @@ class BucketDeArtefactos(unittest.TestCase):
         for sid in ("DenegarLecturaAlPublicador", "DenegarBorradoAlPublicador", "DenegarPublicacionSinSSE"):
             self.assertIn(sid, sids, sid)
         self.assertIn('variable = "s3:x-amz-server-side-encryption"', self.main)
+
+
+    def test_publicador_no_escribe_fuera_del_prefijo(self) -> None:
+        sentencias = _bloques(self.main, "statement")
+        bloque = [s for s in sentencias if "DenegarEscrituraFueraDelPrefijo" in s][0]
+        self.assertIn('effect = "Deny"', bloque)
+        self.assertIn("not_resources", bloque)
+        self.assertIn('${var.prefijo}*"', bloque)
+        self.assertIn("s3:PutObject", bloque)
+        self.assertIn("var.publicador_arn", bloque)
+        # No se usa s3:prefix como condicion de PutObject.
+        self.assertNotIn("s3:prefix", bloque)
+
+    def test_cd_no_usa_head_object_con_el_publicador(self) -> None:
+        cd = _leer(RAIZ / ".github" / "workflows" / "cd-backend.yml")
+        self.assertNotIn("head-object", cd)
+        self.assertIn("ARTIFACT_PUBLISH_CONFLICT", cd)
+        self.assertIn('--if-none-match "*"', cd)
+        self.assertIn("--server-side-encryption AES256", cd)
+        self.assertIn("ChecksumSHA256", cd)
 
 
 class CableadoYNombreDeterminista(unittest.TestCase):

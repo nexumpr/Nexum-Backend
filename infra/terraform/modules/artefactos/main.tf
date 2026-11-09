@@ -188,6 +188,25 @@ data "aws_iam_policy_document" "artefactos" {
     }
   }
 
+  # 3b. El publicador NO escribe fuera del prefijo de releases, aunque su IAM sea
+  #     amplio. Se expresa con not_resources porque no existe condicion IAM sobre la
+  #     clave del objeto para PutObject (s3:prefix solo aplica a ListBucket).
+  statement {
+    sid    = "DenegarEscrituraFueraDelPrefijo"
+    effect = "Deny"
+
+    actions = [
+      "s3:PutObject",
+      "s3:PutObjectAcl",
+    ]
+    not_resources = ["${aws_s3_bucket.artefactos.arn}/${var.prefijo}*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [var.publicador_arn]
+    }
+  }
+
   # 4. Nadie mas toca los objetos del bucket, aunque su IAM sea amplio.
   statement {
     sid    = "DenegarAPrincipalsNoAutorizados"
