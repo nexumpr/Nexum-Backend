@@ -53,3 +53,8 @@
 - [x] Política de acceso sin root, sin SSH público y con identidades temporales.
 - [ ] Drills reales y cierre de incidentes: `NOT_RUN` (requieren Gate de despliegue).
 - [ ] Ratificación humana de tiempos de notificación y severidades.
+- [x] 12 runbooks con 13 campos y sin comandos AWS peligrosos.
+- [x] Matriz S1–S3 con ciclo completo y tiempos pendientes de decision humana.
+- [x] 12 drills con estados locales y sin declarar AWS.
+- [x] Matriz de aceptacion con 12 A, 16 I y 75 E.
+- [x] Politica de acceso y inventario trazable con criticidad.

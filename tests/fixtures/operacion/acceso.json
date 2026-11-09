@@ -4,5 +4,7 @@
   "identidades_temporales": true,
   "claves_estaticas": false,
   "cambio_scp": false,
-  "ssm_solo_en_ventana": true
+  "ssm_solo_en_ventana": true,
+  "minimo_privilegio": true,
+  "auditoria": true
 }

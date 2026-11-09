@@ -7,9 +7,13 @@ plan/apply/destroy`, sin AWS, sin despliegue y sin drills reales.
 
 ## 1. Alcance autorizado
 
-- `sdd/_control/H08/RUNBOOK_OPERATIVO.md` con 10 procedimientos y 8 campos obligatorios.
-- `sdd/_control/H08/MATRIZ_INCIDENTES.md` (S1–S4) y `PLAN_PRUEBAS_OPERACION.md` (5 drills).
-- `herramientas/verificar_operacion_i140.py` con 5 comandos de validación local.
+- `sdd/_control/H08/RUNBOOK_OPERATIVO.md` con **12** procedimientos y **13** campos obligatorios.
+- `sdd/_control/H08/MATRIZ_INCIDENTES.md` (S1–S3 con ciclo completo), `PLAN_PRUEBAS_OPERACION.md`
+  (**12** drills) y `ACCESO_OPERACIONAL.md`.
+- `INVENTARIO_INFRAESTRUCTURA.md` derivado de I-120/I-130 y del catálogo, con `AWS_NOT_VERIFIED`.
+- `MATRIZ_INF_140.md` con trazabilidad de **12 A + 16 I + 75 E** y criterios cloud pendientes.
+- `herramientas/verificar_operacion_i140.py` con 6 comandos (`runbooks`, `incidentes`, `drills`,
+  `aceptacion`, `acceso`, `inventario`).
 - Pruebas adversas, documentos de contrato y actualización de estado/integridad.
 - Commit, push, PR y seguimiento de CI. **Merge requiere autorización humana separada.**
 
@@ -24,12 +28,14 @@ plan/apply/destroy`, sin AWS, sin despliegue y sin drills reales.
 
 ## 3. Decisiones de diseño
 
-1. **Nada escrito acredita ejecución:** los 10 runbooks y los 5 drills quedan `DOCUMENTADO_NO_EJECUTADO`
-   / `NOT_RUN`, y el validador lo exige explícitamente.
-2. **Prioridades coherentes, no inventadas:** se valida la forma (S1 ≤ S2 ≤ S3 en tiempo de
-   notificación) y se declara `PENDIENTE_DE_RATIFICACION_HUMANA`; ningún SLA se da por aprobado.
-3. **Drills sin destrucción:** se rechazan estados `EJECUTADO_AWS` en fase local, acciones
-   `delete/destroy/deshabilitar` y drills con AWS sin datos sintéticos.
+1. **Nada escrito acredita ejecución:** los 12 runbooks y los 12 drills quedan
+   `DOCUMENTADO_NO_EJECUTADO` / `NOT_RUN_AWS`, y el validador lo exige.
+2. **Incidentes sin SLA inventado:** S1–S3 con propietario, escalamiento y ciclo completo; tiempos
+   `PENDIENTE_DECISION_HUMANA`. Se rechazan severidad desconocida, incidente sin propietario,
+   S1/S2 sin escalamiento, datos sensibles y evidencia AWS simulada.
+3. **Drills sin destrucción ni falsa nube:** estados `LOCAL_PASS`/`LOCAL_FAIL`/`NOT_RUN_AWS`/
+   `BLOCKED_DEPENDENCY`; se rechaza `demuestra_aws=true`, `EJECUTADO_AWS`, acciones destructivas y
+   un drill con AWS marcado `LOCAL_PASS`.
 4. **Inventario desde el código:** el verificador cuenta recursos declarados por módulo y declara
    `existe_en_aws = NOT_VERIFIED`; un nombre no prueba existencia.
 5. **Acceso mínimo:** se rechazan root, SSH público, claves estáticas, cambio de SCP y SSM fuera de
@@ -39,24 +45,27 @@ plan/apply/destroy`, sin AWS, sin despliegue y sin drills reales.
 
 | Artefacto | Contenido |
 |---|---|
-| `RUNBOOK_OPERATIVO.md` | 10 procedimientos (`deployment`, `health-fail`, `dynamo-throttle`, `redis-unavailable`, `certificados`, `rotacion-secretos`, `auth-inesperado`, `presupuesto`, `incidente`, `eliminacion-iac`) |
-| `MATRIZ_INCIDENTES.md` | S1–S4 con notificación, escalamiento y rollback |
-| `PLAN_PRUEBAS_OPERACION.md` | 5 drills con degradación, criterio, rollback y AWS requerido |
-| `MATRIZ_INF_140.md` | contratos INF-140-01..06 y dependencias |
-| `verificar_operacion_i140.py` | `runbooks`, `prioridades`, `drills`, `inventario`, `acceso` |
-| `tests/infra/operacion/test_i140_operacion.py` | 36 pruebas adversas |
-| `tests/fixtures/operacion/` | prioridades, drills y política de acceso |
+| `RUNBOOK_OPERATIVO.md` | 12 procedimientos × 13 campos |
+| `MATRIZ_INCIDENTES.md` | S1–S3, ciclo de 10 fases y reglas de clasificación |
+| `PLAN_PRUEBAS_OPERACION.md` | 12 drills con estado y criterio |
+| `ACCESO_OPERACIONAL.md` | identidades temporales, SSM en ventana y prohibiciones |
+| `INVENTARIO_INFRAESTRUCTURA.md` | recursos core/auxiliares con owner, costo y `AWS_NOT_VERIFIED` |
+| `MATRIZ_INF_140.md` | 12 A + 16 I + 75 E y criterios cloud |
+| `verificar_operacion_i140.py` | 6 comandos de validación local |
+| `tests/infra/operacion/test_i140_operacion.py` | 45 pruebas adversas |
+| `tests/fixtures/operacion/` | incidentes, drills y política de acceso |
 
 ## 5. Verificación
 
 | Comprobación | Resultado |
 |---|---|
-| `verificar_operacion_i140.py runbooks` | `RUNBOOKS_COMPLETOS` |
-| `... prioridades` | `PRIORIDADES_COHERENTES` (ratificación pendiente) |
+| `... runbooks` | `RUNBOOKS_COMPLETOS` (12 × 13 campos) |
+| `... incidentes` | `INCIDENTES_VALIDOS` (tiempos `PENDIENTE_DECISION_HUMANA`) |
 | `... drills` | `PLAN_VALIDO`, `ejecucion_aws = NOT_RUN` |
-| `... inventario` | `INVENTARIO_DERIVADO`, `existe_en_aws = NOT_VERIFIED` |
+| `... aceptacion` | `MATRIZ_COMPLETA` (12 A / 16 I / 75 E) |
+| `... inventario` | `INVENTARIO_TRAZABLE`, `existe_en_aws = NOT_VERIFIED` |
 | `... acceso` | `ACCESO_CONFORME` |
-| Suite `tests/infra/operacion` | 140 OK (104 de I-120 + 36 de I-140) |
+| Suite `tests/infra/operacion` | 149 OK (104 de I-120 + 45 de I-140) |
 | `terraform fmt/init -backend=false/validate` | PASS (sin cambios de IaC en esta spec) |
 | Trivy / Gitleaks / Go / SDD / SHA-256 | PASS |
 

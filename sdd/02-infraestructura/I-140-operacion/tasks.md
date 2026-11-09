@@ -91,3 +91,12 @@ Gate `APRUEBO_GATE_I140_LOCAL`. Rama `feat/h08i-i140-operacion`. Nada se ejecuta
 - **T-140-06 (Inventario final):** IMPLEMENTADO_LOCAL. Modulos y recursos declarados; un nombre no prueba existencia.
 - **T-140-90 (Riesgos):** acceso de recuperacion a nodos limitado a SSM en ventana; inconsistencia tras reintentos cubierta por idempotencia de A-070; registros de incidentes dependientes del agente CloudWatch (I-020). Los tres CONDICIONADOS a verificacion real.
 - **T-140-99 (Ratificacion):** REVIEW pendiente; merge requiere autorizacion humana ligada a PR + HEAD.
+
+### Ampliacion de alcance (2026-11-09)
+
+- **T-140-01:** 12 runbooks × 13 campos; validador de runbooks y de comandos peligrosos.
+- **T-140-02:** matriz S1–S3 con ciclo completo; tiempos `PENDIENTE_DECISION_HUMANA`.
+- **T-140-03:** 12 drills con estados locales y `NOT_RUN_AWS`; prohibido `demuestra_aws`.
+- **T-140-04:** matriz de aceptacion 12 A + 16 I + 75 E y criterios cloud pendientes.
+- **T-140-05:** politica de acceso documentada y validada.
+- **T-140-06:** inventario trazable con core 24x7 y auxiliares autorizables.

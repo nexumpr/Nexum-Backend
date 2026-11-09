@@ -1,0 +1,63 @@
+{
+  "version": "1.0.0",
+  "ratificacion": "PENDIENTE_DECISION_HUMANA",
+  "incidentes": [
+    {
+      "id": "INC-S1",
+      "severidad": "S1",
+      "titulo": "incidente S1 de referencia",
+      "propietario": "Responsable de guardia",
+      "tiempo_respuesta": "PENDIENTE_DECISION_HUMANA",
+      "contiene_datos_sensibles": false,
+      "evidencia_aws_simulada": false,
+      "deteccion": "definido: deteccion",
+      "registro_auditable": "definido: registro_auditable",
+      "priorizacion": "definido: priorizacion",
+      "notificacion": "definido: notificacion",
+      "escalamiento": "responsable y seguridad",
+      "contencion": "definido: contencion",
+      "resolucion": "definido: resolucion",
+      "cierre": "definido: cierre",
+      "reapertura": "definido: reapertura",
+      "evidencia": "definido: evidencia"
+    },
+    {
+      "id": "INC-S2",
+      "severidad": "S2",
+      "titulo": "incidente S2 de referencia",
+      "propietario": "Responsable de guardia",
+      "tiempo_respuesta": "PENDIENTE_DECISION_HUMANA",
+      "contiene_datos_sensibles": false,
+      "evidencia_aws_simulada": false,
+      "deteccion": "definido: deteccion",
+      "registro_auditable": "definido: registro_auditable",
+      "priorizacion": "definido: priorizacion",
+      "notificacion": "definido: notificacion",
+      "escalamiento": "responsable de guardia",
+      "contencion": "definido: contencion",
+      "resolucion": "definido: resolucion",
+      "cierre": "definido: cierre",
+      "reapertura": "definido: reapertura",
+      "evidencia": "definido: evidencia"
+    },
+    {
+      "id": "INC-S3",
+      "severidad": "S3",
+      "titulo": "incidente S3 de referencia",
+      "propietario": "Responsable de guardia",
+      "tiempo_respuesta": "PENDIENTE_DECISION_HUMANA",
+      "contiene_datos_sensibles": false,
+      "evidencia_aws_simulada": false,
+      "deteccion": "definido: deteccion",
+      "registro_auditable": "definido: registro_auditable",
+      "priorizacion": "definido: priorizacion",
+      "notificacion": "definido: notificacion",
+      "escalamiento": "cola del equipo",
+      "contencion": "definido: contencion",
+      "resolucion": "definido: resolucion",
+      "cierre": "definido: cierre",
+      "reapertura": "definido: reapertura",
+      "evidencia": "definido: evidencia"
+    }
+  ]
+}

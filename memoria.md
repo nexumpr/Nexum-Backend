@@ -639,3 +639,13 @@
 - `herramientas/verificar_operacion_i140.py`: `runbooks`, `prioridades`, `drills`, `inventario` (deriva recursos del codigo, `existe_en_aws = NOT_VERIFIED`) y `acceso` (sin root, sin SSH publico, identidades temporales, SSM en ventana).
 - 36 pruebas nuevas en `tests/infra/operacion/test_i140_operacion.py`; la suite de operacion suma 140.
 - Sin AWS, sin terraform remoto, sin drills reales y sin merge.
+
+### I-140 alcance ampliado (2026-11-09)
+
+- **INF-140-01:** `RUNBOOK_OPERATIVO.md` reescrito con 12 procedimientos (deploy/rollback, health, instancia perdida, Dynamo, Redis, HTTPS/CloudFront, rotacion de secretos y JWT, 401/403, incidente de seguridad, presupuesto, restauracion y eliminacion IaC) y 13 campos; el validador rechaza comandos `aws ... delete/terminate/destroy`.
+- **INF-140-02:** `MATRIZ_INCIDENTES.md` con S1–S3, ciclo de 10 fases y tiempos `PENDIENTE_DECISION_HUMANA`; el validador rechaza severidad desconocida, incidente sin propietario, S1/S2 sin escalamiento, datos sensibles, evidencia AWS simulada y tiempos contradictorios.
+- **INF-140-03:** `PLAN_PRUEBAS_OPERACION.md` con 12 drills y estados `LOCAL_PASS`/`LOCAL_FAIL`/`NOT_RUN_AWS`/`BLOCKED_DEPENDENCY`; se rechaza `demuestra_aws=true`, `EJECUTADO_AWS` y acciones destructivas.
+- **INF-140-04:** `MATRIZ_INF_140.md` generada con 12 A, 16 I y 75 E y criterios cloud `NOT_RUN`; los contratos E son OpenAPI sin handler.
+- **INF-140-05:** `ACCESO_OPERACIONAL.md` con identidades temporales, SSM en ventana, auditoria y minimo privilegio; se rechazan root, SSH publico, claves estaticas y cambio de SCP.
+- **INF-140-06:** `INVENTARIO_INFRAESTRUCTURA.md` derivado de I-120/I-130 y catalogo: 17 recursos core y 3 auxiliares con owner, criticidad, costo estimado y `AWS_NOT_VERIFIED`.
+- Pruebas: 45 nuevas (suite de operacion 149). Sin AWS, sin drills reales y sin merge.
