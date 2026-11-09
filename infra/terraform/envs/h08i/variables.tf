@@ -199,3 +199,9 @@ variable "secretos_publicador_arn" {
   type        = string
   default     = ""
 }
+
+variable "secretos_gestor_iac_arn" {
+  description = "ARN del rol IAM que ejecuta Terraform sobre el bucket de secretos (RFC-004). Vacio = plan fail-closed."
+  type        = string
+  default     = ""
+}

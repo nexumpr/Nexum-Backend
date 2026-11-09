@@ -755,3 +755,11 @@
 - Bootstrap: `SECRETOS_URI` + `python3` valida `{version, variables{...}}`, exige `APP_ENV`, rechaza claves y valores invalidos, escribe `/etc/nexum/backend.env` atomico en `0640 root:nexum` y **falla cerrado** si el bundle falta o es invalido.
 - Excepcion acotada de Trivy `AWS-0132` solo para `modules/secretos/main.tf`, justificada por la RFC aprobada (SSE-S3 sin CMK).
 - `fmt`/`validate` PASS. `AWS_NOT_RUN`; el bucket y el bundle **no** existen.
+
+### RFC-004: excepcion de ListBucket para el rol gestor IaC (2026-11-09)
+
+- Defecto real: el Deny global de `s3:ListBucket` habria impedido el refresh de `aws_s3_bucket` (HeadBucket exige esa accion en hashicorp/aws v5.72.0), rompiendo plan/apply tras instalar la policy.
+- Correccion: Deny global se mantiene para `ListBucketVersions` y `ListBucketMultipartUploads`; `ListBucket` se deniega con `ArnNotEquals aws:PrincipalArn` y valor unico `var.gestor_iac_arn`. La excepcion es ausencia de Deny, no un Allow: el rol necesita IAM propio y no obtiene acceso a objetos.
+- `gestor_iac_arn` validado como rol IAM, distinto de runtime y publicador; vacio o invalido falla el plan (validate local no se bloquea). Sin ARNs reales inventados ni derivacion desde STS.
+- Alcance residual declarado: el gestor puede enumerar nombres de claves, no contenidos.
+- Pruebas: 59 en `test_secretos_contrato.py`, 6 nuevas para el gestor y el resto de principales. `AWS_NOT_RUN`.

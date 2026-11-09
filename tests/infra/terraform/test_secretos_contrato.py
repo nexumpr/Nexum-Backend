@@ -97,6 +97,7 @@ class ModuloSecretos(unittest.TestCase):
             .replace("var.rol_runtime_arn", f'"{self.RUNTIME}"')
             .replace("var.publicador_arn", f'"{self.PUBLICADOR}"')
             .replace("var.admin_arn", f'"{self.ADMIN}"')
+            .replace("var.gestor_iac_arn", f'"{self.IAC}"')
         )
         salida: list[dict] = []
         for trozo in _bloques(base, "statement"):
@@ -176,7 +177,7 @@ class ModuloSecretos(unittest.TestCase):
                 if variable == "aws:SecureTransport" and prueba == "Bool":
                     if tls is True and "false" in valores:
                         return False
-                elif variable == "aws:PrincipalArn" and prueba == "StringNotEquals":
+                elif variable == "aws:PrincipalArn" and prueba in ("StringNotEquals", "ArnNotEquals"):
                     if principal in valores:
                         return False
                 elif variable == "s3:x-amz-server-side-encryption":
@@ -218,6 +219,7 @@ class ModuloSecretos(unittest.TestCase):
     PUBLICADOR = "arn:aws:iam::111122223333:role/nexum-publicador"
     AJENO = "arn:aws:iam::111122223333:role/otra-app-amplia"
     ADMIN = "arn:aws:iam::111122223333:role/nexum-recuperacion"
+    IAC = "arn:aws:iam::111122223333:role/nexum-iac-gestor"
     OBJETO = "arn:aws:s3:::bucket/nexum/secrets/v1/secrets.json"
     FUERA = "arn:aws:s3:::bucket/otros/secrets.json"
 
@@ -301,6 +303,48 @@ class ModuloSecretos(unittest.TestCase):
         self.assertIn('variable = "aws:PrincipalArn"', self.main)
         self.assertNotIn("not_principals", self.main)
         self.assertNotIn("NotPrincipal", self.main)
+
+    def test_gestor_iac_lista_bucket_sin_deny(self) -> None:
+        # La excepcion es ausencia de Deny, no un Allow del bucket.
+        bucket = "arn:aws:s3:::bucket"
+        self.assertEqual(
+            self._decidir(self.IAC, "s3:ListBucket", bucket, identidad_permite=True), "ALLOW"
+        )
+
+    def test_gestor_iac_sin_iam_no_obtiene_allow(self) -> None:
+        bucket = "arn:aws:s3:::bucket"
+        self.assertEqual(
+            self._decidir(self.IAC, "s3:ListBucket", bucket, identidad_permite=False), "DENY"
+        )
+
+    def test_gestor_iac_no_lista_versiones_ni_multipart(self) -> None:
+        bucket = "arn:aws:s3:::bucket"
+        for accion in ("s3:ListBucketVersions", "s3:ListBucketMultipartUploads"):
+            self.assertEqual(
+                self._decidir(self.IAC, accion, bucket, identidad_permite=True), "DENY", accion
+            )
+
+    def test_gestor_iac_no_accede_a_los_objetos(self) -> None:
+        for accion in ("s3:GetObject", "s3:PutObject", "s3:DeleteObject"):
+            self.assertEqual(
+                self._decidir(self.IAC, accion, self.OBJETO, identidad_permite=True), "DENY", accion
+            )
+
+    def test_list_bucket_denegado_al_resto(self) -> None:
+        bucket = "arn:aws:s3:::bucket"
+        for principal in (self.RUNTIME, self.PUBLICADOR, self.AJENO, self.ADMIN):
+            self.assertEqual(
+                self._decidir(principal, "s3:ListBucket", bucket, identidad_permite=True),
+                "DENY",
+                principal,
+            )
+
+    def test_gestor_iac_aislado_y_validado(self) -> None:
+        self.assertIn('variable "gestor_iac_arn"', self.variables)
+        self.assertIn("var.gestor_iac_arn != var.rol_runtime_arn", self.main)
+        self.assertIn("var.gestor_iac_arn != var.publicador_arn", self.main)
+        self.assertIn("^arn:aws:iam::[0-9]{12}:role/.+$", self.main)
+        self.assertIn("ArnNotEquals", self.main)
 
     def test_administracion_no_implica_lectura_de_secretos(self) -> None:
         # La recuperacion usa s3:PutBucketPolicy (plano de control), que esta

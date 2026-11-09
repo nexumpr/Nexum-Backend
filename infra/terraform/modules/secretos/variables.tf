@@ -41,3 +41,9 @@ variable "publicador_arn" {
   type        = string
   default     = ""
 }
+
+variable "gestor_iac_arn" {
+  description = "ARN del rol IAM que ejecuta Terraform; unico exento del Deny de s3:ListBucket para permitir HeadBucket en el refresh. No concede lectura de objetos."
+  type        = string
+  default     = ""
+}

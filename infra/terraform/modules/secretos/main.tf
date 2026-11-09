@@ -196,11 +196,10 @@ data "aws_iam_policy_document" "secretos" {
   # 5b. ListBucket no lo necesita ninguna identidad de este diseno: se deniega
   #     para todos, incluidos runtime y publicador, y para IAM amplio.
   statement {
-    sid    = "DenegarListBucket"
+    sid    = "DenegarListadoDeVersionesYMultipart"
     effect = "Deny"
 
     actions = [
-      "s3:ListBucket",
       "s3:ListBucketVersions",
       "s3:ListBucketMultipartUploads",
     ]
@@ -209,6 +208,39 @@ data "aws_iam_policy_document" "secretos" {
     principals {
       type        = "*"
       identifiers = ["*"]
+    }
+  }
+
+  # 5b. ListBucket se deniega a todos salvo al rol gestor de IaC.
+  #
+  #     Motivo: `HeadBucket` exige `s3:ListBucket` (AWS S3 API, HeadBucket), y el
+  #     recurso `aws_s3_bucket` del proveedor hashicorp/aws v5.72.0 lo invoca en el
+  #     refresh. Un Deny global dejaria el propio bucket policy sin poder refrescarse,
+  #     incluso para el operador de Terraform.
+  #
+  #     La excepcion es solo AUSENCIA DE DENY, no un Allow: el rol gestor necesita
+  #     ademas `s3:ListBucket` en su policy de identidad. No recibe GetObject,
+  #     PutObject ni DeleteObject por esta via.
+  #
+  #     Alcance residual declarado: `s3:ListBucket` y `HeadBucket` comparten accion,
+  #     de modo que el gestor puede listar las claves del bucket (nombres, no
+  #     contenidos). El bucket solo contiene el bundle y su versionado.
+  statement {
+    sid    = "DenegarListBucket"
+    effect = "Deny"
+
+    actions   = ["s3:ListBucket"]
+    resources = ["${aws_s3_bucket.secretos.arn}"]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "ArnNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [var.gestor_iac_arn]
     }
   }
 
@@ -253,7 +285,7 @@ resource "aws_s3_bucket_policy" "secretos" {
 }
 
 resource "terraform_data" "secretos_preconditions" {
-  input = "${var.prefijo}|${var.retencion_version_dias}|${var.rol_runtime_arn}|${var.publicador_arn}"
+  input = "${var.prefijo}|${var.retencion_version_dias}|${var.rol_runtime_arn}|${var.publicador_arn}|${var.gestor_iac_arn}"
 
   lifecycle {
     precondition {
@@ -280,6 +312,16 @@ resource "terraform_data" "secretos_preconditions" {
     precondition {
       condition     = var.rol_runtime_arn != var.publicador_arn
       error_message = "El rol runtime y el publicador deben ser identidades distintas: el runtime no puede publicar."
+    }
+
+    precondition {
+      condition     = can(regex("^arn:aws:iam::[0-9]{12}:role/.+$", var.gestor_iac_arn))
+      error_message = "gestor_iac_arn debe ser un ARN de ROL IAM (no sesion STS): sin el, el refresh del bucket falla cerrado."
+    }
+
+    precondition {
+      condition     = var.gestor_iac_arn != var.rol_runtime_arn && var.gestor_iac_arn != var.publicador_arn
+      error_message = "El rol gestor de IaC debe ser distinto del runtime y del publicador."
     }
   }
 }
