@@ -103,3 +103,43 @@ No se declara integración cloud `PASS` a partir de mocks o adaptadores en memor
 - El SBOM no sustituye pruebas de seguridad dinámicas.
 - La cobertura de sentencias no mide comportamiento en producción.
 - Branch protection: **BLOQUEADO_PLAN_GITHUB** (HTTP 403 verificado en repositorio privado).
+
+## Grafo modernizado (RFC-008)
+
+- Implementacion local del grafo de doce jobs con `needs:` reales; `AWS_NOT_RUN`.
+- Evidencia de ejecucion: se registra en este documento **solo** cuando el run existe,
+  con su `run_id` y su SHA. Mientras no exista, el estado es `NOT_RUN`.
+- Artefactos exigidos por el Quality Gate: `binario-<sha>`, `cobertura-<sha>`,
+  `mutacion-<sha>`, `dependencias-<sha>`, `sbom-spdx-<sha>`, `semgrep-<sha>`,
+  `integracion-<sha>`, `quality-gate-<sha>`, `hardening-report-<sha>`.
+- `MUTATION = BLOCKED_TECNICO_MUTACION`: no se publican metricas de mutacion.
+- `DAST = NOT_RUN`: sin entorno autorizado.
+
+## Evidencia de ejecucion del grafo (RFC-008)
+
+- **Run `42585629797`** (PR #36), merge SHA `7e98eb1c59cbe1ffb3c1154523a0e119aa774adf`:
+  los **12 jobs** del grafo en `pass`, mas el job `validar` del workflow documental.
+- Run previo **`42584777751`** con **3 fallos propios**, registrados sin ocultarlos:
+  1. la prueba de integracion esperaba `NOT_READY` y el `ReadyHandler` responde `DOWN` (503);
+  2. el fixture SAST en `tests/fixtures/semgrep` no se analizaba porque Semgrep aplica su
+     `.semgrepignore` por defecto a `tests/`;
+  3. la misma prueba de integracion hacia fallar `go test ./...` en el job `calidad`.
+
+  Corregidos en `a69610f`: asercion `DOWN`, fixture movido a
+  `herramientas/semgrep/fixtures/inseguro`, `.semgrepignore` propio que solo excluye
+  `tests/fixtures/` y guarda que exige al escaneo SAST haber alcanzado archivos.
+- **Quality Gate real**: `PASS`, 8 jobs correctos, **8 artefactos verificados**, 0 fallos.
+- **Semgrep**: **86 archivos escaneados**, 0 hallazgos en el codigo; el fixture negativo fue
+  detectado por las cuatro reglas.
+- **Integracion**: pruebas con `-race` en verde y binario real sondeado por TCP
+  (`/api/v1/health/live` 200, ruta inexistente 404, `POST` 405, `/api/v1/health/ready` 503).
+- **Mutacion**: `BLOCKED_TECNICO_MUTACION` con motivos
+  `pruebas_en_el_mismo_paquete` y `herramienta_instalada_en_el_runner`; sin metricas.
+- **Hardening Report**: generado y publicado (`hardening-report-<sha>`), con perfil
+  `{"api": true, "completo": true, "go": true, "infra": true, "sdd": true}`.
+- **Demostracion en rojo del gate** (local, escenario simulado `calidad=failure`,
+  `iac`/`integracion` omitidos con perfil completo): estado `FAIL`, codigo de salida 1 y
+  seis motivos: `calidad: resultado 'failure'`, tres artefactos faltantes y dos omisiones
+  injustificadas.
+- `AWS_NOT_RUN`, `DEPLOY_NOT_RUN`, `HTTP_AWS_NOT_RUN`, `TWO_NODES_AWS_NOT_VERIFIED`,
+  `DAST_NOT_RUN`.

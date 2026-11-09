@@ -94,3 +94,34 @@ Cualquier otro HIGH/CRITICAL sin RFC firmada sigue bloqueando.
 - PR de forks no reciben secretos del repositorio.
 - OIDC/credenciales cloud quedan fuera de I-080: pertenecen a I-090 y a un Gate posterior.
 - No se ejecuta Docker ni `terraform apply/destroy` en CI.
+
+## Grafo modernizado (RFC-008, 2026-11-09)
+
+Los checks exigidos para el merge son los doce del grafo vigente:
+
+| Check | Job |
+|---|---|
+| Deteccion de cambios | `detectar` |
+| Formato, vet, build y pruebas | `calidad` |
+| Analisis estatico y vulnerabilidades | `seguridad` |
+| Escaneo de secretos | `secretos` |
+| Validacion Terraform e IaC | `iac` |
+| Contratos OpenAPI y herramientas | `contratos` |
+| SBOM de dependencias | `cadena-suministro` |
+| SAST Semgrep | `sast-semgrep` |
+| Integracion HTTP y concurrencia | `integracion` |
+| PR Quality Gate | `quality-gate` |
+| Hardening Report | `hardening-report` |
+| CI Success | `ci-success` |
+
+`quality-gate` acepta `skipped` unicamente si el perfil de cambios lo justifica y lo
+registra; cualquier `failure`, `cancelled`, resultado ausente o artefacto exigido no
+publicado bloquea. `ci-success` es el unico nodo que declara el resultado final.
+
+**La proteccion de ramas sigue `BLOQUEADO_PLAN_GITHUB`** (HTTP 403 en repositorio
+privado con el plan actual): estos checks se exigen por el propio pipeline y por la
+revision humana del merge autorizado, no por una regla de GitHub. No se declara
+proteccion activa ni se cambia de plan.
+
+La excepcion temporal de WAF (RFC-006, AWS-0011) mantiene su vigencia y su verificacion
+automatica dentro del job `iac`; ninguna otra excepcion esta autorizada.

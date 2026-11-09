@@ -58,3 +58,13 @@
 - [x] Decision humana sobre RFC-006 concedida; el job iac vuelve a verde sin silenciar el escaner.
 - [x] Vigencia de RFC-006 automatizada en CI (caducidad, revocacion, discrepancias y Gate AWS); la excepcion no sobrevive a su autorizacion.
 - [x] Clasificacion ejecutado vs pendiente de servicios reales documentada; sin declarar integracion cloud por mocks.
+
+- [x] Grafo de jobs con `needs:` reales, sin ciclos y sin dependencias artificiales.
+- [x] Deteccion de cambios fail-closed, sin omitir validaciones obligatorias.
+- [x] SAST Semgrep con reglas propias, version fijada y prueba negativa.
+- [x] Integracion de capas reales con `-race` y binario real sondeado.
+- [x] Mutation testing evaluado y documentado como `BLOCKED_TECNICO_MUTACION`.
+- [x] Quality Gate fail-closed ante fallo, cancelacion, omision y artefacto ausente.
+- [x] Hardening Report generado tambien con controles en rojo.
+- [x] `tests/infra/ci` conectado al pipeline (hallazgo H-03).
+- [x] `sdd-validacion.yml` con accion fijada por SHA (hallazgo H-02).

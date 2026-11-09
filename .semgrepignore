@@ -1,0 +1,10 @@
+# Exclusions de Semgrep para este repositorio (RFC-008).
+#
+# Al existir este archivo, Semgrep deja de aplicar su lista por defecto (que excluye
+# tests/) y usa exclusivamente esta. Se excluyen unicamente los fixtures
+# deliberadamente inseguros; el resto del codigo se analiza con directorios explicitos:
+#   cmd internal pkg tests/unit tests/security tests/integration
+#
+# El fixture de herramientas/semgrep/fixtures/inseguro se analiza aparte en el paso
+# negativo del job `sast-semgrep`, que exige que las cuatro reglas detecten su patron.
+tests/fixtures/

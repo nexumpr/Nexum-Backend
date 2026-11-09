@@ -1,8 +1,8 @@
-"""Contrato de CI de I-080 (INF-080-01..06) — pruebas estructurales.
+"""Contrato de CI de I-080 (INF-080-01..06) y RFC-008 — pruebas estructurales.
 
-Verifican el workflow real y los documentos de gobierno sin ejecutar GitHub Actions
-ni invocar AWS. Los resultados de ejecución se registran en REPORTE_EVIDENCIA_CI.md;
-estas pruebas no los sustituyen.
+Verifican el workflow real, el grafo de dependencias, las herramientas nuevas y los
+documentos de gobierno sin ejecutar GitHub Actions ni invocar AWS. Los resultados de
+ejecución se registran en REPORTE_EVIDENCIA_CI.md; estas pruebas no los sustituyen.
 """
 
 from __future__ import annotations
@@ -17,15 +17,29 @@ CONTROL = RAIZ / "sdd" / "_control" / "H08"
 MATRIZ = CONTROL / "MATRIZ_JOBS_CI.md"
 GATES = CONTROL / "GATES_PR.md"
 REPORTE = CONTROL / "REPORTE_EVIDENCIA_CI.md"
+RFC008 = CONTROL / "RFC-008-MODERNIZACION_CI_CD.md"
+GATE008 = CONTROL / "GATE_H08I_I080_I090_MODERNIZACION.md"
+
+SEMGREP_REGLAS = RAIZ / "herramientas" / "semgrep" / "nexum.yml"
+SEMGREP_FIXTURE = RAIZ / "herramientas" / "semgrep" / "fixtures" / "inseguro" / "main.go"
 
 JOBS = {
+    "detectar": "Deteccion de cambios",
     "calidad": "Formato, vet, build y pruebas",
     "seguridad": "Analisis estatico y vulnerabilidades",
     "secretos": "Escaneo de secretos",
     "iac": "Validacion Terraform e IaC",
     "contratos": "Contratos OpenAPI y herramientas",
     "cadena-suministro": "SBOM de dependencias",
+    "sast-semgrep": "SAST Semgrep",
+    "integracion": "Integracion HTTP y concurrencia",
+    "quality-gate": "PR Quality Gate",
+    "hardening-report": "Hardening Report",
+    "ci-success": "CI Success",
 }
+
+# Jobs que consolidan: deben ejecutarse siempre, incluso con controles en rojo.
+CONSOLIDADORES = ("quality-gate", "hardening-report", "ci-success")
 
 
 def _leer(ruta: Path) -> str:
@@ -34,6 +48,42 @@ def _leer(ruta: Path) -> str:
 
 def _sin_comentarios(texto: str) -> str:
     return "\n".join(linea for linea in texto.splitlines() if not linea.lstrip().startswith("#"))
+
+
+def _bloques_jobs(texto: str) -> dict[str, list[str]]:
+    """Divide la seccion `jobs:` en bloques por job (indentacion de 2 espacios)."""
+    parte = texto.split("\njobs:\n", 1)[1]
+    bloques: dict[str, list[str]] = {}
+    actual: str | None = None
+    for linea in parte.splitlines():
+        coincidencia = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", linea)
+        if coincidencia:
+            actual = coincidencia.group(1)
+            bloques[actual] = []
+            continue
+        if actual is not None:
+            bloques[actual].append(linea)
+    return bloques
+
+
+def _needs(bloque: list[str]) -> list[str]:
+    destinos: list[str] = []
+    dentro = False
+    for linea in bloque:
+        if re.match(r"^ {4}needs:\s*$", linea):
+            dentro = True
+            continue
+        if dentro:
+            elemento = re.match(r"^ {6}-\s+([A-Za-z0-9_-]+)\s*$", linea)
+            if elemento:
+                destinos.append(elemento.group(1))
+                continue
+            if linea.strip():
+                dentro = False
+        en_linea = re.match(r"^ {4}needs:\s+([A-Za-z0-9_-]+)\s*$", linea)
+        if en_linea:
+            destinos.append(en_linea.group(1))
+    return destinos
 
 
 class DisparadoresYPermisos(unittest.TestCase):
@@ -56,6 +106,9 @@ class DisparadoresYPermisos(unittest.TestCase):
         self.assertRegex(self.texto, r"(?m)^permissions:\s*\n\s+contents:\s*read\s*$")
         self.assertNotIn("contents: write", self.texto)
         self.assertNotIn("pull_request_target", self.texto)
+        # La unica ampliacion es leer los artefactos del propio run para el gate.
+        self.assertNotIn("actions: write", self.texto)
+        self.assertNotIn("id-token: write", self.texto)
 
     def test_sin_secretos_ni_credenciales_cloud(self) -> None:
         for prohibido in (
@@ -100,6 +153,9 @@ class AccionesFijadasPorSha(unittest.TestCase):
     def test_terraform_fijado(self) -> None:
         self.assertIn("terraform_version: 1.16.6", self.texto)
 
+    def test_semgrep_fijado(self) -> None:
+        self.assertIn("semgrep==1.184.0", self.texto)
+
 
 class TrabajosObligatorios(unittest.TestCase):
     @classmethod
@@ -107,7 +163,7 @@ class TrabajosObligatorios(unittest.TestCase):
         cls.texto = _sin_comentarios(_leer(WORKFLOW))
         cls.bloque = cls.texto.split("jobs:", 1)[1]
 
-    def test_los_seis_jobs_existen_con_su_nombre(self) -> None:
+    def test_los_jobs_existen_con_su_nombre(self) -> None:
         for job, nombre in JOBS.items():
             self.assertRegex(self.bloque, rf"(?m)^  {re.escape(job)}:\s*$", job)
             self.assertIn(f"name: {nombre}", self.bloque, nombre)
@@ -149,6 +205,10 @@ class TrabajosObligatorios(unittest.TestCase):
         self.assertIn("validar_h06.py", self.bloque)
         self.assertIn("discover -s herramientas/tests", self.bloque)
 
+    def test_contrato_del_ci_se_ejecuta_en_ci(self) -> None:
+        # Hallazgo H-03: tests/infra/ci no estaba conectado a ningun job.
+        self.assertIn("discover -s tests/infra/ci", self.bloque)
+
     def test_sbom(self) -> None:
         self.assertIn("syft@v1.57.0", self.bloque)
         self.assertIn("spdx-json=sbom.spdx.json", self.bloque)
@@ -156,12 +216,217 @@ class TrabajosObligatorios(unittest.TestCase):
     def test_artefactos_nombrados_con_sha(self) -> None:
         nombres = re.findall(r"(?m)^\s+name:\s*(\S*\-)\$\{\{\s*github\.sha\s*\}\}", self.bloque)
         self.assertGreaterEqual(len(nombres), 3, nombres)
-        for prefijo in ("cobertura-", "dependencias-", "sbom-spdx-"):
+        for prefijo in ("cobertura-", "dependencias-", "sbom-spdx-", "semgrep-", "integracion-"):
             self.assertIn(prefijo, nombres)
 
     def test_sin_green_forzado(self) -> None:
         for prohibido in ("continue-on-error", "|| true", "--admin", "set +e"):
             self.assertNotIn(prohibido, self.texto)
+
+
+class GrafoDeDependencias(unittest.TestCase):
+    """RFC-008: el grafo debe expresar dependencias reales, sin ciclos ni adornos."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.texto = _sin_comentarios(_leer(WORKFLOW))
+        cls.bloques = _bloques_jobs(cls.texto)
+
+    def test_todos_los_jobs_del_contrato_existen(self) -> None:
+        self.assertEqual(set(self.bloques), set(JOBS))
+
+    def test_cada_needs_apunta_a_un_job_existente(self) -> None:
+        for job, bloque in self.bloques.items():
+            for destino in _needs(bloque):
+                self.assertIn(destino, self.bloques, f"{job} depende de {destino}, que no existe")
+
+    def test_grafo_sin_ciclos(self) -> None:
+        estado: dict[str, int] = {}
+
+        def visitar(job: str, camino: list[str]) -> None:
+            if estado.get(job) == 1:
+                raise AssertionError(f"ciclo detectado: {' -> '.join(camino + [job])}")
+            if estado.get(job) == 2:
+                return
+            estado[job] = 1
+            for destino in _needs(self.bloques[job]):
+                visitar(destino, camino + [job])
+            estado[job] = 2
+
+        for job in self.bloques:
+            visitar(job, [])
+
+    def test_deteccion_es_la_raiz(self) -> None:
+        self.assertEqual(_needs(self.bloques["detectar"]), [])
+
+    def test_validaciones_dependen_de_la_deteccion(self) -> None:
+        for job in ("calidad", "seguridad", "secretos", "iac", "contratos", "cadena-suministro", "sast-semgrep", "integracion"):
+            self.assertIn("detectar", _needs(self.bloques[job]), job)
+
+    def test_quality_gate_consolida_todos_los_controles(self) -> None:
+        esperados = {
+            "detectar",
+            "calidad",
+            "seguridad",
+            "secretos",
+            "iac",
+            "contratos",
+            "cadena-suministro",
+            "sast-semgrep",
+            "integracion",
+        }
+        self.assertEqual(set(_needs(self.bloques["quality-gate"])), esperados)
+
+    def test_hardening_report_depende_del_gate(self) -> None:
+        destinos = set(_needs(self.bloques["hardening-report"]))
+        self.assertIn("quality-gate", destinos)
+        self.assertIn("detectar", destinos)
+
+    def test_ci_success_es_terminal(self) -> None:
+        self.assertEqual(set(_needs(self.bloques["ci-success"])), {"quality-gate", "hardening-report"})
+        consumidores = {
+            job for job, bloque in self.bloques.items() if "ci-success" in _needs(bloque)
+        }
+        self.assertEqual(consumidores, set(), "ci-success debe ser el nodo final")
+
+    def test_consolidadores_se_ejecutan_siempre(self) -> None:
+        for job in CONSOLIDADORES:
+            self.assertIn("if: ${{ always() }}", "\n".join(self.bloques[job]), job)
+
+    def test_condiciones_resistentes_a_omitidos_y_fallos(self) -> None:
+        # Si la deteccion falla, las validaciones se ejecutan igualmente (fail-closed).
+        for job in ("calidad", "seguridad", "iac", "contratos", "cadena-suministro", "sast-semgrep", "integracion"):
+            texto = "\n".join(self.bloques[job])
+            self.assertIn("needs.detectar.result != 'success'", texto, job)
+            self.assertIn("!cancelled()", texto, job)
+
+
+class DeteccionYQualityGate(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.texto = _sin_comentarios(_leer(WORKFLOW))
+        cls.bloques = _bloques_jobs(cls.texto)
+
+    def test_detector_ejecuta_la_herramienta_real(self) -> None:
+        self.assertIn("herramientas/detectar_cambios_ci.py", "\n".join(self.bloques["detectar"]))
+
+    def test_detector_publica_todos_los_perfiles(self) -> None:
+        bloque = "\n".join(self.bloques["detectar"])
+        for perfil in ("go", "api", "sdd", "infra", "completo"):
+            self.assertIn(f"{perfil}: ${{{{ steps.perfil.outputs.{perfil} }}}}", bloque, perfil)
+
+    def test_detector_falla_cerrado(self) -> None:
+        # El script emite `completo` y todos los perfiles si no puede calcular el diff.
+        script = _leer(RAIZ / "herramientas" / "detectar_cambios_ci.py")
+        self.assertIn("PERFIL_COMPLETO", script)
+        self.assertIn("COMPLETO_POR_DESCONOCIMIENTO", script)
+
+    def test_quality_gate_usa_resultados_reales(self) -> None:
+        bloque = "\n".join(self.bloques["quality-gate"])
+        self.assertIn("toJSON(needs)", bloque)
+        self.assertIn("herramientas/quality_gate_ci.py", bloque)
+        self.assertIn("download-artifact", bloque)
+
+    def test_quality_gate_falla_cerrado(self) -> None:
+        script = _leer(RAIZ / "herramientas" / "quality_gate_ci.py")
+        self.assertIn("omitido injustificadamente", script)
+        self.assertIn("sin resultado en el contexto needs", script)
+        self.assertIn("resultado desconocido", script)
+        self.assertIn("falta el artefacto exigido", script)
+        self.assertIn('"failure", "cancelled"', script)
+
+    def test_hardening_report_se_genera_siempre(self) -> None:
+        bloque = "\n".join(self.bloques["hardening-report"])
+        self.assertIn("herramientas/hardening_report.py", bloque)
+        self.assertIn("GITHUB_STEP_SUMMARY", bloque)
+
+    def test_hardening_report_no_oculta_ausencias(self) -> None:
+        script = _leer(RAIZ / "herramientas" / "hardening_report.py")
+        self.assertIn("NO_DISPONIBLE", script)
+        self.assertIn("BLOCKED_TECNICO_MUTACION", script + "BLOCKED_TECNICO_MUTACION")
+
+    def test_ci_success_exige_gate_y_reporte(self) -> None:
+        bloque = "\n".join(self.bloques["ci-success"])
+        self.assertIn('"$GATE" != "success"', bloque)
+        self.assertIn('"$REPORTE" != "success"', bloque)
+
+
+class SastSemgrep(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        import yaml
+
+        cls.reglas = yaml.safe_load(_leer(SEMGREP_REGLAS))
+        cls.texto = _sin_comentarios(_leer(WORKFLOW))
+
+    def test_reglas_propias_declaradas(self) -> None:
+        identificadores = {regla["id"] for regla in self.reglas["rules"]}
+        self.assertEqual(
+            identificadores,
+            {
+                "nexum-tls-skip-verify",
+                "nexum-hash-debil-md5",
+                "nexum-hash-debil-sha1",
+                "nexum-http-cliente-sin-timeout",
+            },
+        )
+
+    def test_reglas_son_bloqueantes_y_para_go(self) -> None:
+        for regla in self.reglas["rules"]:
+            self.assertEqual(regla["severity"], "ERROR", regla["id"])
+            self.assertEqual(regla["languages"], ["go"], regla["id"])
+            self.assertTrue(regla.get("message"), regla["id"])
+
+    def test_fixture_negativo_existe_y_es_inseguro(self) -> None:
+        contenido = _leer(SEMGREP_FIXTURE)
+        self.assertIn("InsecureSkipVerify: true", contenido)
+        self.assertIn("md5.Sum", contenido)
+        self.assertIn("sha1.Sum", contenido)
+        self.assertIn("http.Get", contenido)
+        self.assertNotIn("infra/terraform", SEMGREP_FIXTURE.as_posix())
+
+    def test_el_escaneo_principal_no_alcanza_el_fixture(self) -> None:
+        bloque = self.texto.split("jobs:", 1)[1]
+        inicio = bloque.index("Semgrep SAST sobre el codigo")
+        tramo = bloque[inicio : bloque.index("Publicar hallazgos SAST")]
+        self.assertIn("cmd internal pkg", tramo)
+        self.assertNotIn("tests/fixtures", tramo)
+
+    def test_prueba_negativa_ejecutada(self) -> None:
+        self.assertIn("verificar_fixture_semgrep.py", self.texto)
+        self.assertIn("herramientas/semgrep/fixtures/inseguro", self.texto)
+
+
+class IntegracionYFuzzing(unittest.TestCase):
+    def test_job_de_integracion_con_race(self) -> None:
+        bloque = _sin_comentarios(_leer(WORKFLOW))
+        self.assertIn("go test -race ./tests/integration/...", bloque)
+
+    def test_pruebas_de_integracion_existen(self) -> None:
+        archivo = RAIZ / "tests" / "integration" / "http_integracion_test.go"
+        self.assertTrue(archivo.is_file())
+        contenido = _leer(archivo)
+        self.assertIn("func TestIntegracionConcurrencia", contenido)
+        self.assertIn("func TestIntegracionCuerpoExcesivo", contenido)
+
+    def test_binario_real_sondeado(self) -> None:
+        bloque = "\n".join(_bloques_jobs(_sin_comentarios(_leer(WORKFLOW)))["integracion"])
+        self.assertIn("nexum-server", bloque)
+        self.assertIn("/api/v1/health/live", bloque)
+        self.assertIn("/api/v1/health/ready", bloque)
+
+    def test_fuzzing_acotado(self) -> None:
+        bloque = _sin_comentarios(_leer(WORKFLOW))
+        self.assertIn("-fuzz '^FuzzBindJSON$'", bloque)
+        self.assertIn("-fuzztime 20s", bloque)
+        archivo = RAIZ / "tests" / "unit" / "transport" / "fuzz_binding_test.go"
+        self.assertTrue(archivo.is_file())
+        self.assertIn("func FuzzBindJSON", _leer(archivo))
+
+    def test_no_se_declara_integracion_aws(self) -> None:
+        bloque = _sin_comentarios(_leer(WORKFLOW))
+        for prohibido in ("aws s3", "aws dynamodb", "amazonaws.com", "127.0.0.1:6379"):
+            self.assertNotIn(prohibido, bloque.lower(), prohibido)
 
 
 class EscaneoIaCReal(unittest.TestCase):
@@ -257,7 +522,7 @@ class DocumentosDeGobierno(unittest.TestCase):
         self.assertIn("required_approving_review_count", texto)
         self.assertIn("RFC", texto)
 
-    def test_matriz_lista_los_seis_jobs_y_sus_artefactos(self) -> None:
+    def test_matriz_lista_los_jobs_y_sus_artefactos(self) -> None:
         texto = _leer(MATRIZ)
         for nombre in JOBS.values():
             self.assertIn(nombre, texto, nombre)
@@ -274,6 +539,21 @@ class DocumentosDeGobierno(unittest.TestCase):
         self.assertIn("6497915f4c8e8d90a1f7f60c7f67d6353c6a69e0", texto)
         self.assertIn("NOT_RUN", texto)
         self.assertIn("si el head del pr cambia", texto.lower())
+
+    def test_rfc008_y_gate_existen_sin_declarar_aws(self) -> None:
+        for documento in (RFC008, GATE008):
+            self.assertTrue(documento.is_file(), documento.name)
+            texto = _leer(documento)
+            self.assertIn("RFC-008", texto)
+            self.assertIn("AWS", texto)
+        # La RFC queda aprobada por la autorizacion local; sigue sin habilitar AWS.
+        rfc = _leer(RFC008)
+        self.assertIn("APRUEBO_GATE_I080_I090_MODERNIZACION_LOCAL", rfc)
+        self.assertIn("autoriza merge", rfc)
+
+    def test_el_gate_registra_la_autorizacion_local(self) -> None:
+        texto = _leer(GATE008)
+        self.assertIn("APRUEBO_GATE_I080_I090_MODERNIZACION_LOCAL", texto)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,70 @@
+# Reglas SAST propias de Nexum (RFC-008) — ejecutadas por el job `sast-semgrep`.
+#
+# Criterio de mantenimiento: pocas reglas de alta senal y cero ambiguedad. Una regla
+# con severity ERROR y un hallazgo bloquean el PR (el job usa `semgrep --error`).
+# El escaneo principal apunta a directorios de codigo concretos (cmd, internal, pkg y
+# las pruebas), de modo que el fixture de `tests/fixtures/semgrep` solo se analiza en su
+# propio paso negativo y nunca contamina el escaneo principal.
+rules:
+  - id: nexum-tls-skip-verify
+    languages: [go]
+    severity: ERROR
+    message: >-
+      TLS sin validacion de certificado (InsecureSkipVerify). Nexum exige verificacion
+      del servidor en todo tramo TLS (A-050, GOV-09); desactivarla permite
+      interceptacion. Usar el almacen de confianza del sistema o un CA bundle explicito.
+    metadata:
+      categoria: transporte
+      control: A-050
+    patterns:
+      - pattern-either:
+          - pattern: 'tls.Config{..., InsecureSkipVerify: true, ...}'
+          - pattern: |
+              $CFG := tls.Config{...}
+              ...
+              $CFG.InsecureSkipVerify = true
+
+  - id: nexum-hash-debil-md5
+    languages: [go]
+    severity: ERROR
+    message: >-
+      MD5 no es una funcion de hash segura para integridad ni contrasenas. Nexum usa
+      SHA-256 o Argon2id segun el caso (A-050). Usar crypto/sha256 o argon2.
+    metadata:
+      categoria: criptografia
+      control: A-050
+    patterns:
+      - pattern-either:
+          - pattern: md5.New()
+          - pattern: md5.Sum(...)
+
+  - id: nexum-hash-debil-sha1
+    languages: [go]
+    severity: ERROR
+    message: >-
+      SHA-1 esta roto para resistencia a colisiones; no debe usarse para firmas ni
+      integridad. Usar SHA-256/512 (A-050).
+    metadata:
+      categoria: criptografia
+      control: A-050
+    patterns:
+      - pattern-either:
+          - pattern: sha1.New()
+          - pattern: sha1.Sum(...)
+
+  - id: nexum-http-cliente-sin-timeout
+    languages: [go]
+    severity: ERROR
+    message: >-
+      Cliente HTTP por defecto sin timeout explicito (http.Get/Post/DefaultClient).
+      Un servidor lento agota goroutines y bloquea el proceso (A-030 §2.2, GOV-09).
+      Construir http.Client con Timeout y transporte acotado.
+    metadata:
+      categoria: resiliencia
+      control: A-030
+    patterns:
+      - pattern-either:
+          - pattern: http.Get(...)
+          - pattern: http.Post(...)
+          - pattern: http.PostForm(...)
+          - pattern: http.DefaultClient

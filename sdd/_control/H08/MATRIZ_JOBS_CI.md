@@ -83,3 +83,35 @@ registro público; no accede a state remoto ni a la cuenta.
 - El SBOM y los artefactos no sustituyen pruebas de runtime AWS.
 - La cobertura mide sentencias del dominio con `-coverpkg=all` y deduplicación por bloque; no mide
   comportamiento en producción.
+
+## Grafo modernizado (RFC-008, 2026-11-09)
+
+Estado: `IMPLEMENTADO_LOCAL` — sin AWS. La matriz anterior describe los seis jobs
+originales; este apartado documenta el grafo vigente.
+
+| Job | Nombre visible | Se ejecuta cuando | Artefacto |
+|---|---|---|---|
+| `detectar` | Deteccion de cambios | siempre | — |
+| `calidad` | Formato, vet, build y pruebas | `go` | `binario-<sha>`, `cobertura-<sha>`, `mutacion-<sha>` |
+| `seguridad` | Analisis estatico y vulnerabilidades | `go` | `dependencias-<sha>` |
+| `secretos` | Escaneo de secretos | siempre | — |
+| `iac` | Validacion Terraform e IaC | `infra` o `sdd` | `iac-devsecops-<sha>` |
+| `contratos` | Contratos OpenAPI y herramientas | `api`, `sdd` o `go` | — |
+| `cadena-suministro` | SBOM de dependencias | `go` | `sbom-spdx-<sha>` |
+| `sast-semgrep` | SAST Semgrep | `go` o `sdd` | `semgrep-<sha>` |
+| `integracion` | Integracion HTTP y concurrencia | `go` | `integracion-<sha>` |
+| `quality-gate` | PR Quality Gate | siempre (`if: always()`) | `quality-gate-<sha>` |
+| `hardening-report` | Hardening Report | siempre (`if: always()`) | `hardening-report-<sha>` |
+| `ci-success` | CI Success | siempre (`if: always()`) | — |
+
+Reglas del grafo:
+
+- `detectar` es la raiz; toda validacion depende de ella.
+- Si `detectar` falla, las validaciones se ejecutan igualmente (fail-closed) y el
+  Quality Gate falla porque el resultado de `detectar` no es `success`.
+- `quality-gate` depende de los nueve jobs anteriores y evalua `toJSON(needs)`.
+- `hardening-report` depende del gate y se genera tambien con controles en rojo.
+- `ci-success` solo depende de `quality-gate` y `hardening-report`.
+- Ningun control admite `continue-on-error`.
+- `cd-backend.yml` no forma parte de este grafo y no se ejecuta en PR ni push.
+- `AWS_NOT_RUN`, `DEPLOY_NOT_RUN`, `DAST_NOT_RUN`, `MUTATION = BLOCKED_TECNICO_MUTACION`.

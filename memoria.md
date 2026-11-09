@@ -705,3 +705,29 @@
 - **A — parser YAML:** se retira el parser artesanal y se adopta **PyYAML 6.0.2** fijado en `herramientas/requirements.txt` e instalado en CI. Un cargador propio rechaza claves duplicadas en cualquier profundidad (ruta, operacion, propiedad) y el YAML invalido falla cerrado. `paridad` compara ademas `components.schemas` (tipo, required, enum, items, additionalProperties, composicion y $ref) y `securitySchemes`: 88 esquemas contrastados; un cambio aislado de tipo o enum en el YAML produce `PARIDAD_ROTA`.
 - **B — excepciones:** se elimina la aprobacion por coincidencia textual. Solo cuenta un registro `sdd/_control/H08/EXCEPCIONES_COMPATIBILIDAD_API.json` con alcance `API_COMPATIBILIDAD`, codigo, ruta, metodo, RFC, aprobador, `gate_documento` con `APRUEBO` y RFC, y vigencia no vencida. RFC-004/005/006/007 se rechazan como autorizacion de API. Sin registro aprobado, toda excepcion se rechaza y el comparador falla cerrado.
 - Pruebas: 110 en `tests/infra/publicacion`. Sin AWS, sin HTTP real y sin merge.
+
+### I-150: cierre post-merge (2026-11-09)
+
+- **PR #35 MERGED** (merge `1e910d26507abc17257db5933c349e7a985bd8da`), HEAD autorizado `0285c23bbe0a5906eea07993383f95c594d7f373` verificado con `--match-head-commit`; merge con padres `7d1418a` y `0285c23`; `main` local = `origin/main`.
+- CI del PR 7/7 PASS (runs 42577747076 y 42577746991); CI de `main` en `1e910d2`: SDD documental run 42578553848 SUCCESS y Go Backend CI run 42578553811 SUCCESS (seis jobs, con PyYAML fijado e instalado).
+- Estado: **INTEGRADO_MAIN - NO DESPLEGADO**. `AWS_NOT_RUN`; `HTTP_AWS_NOT_RUN`; `DEPLOY_NOT_RUN`; `TWO_NODES_AWS_NOT_VERIFIED`; `DAST_NOT_RUN`.
+- Integrado: paridad semantica PyYAML (88 esquemas, duplicados rechazados), breaking changes de respuestas y seguridad efectiva con excepciones solo por autorizacion humana de API, matriz de 75 operaciones, cuatro niveles de evidencia HTTP y diseno de moderacion con `BLOCKED_DEPENDENCY`.
+- Con H08-I cerrado (I-000..I-150), el siguiente bloque es H08-E (E001..E075), que sigue `NOT_AUTHORIZED`.
+- Bloqueos intactos: H-01, RFC-004, RFC-006, RFC-007, D-100-01/02, D-110-01, ARTIFACT_DELIVERY, agente CloudWatch, readiness 503, OIDC/SCP, branch protection, creditos, BLOCKED_I130 y moderacion externa.
+
+### Modernizacion CI/CD (RFC-008) — 2026-11-09
+
+- Gate `APRUEBO_GATE_I080_I090_MODERNIZACION_LOCAL` registrado en `sdd/_control/H08/GATE_H08I_I080_I090_MODERNIZACION.md`; RFC-008 en `sdd/_control/H08/RFC-008-MODERNIZACION_CI_CD.md`. Rama `feat/ci-modernizacion-grafo` desde `main` `1e910d2`.
+- Grafo de **12 jobs** con `needs:` reales: `detectar` -> `calidad`, `seguridad`, `secretos`, `iac`, `contratos`, `cadena-suministro`, `sast-semgrep`, `integracion` -> `quality-gate` -> `hardening-report` -> `ci-success`. Antes habia 6 jobs y **una sola** arista (`needs: preflight` en el CD).
+- Deteccion de cambios fail-closed (`herramientas/detectar_cambios_ci.py`): perfiles `go`, `api`, `sdd`, `infra`, `completo`; un cambio en workflows, `herramientas/`, `go.mod`, `go.sum`, `.gitleaks*`, `.trivyignore.yaml` o una ruta no clasificada activa **todo**.
+- SAST **Semgrep 1.184.0** con 4 reglas propias (`herramientas/semgrep/nexum.yml`): TLS sin verificacion, MD5, SHA-1 y cliente HTTP sin timeout, mas fixture negativo con verificador que exige que **las cuatro** reglas detecten.
+- Integracion de capas reales (`tests/integration`) con `-race` y arranque del **binario real** sondeado por TCP (200 live, 404, 405, 503 ready). No se declara equivalencia AWS.
+- Fuzzing acotado del binding (`FuzzBindJSON`, `-fuzztime 20s`).
+- **Mutation testing: `BLOCKED_TECNICO_MUTACION`** con evidencia: `avito-tech/go-mutesting` sin releases etiquetadas, compila pero exige `diff` (panic verificado en este host) y los paquetes prioritarios no tienen pruebas en el mismo paquete; `herramientas/evaluar_mutacion.py` recalcula la decision en CI y **no se publican metricas**.
+- Quality Gate fail-closed: `failure`, `cancelled`, `skipped` exigido, resultado ausente/desconocido y artefacto faltante bloquean; `skipped` justificado se registra. 14 pruebas de situaciones simuladas.
+- Hardening Report generado con `if: always()` (markdown + JSON + resumen del run), registra `NO_DISPONIBLE` en vez de inventar.
+- Hallazgos corregidos: **H-02** (`sdd-validacion.yml` usaba `actions/checkout@v4` sin SHA), **H-03** (`tests/infra/ci` nunca se ejecutaba en CI), **H-04** (ningun nodo evaluaba el conjunto), **H-05** (sin evidencia consolidada).
+- `permissions` pasa a `contents: read` + `actions: read` (solo para descargar los artefactos del propio run). `cd-backend.yml` **sin cambios**.
+- Pruebas locales: 179 herramientas, 62 contrato de CI, 321 Terraform, 258 FinOps, 181 operacion, 129 respaldo, 110 publicacion; `SDD_DOCUMENTAL_PASS` y `H06_CONTRACT_PASS`; `go build`/`go vet`/`gofmt` limpios.
+- Limitacion verificada: el binario de Semgrep queda bloqueado por la politica de Control de aplicaciones de Windows (`WinError 4551`), igual que `go test`; la validacion efectiva ocurre en el runner Linux.
+- Sin AWS: `AWS_NOT_RUN`, `DEPLOY_NOT_RUN`, `HTTP_AWS_NOT_RUN`, `TWO_NODES_AWS_NOT_VERIFIED`, `DAST_NOT_RUN`.
