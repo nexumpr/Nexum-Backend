@@ -43,3 +43,15 @@ misconfigurations:
       no presupuestado en I-000. Limite declarado en RFC-004 seccion 7: sin CMK no hay
       revocacion criptografica inmediata ni rotacion automatica; la rotacion es
       operativa (nueva version + instance_refresh). No autoriza desplegar AWS.
+
+  - id: AWS-0132
+    paths:
+      - "modules/artefactos/main.tf"
+    statement: >-
+      ARTIFACT_DELIVERY APROBADA el 2026-11-09 con
+      APRUEBO_EXCEPCION_TRIVY_AWS-0132_ARTEFACTOS: el bucket de artefactos usa SSE-S3
+      (AES256) en lugar de CMK porque una KMS key tiene coste fijo no presupuestado en
+      I-000. Objetos afectados: binarios de release y SBOM, no credenciales; el transito
+      va por TLS con gateway endpoint privado. Riesgo residual declarado: sin revocacion
+      criptografica inmediata ni separacion de deberes sobre la clave. Revisar en el Gate
+      de despliegue AWS y al caducar el plan Free (2027-05-04).

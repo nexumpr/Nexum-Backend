@@ -221,17 +221,32 @@ jobs:
             --bucket "$ARTIFACT_BUCKET" --key "$CLAVE" \
             --body release/nexum-backend-linux-arm64 \
             --checksum-algorithm SHA256 \
+            --server-side-encryption AES256 \
             --if-none-match "*" > put.json || PUT=$?
-          HEAD=0
-          aws s3api head-object --bucket "$ARTIFACT_BUCKET" --key "$CLAVE" \
-            --checksum-mode ENABLED > cabeza.json || HEAD=$?
-          if [ "$HEAD" -eq 0 ] && [ -f cabeza.json ]; then
-            python3 herramientas/decidir_publicacion_s3.py \
-              --put-exit "$PUT" --cabeza cabeza.json --sha256 "$IN_DIGEST"
-          else
-            python3 herramientas/decidir_publicacion_s3.py \
-              --put-exit "$PUT" --sha256 "$IN_DIGEST"
+          # El publicador es de SOLO ESCRITURA: la bucket policy le deniega s3:GetObject,
+          # y HeadObject exige exactamente esa accion (AWS S3 API, HeadObject). Por eso
+          # no se consulta el objeto con este rol: la verificacion se apoya en la respuesta
+          # de PutObject (ChecksumSHA256) y en la inmutabilidad de la clave (If-None-Match).
+          # Ante 412 se falla cerrado: sin una identidad verificadora aprobada no se puede
+          # demostrar que el contenido preexistente coincida, y no se declara idempotencia.
+          if [ "$PUT" -ne 0 ]; then
+            echo "ARTIFACT_PUBLISH_CONFLICT: la clave ya existe (412) o la publicacion fallo (exit $PUT)."
+            echo "Sin identidad verificadora aprobada no se acredita idempotencia; abortando."
+            exit 1
           fi
+          python3 herramientas/decidir_publicacion_s3.py \
+            --put-exit "$PUT" --sha256 "$IN_DIGEST"
+          python3 - <<'PY'
+          import json
+          import sys
+
+          with open("put.json", encoding="utf-8") as manejador:
+              respuesta = json.load(manejador)
+          checksum = respuesta.get("ChecksumSHA256", "")
+          if not checksum:
+              sys.exit("PutObject no devolvio ChecksumSHA256: falla cerrado")
+          print(f"checksum_s3={checksum}")
+          PY
 
       - name: Comprobar 2 nodos sanos antes de mutar
         run: |
