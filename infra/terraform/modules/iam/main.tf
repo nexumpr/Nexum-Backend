@@ -359,3 +359,24 @@ resource "aws_iam_role_policy" "terraform_apply_pass_runtime" {
     }]
   })
 }
+
+# RFC-004 opcion B: lectura del bundle de secretos. Permiso de LECTURA y solo sobre
+# el prefijo del bundle; no se concede PutObject ni acceso al bucket completo.
+resource "aws_iam_role_policy" "runtime_secretos" {
+  count = length(var.secretos_object_arns) > 0 ? 1 : 0
+
+  name = "${local.nombre}-runtime-secretos-lectura"
+  role = aws_iam_role.runtime.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "LeerBundleDeSecretos"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = var.secretos_object_arns
+      }
+    ]
+  })
+}

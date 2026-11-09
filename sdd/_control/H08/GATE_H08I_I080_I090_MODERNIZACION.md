@@ -101,3 +101,20 @@ habilita ese paso ni lo prepara como ejecución.
   `base...head` como primera estrategia.
 - Alcance: unicamente la herramienta de deteccion y sus pruebas. Sin AWS, sin cambios en
   el grafo, sin cambios en `cd-backend.yml`.
+
+## 9. Registro de integracion del PR #37 — 2026-11-09
+
+- `APRUEBO_MERGE_PR_37_SHA_d2708abc4c742642c1ab9641f441aa5efa406c1b` concedido por el
+  responsable; HEAD verificado por igualdad exacta y `--match-head-commit`; **13/13**
+  checks en `pass` y `MERGEABLE`/`CLEAN`.
+- **PR #37 `MERGED`** (`2026-11-09T16:03:34Z`); merge commit y `main` =
+  **`2ebc9f2398ad344fa826ed0cf88fe07b4710fedc`** (padres `a441a0c` y `d2708ab`).
+- **D-01 verificado de extremo a extremo**: el mismo tipo de commit de merge que en el
+  run `42648177960` dejo **8 jobs `skipped`** ahora ejecuta **12/12 en `success`** en el
+  run `42650883409` (Go Backend CI) y `42650883410` (SDD documental), sin omisiones y sin
+  intervencion manual.
+- Deteccion local sobre el merge real: **8 archivos** y perfil completo, donde antes
+  devolvia cero.
+- Estado: **INTEGRADO_MAIN — NO DESPLEGADO**. `AWS_NOT_RUN`, `DEPLOY_NOT_RUN`,
+  `HTTP_AWS_NOT_RUN`, `TWO_NODES_AWS_NOT_VERIFIED`, `DAST_NOT_RUN`,
+  `MUTATION = BLOCKED_TECNICO_MUTACION`.

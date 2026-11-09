@@ -33,3 +33,13 @@ misconfigurations:
       compensatorios existentes, caducidad 2026-12-02 o Gate de despliegue AWS.
       No autoriza desplegar AWS ni implementar WAF. Al caducar, Trivy vuelve a
       fallar y se requiere nueva decisión humana.
+
+  - id: AWS-0132
+    paths:
+      - "modules/secretos/main.tf"
+    statement: >-
+      RFC-004 opcion B APROBADA el 2026-11-09 con APRUEBO_RFC004_OPCION_B: el bundle
+      de secretos usa SSE-S3 (AES256) en lugar de CMK porque una CMK tiene coste fijo
+      no presupuestado en I-000. Limite declarado en RFC-004 seccion 7: sin CMK no hay
+      revocacion criptografica inmediata ni rotacion automatica; la rotacion es
+      operativa (nueva version + instance_refresh). No autoriza desplegar AWS.

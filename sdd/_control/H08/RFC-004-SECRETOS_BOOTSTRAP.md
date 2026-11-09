@@ -5,7 +5,7 @@
 | Documento | `sdd/_control/H08/RFC-004-SECRETOS_BOOTSTRAP.md` |
 | Fecha | 2026-11-06 |
 | Alcance | I-000 (diseño E), I-020 (cómputo), I-060 (IAM/secretos) |
-| Estado | **PROPUESTO — requiere aprobación humana; no aplicado** |
+| Estado | **APROBADA (2026-11-09)** por `APRUEBO_RFC004_OPCION_B` — implementación local en curso; AWS no ejecutado |
 | Bloquea | **Despliegue** de I-020/I-030, no la implementación local |
 
 ## 1. Defecto demostrado
@@ -90,7 +90,7 @@ local de I-020 (Terraform, systemd, build ARM64, pruebas) **no** se ve afectada.
 **Riesgo que impide declararlo equivalente a Secrets Manager:** sin CMK no hay revocación criptográfica
 ni rotación automática; la rotación es operativa (humano + refresh). Debe aceptarse explícitamente.
 
-**Estado:** PROPUESTO. No se implementa ni se aprueba en I-020.
+**Estado:** **APROBADA (2026-11-09)** con `APRUEBO_RFC004_OPCION_B`; implementada en I-020/I-060.
 
 ## 8. Bloqueo de despliegue vigente
 

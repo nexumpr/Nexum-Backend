@@ -74,6 +74,7 @@ module "computo" {
   puerto_backend = var.puerto_backend
 
   iam_instance_profile_name = module.iam.runtime_instance_profile_name
+  secretos_s3_uri           = var.secretos_version == "" ? "" : "${module.secretos.secrets_uri_base}${var.secretos_version}/secrets.json"
   root_volume_gb            = var.root_volume_gb
   artefacto_s3_uri          = var.artefacto_s3_uri
   artefacto_sha256          = var.artefacto_sha256
@@ -152,6 +153,17 @@ module "dynamodb" {
 
 # --- I-060: IAM runtime + trust-only OIDC contracts ------------------------
 
+module "secretos" {
+  source = "../../modules/secretos"
+
+  proyecto               = "nexum"
+  entorno                = var.entorno
+  etiquetas              = var.etiquetas
+  rol_runtime_arn        = module.iam.runtime_role_arn
+  prefijo                = "nexum/secrets/"
+  retencion_version_dias = 30
+}
+
 module "iam" {
   source = "../../modules/iam"
 
@@ -168,6 +180,7 @@ module "iam" {
   # Los objetos exactos esperan I-080; los log groups/sink los define I-110.
   # Listas vacías significan que NO se concede acceso S3/CloudWatch.
   artifact_object_arns      = var.iam_artifact_object_arns
+  secretos_object_arns      = [module.secretos.secrets_prefix_arn]
   cloudwatch_log_group_arns = var.iam_cloudwatch_log_group_arns
 
   # Provider OIDC existente, environment y SCP no se verifican ni mutan en I-060.

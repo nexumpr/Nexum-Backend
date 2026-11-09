@@ -187,3 +187,9 @@ variable "iam_apply_environment_protected" {
   type        = bool
   default     = false
 }
+
+variable "secretos_version" {
+  description = "Version del bundle de secretos a fijar en el bootstrap (RFC-004). Vacio = sin bundle."
+  type        = string
+  default     = ""
+}

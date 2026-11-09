@@ -135,3 +135,14 @@ variable "etiquetas" {
   type        = map(string)
   default     = {}
 }
+
+variable "secretos_object_arns" {
+  description = "ARNs del prefijo del bundle de secretos (RFC-004). Vacio = sin permiso."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for arn in var.secretos_object_arns : can(regex("^arn:aws:s3:::[a-z0-9.-]+/.+$", arn))])
+    error_message = "Los ARNs de secretos deben apuntar a un prefijo de bucket, no al bucket completo."
+  }
+}
