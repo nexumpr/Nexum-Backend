@@ -112,7 +112,8 @@ data "aws_iam_policy_document" "secretos" {
       "s3:DeleteObject",
       "s3:DeleteObjectVersion",
     ]
-    resources = ["${aws_s3_bucket.secretos.arn}/${var.prefijo}*"]
+    # Todo el bucket: un IAM amplio no habilita escribir fuera del prefijo.
+    resources = ["${aws_s3_bucket.secretos.arn}/*"]
 
     principals {
       type        = "AWS"
@@ -127,6 +128,23 @@ data "aws_iam_policy_document" "secretos" {
 
     actions   = ["s3:GetObject", "s3:GetObjectVersion"]
     resources = ["${aws_s3_bucket.secretos.arn}/${var.prefijo}*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [var.publicador_arn]
+    }
+  }
+
+  # 3b. Ser publicador tampoco concede borrado, ni con un IAM amplio.
+  statement {
+    sid    = "DenegarBorradoAlPublicador"
+    effect = "Deny"
+
+    actions = [
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion",
+    ]
+    resources = ["${aws_s3_bucket.secretos.arn}/*"]
 
     principals {
       type        = "AWS"
@@ -172,6 +190,25 @@ data "aws_iam_policy_document" "secretos" {
       test     = "StringEquals"
       variable = "s3:x-amz-server-side-encryption"
       values   = ["AES256"]
+    }
+  }
+
+  # 5b. ListBucket no lo necesita ninguna identidad de este diseno: se deniega
+  #     para todos, incluidos runtime y publicador, y para IAM amplio.
+  statement {
+    sid    = "DenegarListBucket"
+    effect = "Deny"
+
+    actions = [
+      "s3:ListBucket",
+      "s3:ListBucketVersions",
+      "s3:ListBucketMultipartUploads",
+    ]
+    resources = ["${aws_s3_bucket.secretos.arn}"]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
     }
   }
 

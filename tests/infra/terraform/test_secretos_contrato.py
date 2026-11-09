@@ -263,6 +263,40 @@ class ModuloSecretos(unittest.TestCase):
             self._decidir(self.PUBLICADOR, "s3:PutObject", self.OBJETO, sse=None), "DENY"
         )
 
+    def test_publicador_no_borra_ni_con_iam_amplio(self) -> None:
+        for accion in ("s3:DeleteObject", "s3:DeleteObjectVersion"):
+            self.assertEqual(
+                self._decidir(self.PUBLICADOR, accion, self.OBJETO, identidad_permite=True),
+                "DENY",
+                accion,
+            )
+            self.assertEqual(
+                self._decidir(self.PUBLICADOR, accion, self.FUERA, identidad_permite=True),
+                "DENY",
+                accion,
+            )
+
+    def test_nadie_lista_el_bucket(self) -> None:
+        bucket = "arn:aws:s3:::bucket"
+        for principal in (self.AJENO, self.RUNTIME, self.PUBLICADOR):
+            self.assertEqual(
+                self._decidir(principal, "s3:ListBucket", bucket, identidad_permite=True),
+                "DENY",
+                principal,
+            )
+
+    def test_runtime_no_escribe_ni_borra_fuera_del_prefijo(self) -> None:
+        for accion in ("s3:PutObject", "s3:DeleteObject"):
+            self.assertEqual(
+                self._decidir(self.RUNTIME, accion, self.FUERA, identidad_permite=True),
+                "DENY",
+                accion,
+            )
+
+    def test_lectura_y_publicacion_legitimas_siguen_permitidas(self) -> None:
+        self.assertEqual(self._decidir(self.RUNTIME, "s3:GetObject", self.OBJETO), "ALLOW")
+        self.assertEqual(self._decidir(self.PUBLICADOR, "s3:PutObject", self.OBJETO), "ALLOW")
+
     def test_condiciones_usan_principalarn_y_no_notprincipal(self) -> None:
         self.assertIn('variable = "aws:PrincipalArn"', self.main)
         self.assertNotIn("not_principals", self.main)
@@ -282,7 +316,7 @@ class ModuloSecretos(unittest.TestCase):
     def test_la_politica_no_concede_listbucket(self) -> None:
         # ListBucket es de plano de control/identidad: este modulo no lo concede
         # ni lo deniega, y ninguna sentencia debe nombrarlo.
-        self.assertNotIn("ListBucket", self.main)
+        self.assertIn("DenegarListBucket", self.main)
 
     def test_condicion_no_reconocida_no_se_asume_verdadera(self) -> None:
         sentencias = self._statements()
