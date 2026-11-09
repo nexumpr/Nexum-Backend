@@ -78,3 +78,34 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+## Implementacion H08-I (2026-11-09) — LOCAL, sin AWS
+
+Gate `APRUEBO_GATE_I130_LOCAL`. Rama `feat/h08i-i130-backup`. Nada se despliega: `AWS_NOT_RUN`.
+
+- **T-130-01 (RTO/RPO):** IMPLEMENTADO_LOCAL. RTO 4 h / RPO 24 h declarados `OBJETIVO_PROPUESTO_NO_MEDIDO`; `MEDIDO` exige restore real.
+- **T-130-02 (Datos):** IMPLEMENTADO_LOCAL. PITR obligatorio y backup on-demand documentado como procedimiento fuera de IaC; retencion <= 35 d.
+- **T-130-03 (State):** IMPLEMENTADO_LOCAL. Versionado, cifrado y `prevent_destroy` exigidos simultaneamente por precondition.
+- **T-130-04 (Restore):** IMPLEMENTADO_LOCAL. Solo tabla nueva aislada con patron obligatorio; invariantes `saved = opening + sum(allocations)`; `RESTORE_AWS_NO_VERIFICADO`.
+- **T-130-05 (Privacidad):** IMPLEMENTADO_LOCAL. `BORRADO_DIFERIDO_DOCUMENTADO`; prohibido afirmar borrado inmediato de copias o de copias inmutables.
+- **T-130-06 (Runbook):** IMPLEMENTADO_LOCAL en `PRUEBAS_RESTORE.md` §2.
+- **T-130-90 (Riesgos):** PITR/backup de pago presupuestado (0.9690 USD/mes declarado, no medido); perdida de datos mitigada por restauracion aislada; restore de aportaciones divididas cubierto por invariante aritmetica. Los tres CONDICIONADOS a verificacion real.
+- **T-130-99 (Ratificacion):** REVIEW pendiente; merge requiere autorizacion humana ligada a PR + HEAD.
+
+### Ampliacion v2 (2026-11-09)
+
+- **T-130-01:** matriz de 6 capas y medicion de 13 fases; `RTO_RPO_PENDING_HUMAN_APPROVAL`. Pruebas: `MatrizRTOyRPO`, `MedicionDeRecuperacion`.
+- **T-130-02:** vigencia de backup y confirmacion de que no existe recurso declarativo de backup en el proveedor fijado. Pruebas: `VigenciaDeBackup`.
+- **T-130-03:** recuperacion de state en 8 pasos y concurrencia. Pruebas: `RecuperacionDeState`, `ConcurrenciaYCLI`.
+- **T-130-04:** integridad financiera (13 codigos) y reconfiguracion posterior al restore. Pruebas: `test_integridad_financiera.py`.
+- **T-130-05:** politica de privacidad; prohibida la reactivacion de cuentas y sesiones. Pruebas: `PrivacidadTrasRestore`.
+- **T-130-06:** runbook de 13 fases con campos obligatorios.
+- **FinOps:** matriz 2 GB vs 3 GB con cuatro estados de evidencia.
+
+### Revision definitiva (2026-11-09)
+
+- **T-130-04:** `APORTACION_HUERFANA`, `DUPLICADO_ENTIDAD` y `REVERSION_EXCEDIDA` implementados; centavos enteros en la verificacion sintetica. Pruebas: `RegresionesReportadas`, `RegresionesRestoreSintetico`.
+- **T-130-02:** PITR (1..35 d, punto en ventana) separado de on-demand (retencion aprobada, sin caducidad automatica). Pruebas: `VigenciaDeBackup`.
+- **T-130-03:** `PLAN_SINTETICO_EVALUADO` y `autorizacion_real = DENEGADA_EN_I130_LOCAL`. Pruebas: `RecuperacionDeState`.
+- **T-130-01:** `medido_declarado` vs `medido_verificable`. Pruebas: `MatrizRTOyRPO`.
+- **FinOps:** conciliacion sin doble conteo. Pruebas: `test_finops_conciliacion_130.py`.

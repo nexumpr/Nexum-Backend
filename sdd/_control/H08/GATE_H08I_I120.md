@@ -155,3 +155,18 @@ Defectos de fail-open corregidos y verificados con pruebas negativas:
 Evidencia: 104 pruebas de operación, 238 de FinOps, 36 de contrato Terraform, 11 de configuración
 gitleaks, `terraform fmt/init -backend=false/validate`, Trivy, SDD y SHA-256. `AWS_NOT_RUN`,
 `PLAN_AWS_NO_VERIFICADO`, `BLOCKED_I130`.
+## 11. Registro de integración — 2026-11-09
+
+- `APRUEBO_MERGE_PR_32_SHA_03b10cdb1a7c982f2077915cb324c9f880865da0` concedido por el responsable;
+  HEAD verificado por igualdad exacta y `--match-head-commit` antes de fusionar; 7/7 checks `pass` y
+  `MERGEABLE`/`CLEAN`.
+- **PR #32 `MERGED`** (`2026-11-09T03:21:49Z`); merge commit y `main` = **`31d25127033cd63a4a74040caea4137f52732536`**;
+  `git pull --ff-only` dejó `main` local idéntico a `origin/main`.
+- CI post-merge sobre `main` en `31d2512`: **SDD documental `success`** (run `42555990713`) y
+  **Go Backend CI `success`** (run `42555990909`, seis jobs en verde).
+- Estado: **INTEGRADO_MAIN — NO DESPLEGADO**. `AWS_NOT_RUN`, `PLAN_AWS_NO_VERIFICADO`,
+  `TWO_NODES_AWS_NOT_VERIFIED`, `BLOCKED_I130`, `DAST_NOT_RUN`.
+- Defectos y RFC sin cambios: `D-100-01`, `D-100-02`, `D-110-01`, RFC-004, H-01, RFC-006, RFC-007,
+  `ARTIFACT_DELIVERY`, agente CloudWatch (I-020), `ALERT_DELIVERY = BLOCKED_RFC007_SNS_KMS`,
+  readiness 503, OIDC, `AWS_SCP_NOT_VERIFIED`, branch protection `BLOQUEADO_PLAN_GITHUB`.
+- Este registro es documental: no se modificó Terraform, Go, OpenAPI ni workflows tras el merge.

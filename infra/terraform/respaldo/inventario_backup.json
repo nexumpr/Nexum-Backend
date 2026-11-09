@@ -1,0 +1,89 @@
+{
+  "version": "1.0.0",
+  "entorno": "h08i",
+  "region": "us-east-2",
+  "spec": "I-130-backup-recuperacion",
+  "fecha_corte": "2026-11-09",
+  "catalogo_precios": "infra/finops/precios_us-east-2.json",
+  "objetivos": {
+    "rto_horas": "4",
+    "rpo_horas": "24",
+    "medido": false,
+    "estado": "OBJETIVO_PROPUESTO_NO_MEDIDO",
+    "nota": "RTO/RPO propuestos por la spec (INF-130-01); no se declaran logrados sin restore real medido en AWS."
+  },
+  "politica": {
+    "datos_activos": "Nunca se destruyen por rutina de ahorro; el core 24x7 de I-120 los protege.",
+    "restore": "Solo sobre tabla NUEVA aislada; prohibido sobreescribir la tabla activa.",
+    "state": "Versionado y cifrado obligatorios; perdida de state impide reconciliar (I-070).",
+    "secretos": "Rotacion segun RFC-004 (PROPUESTO); no se declara secreto creado.",
+    "borrado_cuenta": "Los datos activos se borran; las copias siguen su retencion documentada, sin afirmar borrado instantaneo de copias inmutables."
+  },
+  "restore": {
+    "patron_tabla_destino": "^NEXUM_CORE_RESTORE_[a-z0-9]{4,20}$",
+    "requiere_tabla_nueva": true,
+    "prohibido_sobreescribir": true,
+    "etiqueta_obligatoria": "nexum:purpose=restore-verification",
+    "verificacion": "recuentos, checksums e invariantes de saldos sobre datos sinteticos"
+  },
+  "borrado_cuenta": {
+    "datos_activos": "borrado inmediato",
+    "backups": "retencion documentada hasta caducidad",
+    "borrado_inmediato_backups": false,
+    "afirma_borrado_inmutable": false
+  },
+  "activos": [
+    {
+      "nombre": "dynamodb-core",
+      "tipo": "aws_dynamodb_table",
+      "mecanismo": "PITR",
+      "retencion_dias": 35,
+      "cifrado": "SSE administrada por AWS",
+      "restauracion": "tabla nueva aislada",
+      "estado": "DECLARADO_NO_CREADO",
+      "protegido": true,
+      "partidas": [
+        { "sku": "DDB_PITR_GB_MES", "cantidad": "3", "base": "mes" }
+      ],
+      "dependencias": ["I-040"]
+    },
+    {
+      "nombre": "dynamodb-backup-on-demand",
+      "tipo": "aws_dynamodb_backup",
+      "mecanismo": "backup on-demand",
+      "retencion_dias": 30,
+      "cifrado": "SSE administrada por AWS",
+      "restauracion": "tabla nueva aislada",
+      "estado": "OPCIONAL_NO_CREADO",
+      "protegido": true,
+      "partidas": [
+        { "sku": "DDB_BACKUP_GB_MES", "cantidad": "3", "base": "mes" }
+      ],
+      "dependencias": ["I-040", "I-130"]
+    },
+    {
+      "nombre": "terraform-state",
+      "tipo": "aws_s3_bucket",
+      "mecanismo": "versionado + SSE-S3",
+      "retencion_dias": 30,
+      "cifrado": "SSE-S3",
+      "estado": "DECLARADO_NO_CREADO",
+      "protegido": true,
+      "partidas": [
+        { "sku": "S3_STANDARD_GB_MES", "cantidad": "3", "base": "mes" }
+      ],
+      "dependencias": ["I-070"]
+    },
+    {
+      "nombre": "secretos-bootstrap",
+      "tipo": "aws_secretsmanager_secret",
+      "mecanismo": "rotacion (RFC-004)",
+      "retencion_dias": 0,
+      "cifrado": "KMS administrada por AWS",
+      "estado": "BLOQUEADO_RFC004",
+      "protegido": true,
+      "partidas": [],
+      "dependencias": ["RFC-004"]
+    }
+  ]
+}

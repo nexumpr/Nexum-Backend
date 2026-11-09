@@ -46,3 +46,21 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+- [x] PITR obligatorio y retencion dentro del limite real de 35 dias.
+- [x] State con versionado, cifrado y `prevent_destroy` exigidos a la vez.
+- [x] Restauracion solo en tabla nueva aislada; prohibido sobreescribir o usar la tabla activa.
+- [x] Invariantes de saldos verificadas con `Decimal` sobre datos sinteticos.
+- [x] Borrado de cuenta documentado sin afirmar borrado inmediato de copias.
+- [x] Comandos destructivos y `restore-in-place` inexistentes (codigo 2).
+- [ ] Restore real y RTO/RPO medidos: `NOT_RUN` (requiere Gate de despliegue).
+- [ ] Discrepancia 2 GB (spec §8) vs 3 GB (inventario): pendiente de ratificacion humana.
+
+- [x] Matriz RTO/RPO de 6 capas con `RTO_RPO_PENDING_HUMAN_APPROVAL`.
+- [x] Medicion determinista de las 13 fases y condicion de incumplimiento.
+- [x] Vigencia de backup validada (inexistente, caducado, otra tabla, retencion invalida).
+- [x] Recuperacion de state en 8 pasos con escritor unico.
+- [x] Integridad financiera con 13 codigos sobre datos sinteticos.
+- [x] Configuracion posterior al restore explicitada (TTL, streams, PITR, IAM, alarmas, tags).
+- [x] Privacidad: sin reactivacion de cuentas eliminadas ni sesiones revocadas.
+- [x] FinOps 2 GB vs 3 GB con `ESTIMADO`/`PRESUPUESTADO`/`VERIFICADO_EN_CUENTA`/`CONSUMO_REAL`.

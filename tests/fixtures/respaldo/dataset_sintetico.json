@@ -1,0 +1,62 @@
+{
+  "descripcion": "Dataset 100% sintetico para verificar integridad tras una restauracion aislada. Sin datos personales ni reales.",
+  "version": "1.0.0",
+  "usuarios": [
+    { "id": "u-sint-1", "estado": "activo", "email_hash": "hash-sintetico-1" },
+    { "id": "u-sint-2", "estado": "eliminado", "email_hash": "hash-sintetico-2" }
+  ],
+  "cuentas_eliminadas": [
+    { "user_id": "u-sint-2", "fecha": "2026-10-01" }
+  ],
+  "metas": [
+    {
+      "id": "m-sint-1",
+      "user_id": "u-sint-1",
+      "saved_centavos": 1000,
+      "opening_saved_centavos": 400,
+      "no_distribuido_centavos": 0,
+      "allocations": [
+        { "id": "a-sint-1", "user_id": "u-sint-1", "goal_id": "m-sint-1", "movimiento_id": "mov-sint-1", "importe_centavos": 300 },
+        { "id": "a-sint-2", "user_id": "u-sint-1", "goal_id": "m-sint-1", "movimiento_id": "mov-sint-2", "importe_centavos": 300 }
+      ]
+    }
+  ],
+  "movimientos": [
+    {
+      "id": "mov-sint-1",
+      "user_id": "u-sint-1",
+      "tipo": "gasto",
+      "importe_centavos": 300,
+      "meta_id": "m-sint-1",
+      "idempotency_key": "idem-sint-1",
+      "expiresAt": 1798761600
+    },
+    {
+      "id": "mov-sint-2",
+      "user_id": "u-sint-1",
+      "tipo": "gasto",
+      "importe_centavos": 300,
+      "meta_id": "m-sint-1",
+      "idempotency_key": "idem-sint-2",
+      "expiresAt": 1798761600
+    },
+    {
+      "id": "mov-sint-3",
+      "user_id": "u-sint-1",
+      "tipo": "reversion",
+      "original_id": "mov-sint-2",
+      "importe_centavos": -300,
+      "idempotency_key": "idem-sint-3",
+      "expiresAt": 1798761600
+    }
+  ],
+  "sesiones": [
+    { "id": "s-sint-1", "user_id": "u-sint-1", "estado": "activa" },
+    { "id": "s-sint-2", "user_id": "u-sint-1", "estado": "revocada" },
+    { "id": "s-sint-3", "user_id": "u-sint-2", "estado": "revocada" }
+  ],
+  "revocaciones": [
+    { "sesion_id": "s-sint-2", "fecha": "2026-10-02" },
+    { "sesion_id": "s-sint-3", "fecha": "2026-10-01" }
+  ]
+}
