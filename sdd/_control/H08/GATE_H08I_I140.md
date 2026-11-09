@@ -83,3 +83,22 @@ plan/apply/destroy`, sin AWS, sin despliegue y sin drills reales.
 |---|---|
 | 2026-11-09 | `APRUEBO_GATE_I140_LOCAL` concedido; rama `feat/h08i-i140-operacion` desde `main` `da2aee1` (incluye el cierre documental de I-130) |
 | 2026-11-09 | Implementación local completada; PR y CI por el agente; merge pendiente de autorización humana ligada a PR + HEAD |
+
+## 8. Corrección final (2026-11-09)
+
+- **Evidencia de drills:** `LOCAL_PASS` exige `evidencia` con archivo y prueba existentes, resultado
+  `PASS` y sin duplicados entre escenarios. Seis drills tienen evidencia real:
+  `TestHTTPServerStatusesAndErrors`, `TestGoalReversionPreservesInvariant`,
+  `TestIdempotencyManagerBehavior`, `TestRefreshTokenReplayFamilyRevocation`,
+  `TestReadinessProbeDegradation503` y `DecisionRollback`. Los cinco que requieren AWS siguen
+  `NOT_RUN_AWS` y `perdida-observabilidad` queda `BLOCKED_DEPENDENCY` por I-020.
+- **Inventario y costes:** se contabilizan partidas mensuales (÷730 solo para la vista horaria), se
+  separan USD/h, USD/mes y consumo variable, y un precio ausente **anula** el total del recurso en vez
+  de contarse como 0 (queda en `precios_desconocidos`). Se consolidan los recursos repetidos entre
+  I-120 e I-130 (`dynamodb-core`, `terraform-state`, `secretos-bootstrap`) sin duplicar costos y se
+  conservan los distintos. Owners y etiquetas salen de fuentes declarativas; lo no declarado se marca
+  `PENDIENTE_DECLARACION`. La capacidad del ASG se contrasta con el módulo `computo` (min = desired =
+  max = 2) sin afirmar instancias reales.
+
+Evidencia: 167 pruebas en `tests/infra/operacion` (104 de I-120 + 63 de I-140), SDD y SHA-256 PASS.
+`AWS_NOT_RUN`, `DRILLS_AWS_NOT_RUN`, `AWS_COST_REAL_NOT_VERIFIED`.

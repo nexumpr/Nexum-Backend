@@ -71,7 +71,12 @@
       "estado": "LOCAL_PASS",
       "accion": "pruebas de timeouts",
       "datos_sinteticos": true,
-      "demuestra_aws": false
+      "demuestra_aws": false,
+      "evidencia": {
+        "archivo": "tests/unit/transport/http_server_test.go",
+        "prueba": "TestHTTPServerStatusesAndErrors",
+        "resultado": "PASS"
+      }
     },
     {
       "id": "operacion-financiera-parcial",
@@ -83,7 +88,12 @@
       "estado": "LOCAL_PASS",
       "accion": "fixtures A-070",
       "datos_sinteticos": true,
-      "demuestra_aws": false
+      "demuestra_aws": false,
+      "evidencia": {
+        "archivo": "tests/unit/financial/consistency_resilience_test.go",
+        "prueba": "TestGoalReversionPreservesInvariant",
+        "resultado": "PASS"
+      }
     },
     {
       "id": "idempotencia",
@@ -95,7 +105,12 @@
       "estado": "LOCAL_PASS",
       "accion": "pruebas de idempotencia",
       "datos_sinteticos": true,
-      "demuestra_aws": false
+      "demuestra_aws": false,
+      "evidencia": {
+        "archivo": "tests/unit/financial/consistency_resilience_test.go",
+        "prueba": "TestIdempotencyManagerBehavior",
+        "resultado": "PASS"
+      }
     },
     {
       "id": "revocacion-rotacion-jwt",
@@ -107,7 +122,12 @@
       "estado": "LOCAL_PASS",
       "accion": "pruebas A-050",
       "datos_sinteticos": true,
-      "demuestra_aws": false
+      "demuestra_aws": false,
+      "evidencia": {
+        "archivo": "tests/unit/security/auth_service_test.go",
+        "prueba": "TestRefreshTokenReplayFamilyRevocation",
+        "resultado": "PASS"
+      }
     },
     {
       "id": "health-readiness",
@@ -119,7 +139,12 @@
       "estado": "LOCAL_PASS",
       "accion": "pruebas A-090",
       "datos_sinteticos": true,
-      "demuestra_aws": false
+      "demuestra_aws": false,
+      "evidencia": {
+        "archivo": "tests/unit/telemetry/observability_health_test.go",
+        "prueba": "TestReadinessProbeDegradation503",
+        "resultado": "PASS"
+      }
     },
     {
       "id": "perdida-observabilidad",
@@ -131,7 +156,8 @@
       "estado": "BLOCKED_DEPENDENCY",
       "accion": "simular ausencia",
       "datos_sinteticos": true,
-      "demuestra_aws": false
+      "demuestra_aws": false,
+      "dependencia": "I-020 (agente CloudWatch)"
     },
     {
       "id": "riesgo-rollback",
@@ -143,7 +169,12 @@
       "estado": "LOCAL_PASS",
       "accion": "simulador I-090",
       "datos_sinteticos": true,
-      "demuestra_aws": false
+      "demuestra_aws": false,
+      "evidencia": {
+        "archivo": "herramientas/tests/test_cd_helpers.py",
+        "prueba": "DecisionRollback",
+        "resultado": "PASS"
+      }
     }
   ]
 }

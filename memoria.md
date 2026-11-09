@@ -649,3 +649,11 @@
 - **INF-140-05:** `ACCESO_OPERACIONAL.md` con identidades temporales, SSM en ventana, auditoria y minimo privilegio; se rechazan root, SSH publico, claves estaticas y cambio de SCP.
 - **INF-140-06:** `INVENTARIO_INFRAESTRUCTURA.md` derivado de I-120/I-130 y catalogo: 17 recursos core y 3 auxiliares con owner, criticidad, costo estimado y `AWS_NOT_VERIFIED`.
 - Pruebas: 45 nuevas (suite de operacion 149). Sin AWS, sin drills reales y sin merge.
+
+### I-140 correccion final (2026-11-09)
+
+- **Evidencia de drills:** `validar_drills` exige para `LOCAL_PASS` un `evidencia` con archivo y prueba existentes (se comprueba que la prueba aparece en el archivo), resultado `PASS` y sin duplicados. Seis drills quedan con evidencia real; cinco `NOT_RUN_AWS` y uno `BLOCKED_DEPENDENCY` (I-020). Un JSON editado a mano ya no puede fabricar `LOCAL_PASS`.
+- **Costes del inventario:** `costos_activo` incluye partidas mensuales (÷730 solo para la vista horaria), separa USD/h, USD/mes y consumo variable, y anula el total cuando falta un precio (`precios_desconocidos`), en lugar de contarlo como 0.
+- **Consolidacion:** se detectan recursos repetidos entre I-120 e I-130 (`dynamodb-core`, `terraform-state`, `secretos-bootstrap`), se suman fuentes y partidas sin duplicar costos y se conservan los recursos distintos del mismo servicio.
+- **Owners y ASG:** owners y etiquetas se derivan de fuentes declarativas y lo no declarado queda `PENDIENTE_DECLARACION`; la capacidad del ASG se contrasta con `modules/computo` (min=desired=max=2) sin afirmar instancias reales.
+- Conteos: 63 pruebas de I-140 (suite de operacion 167). Sin AWS y sin merge.

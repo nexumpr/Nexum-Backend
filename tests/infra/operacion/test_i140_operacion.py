@@ -235,7 +235,7 @@ class InventarioYAcceso(unittest.TestCase):
 
     def test_cada_recurso_tiene_fuente_owner_y_criticidad(self) -> None:
         for recurso in self.inv["recursos"]:
-            self.assertTrue(recurso["fuente"], recurso["nombre"])
+            self.assertTrue(recurso["fuentes"], recurso["nombre"])
             self.assertTrue(recurso["owner"], recurso["nombre"])
             self.assertIn(recurso["criticidad"], ("CORE_24X7", "AUXILIAR_AUTORIZABLE"))
             self.assertFalse(recurso["verificado_aws"], recurso["nombre"])
@@ -301,6 +301,193 @@ class CliYSeguridad(unittest.TestCase):
             "import subprocess", "from subprocess", "os.system",
         ):
             self.assertNotIn(prohibido, fuente)
+
+
+class EvidenciaDeDrills(unittest.TestCase):
+    """LOCAL_PASS exige archivo y prueba reales, distintos y en PASS."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.base = _fixture("drills.json")
+
+    def _con_evidencia(self, drill_id: str, evidencia):
+        datos = copy.deepcopy(self.base)
+        for drill in datos["drills"]:
+            if drill["id"] == drill_id:
+                drill["evidencia"] = evidencia
+        return datos
+
+    def test_plan_actual_tiene_evidencia_verificable(self) -> None:
+        resultado = op.validar_drills(self.base)
+        self.assertEqual(resultado["estado"], "PLAN_VALIDO")
+        self.assertEqual(resultado["conteo_estados"]["LOCAL_PASS"], 6)
+        self.assertEqual(resultado["evidencias_distintas"], 6)
+        self.assertEqual(resultado["sin_evidencia_local"], [])
+
+    def test_local_pass_sin_evidencia_se_rechaza(self) -> None:
+        datos = copy.deepcopy(self.base)
+        for drill in datos["drills"]:
+            if drill["id"] == "idempotencia":
+                drill.pop("evidencia", None)
+        resultado = op.validar_drills(datos)
+        self.assertEqual(resultado["estado"], "PLAN_RECHAZADO")
+        self.assertIn("idempotencia", resultado["sin_evidencia_local"])
+
+    def test_archivo_de_evidencia_inexistente(self) -> None:
+        datos = self._con_evidencia(
+            "idempotencia",
+            {"archivo": "tests/unit/no-existe_test.go", "prueba": "TestX", "resultado": "PASS"},
+        )
+        resultado = op.validar_drills(datos)
+        self.assertEqual(resultado["estado"], "PLAN_RECHAZADO")
+        self.assertTrue(any("inexistente" in p for p in resultado["problemas"]))
+
+    def test_prueba_inexistente_en_el_archivo(self) -> None:
+        datos = self._con_evidencia(
+            "idempotencia",
+            {
+                "archivo": "tests/unit/financial/consistency_resilience_test.go",
+                "prueba": "TestInventado",
+                "resultado": "PASS",
+            },
+        )
+        resultado = op.validar_drills(datos)
+        self.assertEqual(resultado["estado"], "PLAN_RECHAZADO")
+        self.assertTrue(any("no existe" in p for p in resultado["problemas"]))
+
+    def test_resultado_distinto_de_pass(self) -> None:
+        datos = self._con_evidencia(
+            "idempotencia",
+            {
+                "archivo": "tests/unit/financial/consistency_resilience_test.go",
+                "prueba": "TestIdempotencyManagerBehavior",
+                "resultado": "FAIL",
+            },
+        )
+        resultado = op.validar_drills(datos)
+        self.assertEqual(resultado["estado"], "PLAN_RECHAZADO")
+        self.assertTrue(any("resultado PASS" in p for p in resultado["problemas"]))
+
+    def test_evidencia_duplicada_entre_escenarios(self) -> None:
+        datos = copy.deepcopy(self.base)
+        referencia = None
+        for drill in datos["drills"]:
+            if drill["id"] == "idempotencia":
+                referencia = drill["evidencia"]
+        for drill in datos["drills"]:
+            if drill["id"] == "timeouts-reintentos":
+                drill["evidencia"] = copy.deepcopy(referencia)
+        resultado = op.validar_drills(datos)
+        self.assertEqual(resultado["estado"], "PLAN_RECHAZADO")
+        self.assertTrue(any("duplicada" in p for p in resultado["problemas"]))
+
+    def test_blocked_dependency_exige_dependencia(self) -> None:
+        datos = copy.deepcopy(self.base)
+        for drill in datos["drills"]:
+            if drill["id"] == "perdida-observabilidad":
+                drill.pop("dependencia", None)
+        resultado = op.validar_drills(datos)
+        self.assertEqual(resultado["estado"], "PLAN_RECHAZADO")
+        self.assertTrue(any("exige 'dependencia'" in p for p in resultado["problemas"]))
+
+    def test_evidencia_apunta_a_archivo_real_para_cada_local_pass(self) -> None:
+        for drill in self.base["drills"]:
+            if drill["estado"] != "LOCAL_PASS":
+                continue
+            with self.subTest(drill=drill["id"]):
+                archivo = RAIZ / drill["evidencia"]["archivo"]
+                self.assertTrue(archivo.is_file(), drill["evidencia"]["archivo"])
+                self.assertIn(drill["evidencia"]["prueba"], archivo.read_text(encoding="utf-8"))
+
+
+class CostesDelInventario(unittest.TestCase):
+    """Costes con unidades separadas y sin convertir precios ausentes en cero."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalogo = json.loads((RAIZ / "infra" / "finops" / "precios_us-east-2.json").read_text(encoding="utf-8"))
+        cls.inv = op.inventario_infraestructura()
+
+    def test_precio_ausente_no_es_cero(self) -> None:
+        catalogo = copy.deepcopy(self.catalogo)
+        catalogo["items"]["DDB_PITR_GB_MES"]["precio_usd"] = None
+        precio, estado = op._precio(catalogo, "DDB_PITR_GB_MES")
+        self.assertIsNone(precio)
+        self.assertEqual(estado, "DESCONOCIDO")
+
+    def test_partida_mensual_se_contabiliza(self) -> None:
+        activo = {"nombre": "x", "partidas": [{"sku": "DDB_PITR_GB_MES", "cantidad": "3", "base": "mes"}]}
+        costos = op.costos_activo(activo, self.catalogo)
+        self.assertEqual(costos["costo_mes_usd"], "0.6000")
+        self.assertEqual(costos["costo_hora_usd"], "0.0008")
+        self.assertEqual(costos["precios_desconocidos"], [])
+
+    def test_precio_desconocido_anula_el_total(self) -> None:
+        catalogo = copy.deepcopy(self.catalogo)
+        catalogo["items"]["DDB_PITR_GB_MES"]["precio_usd"] = None
+        activo = {
+            "nombre": "x",
+            "partidas": [
+                {"sku": "EC2_T4G_MICRO_HORA", "cantidad": "2", "base": "hora"},
+                {"sku": "DDB_PITR_GB_MES", "cantidad": "3", "base": "mes"},
+            ],
+        }
+        costos = op.costos_activo(activo, catalogo)
+        self.assertIsNone(costos["costo_hora_usd"])
+        self.assertIsNone(costos["costo_mes_usd"])
+        self.assertEqual(costos["precios_desconocidos"], ["DDB_PITR_GB_MES"])
+
+    def test_partida_variable_no_se_suma_ni_se_inventa(self) -> None:
+        activo = {"nombre": "x", "partidas": [{"sku": "EGRESO_INTERNET_GB", "cantidad": None, "base": "variable"}]}
+        costos = op.costos_activo(activo, self.catalogo)
+        self.assertEqual(costos["costo_hora_usd"], "0.0000")
+        self.assertEqual(costos["partidas"][0]["importe"], None)
+
+    def test_recurso_repetido_no_duplica_coste(self) -> None:
+        nombres = [r["nombre"] for r in self.inv["recursos"]]
+        self.assertEqual(len(nombres), len(set(nombres)))
+        consolidated = {d["nombre"] for d in self.inv["consolidados"]}
+        self.assertIn("dynamodb-core", consolidated)
+        core = next(r for r in self.inv["recursos"] if r["nombre"] == "dynamodb-core")
+        self.assertEqual(len(core["fuentes"]), 2)
+
+    def test_recursos_distintos_del_mismo_servicio_no_se_fusionan(self) -> None:
+        nombres = {r["nombre"] for r in self.inv["recursos"]}
+        self.assertIn("dynamodb-core", nombres)
+        self.assertIn("dynamodb-backup-on-demand", nombres)
+        self.assertIn("terraform-state-s3", nombres)
+
+    def test_owner_pendiente_se_informa(self) -> None:
+        inventario = op.inventario_infraestructura()
+        for recurso in inventario["recursos"]:
+            if recurso["owner"] == "PENDIENTE_DECLARACION":
+                self.assertIn(recurso["nombre"], inventario["owners_pendientes"])
+
+    def test_asg_declarado_con_dos_instancias(self) -> None:
+        asg = op.capacidad_asg_declarada()
+        self.assertTrue(asg["ok"])
+        self.assertEqual(asg["declarada"], 2)
+        self.assertTrue(asg["min_desired_max_ligados"])
+
+    def test_asg_con_una_instancia_falla(self) -> None:
+        modulo = Path(tempfile.mkdtemp())
+        (modulo / "variables.tf").write_text(
+            'variable "asg_capacidad" {\n  default = 1\n}\n', encoding="utf-8"
+        )
+        (modulo / "main.tf").write_text(
+            "min_size = var.asg_capacidad\ndesired_capacity = var.asg_capacidad\n"
+            "max_size = var.asg_capacidad\n",
+            encoding="utf-8",
+        )
+        resultado = op.capacidad_asg_declarada(modulo)
+        self.assertFalse(resultado["ok"])
+        self.assertEqual(resultado["declarada"], 1)
+
+    def test_core_y_estado_cloud_del_inventario(self) -> None:
+        self.assertGreaterEqual(self.inv["core_24x7"], 12)
+        self.assertEqual(self.inv["existe_en_aws"], "NOT_VERIFIED")
+        self.assertEqual(self.inv["costo_observado"], "NOT_VERIFIED")
+        self.assertFalse(self.inv["aws_consultado"])
 
 
 if __name__ == "__main__":  # pragma: no cover
