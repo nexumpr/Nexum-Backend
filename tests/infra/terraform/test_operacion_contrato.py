@@ -178,6 +178,63 @@ class InventarioDeclarativo(unittest.TestCase):
         self.assertIn("precios_us-east-2.json", operador)
 
 
+class AlcanceDelPlanDeclarativo(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.main = _leer(MODULO / "main.tf")
+        cls.vars = _leer(MODULO / "variables.tf")
+        cls.outs = _leer(MODULO / "outputs.tf")
+        cls.env = _leer(ENV)
+        cls.inv = _inventario()
+
+    def test_variable_de_cambios_propuestos(self) -> None:
+        self.assertIn('variable "cambios_propuestos"', self.vars)
+        self.assertIn("direccion = string", self.vars)
+        self.assertIn("accion    = string", self.vars)
+        self.assertIn("default = []", self.vars)
+
+    def test_no_se_admiten_delete_ni_destroy(self) -> None:
+        bloque = self.vars.split('variable "cambios_propuestos"')[1].split("variable ")[0]
+        self.assertIn('contains(["create", "update", "read", "no-op"]', bloque)
+        self.assertNotIn('"delete"', bloque)
+        self.assertNotIn('"destroy"', bloque)
+
+    def test_precondition_de_cambios_sobre_core(self) -> None:
+        self.assertIn("length(local.cambios_sobre_core) == 0", self.main)
+        self.assertIn("length(local.cambios_fuera_de_allowlist) == 0", self.main)
+
+    def test_capacidad_minima_declarativa(self) -> None:
+        self.assertIn("c.desired == null || c.desired >= 2", self.vars)
+        self.assertIn("doble instancia", self.vars)
+
+    def test_output_alcance_sin_delete(self) -> None:
+        bloque = self.outs.split('output "alcance_plan"')[1]
+        self.assertRegex(bloque, r"permite_delete\s+= false")
+        self.assertRegex(bloque, r"permite_destroy\s+= false")
+        self.assertRegex(bloque, r"minimo_nodos\s+= 2")
+
+    def test_entorno_no_declara_plan_aplicado(self) -> None:
+        self.assertIn("cambios_propuestos = []", self.env)
+        self.assertIn("alcance_plan", self.env)
+
+    def test_inventario_declara_impacto_core(self) -> None:
+        permitidos = {"NINGUNO", "VENTANA_DECLARADA", "BLOQUEANTE"}
+        for item in self.inv["items"]:
+            self.assertIn(item.get("impacto_core", "NINGUNO"), permitidos, item["nombre"])
+        self.assertEqual(
+            self.cinv("interface-endpoint-ssm")["impacto_core"], "VENTANA_DECLARADA"
+        )
+
+    def test_ningun_core_declara_impacto_bloqueante(self) -> None:
+        for item in self.inv["items"]:
+            if item["criticidad"] == "core":
+                self.assertNotEqual(item.get("impacto_core"), "BLOQUEANTE", item["nombre"])
+
+    @classmethod
+    def cinv(cls, nombre: str) -> dict:
+        return {item["nombre"]: item for item in cls.inv["items"]}[nombre]
+
+
 class DocumentosOperativos(unittest.TestCase):
     def test_maquina_de_estados_documentada(self) -> None:
         texto = _leer(CONTROL / "MAQUINA_ESTADOS_RUNTIME.md")
@@ -191,6 +248,15 @@ class DocumentosOperativos(unittest.TestCase):
         self.assertIn("nexum_operacion.py", texto)
         self.assertIn("destroy-data", texto)
         self.assertIn("AWS_NOT_RUN", texto)
+
+    def test_matriz_inf_120_01_06_existe(self) -> None:
+        texto = _leer(CONTROL / "MATRIZ_INF_120.md")
+        for contrato in (
+            "INF-120-01", "INF-120-02", "INF-120-03",
+            "INF-120-04", "INF-120-05", "INF-120-06",
+        ):
+            self.assertIn(contrato, texto)
+        self.assertIn("BLOCKED_I130", texto)
 
     def test_inventario_residual_enumerado(self) -> None:
         texto = _leer(CONTROL / "INVENTARIO_RESIDUAL.md")

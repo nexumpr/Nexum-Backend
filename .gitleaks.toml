@@ -29,3 +29,10 @@ condition = "AND"
 paths = ['''^sdd/_control/H07/BASELINE_SHA256\.json$''']
 regexTarget = "line"
 regexes = ['''^\s*"[A-Za-z0-9_./\\-]+":\s*"[a-f0-9]{64}"\s*,?$''']
+
+[[rules.allowlists]]
+description = "Constante de estado BLOQUEADO_* en la prueba de I-120 (no es credencial; commit 3f45f16)"
+condition = "AND"
+paths = ['''^tests/infra/operacion/.*\.py$''']
+regexTarget = "secret"
+regexes = ['''^BLOQUEADO_[A-Z0-9]+$''']

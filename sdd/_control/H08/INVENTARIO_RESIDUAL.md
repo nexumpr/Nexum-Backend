@@ -60,6 +60,29 @@ puede apagar.
 La política vigente (D6 de I-000) los mantiene cerrados y los abre solo en ventanas: ese uso real es
 `1.4400 USD` por 24 h de ventana, según I-000, no 64.8000.
 
+## 2.3 Fijos frente a variables
+
+| Naturaleza | Recursos | Tratamiento |
+|---|---|---|
+| **Fijo por existencia** | 2 EC2, ALB, Redis, endpoints de logs, EBS, almacenamiento DynamoDB y PITR, S3 de state, almacenamiento de logs, 8 alarmas | Se suman al residual con precio `VERIFIED_AWS` |
+| **Variable por uso** | egreso CloudFront, RRU/WRU de DynamoDB, ingesta de logs, solicitudes S3, inter-AZ de Redis | **No** se suman y **no** se declaran cero |
+| **Sin cargo por existencia** | VPC, subredes, IGW, NACL, SG, gateway endpoints, certificado CloudFront, VPC Origins | Se declaran `0.0000` con fuente oficial |
+| **No computable** | `secretsmanager` (`BLOQUEADO_RFC004`) | Se excluye y se nombra |
+| **Presupuestado sin crear** | backup programado de DynamoDB (I-130 `NOT_AUTHORIZED`) | Se muestra separado |
+
+## 2.4 Costo neto, cr?ditos y margen
+
+| Campo | Estado |
+|---|---|
+| Estimaci?n bruta (residual fijo) | `97.4412 USD / 45 d` |
+| Margen de seguridad 10 % | `107.1853 USD / 45 d` |
+| Cr?ditos aplicables | **`NOT_VERIFIED`** (no hay saldo verificado en esta corrida) |
+| Costo neto | **desconocido** (`neto_con_creditos_usd = null`) |
+| Servicios no verificados | CloudFront egreso, DynamoDB requests, ingesta, S3 requests, inter-AZ, IVA, `secretsmanager` |
+
+El operador expone `creditos_aplicables_usd = null` y `neto_con_creditos_usd = null`
+mientras no exista evidencia autorizada: no se inventa el saldo ni el gasto.
+
 ## 3. Residual calculado
 
 | Concepto | USD/hora | USD/45 días (1080 h) |

@@ -36,6 +36,9 @@ module "operacion" {
   max_denegados  = 0
   destroy_datos  = false
   destroy_estado = false
+
+  # Sin plan aplicado en I-120 LOCAL: no se declara alcance ni se asume nada.
+  cambios_propuestos = []
 }
 
 output "operacion" {
@@ -46,6 +49,7 @@ output "operacion" {
     denegados                = module.operacion.denegados
     auxiliares_sin_allowlist = module.operacion.auxiliares_fuera_de_allowlist
     politica                 = module.operacion.politica
+    alcance_plan             = module.operacion.alcance_plan
     umbrales_credito_usd     = local.inventario_operacion.umbrales_credito_usd
     estado_despliegue        = module.operacion.estado_despliegue
   }

@@ -2,16 +2,19 @@
 
 Reglas que este programa hace cumplir:
 
-- **Nunca** habla con AWS ni con Terraform: no importa boto3 ni ``subprocess``.
-  Todo lo que produce es un *plan* local reproducible (``AWS_NOT_RUN``).
-- El *core* (2 EC2 Go, ALB, CloudFront, Redis, DynamoDB, state) es 24x7 e
-  intocable: ningun comando auxiliar puede detenerlo, escalarlo por debajo de 2,
-  eliminarlo ni destruirlo.
+- **Nunca** habla con AWS ni ejecuta Terraform: no importa SDK de nube ni lanza
+  procesos externos. Todo lo que produce es un *plan* local reproducible
+  (``AWS_NOT_RUN``).
+- El *core* (2 EC2 Go, ASG, ALB, CloudFront, Redis, DynamoDB, red esencial,
+  state, secretos, monitoreo) es 24x7 e intocable: ningun comando auxiliar puede
+  detenerlo, escalarlo por debajo de 2, eliminarlo ni destruirlo.
 - ``criticality=auxiliary`` solo se opera si figura en la allowlist revisada.
 - Un recurso sin etiqueta ``nexum:criticality`` valida, desconocido o incoherente
   se **deniega** siempre (deny por defecto).
 - ``destroy-data``, ``destroy-state`` y ``destroy-all`` **no existen** como
   capacidades; se rechazan con codigo 2 y sin efecto.
+- Toda operacion capaz de mutar infraestructura esta **deshabilitada** en
+  I-120 LOCAL: ``apply`` devuelve un plan y codigo 2. Ningun flag lo habilita.
 - El dinero se calcula con ``Decimal`` (R-030): nunca float.
 
 Codigos de salida: 0 correcto, 1 denegado/bloqueado, 2 uso invalido o prohibido.
@@ -26,7 +29,7 @@ import sys
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 RAIZ = Path(__file__).resolve().parents[1]
 INVENTARIO_DEFECTO = RAIZ / "infra" / "terraform" / "operacion" / "inventario.json"
@@ -53,6 +56,29 @@ TRANSICIONES = {
     "ERROR": ("DRAINING", "STARTING"),
 }
 
+# Estados que describen el runtime auxiliar; nunca el core compartido 24x7.
+ESTADOS_AUXILIARES = ("OFF", "DRAINING", "ERROR")
+ESTADO_CORE_NUNCA = ("OFF",)
+
+COMANDOS = {
+    "estado": "estado",
+    "status": "estado",
+    "plan": "plan",
+    "encender": "encender",
+    "start": "encender",
+    "suspender-aux": "suspender-aux",
+    "suspend-aux": "suspender-aux",
+    "reanudar-aux": "reanudar-aux",
+    "resume-aux": "reanudar-aux",
+    "reconciliar": "reconciliar",
+    "reconcile": "reconciliar",
+    "rollback": "rollback",
+    "destruir-aux": "destruir-aux",
+    "destroy-aux": "destruir-aux",
+    "aplicar": "aplicar",
+    "apply": "aplicar",
+}
+
 # Nombres que un operador podria teclear y que este Gate no autoriza jamas.
 COMANDOS_PROHIBIDOS = frozenset(
     {
@@ -67,10 +93,11 @@ COMANDOS_PROHIBIDOS = frozenset(
         "destruir_estado",
         "destroy-state",
         "destroy-infra",
+        "destroy-runtime-core",
         "terraform-apply",
         "terraform-destroy",
-        "apply",
         "destroy",
+        "refresh",
     }
 )
 
@@ -86,14 +113,23 @@ DESTRUIR_TODO_MSG = (
     "PROHIBIDO: destroy-all no existe. Los destroys estan separados por diseno "
     "(spec I-120 INF-120-05: destroy-runtime / destroy-data / destroy-state)."
 )
+EJECUCION_MSG = (
+    "EJECUCION_REAL_DESHABILITADA_EN_I120_LOCAL: apply solo produce plan. Mutar "
+    "infraestructura exige Gate de despliegue independiente y entorno protegido "
+    "(I-090); ningun flag --force/--yes habilita efectos."
+)
 
 
 class ErrorUso(Exception):
-    """Uso invalido o comando prohibido (codigo 2)."""
+    """Uso invalido, comando prohibido o ejecucion no autorizada (codigo 2)."""
 
 
 class ErrorInventario(Exception):
     """Inventario malformado (codigo 2). No se tolera a la baja."""
+
+
+class ErrorOperacion(Exception):
+    """Fallo de una operacion simulada, apto para reintento."""
 
 
 # --------------------------------------------------------------------------- #
@@ -214,6 +250,29 @@ def clasificar(
     }
 
 
+IMPACTOS_CORE = ("NINGUNO", "VENTANA_DECLARADA", "BLOQUEANTE")
+
+
+def dependencias_core(inventario: Mapping[str, Any], nombres: Sequence[str]) -> dict[str, str]:
+    """Impacto indirecto declarado: BLOQUEANTE impide operar el auxiliar.
+
+    VENTANA_DECLARADA (D6 de I-000) es el unico impacto admitido: el recurso es
+    necesario solo dentro de la ventana aprobada de mantenimiento.
+    """
+    por_nombre = {item["nombre"]: item for item in inventario["items"]}
+    impacto: dict[str, str] = {}
+    for nombre in nombres:
+        item = por_nombre.get(nombre)
+        if item is None:
+            raise ErrorInventario(f"Recurso inexistente en el inventario: {nombre}")
+        valor = item.get("impacto_core", "NINGUNO")
+        if valor not in IMPACTOS_CORE:
+            raise ErrorInventario(f"impacto_core invalido en '{nombre}': {valor!r}")
+        if valor == "BLOQUEANTE":
+            impacto[nombre] = valor
+    return impacto
+
+
 # --------------------------------------------------------------------------- #
 # Coste exacto (Decimal, R-030)
 # --------------------------------------------------------------------------- #
@@ -248,12 +307,7 @@ def costo_horario_item(item: Mapping[str, Any], catalogo: Mapping[str, Any]) -> 
 def residual(
     inventario: Mapping[str, Any], catalogo: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Coste que persiste por existencia (no depende del trafico).
-
-    Se separa lo que el codigo declara (``DECLARADO_NO_CREADO``) de lo que solo
-    esta presupuestado en I-000 (``PRESUPUESTADO_NO_CREADO``) y de lo bloqueado
-    (``BLOQUEADO_RFC004``), que no se suma.
-    """
+    """Coste que persiste por existencia (no depende del trafico)."""
     residente = Decimal("0")
     presupuestado = Decimal("0")
     no_computable: dict[str, str] = {}
@@ -288,6 +342,9 @@ def residual(
         "residente_45d_usd": str(cuantizar(residente * HORAS_45_DIAS)),
         "presupuestado_45d_usd": str(cuantizar(presupuestado * HORAS_45_DIAS)),
         "total_45d_usd": str(cuantizar(total_hora * HORAS_45_DIAS)),
+        "neto_con_creditos_usd": None,
+        "creditos_aplicables_usd": None,
+        "margen_seguridad_10_usd": str(cuantizar(total_hora * HORAS_45_DIAS * Decimal("1.10"))),
         "no_computable": {k: no_computable[k] for k in sorted(no_computable)},
         "componentes_variables": sorted(variable),
         "moneda": "USD",
@@ -295,7 +352,8 @@ def residual(
         "advertencia": (
             "Solo coste fijo por existencia. Las partidas variables (RRU/WRU, "
             "ingesta, egreso CloudFront, solicitudes S3, interferencia Redis) y "
-            "las reservas de I-000 NO se incluyen ni se declaran cero."
+            "las reservas de I-000 NO se incluyen ni se declaran cero. El costo "
+            "neto es desconocido sin creditos verificados."
         ),
     }
 
@@ -325,7 +383,7 @@ def ahorro_auxiliares(
 
 
 # --------------------------------------------------------------------------- #
-# Maquina de estados
+# Maquina de estados (INF-120-01)
 # --------------------------------------------------------------------------- #
 
 
@@ -335,20 +393,38 @@ def transicion(
     actor: str | None,
     runbook: str | None,
     ahora: str | None = None,
+    **contexto: Any,
 ) -> dict[str, Any]:
+    """Transicion validada con el registro completo exigido por INF-120-01."""
     if desde not in ESTADOS_RUNTIME:
         raise ErrorUso(f"Estado de origen desconocido: {desde!r}")
     if hacia not in ESTADOS_RUNTIME:
         raise ErrorUso(f"Estado de destino desconocido: {hacia!r}")
+
+    registro = {
+        "estado_anterior": desde,
+        "estado_nuevo": hacia,
+        "actor": actor or "DESCONOCIDO",
+        "timestamp_utc": ahora,
+        "entorno": contexto.get("entorno"),
+        "recurso": contexto.get("recurso", "runtime"),
+        "motivo": contexto.get("motivo"),
+        "operacion_id": contexto.get("operacion_id"),
+        "autorizacion": contexto.get("autorizacion"),
+        "resultado": "IDEMPOTENTE" if desde == hacia else "PLANIFICADO",
+        "evidencia": contexto.get("evidencia"),
+        "rollback": contexto.get("rollback", "RUNBOOK_START_STOP.md#rollback"),
+        "permitida": True,
+        "idempotente": desde == hacia,
+        "desde": desde,
+        "hacia": hacia,
+        "runbook": runbook,
+        "actor_operador": actor,
+    }
+
     if desde == hacia:
-        return {
-            "permitida": True,
-            "idempotente": True,
-            "desde": desde,
-            "hacia": hacia,
-            "actor": actor,
-            "runbook": runbook,
-        }
+        return registro
+
     if hacia not in TRANSICIONES[desde]:
         raise ErrorUso(
             f"Transicion no permitida: {desde} -> {hacia}. "
@@ -358,20 +434,94 @@ def transicion(
         raise ErrorUso("Toda transicion exige --actor identificable.")
     if not runbook:
         raise ErrorUso("Toda transicion exige --runbook (procedimiento aplicado).")
-    marca = ahora or datetime.now(timezone.utc).isoformat(timespec="seconds")
-    return {
-        "permitida": True,
-        "idempotente": False,
-        "desde": desde,
-        "hacia": hacia,
-        "actor": actor,
-        "runbook": runbook,
-        "timestamp_utc": marca,
-    }
+
+    registro["timestamp_utc"] = ahora or datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return registro
+
+
+def es_estado_auxiliar(estado: str) -> bool:
+    """OFF nunca es un estado valido del core compartido 24x7 (spec seccion 9)."""
+    return estado in ESTADOS_AUXILIARES
 
 
 # --------------------------------------------------------------------------- #
-# Aprobaciones y umbrales
+# Alcance real del plan (proteccion contra destruccion indirecta)
+# --------------------------------------------------------------------------- #
+
+ACCIONES_PROHIBIDAS = ("delete", "destroy", "forget")
+CAMPOS_CAPACIDAD = ("desired", "desired_capacity", "desiredCapacity", "max_size")
+
+
+def verificar_alcance_plan(
+    cambios: Sequence[Mapping[str, Any]] | None,
+    core: Sequence[str],
+    allowlist: Sequence[str],
+) -> dict[str, Any]:
+    """Rechaza cualquier cambio propuesto que toque el core o baje de 2 nodos.
+
+    No basta con mirar etiquetas: un plan manipulado podria destruir un recurso
+    core sin aparecer como operacion auxiliar.
+    """
+    if cambios is None:
+        return {"verificado": False, "motivo": "Sin plan de cambios aportado; no se asume alcance."}
+
+    core_set = set(core)
+    permitidos = set(allowlist)
+    denegados: list[str] = []
+    nodos_tras_cambio: int | None = None
+
+    for cambio in cambios:
+        if not isinstance(cambio, Mapping):
+            raise ErrorUso("Cada cambio del plan debe ser un objeto.")
+        direccion = str(cambio.get("direccion", "")).strip()
+        accion = str(cambio.get("accion", "")).strip().lower()
+        base = direccion.split("[")[0].strip()
+        if not direccion:
+            raise ErrorUso("Cambio sin 'direccion': plan malformado, se falla cerrado.")
+        if not accion:
+            raise ErrorUso(f"Cambio sin 'accion' para {direccion}: plan malformado.")
+        if base in core_set:
+            denegados.append(f"{direccion}: el core nunca se modifica ({accion})")
+            continue
+        if base not in permitidos:
+            denegados.append(f"{direccion}: recurso no declarado o fuera de allowlist")
+            continue
+        if accion in ACCIONES_PROHIBIDAS:
+            denegados.append(f"{direccion}: accion '{accion}' no permitida sobre auxiliares")
+        for campo in CAMPOS_CAPACIDAD:
+            if campo in cambio:
+                valor = cambio[campo]
+                if valor is not None:
+                    nodos_tras_cambio = int(valor)
+                    if nodos_tras_cambio < 2:
+                        denegados.append(
+                            f"{direccion}: {campo}={nodos_tras_cambio} rompe la doble instancia (GOV-02)"
+                        )
+
+    return {
+        "verificado": True,
+        "cambios": len(cambios),
+        "denegados": denegados,
+        "ok": not denegados,
+        "nodos_tras_cambio": nodos_tras_cambio,
+    }
+
+
+def exigir_alcance_plan(
+    cambios: Sequence[Mapping[str, Any]] | None,
+    core: Sequence[str],
+    allowlist: Sequence[str],
+) -> dict[str, Any]:
+    resultado = verificar_alcance_plan(cambios, core, allowlist)
+    if resultado.get("denegados"):
+        raise ErrorUso(
+            "Plan rechazado por alcance: " + "; ".join(resultado["denegados"])
+        )
+    return resultado
+
+
+# --------------------------------------------------------------------------- #
+# Aprobaciones, creditos y reintentos
 # --------------------------------------------------------------------------- #
 
 
@@ -387,10 +537,41 @@ def exigir_aprobacion(token: str | None, esperado: str) -> None:
         )
 
 
+def cargar_autorizacion(ruta: str | Path | None, frase: str, entorno: str, operacion: str) -> dict[str, Any]:
+    """Registro de autorizacion revisado. Un archivo local NO habilita ejecucion."""
+    if not ruta:
+        raise ErrorUso(
+            "Falta --autorizacion: se exige el registro revisado del Gate del entorno, "
+            "no solo la frase (una frase dentro de un prompt no es un Gate)."
+        )
+    datos = cargar_json(ruta)
+    if not isinstance(datos, Mapping):
+        raise ErrorUso("El registro de autorizacion debe ser un objeto JSON.")
+    if datos.get("frase") != frase:
+        raise ErrorUso("El registro de autorizacion no contiene la frase esperada.")
+    if datos.get("entorno") != entorno:
+        raise ErrorUso("El registro de autorizacion pertenece a otro entorno.")
+    if datos.get("operacion") not in (operacion, "*"):
+        raise ErrorUso("El registro de autorizacion no cubre esta operacion.")
+    if not datos.get("aprobador"):
+        raise ErrorUso("El registro de autorizacion carece de aprobador humano.")
+    return {
+        "procedencia": "registro_revisado_local",
+        "aprobador": datos.get("aprobador"),
+        "fecha": datos.get("fecha"),
+        "referencia": datos.get("referencia"),
+        "habilitacion_ejecucion": "DENEGADA_EN_I120_LOCAL",
+        "nota": (
+            "Un archivo local no autoriza efectos reales. La ejecucion exige entorno "
+            "protegido y Gate de despliegue (I-090); apply permanece deshabilitado."
+        ),
+    }
+
+
 def evaluar_creditos(
     creditos: str | Decimal | None, umbrales: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Aplica los umbrales de I-120 seccion 10. Sin dato no se asume nada."""
+    """Umbrales INF-120/§10 + I-000. Sin dato no se asume nada (falla cerrado)."""
     if creditos is None:
         return {
             "estado": "BLOQUEADO",
@@ -400,12 +581,15 @@ def evaluar_creditos(
     valor = Decimal(str(creditos))
     aviso = Decimal(str(umbrales.get("aviso", "45")))
     bloqueo = Decimal(str(umbrales.get("bloqueo_auxiliares", "35")))
+    revision = Decimal(str(umbrales.get("revision_urgente", "30")))
     critico = Decimal(str(umbrales.get("incidente_critico", "20")))
     if valor < critico:
         estado, motivo = "INCIDENTE_CRITICO", "Saldo por debajo del umbral critico: escalar al responsable."
-    elif valor < bloqueo:
+    elif valor <= revision:
+        estado, motivo = "REVISION_URGENTE", "Saldo en revision urgente: bloquear cambios auxiliares no esenciales."
+    elif valor <= bloqueo:
         estado, motivo = "BLOQUEADO", "Saldo por debajo del umbral de bloqueo de auxiliares."
-    elif valor < aviso:
+    elif valor <= aviso:
         estado, motivo = "AVISO", "Saldo por debajo del umbral de aviso; mantener ventanas al minimo."
     else:
         estado, motivo = "OK", "Saldo por encima del umbral de aviso."
@@ -418,35 +602,47 @@ def evaluar_creditos(
     }
 
 
+def ejecutar_con_reintentos(
+    accion: Callable[[], Any], intentos: int = 3
+) -> tuple[Any, list[str]]:
+    """Reintenta fallos transitorios y devuelve el historial. No oculta el fallo final."""
+    errores: list[str] = []
+    for _ in range(max(1, int(intentos))):
+        try:
+            return accion(), errores
+        except ErrorOperacion as exc:
+            errores.append(str(exc))
+    raise ErrorOperacion(
+        f"Operacion fallida tras {intentos} intentos: " + "; ".join(errores)
+    )
+
+
+def simular_aplicacion(
+    objetivo: Sequence[str], fallos: Iterable[str] = ()
+) -> dict[str, Any]:
+    """Aplicacion simulada con fallos parciales declarados por quien prueba."""
+    fallidos = set(fallos)
+    aplicados, errores = [], []
+    for nombre in objetivo:
+        if nombre in fallidos:
+            errores.append(nombre)
+        else:
+            aplicados.append(nombre)
+    resultado = "PARCIAL" if aplicados and errores else ("FALLIDO" if errores else "APLICADO")
+    return {
+        "resultado": resultado,
+        "aplicados": aplicados,
+        "fallidos": errores,
+        "rollback": "RUNBOOK_START_STOP.md#rollback",
+        "datos_destruidos": False,
+        "estado_destruido": False,
+        "ejecutado_en_aws": False,
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Planes por comando
 # --------------------------------------------------------------------------- #
-
-
-def _titulo(texto: str) -> dict[str, str]:
-    return {"mensaje": texto}
-
-
-def plan_estado(
-    inventario: Mapping[str, Any],
-    catalogo: Mapping[str, Any],
-    allowlist: Sequence[str],
-    observado: Mapping[str, Any] | None,
-) -> dict[str, Any]:
-    clasif = clasificar(inventario, allowlist)
-    estado = (observado or {}).get("estado", "DESCONOCIDO")
-    return {
-        "comando": "estado",
-        "estado_runtime": estado,
-        "estado_origen": "observado" if observado else "DESCONOCIDO (sin evidencia AWS)",
-        "clasificacion": clasif,
-        "residual": residual(inventario, catalogo),
-        "dos_nodos": _dos_nodos(
-            (observado or {}).get("targets_sanos"),
-            (observado or {}).get("minimo_instancias", 2),
-        ),
-        "advertencia": "Estado leido de un archivo observado; este Gate no consulta AWS.",
-    }
 
 
 def _dos_nodos(targets: Any, minimo: int = 2) -> dict[str, Any]:
@@ -468,6 +664,30 @@ def _dos_nodos(targets: Any, minimo: int = 2) -> dict[str, Any]:
             if sano
             else "No se puede publicar el servicio: 1 nodo no es doble instancia (GOV-02)."
         ),
+        "alcance": "disponibilidad_global_del_backend",
+    }
+
+
+def plan_estado(
+    inventario: Mapping[str, Any],
+    catalogo: Mapping[str, Any],
+    allowlist: Sequence[str],
+    observado: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    clasif = clasificar(inventario, allowlist)
+    estado = (observado or {}).get("estado", "DESCONOCIDO")
+    return {
+        "comando": "estado",
+        "estado_runtime": estado,
+        "estado_origen": "observado" if observado else "DESCONOCIDO (sin evidencia AWS)",
+        "off_sobre_core": estado in ESTADO_CORE_NUNCA,
+        "clasificacion": clasif,
+        "residual": residual(inventario, catalogo),
+        "dos_nodos": _dos_nodos(
+            (observado or {}).get("targets_sanos"),
+            (observado or {}).get("minimo_instancias", 2),
+        ),
+        "advertencia": "Estado leido de un archivo observado; este Gate no consulta AWS.",
     }
 
 
@@ -481,13 +701,28 @@ def plan_encender(
     actor: str | None,
     runbook: str | None,
     ahora: str | None,
+    motivo: str | None = None,
+    operacion_id: str | None = None,
+    autorizacion: str | None = None,
 ) -> dict[str, Any]:
     exigir_aprobacion(aprobacion, f"APRUEBO_ENCENDER_{entorno.upper()}")
     obs = observado or {}
     desde = obs.get("estado", "OFF")
     dos = _dos_nodos(obs.get("targets_sanos"), 2)
     hacia = "ON_2_HEALTHY" if dos["cumple_doble_instancia"] else "STARTING"
-    registro = transicion(desde, hacia, actor, runbook, ahora)
+    registro = transicion(
+        desde,
+        hacia,
+        actor,
+        runbook,
+        ahora,
+        entorno=entorno,
+        recurso="runtime",
+        motivo=motivo or "reanudacion planificada",
+        operacion_id=operacion_id,
+        autorizacion=autorizacion,
+        evidencia=obs.get("evidencia"),
+    )
     return {
         "comando": "encender",
         "transicion": registro,
@@ -495,7 +730,7 @@ def plan_encender(
         "acciones": [
             "verificar plan Free, creditos y cuota antes de publicar",
             "desiredCapacity=2 (min=desired=max)",
-            "comprobar 2 targets sanos en /api/v1/health/live y readiness segun Gate",
+            "comprobar 2 targets sanos en /api/v1/health/live; readiness segun su Gate",
             "no exponer la URL publica hasta ON_2_HEALTHY",
         ],
         "residual": residual(inventario, catalogo),
@@ -514,6 +749,7 @@ def plan_suspender_aux(
     actor: str | None,
     runbook: str | None,
     observado: Mapping[str, Any] | None,
+    cambios_plan: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     exigir_aprobacion(aprobacion, f"APRUEBO_SUSPENDER_AUX_{entorno.upper()}")
     clasif = clasificar(inventario, allowlist)
@@ -537,16 +773,38 @@ def plan_suspender_aux(
             + ", ".join(core_tocado)
             + ". Es un incidente, no un ahorro."
         )
+    impacto = dependencias_core(inventario, objetivo)
+    if impacto:
+        raise ErrorUso(
+            "Suspension rechazada por impacto indirecto BLOQUEANTE sobre el core: "
+            + json.dumps(impacto, ensure_ascii=False, sort_keys=True)
+        )
+    alcance = exigir_alcance_plan(cambios_plan, clasif["core"], clasif["suspendibles"])
+    ya_suspendidos = sorted(set(objetivo) & suspendidos_observados)
     return {
         "comando": "suspender-aux",
         "objetivo": objetivo,
+        "idempotente": len(ya_suspendidos) == len(objetivo),
+        "ya_suspendidos": ya_suspendidos,
         "ahorro": ahorro_auxiliares(inventario, catalogo, objetivo),
         "residual_tras_suspender": residual(inventario, catalogo),
         "no_tocado": clasif["core"],
         "denegados": clasif["denegados"],
+        "alcance_plan": alcance,
+        "registro": transicion(
+            (observado or {}).get("estado", "ON_2_HEALTHY"),
+            (observado or {}).get("estado", "ON_2_HEALTHY"),
+            actor,
+            runbook,
+            entorno=entorno,
+            recurso=",".join(objetivo),
+            motivo="ventana de mantenimiento",
+            autorizacion="APRUEBO_SUSPENDER_AUX",
+        ),
         "actor": actor,
         "runbook": runbook,
         "ejecutado_en_aws": False,
+        "dry_run": True,
     }
 
 
@@ -559,26 +817,69 @@ def plan_reanudar_aux(
     creditos: str | None,
     actor: str | None,
     runbook: str | None,
+    pronostico: str | None = None,
+    cambios_plan: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     exigir_aprobacion(aprobacion, f"APRUEBO_REANUDAR_AUX_{entorno.upper()}")
     clasif = clasificar(inventario, allowlist)
     umbrales = inventario.get("umbrales_credito_usd", {})
     evaluacion = evaluar_creditos(creditos, umbrales)
-    bloqueado = evaluacion["estado"] in ("BLOQUEADO", "INCIDENTE_CRITICO")
+    pronostico_eval = evaluar_pronostico(pronostico, creditos)
+    bloqueado = evaluacion["estado"] in ("BLOQUEADO", "INCIDENTE_CRITICO", "REVISION_URGENTE")
+    if pronostico_eval["bloquea"]:
+        bloqueado = True
+    alcance = exigir_alcance_plan(cambios_plan, clasif["core"], clasif["suspendibles"])
     return {
         "comando": "reanudar-aux",
         "objetivo": clasif["suspendibles"],
         "creditos": evaluacion,
+        "pronostico": pronostico_eval,
+        "alcance_plan": alcance,
         "estado": "BLOQUEADO" if bloqueado else "PLANIFICADO",
+        "requisitos": [
+            "autorizacion humana del ambiente",
+            "inventario y allowlist revisados",
+            "creditos y estado de cuenta verificados",
+            "costos futuros calculados",
+            "dependencias sin impacto en el core",
+            "state Terraform preservado",
+            "rollback disponible",
+        ],
         "acciones": [
             "terraform plan contra el state remoto preservado (I-070)",
             "verificar prerrequisitos, cuota y creditos",
             "aplicar de forma idempotente tras aprobacion por ambiente",
             "pruebas funcionales sin regenerar secretos ni sustituir datos",
         ],
+        "idempotente": True,
         "actor": actor,
         "runbook": runbook,
         "ejecutado_en_aws": False,
+    }
+
+
+def evaluar_pronostico(pronostico: str | None, creditos: str | None) -> dict[str, Any]:
+    """Forecast > credito restante => bloqueo de nuevos despliegues auxiliares."""
+    if pronostico is None or creditos is None:
+        return {
+            "estado": "BLOQUEADO",
+            "bloquea": True,
+            "motivo": "Sin forecast y creditos verificados no se autoriza reanudar auxiliares.",
+        }
+    previsto = Decimal(str(pronostico))
+    disponible = Decimal(str(creditos))
+    excede = previsto > disponible
+    return {
+        "estado": "EXCEDE_CREDITO" if excede else "CUBIERTO",
+        "bloquea": excede,
+        "pronostico_usd": str(cuantizar(previsto)),
+        "credito_restante_usd": str(cuantizar(disponible)),
+        "motivo": (
+            "El forecast excede el credito restante: bloquear nuevos despliegues auxiliares."
+            if excede
+            else "El forecast cabe en el credito restante declarado."
+        ),
+        "advertencia": "Un forecast no es un hard cap ni una autorizacion de gasto.",
     }
 
 
@@ -662,6 +963,7 @@ def plan_destruir_aux(
     seleccion: Sequence[str] | None,
     actor: str | None,
     runbook: str | None,
+    cambios_plan: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     exigir_aprobacion(aprobacion, f"APRUEBO_DESTRUIR_AUX_{entorno.upper()}")
     clasif = clasificar(inventario, allowlist)
@@ -672,12 +974,20 @@ def plan_destruir_aux(
             "destroy-runtime solo alcanza auxiliares en allowlist; se intento: "
             + ", ".join(sorted(intrusos))
         )
+    impacto = dependencias_core(inventario, objetivo)
+    if impacto:
+        raise ErrorUso(
+            "Destroy rechazado por impacto indirecto BLOQUEANTE sobre el core: "
+            + json.dumps(impacto, ensure_ascii=False, sort_keys=True)
+        )
+    alcance = exigir_alcance_plan(cambios_plan, clasif["core"], clasif["suspendibles"])
     return {
         "comando": "destruir-aux",
         "objetivo": objetivo,
         "ahorro": ahorro_auxiliares(inventario, catalogo, objetivo),
         "residual_tras_destruir": residual(inventario, catalogo),
         "core_intacto": clasif["core"],
+        "alcance_plan": alcance,
         "datos_destruidos": False,
         "estado_destruido": False,
         "actor": actor,
@@ -696,21 +1006,36 @@ def construir_parser() -> argparse.ArgumentParser:
         prog="nexum_operacion.py",
         description="Operador local y determinista de encendido/apagado (I-120). Nunca ejecuta AWS.",
     )
-    parser.add_argument("comando", help="estado | plan | encender | suspender-aux | reanudar-aux | reconciliar | rollback | destruir-aux")
+    parser.add_argument(
+        "comando",
+        help=(
+            "estado/status | plan | encender/start | suspender-aux/suspend-aux | "
+            "reanudar-aux/resume-aux | reconciliar/reconcile | rollback | "
+            "destruir-aux/destroy-aux | aplicar/apply (solo plan)"
+        ),
+    )
     parser.add_argument("--inventario", default=str(INVENTARIO_DEFECTO))
     parser.add_argument("--catalogo", default=str(CATALOGO_DEFECTO))
     parser.add_argument("--entorno", default="h08i")
     parser.add_argument("--allowlist", default=None, help="Lista separada por comas; por defecto la del inventario auxiliar")
     parser.add_argument("--observado", default=None, help="JSON con el estado observado (nunca se consulta AWS)")
     parser.add_argument("--snapshot", default=None, help="JSON con el estado deseado anterior para rollback")
+    parser.add_argument("--plan-cambios", default=None, dest="plan_cambios", help="JSON con los cambios propuestos a verificar")
     parser.add_argument("--seleccion", default=None, help="Subconjunto de auxiliares separado por comas")
     parser.add_argument("--aprobacion", default=None)
+    parser.add_argument("--autorizacion", default=None, help="Registro revisado del Gate del entorno")
     parser.add_argument("--creditos", default=None, help="Creditos declarados en USD (evidencia externa)")
+    parser.add_argument("--pronostico", default=None, help="Gasto proyectado en USD (evidencia externa)")
+    parser.add_argument("--motivo", default=None)
+    parser.add_argument("--operacion-id", default=None, dest="operacion_id")
     parser.add_argument("--actor", default=None)
     parser.add_argument("--runbook", default=None)
     parser.add_argument("--ahora", default=None, help="Marca ISO-8601 para pruebas deterministas")
     parser.add_argument("--json", action="store_true", dest="salida_json")
     parser.add_argument("--salida", default=None, help="Ruta opcional donde escribir el plan JSON")
+    # Flags de fuerza: se aceptan solo para rechazarlos de forma explicita.
+    parser.add_argument("--force", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--yes", action="store_true", help=argparse.SUPPRESS)
     return parser
 
 
@@ -728,13 +1053,26 @@ def ejecutar(argv: Sequence[str] | None = None) -> tuple[int, dict[str, Any]]:
     parser = construir_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
 
-    comando = args.comando.strip().lower()
-    if comando in COMANDOS_PROHIBIDOS:
-        if comando in ("destruir-datos", "destruir_datos", "destroy-data"):
+    crudo = args.comando.strip().lower()
+    if crudo in COMANDOS_PROHIBIDOS:
+        if crudo in ("destruir-datos", "destruir_datos", "destroy-data"):
             raise ErrorUso(DESTRUIR_DATOS_MSG)
-        if comando in ("destruir-estado", "destruir_estado", "destroy-state"):
+        if crudo in ("destruir-estado", "destruir_estado", "destroy-state"):
             raise ErrorUso(DESTRUIR_ESTADO_MSG)
         raise ErrorUso(DESTRUIR_TODO_MSG)
+
+    if getattr(args, "force", False) or getattr(args, "yes", False):
+        raise ErrorUso(
+            "Los flags --force/--yes no habilitan efectos: la autorizacion exige Gate "
+            "humano con procedencia verificable, no un booleano."
+        )
+
+    comando = COMANDOS.get(crudo)
+    if comando is None:
+        raise ErrorUso(
+            f"Comando desconocido: {crudo!r}. Solo existen: estado, plan, encender, "
+            "suspender-aux, reanudar-aux, reconciliar, rollback, destruir-aux, aplicar."
+        )
 
     inventario = cargar_inventario(args.inventario)
     validar_inventario(inventario)
@@ -746,29 +1084,55 @@ def ejecutar(argv: Sequence[str] | None = None) -> tuple[int, dict[str, Any]]:
 
     observado = _leer_opcional(args.observado)
     snapshot = _leer_opcional(args.snapshot)
+    cambios_plan = _leer_opcional(args.plan_cambios)
     seleccion = _lista(args.seleccion) or None
+
+    if comando == "aplicar":
+        clasif = clasificar(inventario, allowlist)
+        alcance = exigir_alcance_plan(cambios_plan, clasif["core"], clasif["suspendibles"])
+        resultado = {
+            "comando": "aplicar",
+            "estado": "EJECUCION_DESHABILITADA",
+            "dry_run": True,
+            "alcance_plan": alcance,
+            "datos_destruidos": False,
+            "estado_destruido": False,
+            "ejecutado_en_aws": False,
+            "motivo": EJECUCION_MSG,
+        }
+        resultado["entorno"] = args.entorno
+        resultado["generado_utc"] = args.ahora or datetime.now(timezone.utc).isoformat(timespec="seconds")
+        resultado["aws_consultado"] = False
+        resultado["terraform_ejecutado"] = False
+        if args.salida:
+            Path(args.salida).write_text(
+                json.dumps(resultado, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        return 2, resultado
 
     if comando == "estado":
         resultado = plan_estado(inventario, catalogo, allowlist, observado)
-    elif comando == "plan":
+    elif comando in ("plan", "encender"):
         resultado = plan_encender(
             inventario, catalogo, allowlist, observado, args.aprobacion, args.entorno,
-            args.actor, args.runbook, args.ahora,
-        )
-    elif comando == "encender":
-        resultado = plan_encender(
-            inventario, catalogo, allowlist, observado, args.aprobacion, args.entorno,
-            args.actor, args.runbook, args.ahora,
+            args.actor, args.runbook, args.ahora, args.motivo, args.operacion_id,
+            args.autorizacion,
         )
     elif comando == "suspender-aux":
+        autorizacion = cargar_autorizacion(
+            args.autorizacion, f"APRUEBO_SUSPENDER_AUX_{args.entorno.upper()}",
+            args.entorno, "suspender-aux",
+        ) if args.autorizacion else None
         resultado = plan_suspender_aux(
             inventario, catalogo, allowlist, args.aprobacion, args.entorno,
-            seleccion, args.actor, args.runbook, observado,
+            seleccion, args.actor, args.runbook, observado, cambios_plan,
         )
+        resultado["autorizacion"] = autorizacion
     elif comando == "reanudar-aux":
         resultado = plan_reanudar_aux(
             inventario, catalogo, allowlist, args.aprobacion, args.entorno,
-            args.creditos, args.actor, args.runbook,
+            args.creditos, args.actor, args.runbook, args.pronostico, cambios_plan,
         )
     elif comando == "reconciliar":
         resultado = plan_reconciliar(inventario, catalogo, allowlist, observado)
@@ -779,16 +1143,14 @@ def ejecutar(argv: Sequence[str] | None = None) -> tuple[int, dict[str, Any]]:
     elif comando == "destruir-aux":
         resultado = plan_destruir_aux(
             inventario, catalogo, allowlist, args.aprobacion, args.entorno,
-            seleccion, args.actor, args.runbook,
+            seleccion, args.actor, args.runbook, cambios_plan,
         )
-    else:
-        raise ErrorUso(
-            f"Comando desconocido: {comando!r}. Solo existen: estado, plan, encender, "
-            "suspender-aux, reanudar-aux, reconciliar, rollback, destruir-aux."
-        )
+    else:  # pragma: no cover - cubierto por el mapa COMANDOS
+        raise ErrorUso(f"Comando no implementado: {comando!r}")
 
     resultado["entorno"] = args.entorno
     resultado["generado_utc"] = args.ahora or datetime.now(timezone.utc).isoformat(timespec="seconds")
+    resultado["operacion_id"] = args.operacion_id
     resultado["aws_consultado"] = False
     resultado["terraform_ejecutado"] = False
 

@@ -91,3 +91,13 @@ Gate `APRUEBO_GATE_I120_LOCAL`. Rama `feat/h08i-i120-operacion`. Nada se desplie
 - **T-120-06 (Prueba):** PENDIENTE_AWS. La prueba OFF/ON con inventario y facturacion reales requiere Gate de despliegue; hoy `AWS_NOT_RUN` y `AWS_COST_REAL = NOT_VERIFIED`.
 - **T-120-90 (Riesgos):** R01 (apagado incompleto) mitigado por politica core + residual documentado; R02 (destroy de datos) mitigado por capacidad inexistente; R03 (gasto con runtime OFF) mitigado por residual enumerado. Los tres quedan CONDICIONADOS a verificacion real.
 - **T-120-99 (Ratificacion):** REVIEW pendiente; merge requiere autorizacion humana ligada a PR + HEAD.
+
+### Ampliacion v2 de la implementacion local (2026-11-09)
+
+- **T-120-01:** registro con 12 campos; `off_sobre_core` como incidente. Pruebas: `RegistroDeTransiciones`.
+- **T-120-02:** `reanudar-aux` exige creditos y forecast; 7 prerrequisitos declarados. Pruebas: `test_reanudar_bloquea_sin_pronostico`, `test_reanudar_ok_con_pronostico_cubierto`.
+- **T-120-03:** `impacto_core` + allowlist + etiqueta + alcance de plan; `BLOQUEANTE` deniega. Pruebas: `ImpactoYAuxiliares`.
+- **T-120-04:** rechazo de planes sobre core y de capacidad < 2 en Terraform y operador.
+- **T-120-05:** `apply` deshabilitado, `--force`/`--yes` rechazados, autorizacion con procedencia revisada.
+- **T-120-06:** 20 categorias de prueba, reintentos, fallos parciales y concurrencia.
+- **FinOps diario:** herramienta y 18 pruebas con umbrales 45/35/30/20 y forecast.

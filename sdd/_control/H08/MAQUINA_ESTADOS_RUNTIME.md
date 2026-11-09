@@ -86,11 +86,19 @@ recursos auxiliares. Nadie, incluido OpenCode, puede apagar un recurso core por 
   ahorro;
 - el rollback nunca destruye datos ni state, y rechaza snapshots que lo soliciten.
 
+## 4.1 Core frente a auxiliar
+
+`OFF` es un estado **auxiliar**: `es_estado_auxiliar("OFF")` devuelve `True` y
+`es_estado_auxiliar("ON_2_HEALTHY")` devuelve `False`. Si el estado observado del
+core es `OFF`, la salida incluye `off_sobre_core=true` y se trata como incidente:
+la spec ?9 proh?be apagar el n?cleo aunque el saldo sea bajo.
+
 ## 5. Evidencia
 
 | Comprobación | Resultado |
 |---|---|
-| Pruebas del operador (`tests/infra/operacion`) | 54 OK |
+| Pruebas del operador (`tests/infra/operacion`) | 83 OK (b?sicas + avanzadas) |
+| Control FinOps diario (`tests/infra/finops`) | 18 OK |
 | Contrato estático Terraform (`tests/infra/terraform/test_operacion_contrato.py`) | Incluido en la suite de 255+ |
 | `terraform fmt` / `init -backend=false` / `validate` | PASS |
 | Transiciones reales en AWS | `NOT_RUN` |

@@ -546,3 +546,15 @@
 - Documentos: `MAQUINA_ESTADOS_RUNTIME.md`, `RUNBOOK_START_STOP.md`, `INVENTARIO_RESIDUAL.md`.
 - Pruebas: 54 operador + 27 contrato Terraform + 7 alineacion FinOps; `fmt`/`init -backend=false`/`validate` PASS; Trivy PASS.
 - Sin recursos AWS, sin `terraform plan/apply/destroy`, sin Cost Explorer. Bloqueos vigentes: I-130 (backups), RFC-004, H-01, RFC-007, `AWS_SCP_NOT_VERIFIED`, readiness 503, D-100-01/02, D-110-01.
+
+### I-120 ampliacion v2 (2026-11-09)
+
+- **INF-120-01:** registro de transicion con 12 campos (estado anterior/nuevo, actor, timestamp UTC, entorno, recurso, motivo, operacion_id, autorizacion, resultado, evidencia, rollback). `OFF` se clasifica como estado auxiliar; si el core observa `OFF` se marca `off_sobre_core` y se trata como incidente.
+- **INF-120-02:** `reanudar-aux` exige creditos Y forecast; sin pronostico el resultado es `BLOQUEADO` (codigo 1). Dos targets sanos solo deciden publicabilidad (`alcance = disponibilidad_global_del_backend`), no autorizan tocar el core.
+- **INF-120-03:** campo `impacto_core` en el inventario (`NINGUNO`/`VENTANA_DECLARADA`/`BLOQUEANTE`); `VENTANA_DECLARADA` (D6) es el unico admitido para los 3 endpoints de mantenimiento y `BLOQUEANTE` deniega. Pruebas negativas con EC2 core, ALB, Redis, DynamoDB, CloudFront, state, auxiliar autorizado, sin etiqueta, desconocido y auxiliar bloqueante.
+- **INF-120-04:** el plan se verifica contra el core (`cambios_sobre_core`, `cambios_fuera_de_allowlist`); `desired < 2` se rechaza en Terraform y en el operador. `TWO_NODES_AWS_NOT_VERIFIED`.
+- **INF-120-05:** `apply`/`aplicar` devuelve `EJECUCION_DESHABILITADA` (codigo 2) y `--force`/`--yes` se rechazan. `cargar_autorizacion` valida frase, entorno, operacion y aprobador y declara `habilitacion_ejecucion = DENEGADA_EN_I120_LOCAL`. Separacion prevista read-only/plan/apply-aux/apply-core sin crear roles (I-060/I-090 intactos).
+- **INF-120-06:** 20 categorias cubiertas, incluidas idempotencia, reintentos, fallos parciales, concurrencia (25 hilos) y manipulacion de planes.
+- **FinOps diario:** `herramientas/verificar_finops_diario.py` con umbrales `<=45` aviso, `<=35` bloqueo, `<=30` revision urgente, `<20` incidente critico y `forecast > credito restante`; sin evidencia devuelve `BLOQUEADO_SIN_DATOS`. Nunca apaga el core ni cambia el plan Free.
+- **gitleaks:** excepcion acotada dentro de `generic-api-key` (ruta `tests/infra/operacion/**` y valor `^BLOQUEADO_[A-Z0-9]+$`) para el falso positivo del commit `3f45f16`; sin allowlist global ni reglas desactivadas. Probado que un secreto real no cumple el patron.
+- Evidencia: 83 pruebas de operacion, 36 de contrato Terraform, 18 de FinOps diario, 11 de configuracion gitleaks; `terraform fmt/init -backend=false/validate` PASS; Trivy PASS.

@@ -126,6 +126,17 @@ Parar una EC2 no elimina ALB, IPv4, Redis, EBS ni facturación de logs. El resid
 | Saldo por debajo del umbral de bloqueo | Bloquear auxiliares nuevos; escalar al responsable |
 | Snapshot con destroy | Rechazado; no se relaja la guarda para "recuperar" el cambio |
 
+## 9.1 Control FinOps diario
+
+```powershell
+py -3.13 herramientas/verificar_finops_diario.py --evidencia evidencia.json
+```
+
+Niveles: `<= 45` aviso, `<= 35` bloqueo de cambios auxiliares, `<= 30` revisi?n
+urgente, `< 20` incidente cr?tico y `forecast > cr?dito restante` bloqueo de
+despliegues. Sin evidencia el nivel es `BLOQUEADO_SIN_DATOS` (c?digo 1). Nunca
+apaga el core, nunca cambia el plan Free y no es un hard cap.
+
 ## 10. Evidencia
 
 - `terraform fmt -check`, `init -backend=false`, `validate`: PASS en local.

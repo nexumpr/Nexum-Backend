@@ -41,3 +41,15 @@ output "estado_despliegue" {
   description = "Las guardas son locales: no se creo ni modifico ningun recurso AWS"
   value       = "NO_CREADO"
 }
+
+output "alcance_plan" {
+  description = "Verificacion del alcance de los cambios propuestos"
+  value = {
+    cambios            = length(var.cambios_propuestos)
+    sobre_core         = local.cambios_sobre_core
+    fuera_de_allowlist = local.cambios_fuera_de_allowlist
+    permite_delete     = false
+    permite_destroy    = false
+    minimo_nodos       = 2
+  }
+}

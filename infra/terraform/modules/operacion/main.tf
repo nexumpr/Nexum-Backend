@@ -56,6 +56,20 @@ locals {
   # suspender auxiliares pareceria no tener coste ni riesgo.
   componentes_core_obligatorios = ["computo", "datos", "estado"]
 
+  core_fijado = toset(local.core)
+
+  # Un plan que toque el core o salga de la allowlist se rechaza, aunque la accion
+  # sea "update": no basta mirar etiquetas (INF-120-05).
+  cambios_sobre_core = sort([
+    for c in var.cambios_propuestos : c.direccion
+    if contains(local.core_fijado, split("[", c.direccion)[0])
+  ])
+
+  cambios_fuera_de_allowlist = sort([
+    for c in var.cambios_propuestos : c.direccion
+    if !contains(local.core_fijado, split("[", c.direccion)[0]) && !contains(local.suspendibles, split("[", c.direccion)[0])
+  ])
+
   componentes_core_faltantes = sort([
     for componente in local.componentes_core_obligatorios : componente
     if !contains(local.componentes_core, componente)
@@ -105,6 +119,16 @@ resource "terraform_data" "guardas_operativas" {
     precondition {
       condition     = var.destroy_datos == false && var.destroy_estado == false
       error_message = "destroy-data y destroy-state deben permanecer en false: son capacidades inexistentes en I-120."
+    }
+
+    precondition {
+      condition     = length(local.cambios_sobre_core) == 0
+      error_message = "El plan modifica recursos core (${join(", ", local.cambios_sobre_core)}): el core 24x7 no se altera por operaciones auxiliares."
+    }
+
+    precondition {
+      condition     = length(local.cambios_fuera_de_allowlist) == 0
+      error_message = "El plan incluye recursos no declarados o fuera de allowlist (${join(", ", local.cambios_fuera_de_allowlist)}): deny por defecto."
     }
   }
 }

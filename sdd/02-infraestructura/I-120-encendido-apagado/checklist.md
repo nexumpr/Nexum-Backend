@@ -61,3 +61,12 @@
 - [x] 54 pruebas del operador, 27 de contrato Terraform y 7 de alineacion FinOps.
 - [ ] Ejecucion real OFF/ON con inventario y facturacion: `NOT_RUN` (requiere Gate de despliegue).
 - [ ] Backups de DynamoDB: bloqueados por I-130 `NOT_AUTHORIZED`.
+
+- [x] Registro de transicion con los 12 campos de INF-120-01.
+- [x] `apply` deshabilitado y flags de fuerza rechazados.
+- [x] Alcance de plan verificado: core y capacidad < 2 se rechazan.
+- [x] Impacto `BLOQUEANTE` deniega suspender y destroy auxiliar.
+- [x] Control FinOps diario con 4 umbrales y regla de forecast, fallando cerrado.
+- [x] `MATRIZ_INF_120.md` con los seis contratos y sus pruebas.
+- [x] Excepcion gitleaks acotada a una constante de estado, sin exclusion global.
+- [ ] Restauracion real de backups: `BLOCKED_I130`.

@@ -103,3 +103,28 @@ hallazgos, las suites locales pasen y el SDD/hashes permanezcan íntegros.
 |---|---|
 | 2026-11-09 | `APRUEBO_GATE_I120_LOCAL` concedido; rama `feat/h08i-i120-operacion` creada desde `main` `071478a1` (incluye cierre documental de I-110) |
 | 2026-11-09 | Implementación local completada; verificación y PR por agente; merge pendiente de autorización humana ligada a PR + HEAD |
+| 2026-11-09 | Ampliación v2: registro completo de transiciones, alcance de plan (rechazo de destrucción indirecta), `apply` deshabilitado, reintentos y fallos parciales, impacto `BLOQUEANTE`, control FinOps diario con 4 umbrales y forecast, `MATRIZ_INF_120.md` y excepción gitleaks acotada a una constante de estado. Merge sigue pendiente de autorización humana ligada a PR + HEAD |
+
+## 9. Ampliación v2 (2026-11-09)
+
+- **INF-120-01:** registro con 12 campos (estado anterior/nuevo, actor, timestamp UTC, entorno,
+  recurso, motivo, operación, autorización, resultado, evidencia, rollback); `OFF` marcado como
+  estado auxiliar y `off_sobre_core` tratado como incidente.
+- **INF-120-02:** `reanudar-aux` exige créditos **y** forecast; sin ellos queda `BLOQUEADO`.
+- **INF-120-03:** rechazo por impacto `BLOQUEANTE` declarado en el inventario; `VENTANA_DECLARADA`
+  (D6) es el único impacto admitido para los 3 endpoints de mantenimiento.
+- **INF-120-04:** cualquier cambio de plan sobre ALB/CloudFront/core se rechaza; capacidad < 2 se
+  rechaza en Terraform y en el operador.
+- **INF-120-05:** `apply` devuelve `EJECUCION_DESHABILITADA` (código 2); `--force`/`--yes`
+  rechazados; `cargar_autorizacion` valida el registro revisado y declara
+  `habilitacion_ejecucion = DENEGADA_EN_I120_LOCAL`.
+- **INF-120-06:** 20 categorías cubiertas, incluidas reintentos, fallos parciales, concurrencia y
+  manipulación de planes.
+- **FinOps:** `herramientas/verificar_finops_diario.py` con umbrales 45/35/30/20, regla de forecast
+  y fallo cerrado (`BLOQUEADO_SIN_DATOS`).
+- **gitleaks:** excepción acotada dentro de `generic-api-key` (ruta `tests/infra/operacion/**` y
+  valor `^BLOQUEADO_[A-Z0-9]+$`), sin allowlist global ni reglas desactivadas.
+
+Evidencia local v2: 83 pruebas de operación, 36 de contrato Terraform, 18 de FinOps diario,
+`terraform fmt/init -backend=false/validate` PASS, Trivy PASS, SDD y SHA-256 PASS.
+`AWS_NOT_RUN`, `TWO_NODES_AWS_NOT_VERIFIED`, `BLOCKED_I130`.

@@ -352,8 +352,11 @@ class CreditosYUmbrales(unittest.TestCase):
 
     def test_umbrales_de_la_spec(self) -> None:
         self.assertEqual(op.evaluar_creditos("10", self.umbrales)["estado"], "INCIDENTE_CRITICO")
-        self.assertEqual(op.evaluar_creditos("30", self.umbrales)["estado"], "BLOQUEADO")
+        self.assertEqual(op.evaluar_creditos("20", self.umbrales)["estado"], "REVISION_URGENTE")
+        self.assertEqual(op.evaluar_creditos("30", self.umbrales)["estado"], "REVISION_URGENTE")
+        self.assertEqual(op.evaluar_creditos("35", self.umbrales)["estado"], "BLOQUEADO")
         self.assertEqual(op.evaluar_creditos("40", self.umbrales)["estado"], "AVISO")
+        self.assertEqual(op.evaluar_creditos("45", self.umbrales)["estado"], "AVISO")
         self.assertEqual(op.evaluar_creditos("50", self.umbrales)["estado"], "OK")
 
     def test_reanudar_con_saldo_bajo_bloquea(self) -> None:

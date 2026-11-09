@@ -88,3 +88,27 @@ variable "destroy_estado" {
     error_message = "destroy-state esta prohibido: el state Terraform tiene prevent_destroy y es irrecuperable sin el (I-070)."
   }
 }
+
+variable "cambios_propuestos" {
+  description = <<-EOT
+    Cambios del plan a verificar (direccion + accion). Vacio significa "sin plan
+    evaluado": no se asume alcance. Cualquier cambio sobre un recurso core o sobre
+    capacidad por debajo de 2 se rechaza (proteccion contra destruccion indirecta).
+  EOT
+  type = list(object({
+    direccion = string
+    accion    = string
+    desired   = optional(number)
+  }))
+  default = []
+
+  validation {
+    condition     = alltrue([for c in var.cambios_propuestos : contains(["create", "update", "read", "no-op"], lower(c.accion))])
+    error_message = "Solo se admiten acciones create/update/read/no-op: delete y destroy no existen para el core ni para auxiliares en I-120."
+  }
+
+  validation {
+    condition     = alltrue([for c in var.cambios_propuestos : c.desired == null || c.desired >= 2])
+    error_message = "desired por debajo de 2 rompe la doble instancia (GOV-02)."
+  }
+}
