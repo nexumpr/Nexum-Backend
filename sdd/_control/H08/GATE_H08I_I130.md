@@ -120,3 +120,30 @@ el SDD/hashes permanezcan íntegros.
 Evidencia: 104 pruebas de respaldo (39 base + 42 de integridad/recuperación + 23 previas), 321 de
 Terraform, `fmt`/`validate`, SDD y SHA-256 PASS. `AWS_NOT_RUN`, `RESTORE_AWS_NOT_RUN`,
 `RTO_RPO_PENDING_HUMAN_APPROVAL`.
+
+## 10. Revisión definitiva (2026-11-09)
+
+- **Reversión financiera:** se reproduce el caso `-250` sobre original `300` y se mantiene como
+  `REVERSION_INCONSISTENTE` (A-070 modela la reversión como total). Se añade `REVERSION_EXCEDIDA` para
+  reversiones duplicadas.
+- **Aportaciones huérfanas:** el validador no comprobaba `allocation.movimiento_id`; ahora emite
+  `APORTACION_HUERFANA` y valida usuario, meta y `goal_id`. Se detectan además duplicados de entidades
+  que los diccionarios por id ocultaban.
+- **Dinero:** `verificar_restore_sintetico` exige centavos enteros y rechaza float, booleanos y texto
+  no entero (antes aceptaba `10.5`).
+- **PITR vs on-demand:** se separan. PITR exige ventana 1..35 d y punto dentro de la ventana;
+  on-demand usa la retención aprobada sin ese máximo y **no caduca solo**. Se rechazan fecha futura,
+  fecha inválida, backup sin id, tabla distinta, tipo desconocido y punto fuera de ventana.
+- **Alcance de backup:** `BACKUP_DECLARADO_LOCAL`, `BACKUP_AWS_NOT_VERIFIED` y `BACKUP_AWS_VERIFIED`
+  (este último solo con evidencia AWS autorizada).
+- **Autorización:** `plan_recuperacion_state` devuelve `PLAN_SINTETICO_EVALUADO`, separa
+  precondiciones declaradas de verificadas y declara `autorizacion_real = DENEGADA_EN_I130_LOCAL`; una
+  cadena local no acredita Gate, locking ni recuperación.
+- **RTO/RPO:** `medido=true` no acredita; se expone `medido_declarado` y `medido_verificable`, y la
+  ratificación exige referencia y fecha.
+- **FinOps:** conciliación por SKU contra el modelo H05 V3; el incremento real es **0.0000 USD** (las
+  líneas ya estaban presupuestadas) y la diferencia 2/3 GB es −0.4779 USD. Decisión
+  `VIABILIDAD_LOCAL_SIN_EVIDENCIA_DE_CUENTA`, sin declarar `NO_BLOCKED_FINOPS` como PASS.
+
+Evidencia: 126 pruebas de respaldo, 15 de conciliación FinOps, 321 de Terraform. `AWS_NOT_RUN`,
+`RESTORE_AWS_NOT_RUN`, `RTO_RPO_PENDING_HUMAN_APPROVAL`.

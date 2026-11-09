@@ -58,7 +58,21 @@ class MatrizRTOyRPO(unittest.TestCase):
         self.assertEqual(matriz["resultado_aws"]["estado"], "NOT_RUN")
 
     def test_objetivo_medido_solo_por_restore_real(self) -> None:
-        self.assertFalse(rec.matriz_rto_rpo(_inv())["objetivo_medido"]["medido"])
+        objetivos = rec.matriz_rto_rpo(_inv())["objetivo_medido"]
+        self.assertFalse(objetivos["medido_declarado"])
+        self.assertFalse(objetivos["medido_verificable"])
+
+    def test_medido_declarado_no_acredita(self) -> None:
+        inventario = _inv()
+        inventario["objetivos"]["medido"] = True
+        objetivos = rec.matriz_rto_rpo(inventario)["objetivo_medido"]
+        self.assertTrue(objetivos["medido_declarado"])
+        self.assertFalse(objetivos["medido_verificable"])
+
+    def test_ratificacion_sin_referencia_no_cuenta(self) -> None:
+        inventario = _inv()
+        inventario["ratificacion_objetivos"] = {"aprobado": True}
+        self.assertEqual(rec.matriz_rto_rpo(inventario)["estado"], rec.RTO_RPO_PENDING)
 
 
 class MedicionDeRecuperacion(unittest.TestCase):
@@ -115,6 +129,7 @@ class MedicionDeRecuperacion(unittest.TestCase):
 class VigenciaDeBackup(unittest.TestCase):
     def _solicitud(self, **extra) -> dict:
         base = {
+            "tipo": "PITR",
             "tabla_activa": "NEXUM_CORE_h08i",
             "backup": {
                 "id": "backup-sint-1",
@@ -129,16 +144,18 @@ class VigenciaDeBackup(unittest.TestCase):
 
     def test_backup_disponible(self) -> None:
         resultado = rec.evaluar_backup(self._solicitud(), date(2026, 11, 9))
-        self.assertEqual(resultado["estado"], "DISPONIBLE")
+        self.assertEqual(resultado["estado"], "DECLARADO_VIGENTE")
+        self.assertEqual(resultado["alcance"], "BACKUP_AWS_NOT_VERIFIED")
         self.assertTrue(resultado["valido"])
         self.assertEqual(resultado["edad_dias"], 4)
 
     def test_backup_inexistente(self) -> None:
-        self.assertEqual(rec.evaluar_backup({"tabla_activa": "X"}, None)["estado"], "NO_EXISTE")
+        self.assertEqual(rec.evaluar_backup({"tipo": "PITR", "tabla_activa": "X"}, None)["estado"], "NO_EXISTE")
 
     def test_backup_caducado(self) -> None:
         resultado = rec.evaluar_backup(self._solicitud(), date(2027, 1, 9))
-        self.assertEqual(resultado["estado"], "CADUCADO")
+        self.assertEqual(resultado["estado"], "FUERA_DE_RETENCION")
+        self.assertTrue(resultado["caducidad_automatica"])
         self.assertFalse(resultado["valido"])
 
     def test_backup_de_otra_tabla(self) -> None:
@@ -158,6 +175,62 @@ class VigenciaDeBackup(unittest.TestCase):
         with self.assertRaises(br.ErrorUso):
             rec.evaluar_backup(None)
 
+    def test_tipo_desconocido_se_rechaza(self) -> None:
+        solicitud = self._solicitud()
+        solicitud["tipo"] = "snapshot-magico"
+        with self.assertRaises(br.ErrorUso):
+            rec.evaluar_backup(solicitud, date(2026, 11, 9))
+
+    def test_fecha_futura_se_rechaza(self) -> None:
+        solicitud = self._solicitud(backup={"fecha": "2026-12-01"})
+        self.assertEqual(
+            rec.evaluar_backup(solicitud, date(2026, 11, 9))["estado"], "FECHA_FUTURA"
+        )
+
+    def test_pitr_no_admite_mas_de_35_dias(self) -> None:
+        solicitud = self._solicitud(backup={"retencion_dias": 40})
+        self.assertEqual(
+            rec.evaluar_backup(solicitud, date(2026, 11, 9))["estado"], "RETENCION_INVALIDA"
+        )
+
+    def test_on_demand_admite_retencion_mayor_y_no_caduca_solo(self) -> None:
+        solicitud = self._solicitud(tipo="on-demand", backup={"retencion_dias": 90})
+        resultado = rec.evaluar_backup(solicitud, date(2026, 11, 9))
+        self.assertEqual(resultado["estado"], "DECLARADO_VIGENTE")
+        self.assertFalse(resultado["caducidad_automatica"])
+
+    def test_on_demand_fuera_de_retencion_no_caduca_solo(self) -> None:
+        solicitud = self._solicitud(tipo="on-demand", backup={"fecha": "2026-01-01", "retencion_dias": 30})
+        resultado = rec.evaluar_backup(solicitud, date(2026, 11, 9))
+        self.assertEqual(resultado["estado"], "FUERA_DE_RETENCION")
+        self.assertFalse(resultado["caducidad_automatica"])
+        self.assertIn("no caduca solo", resultado["motivo"])
+
+    def test_punto_fuera_de_ventana(self) -> None:
+        solicitud = self._solicitud(punto_restauracion="2026-01-01T00:00:00Z")
+        self.assertEqual(
+            rec.evaluar_backup(solicitud, date(2026, 11, 9))["estado"], "PUNTO_FUERA_DE_VENTANA"
+        )
+
+    def test_punto_invalido_es_error(self) -> None:
+        solicitud = self._solicitud(punto_restauracion="01/01/2026")
+        with self.assertRaises(br.ErrorUso):
+            rec.evaluar_backup(solicitud, date(2026, 11, 9))
+
+    def test_evidencia_aws_verificada(self) -> None:
+        solicitud = self._solicitud(
+            evidencia_aws={"verificado_por_aws": True, "huella_sha256": "a" * 64}
+        )
+        self.assertEqual(
+            rec.evaluar_backup(solicitud, date(2026, 11, 9))["alcance"], "BACKUP_AWS_VERIFIED"
+        )
+
+    def test_sin_evidencia_aws_no_se_declara_verificado(self) -> None:
+        self.assertEqual(
+            rec.evaluar_backup(self._solicitud(), date(2026, 11, 9))["alcance"],
+            "BACKUP_AWS_NOT_VERIFIED",
+        )
+
 
 class RecuperacionDeState(unittest.TestCase):
     def _solicitud(self, **extra) -> dict:
@@ -174,11 +247,13 @@ class RecuperacionDeState(unittest.TestCase):
         base.update(extra)
         return base
 
-    def test_plan_valido(self) -> None:
+    def test_plan_valido_es_sintetico_y_no_autoriza(self) -> None:
         resultado = rec.plan_recuperacion_state(self._solicitud())
-        self.assertEqual(resultado["estado"], "PLAN_LOCAL_VALIDADO")
+        self.assertEqual(resultado["estado"], "PLAN_SINTETICO_EVALUADO")
         self.assertEqual(resultado["faltantes"], [])
+        self.assertEqual(resultado["autorizacion_real"], "DENEGADA_EN_I130_LOCAL")
         self.assertEqual(resultado["alcance_aws"], rec.STATE_AWS_NOT_VERIFIED)
+        self.assertFalse(any(resultado["precondiciones_verificadas"].values()))
 
     def test_sin_version_se_rechaza(self) -> None:
         resultado = rec.plan_recuperacion_state(self._solicitud(version_id=None))
@@ -187,15 +262,15 @@ class RecuperacionDeState(unittest.TestCase):
 
     def test_integridad_rota(self) -> None:
         resultado = rec.plan_recuperacion_state(self._solicitud(sha256_observado="b" * 64))
-        self.assertIn("integridad_verificada", resultado["faltantes"])
+        self.assertIn("integridad_declarada", resultado["faltantes"])
 
     def test_sin_aprobacion(self) -> None:
         resultado = rec.plan_recuperacion_state(self._solicitud(aprobacion=None))
-        self.assertIn("aprobacion_registrada", resultado["faltantes"])
+        self.assertIn("aprobacion_declarada", resultado["faltantes"])
 
     def test_sin_copia_previa_no_hay_reversion(self) -> None:
         resultado = rec.plan_recuperacion_state(self._solicitud(copia_state_actual=None))
-        self.assertIn("reversion_posible", resultado["faltantes"])
+        self.assertIn("reversion_declarada", resultado["faltantes"])
 
     def test_secretos_en_logs_se_rechaza(self) -> None:
         resultado = rec.plan_recuperacion_state(self._solicitud(registra_secretos=True))
@@ -203,7 +278,7 @@ class RecuperacionDeState(unittest.TestCase):
 
     def test_sin_gate_se_rechaza(self) -> None:
         resultado = rec.plan_recuperacion_state(self._solicitud(gate=None))
-        self.assertIn("gate_despliegue", resultado["faltantes"])
+        self.assertIn("gate_referenciado", resultado["faltantes"])
 
     def test_sin_solicitud_es_error(self) -> None:
         with self.assertRaises(br.ErrorUso):
@@ -225,6 +300,7 @@ class ConcurrenciaYCLI(unittest.TestCase):
 
     def test_cli_backup_caducado_sale_uno(self) -> None:
         solicitud = _json({
+            "tipo": "PITR",
             "tabla_activa": "NEXUM_CORE_h08i",
             "backup": {"id": "b1", "tabla": "NEXUM_CORE_h08i", "fecha": "2020-01-01", "retencion_dias": 7},
         })

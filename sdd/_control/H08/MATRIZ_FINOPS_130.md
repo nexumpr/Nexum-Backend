@@ -1,75 +1,76 @@
-# Matriz FinOps 2 GB vs 3 GB — I-130
+# Matriz FinOps 2 GB vs 3 GB — conciliación I-130
 
 | Campo | Valor |
 |---|---|
 | Spec | `I-130-backup-recuperacion` |
-| Versión | 0.1.0 |
+| Versión | 0.2.0 |
 | Estado | **IMPLEMENTADO_LOCAL — NO DESPLEGADO** |
+| Conciliación | `herramientas/conciliar_finops_130.py` |
 | Costo observado | `CONSUMO_REAL = NOT_VERIFIED` |
 
-## 1. Origen de la discrepancia
+## 1. Conclusión de la conciliación
 
-| Fuente | Cantidad | Concepto exacto |
-|---|---|---|
-| I-130 §8 | 2 GB | Escenario de referencia del cierre H05 (PITR, backup y restore) |
-| I-000 / inventario I-120 | 3 GB | Cantidad ya usada en el presupuesto de 45 días y en el residual |
+El modelo **H05 V3 ya presupuesta** las cuatro líneas relevantes (PITR, backup, restore y S3 del
+state) con precios idénticos a los del catálogo:
 
-No son la misma medición: **2 GB** es un escenario ilustrativo de la spec y **3 GB** es la cifra que
-arrastra el presupuesto aprobado de I-000. Ninguna de las dos es un consumo observado.
-
-**Decisión local:** se mantienen **3 GB** para no contradecir I-000, y se calcula también 2 GB para que
-el responsable elija. Cambiar el compromiso económico exige RFC; no se modifica el catálogo ni la spec.
-
-## 2. Costes por escenario (precios `VERIFIED_AWS` de I-000)
-
-| Partida | Precio | 2 GB | 3 GB |
+| Concepto | Modelo H05 V3 | I-130 (3 GB) | Incremento |
 |---|---|---|---|
-| PITR (GB-mes) | 0.20 | 0.4000 | 0.6000 |
-| Backup on-demand (GB-mes) | 0.10 | 0.2000 | 0.3000 |
-| S3 state (GB-mes) | 0.023 | 0.0460 | 0.0690 |
-| **Total mensual** | | **0.6460** | **0.9690** |
-| **Total 45 días** (÷730 × 1080) | | **0.9556** | **1.4336** |
-| Restore de verificación (una vez) | 0.15/GB | 0.3000 | 0.4500 |
+| DynamoDB PITR | 3 GB-mes × 0.20 | 3 GB-mes × 0.20 | **0.0000** |
+| DynamoDB backup | 3 GB-mes × 0.10 | 3 GB-mes × 0.10 | **0.0000** |
+| S3 Terraform-state | 3 GB-mes × 0.023 | 3 GB-mes × 0.023 | **0.0000** |
+| DynamoDB restore | 2 GB × 0.15 (eventual) | no habilitado | **0.0000** |
+| **Total** | | | **0.0000 USD** |
 
-## 3. Separación de estados
+**No se añade 1.4336 USD al presupuesto**: esa cifra es la *itemización* de líneas que el modelo ya
+contiene. Sumarla otra vez sería doble conteo. `1.4336 USD/45 d` es el importe de las líneas de I-130
+consideradas aisladas, no un incremento.
 
-| Estado | Significado | Valor |
+## 2. Qué cambia entre 2 GB y 3 GB
+
+| SKU | 2 GB (45 d) | 3 GB (45 d) | Diferencia |
+|---|---|---|---|
+| `DDB_PITR_GB_MES` | 0.5918 | 0.8877 | −0.2959 |
+| `DDB_BACKUP_GB_MES` | 0.2959 | 0.4438 | −0.1479 |
+| `S3_STANDARD_GB_MES` | 0.0681 | 0.1021 | −0.0340 |
+| **Total** | **0.9558** | **1.4336** | **−0.4779** |
+
+La diferencia **no es un ahorro nuevo**: es la distancia entre dos escenarios, y el modelo ya usa 3 GB.
+Adoptar 2 GB reduciría el modelo en 0.4779 USD/45 d; no se cambia el compromiso sin RFC.
+
+## 3. Separaciones obligatorias
+
+| Concepto | Valor | Estado |
 |---|---|---|
-| `ESTIMADO` | cálculo determinista con precios del catálogo | 0.9556 / 1.4336 USD |
-| `PRESUPUESTADO` | línea incluida en el presupuesto de 45 días de I-000 | sí (PITR + backup) |
-| `VERIFICADO_EN_CUENTA` | precio unitario confirmado por Price List | sí para los SKU usados |
-| `CONSUMO_REAL` | facturación observada | **`NOT_VERIFIED`** |
+| Backup habilitado | 0.4438 USD/45 d | `HABILITADO` (PITR) / `OPCIONAL_NO_HABILITADO` (on-demand) |
+| Restore futuro | 0.3000 USD por 2 GB | `EVENTUAL`, no recurrente |
+| Recurrente I-130 | 1.4336 USD/45 d | ya presupuestado |
+| Incremento real | **0.0000 USD** | — |
 
-## 4. Impacto en el presupuesto de 45 días
+## 4. Estado de la evidencia
 
-| Concepto | Valor |
+| Estado | Valor |
 |---|---|
-| Bruto verificado I-000 (escenario C) | 84.0430 USD |
-| Conectividad I-000 | 23.7400 USD |
-| Total verificado con margen 10 % | 113.0613 USD |
-| Créditos verificados | 120.0000 USD |
-| Incremento de I-130 (3 GB) | 1.4336 USD |
-| **Total con I-130 (sin reserva de restore)** | **114.4949 USD** ≤ 120.0000 |
-| Con un restore de verificación (0.4500) | 114.9449 USD |
-| Margen restante | ≈ 5.06 USD |
+| `ESTIMADO` | calculado con `Decimal` desde el catálogo |
+| `PRESUPUESTADO` | sí, modelo H05 V3 |
+| `VERIFICADO_EN_CUENTA` | **`NOT_VERIFIED`** |
+| `CONSUMO_REAL` | **`NOT_VERIFIED`** |
 
-`BLOCKED_FINOPS` **no** se declara: cabe en el presupuesto verificado. Se advierte que el margen es
-estrecho y que cualquier ventana adicional de restore lo consume.
+## 5. Decisión
 
-## 5. Costes residuales y durante OFF
-
-- PITR y backup **persisten** aunque el runtime auxiliar esté cerrado: I-120 no apaga el core.
-- Recursos temporales de recuperación (tabla de verificación) se facturan por almacenamiento mientras
-  existan y deben eliminarse con Gate.
-- `AWS_COST_REAL`, `AWS_CREDITS` y `AWS_ACCOUNT_STATUS`: `NOT_VERIFIED`. Los créditos **no** son garantía
-  de gasto cero.
-
-## 6. Reproducibilidad
+`VIABILIDAD_LOCAL_SIN_EVIDENCIA_DE_CUENTA`. **No** se declara `NO_BLOCKED_FINOPS` como PASS: falta
+evidencia de cuenta y de créditos. Tampoco hay `BLOCKED_FINOPS`: con el modelo vigente el margen local
+es amplio, pero **los créditos declarados no son saldo comprobado** y no se presenta la incertidumbre
+como un aprobado.
 
 ```powershell
-py -3.13 herramientas/verificar_backup_restore.py estado          # 3 GB (inventario)
-py -3.13 herramientas/verificar_recuperacion.py matriz-rto-rpo    # objetivos
+py -3.13 herramientas/conciliar_finops_130.py
 ```
 
-La variante 2 GB se obtiene cambiando `cantidad` en el inventario de respaldo **en una copia**, nunca
-sobrescribiendo el catálogo ni la spec.
+Código 1 solo si el margen local resultara negativo; 0 en otro caso, con la decisión explícita arriba.
+
+## 6. Lo que no se hace
+
+- No se consulta AWS ni Cost Explorer.
+- No se modifica el catálogo ni el modelo H05.
+- No se cambian compromisos económicos del SDD.
+- No se presenta el crédito declarado como saldo disponible comprobado.

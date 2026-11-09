@@ -12,6 +12,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(RAIZ / "herramientas"))
 
+import verificar_backup_restore as br  # noqa: E402
 import verificar_integridad_financiera as fi  # noqa: E402
 
 FIXTURE = RAIZ / "tests" / "fixtures" / "respaldo" / "dataset_sintetico.json"
@@ -202,6 +203,77 @@ class CliYSeguridad(unittest.TestCase):
         ):
             self.assertNotIn(prohibido, fuente)
 
+
+class RegresionesReportadas(unittest.TestCase):
+    """Los dos casos reportados deben producir violaciones reales."""
+
+    def test_caso_a_reversion_que_no_netea(self) -> None:
+        datos = _datos()
+        datos["movimientos"][2]["importe_centavos"] = -250  # original 300
+        resultado = fi.validar_dataset(datos)
+        self.assertEqual(resultado["estado"], "INTEGRIDAD_ROTA")
+        self.assertIn("REVERSION_INCONSISTENTE", resultado["codigos"])
+        detalle = " ".join(v["detalle"] for v in resultado["violaciones"])
+        self.assertIn("mov-sint-3", detalle)
+
+    def test_caso_b_aportacion_a_movimiento_inexistente(self) -> None:
+        datos = _datos()
+        datos["metas"][0]["allocations"][0]["movimiento_id"] = "mov-no-existe"
+        resultado = fi.validar_dataset(datos)
+        self.assertEqual(resultado["estado"], "INTEGRIDAD_ROTA")
+        self.assertIn("APORTACION_HUERFANA", resultado["codigos"])
+
+    def test_reversion_duplicada_se_detecta(self) -> None:
+        datos = _datos()
+        duplicada = copy.deepcopy(datos["movimientos"][2])
+        duplicada["id"] = "mov-sint-4"
+        duplicada["idempotency_key"] = "idem-sint-4"
+        datos["movimientos"].append(duplicada)
+        self.assertIn("REVERSION_EXCEDIDA", _codigos(fi.validar_dataset(datos)))
+
+    def test_entidad_duplicada_no_queda_oculta(self) -> None:
+        datos = _datos()
+        datos["metas"].append(copy.deepcopy(datos["metas"][0]))
+        self.assertIn("DUPLICADO_ENTIDAD", _codigos(fi.validar_dataset(datos)))
+
+    def test_asignacion_duplicada(self) -> None:
+        datos = _datos()
+        datos["metas"][0]["allocations"].append(copy.deepcopy(datos["metas"][0]["allocations"][1]))
+        self.assertIn("DUPLICADO_ENTIDAD", _codigos(fi.validar_dataset(datos)))
+
+    def test_aportacion_a_meta_distinta(self) -> None:
+        datos = _datos()
+        datos["metas"][0]["allocations"][0]["goal_id"] = "m-otra"
+        self.assertIn("REFERENCIA_ROTA", _codigos(fi.validar_dataset(datos)))
+
+    def test_dataset_malformado(self) -> None:
+        with self.assertRaises(fi.ErrorUso):
+            fi.validar_dataset(["no", "es", "objeto"])
+
+
+class RegresionesRestoreSintetico(unittest.TestCase):
+    """La verificacion sintetica exige centavos enteros."""
+
+    def _datos(self, valor):
+        return {"saved_centavos": "10", "opening_saved_centavos": "0", "allocations_centavos": [valor]}
+
+    def test_rechaza_decimal(self) -> None:
+        for valor in ("10.5", 10.5):
+            with self.subTest(valor=valor):
+                with self.assertRaises(br.ErrorUso):
+                    br.verificar_restore_sintetico(self._datos(valor))
+
+    def test_rechaza_booleano(self) -> None:
+        with self.assertRaises(br.ErrorUso):
+            br.verificar_restore_sintetico(self._datos(True))
+
+    def test_rechaza_texto_no_entero(self) -> None:
+        with self.assertRaises(br.ErrorUso):
+            br.verificar_restore_sintetico(self._datos("diez"))
+
+    def test_acepta_entero(self) -> None:
+        resultado = br.verificar_restore_sintetico(self._datos(10))
+        self.assertEqual(resultado["estado"], "INVARIANTES_OK")
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

@@ -34,11 +34,14 @@ CODIGOS = (
     "MONEY_NEGATIVO",
     "MOVIMIENTO_DUPLICADO",
     "IDEMPOTENCIA_DUPLICADA",
+    "DUPLICADO_ENTIDAD",
+    "APORTACION_HUERFANA",
     "REFERENCIA_ROTA",
     "AISLAMIENTO_USUARIO",
     "SUMA_ASIGNACIONES",
     "CENTAVOS_NO_DISTRIBUIDOS",
     "REVERSION_INCONSISTENTE",
+    "REVERSION_EXCEDIDA",
     "SESION_REVOCADA_REACTIVADA",
     "CUENTA_ELIMINADA_REACTIVADA",
     "TTL_AUSENTE",
@@ -106,8 +109,25 @@ def validar_dataset(datos: Mapping[str, Any] | None) -> dict[str, Any]:
     eliminadas = {c["user_id"] for c in datos.get("cuentas_eliminadas", [])}
 
     violaciones: list[dict[str, str]] = []
+
+    # Los diccionarios por id ocultan duplicados: se detectan antes de indexar.
+    for coleccion in ("usuarios", "metas", "sesiones"):
+        vistos_coleccion: set[str] = set()
+        for elemento in datos.get(coleccion, []) or []:
+            identificador = str(elemento.get("id"))
+            if identificador in vistos_coleccion:
+                violaciones.append(
+                    _violacion("DUPLICADO_ENTIDAD", f"{coleccion}: id repetido {identificador}")
+                )
+            vistos_coleccion.add(identificador)
+
+    usuarios = {u["id"]: u for u in datos.get("usuarios", [])}
+    metas = {m["id"]: m for m in datos.get("metas", [])}
+    movimientos = datos.get("movimientos", [])
+    sesiones = datos.get("sesiones", [])
     vistos: set[str] = set()
     importes: dict[str, int] = {}
+    revertido: dict[str, int] = {}
     idempotencia: set[str] = set()
     neto_reversiones = Decimal("0")
     total_asignado = Decimal("0")
@@ -138,12 +158,22 @@ def validar_dataset(datos: Mapping[str, Any] | None) -> dict[str, Any]:
                     _violacion("REVERSION_INCONSISTENTE", f"reversion {mid} sin original valido")
                 )
             elif importe != -importes[original]:
+                # A-070 modela la reversion como total: una parcial no esta definida.
                 violaciones.append(
                     _violacion(
                         "REVERSION_INCONSISTENTE",
                         f"reversion {mid} ({importe}) no netea el original {original} ({importes[original]})",
                     )
                 )
+            else:
+                revertido[original] = revertido.get(original, 0) + (-importe)
+                if revertido[original] > importes[original]:
+                    violaciones.append(
+                        _violacion(
+                            "REVERSION_EXCEDIDA",
+                            f"original {original} revertido {revertido[original]} > {importes[original]} (reversion duplicada)",
+                        )
+                    )
             neto_reversiones += Decimal(importe)
 
         importes[mid] = importe
@@ -164,15 +194,25 @@ def validar_dataset(datos: Mapping[str, Any] | None) -> dict[str, Any]:
                     )
                 )
 
+    movimientos_por_id = {str(m.get("id")): m for m in movimientos}
+
     for meta in metas.values():
         guardado = _dinero(f"meta {meta['id']}.saved_centavos", meta.get("saved_centavos"), violaciones)
         apertura = _dinero(
             f"meta {meta['id']}.opening_saved_centavos", meta.get("opening_saved_centavos"), violaciones
         )
         asignado = Decimal("0")
+        vistos_asignacion: set[str] = set()
         for asignacion in meta.get("allocations", []) or []:
+            aid = str(asignacion.get("id"))
+            if aid in vistos_asignacion:
+                violaciones.append(
+                    _violacion("DUPLICADO_ENTIDAD", f"meta {meta['id']}: asignacion repetida {aid}")
+                )
+            vistos_asignacion.add(aid)
+
             valor = _dinero(
-                f"meta {meta['id']}.allocation.{asignacion.get('id')}",
+                f"meta {meta['id']}.allocation.{aid}",
                 asignacion.get("importe_centavos"),
                 violaciones,
             )
@@ -180,7 +220,31 @@ def validar_dataset(datos: Mapping[str, Any] | None) -> dict[str, Any]:
                 violaciones.append(
                     _violacion(
                         "AISLAMIENTO_USUARIO",
-                        f"asignacion {asignacion.get('id')} de otro usuario en meta {meta['id']}",
+                        f"asignacion {aid} de otro usuario en meta {meta['id']}",
+                    )
+                )
+            if asignacion.get("goal_id") and asignacion.get("goal_id") != meta["id"]:
+                violaciones.append(
+                    _violacion(
+                        "REFERENCIA_ROTA",
+                        f"asignacion {aid} apunta a la meta {asignacion.get('goal_id')} y no a {meta['id']}",
+                    )
+                )
+
+            movimiento_id = asignacion.get("movimiento_id")
+            movimiento = movimientos_por_id.get(str(movimiento_id)) if movimiento_id else None
+            if not movimiento_id or movimiento is None:
+                violaciones.append(
+                    _violacion(
+                        "APORTACION_HUERFANA",
+                        f"asignacion {aid} referencia el movimiento inexistente {movimiento_id!r}",
+                    )
+                )
+            elif movimiento.get("user_id") != meta.get("user_id"):
+                violaciones.append(
+                    _violacion(
+                        "AISLAMIENTO_USUARIO",
+                        f"asignacion {aid} referencia un movimiento de {movimiento.get('user_id')}",
                     )
                 )
             asignado += Decimal(valor)

@@ -600,3 +600,14 @@
 - **FinOps:** `MATRIZ_FINOPS_130.md` con 2 GB vs 3 GB y 4 estados de evidencia; total con I-130 114.4949 USD frente a 120.0000 verificados.
 - **Runbook:** `RUNBOOK_RESTAURACION.md` con 13 fases y campos obligatorios.
 - Conteos: 104 pruebas de respaldo, 321 de Terraform, 148 de herramientas; SDD y SHA-256 PASS; sin AWS, sin Terraform remoto y sin merge.
+
+### I-130 revision definitiva (2026-11-09)
+
+- **Caso A reproducido:** reversion de -250 sobre original de 300 -> `REVERSION_INCONSISTENTE` en el HEAD real (no reproducia INTEGRIDAD_OK). Se anade `REVERSION_EXCEDIDA` para reversiones duplicadas y se documenta que A-070 modela la reversion como total.
+- **Caso B reproducido y corregido:** una aportacion con `movimiento_id` inexistente pasaba como INTEGRIDAD_OK. Ahora emite `APORTACION_HUERFANA` y valida tambien `goal_id`, usuario de la meta y usuario del movimiento. Se anade deteccion de duplicados de usuarios/metas/sesiones/asignaciones (`DUPLICADO_ENTIDAD`).
+- **Dinero:** `verificar_restore_sintetico` exige centavos enteros; rechaza `10.5`, booleanos y texto no entero (caso reproducido: antes devolvia INVARIANTES_ROTAS con suma 10.5).
+- **PITR vs on-demand:** `estado-backup` exige `tipo`; PITR 1..35 d con punto dentro de ventana; on-demand con retencion aprobada sin el maximo de PITR y sin caducidad automatica. Nuevos rechazos: fecha futura, fecha invalida, id ausente, tabla distinta, tipo desconocido, punto fuera de ventana. Alcance: `BACKUP_DECLARADO_LOCAL` / `BACKUP_AWS_NOT_VERIFIED` / `BACKUP_AWS_VERIFIED`.
+- **Autorizacion:** `plan-state` devuelve `PLAN_SINTETICO_EVALUADO`, separa precondiciones declaradas de verificadas y fija `autorizacion_real = DENEGADA_EN_I130_LOCAL`; las cadenas locales no acreditan Gate, locking ni recuperacion.
+- **RTO/RPO:** `medido=true` no acredita (`medido_declarado` vs `medido_verificable`); la ratificacion exige referencia y fecha.
+- **FinOps:** `conciliar_finops_130.py` concilia por SKU contra el modelo H05 V3. Incremento real **0.0000 USD** (sin doble conteo de 1.4336); diferencia 2 vs 3 GB -0.4779 USD; decision `VIABILIDAD_LOCAL_SIN_EVIDENCIA_DE_CUENTA`.
+- Conteos: 126 pruebas de respaldo, 15 de conciliacion FinOps, 321 de Terraform. Sin AWS, sin Terraform remoto, sin merge.

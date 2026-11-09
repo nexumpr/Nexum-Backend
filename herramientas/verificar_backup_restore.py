@@ -257,16 +257,32 @@ def plan_restauracion(
     }
 
 
+def _centavos(valor: Any, campo: str) -> Decimal:
+    """Los importes se expresan en centavos **enteros**; float, bool y texto no valen."""
+    if isinstance(valor, bool):
+        raise ErrorUso(f"{campo}: un booleano no es una cantidad de centavos.")
+    if isinstance(valor, float):
+        raise ErrorUso(f"{campo}: {valor!r} es float; se exigen centavos enteros (R-030).")
+    if isinstance(valor, str):
+        if not re.fullmatch(r"-?[0-9]+", valor.strip()):
+            raise ErrorUso(f"{campo}: {valor!r} no es un entero de centavos.")
+        return Decimal(valor.strip())
+    if isinstance(valor, int):
+        return Decimal(valor)
+    raise ErrorUso(f"{campo}: tipo no admitido {type(valor).__name__}.")
+
+
 def verificar_restore_sintetico(datos: Mapping[str, Any] | None) -> dict[str, Any]:
     if datos is None:
         raise ErrorUso("La verificacion sintetica requiere --datos con movimientos y metas.")
-    saved = Decimal(str(datos.get("saved_centavos", "0")))
-    apertura = Decimal(str(datos.get("opening_saved_centavos", "0")))
+    saved = _centavos(datos.get("saved_centavos", "0"), "saved_centavos")
+    apertura = _centavos(datos.get("opening_saved_centavos", "0"), "opening_saved_centavos")
     asignaciones = datos.get("allocations_centavos", [])
     if not isinstance(asignaciones, list):
         raise ErrorUso("'allocations_centavos' debe ser una lista.")
-    total = sum([Decimal(str(valor)) for valor in asignaciones], Decimal("0"))
-    if any(Decimal(str(valor)) < 0 for valor in asignaciones):
+    valores = [_centavos(valor, "allocations_centavos") for valor in asignaciones]
+    total = sum(valores, Decimal("0"))
+    if any(valor < 0 for valor in valores):
         raise ErrorUso("Una asignacion negativa rompe la invariante de saldos.")
     esperado = apertura + total
     return {

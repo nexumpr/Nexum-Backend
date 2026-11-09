@@ -47,7 +47,12 @@ def matriz_rto_rpo(inventario: Mapping[str, Any]) -> dict[str, Any]:
     """Seis capas: propuesto, ratificado, medido, capacidad, simulacion y AWS."""
     objetivos = inventario.get("objetivos", {})
     ratificacion = inventario.get("ratificacion_objetivos", {})
-    ratificado = bool(ratificacion.get("aprobado"))
+    # Solo cuenta una ratificacion con referencia y fecha; aun asi no es verificable aqui.
+    ratificado = bool(ratificacion.get("aprobado")) and bool(ratificacion.get("referencia")) and bool(
+        ratificacion.get("fecha")
+    )
+    medicion = inventario.get("medicion_aws") or {}
+    medido_verificable = bool(medicion.get("verificado_por_aws")) and bool(medicion.get("huella_sha256"))
     return {
         "comando": "matriz-rto-rpo",
         "objetivo_propuesto": {
@@ -60,7 +65,11 @@ def matriz_rto_rpo(inventario: Mapping[str, Any]) -> dict[str, Any]:
             "fecha": ratificacion.get("fecha"),
             "referencia": ratificacion.get("referencia"),
         },
-        "objetivo_medido": {"medido": bool(objetivos.get("medido")), "fuente": "restore real en AWS"},
+        "objetivo_medido": {
+            "medido_declarado": bool(objetivos.get("medido")),
+            "medido_verificable": medido_verificable,
+            "fuente": "restore real en AWS con evidencia autorizada",
+        },
         "capacidad_teorica": {
             "rpo": "PITR continuo hasta 35 dias; 24 h si solo hay backup diario",
             "rto": "depende del tamano de la tabla y del tiempo de crear la tabla nueva",
@@ -69,6 +78,8 @@ def matriz_rto_rpo(inventario: Mapping[str, Any]) -> dict[str, Any]:
         "simulacion_local": {"estado": "SIMULADO_CON_FIXTURES", "acredita_cumplimiento": False},
         "resultado_aws": {"estado": "NOT_RUN", "medido": False},
         "estado": "RATIFICADO" if ratificado else RTO_RPO_PENDING,
+        "ratificacion_verificable": False,
+        "medicion_verificable": False,
         "advertencia": (
             "Una simulacion local no declara RTO/RPO cumplidos; solo el restore real medido "
             "puede cambiar objetivo_medido."
@@ -128,70 +139,154 @@ def medir_recuperacion(
 def evaluar_backup(
     solicitud: Mapping[str, Any] | None,
     hoy: date | None = None,
+    raiz: Path | None = None,
 ) -> dict[str, Any]:
-    """Vigencia de un backup declarado: existencia, tabla, retencion y caducidad."""
+    """Vigencia de un backup declarado, distinguiendo PITR de on-demand.
+
+    - PITR: ventana 1..35 dias; el punto debe caer dentro de la ventana.
+    - on-demand: retencion aprobada sin el maximo de PITR; no caduca solo.
+    - La existencia real **no** se acredita con un JSON: se declara el alcance.
+    """
     if solicitud is None:
         raise br.ErrorUso("Se requiere --solicitud con los datos del backup.")
+    tipo = str(solicitud.get("tipo", "")).strip()
+    if tipo not in ("PITR", "on-demand"):
+        raise br.ErrorUso(f"tipo de backup desconocido: {tipo!r}; solo PITR u on-demand.")
+
     backup = solicitud.get("backup")
     if not isinstance(backup, Mapping) or not backup.get("id"):
         return {
             "comando": "estado-backup",
+            "tipo": tipo,
             "estado": "NO_EXISTE",
             "valido": False,
-            "motivo": "backup inexistente",
+            "alcance": "BACKUP_DECLARADO_LOCAL",
+            "motivo": "backup inexistente o sin identificador",
         }
 
-    retencion = int(backup.get("retencion_dias", 0))
-    tabla_activa = solicitud.get("tabla_activa")
+    referencia = hoy or datetime.now(timezone.utc).date()
     fecha_txt = str(backup.get("fecha", ""))
     try:
         fecha = datetime.strptime(fecha_txt, "%Y-%m-%d").date()
     except ValueError as exc:
         raise br.ErrorUso(f"fecha de backup invalida: {fecha_txt!r} ({exc})") from exc
-    edad = ((hoy or datetime.now(timezone.utc).date()) - fecha).days
+    if fecha > referencia:
+        return {
+            "comando": "estado-backup",
+            "tipo": tipo,
+            "estado": "FECHA_FUTURA",
+            "valido": False,
+            "alcance": "BACKUP_DECLARADO_LOCAL",
+        }
 
-    if backup.get("tabla") != tabla_activa:
-        return {"comando": "estado-backup", "estado": "TABLA_NO_COINCIDE", "valido": False, "edad_dias": edad}
-    if retencion < 1 or retencion > 35:
-        return {"comando": "estado-backup", "estado": "RETENCION_INVALIDA", "valido": False, "edad_dias": edad}
+    edad = (referencia - fecha).days
+    retencion = int(backup.get("retencion_dias", 0))
+    if retencion < 1:
+        return {"comando": "estado-backup", "tipo": tipo, "estado": "RETENCION_INVALIDA", "valido": False}
+
+    if tipo == "PITR" and retencion > 35:
+        return {
+            "comando": "estado-backup",
+            "tipo": tipo,
+            "estado": "RETENCION_INVALIDA",
+            "valido": False,
+            "motivo": "PITR no conserva mas de 35 dias",
+        }
+
+    if backup.get("tabla") != solicitud.get("tabla_activa"):
+        return {
+            "comando": "estado-backup",
+            "tipo": tipo,
+            "estado": "TABLA_NO_COINCIDE",
+            "valido": False,
+            "edad_dias": edad,
+        }
+
     if edad > retencion:
-        return {"comando": "estado-backup", "estado": "CADUCADO", "valido": False, "edad_dias": edad}
+        return {
+            "comando": "estado-backup",
+            "tipo": tipo,
+            "estado": "FUERA_DE_RETENCION",
+            "valido": False,
+            "edad_dias": edad,
+            "retencion_dias": retencion,
+            "caducidad_automatica": tipo == "PITR",
+            "motivo": (
+                "fuera de la ventana de PITR"
+                if tipo == "PITR"
+                else "fuera de la retencion aprobada; el backup no caduca solo, requiere borrado autorizado"
+            ),
+        }
+
+    punto = solicitud.get("punto_restauracion")
+    if tipo == "PITR" and punto:
+        try:
+            momento = datetime.strptime(str(punto), "%Y-%m-%dT%H:%M:%SZ").date()
+        except ValueError as exc:
+            raise br.ErrorUso(f"punto_restauracion invalido: {punto!r} ({exc})") from exc
+        if momento > referencia or (referencia - momento).days > retencion:
+            return {
+                "comando": "estado-backup",
+                "tipo": tipo,
+                "estado": "PUNTO_FUERA_DE_VENTANA",
+                "valido": False,
+                "retencion_dias": retencion,
+            }
+
+    evidencia = solicitud.get("evidencia_aws") or {}
+    verificado_aws = bool(evidencia.get("verificado_por_aws")) and bool(evidencia.get("huella_sha256"))
+    alcance = "BACKUP_AWS_VERIFIED" if verificado_aws else "BACKUP_AWS_NOT_VERIFIED"
     return {
         "comando": "estado-backup",
-        "estado": "DISPONIBLE",
+        "tipo": tipo,
+        "estado": "DECLARADO_VIGENTE",
         "valido": True,
         "edad_dias": edad,
         "retencion_dias": retencion,
-        "advertencia": "Vigencia calculada sobre datos declarados; no se consulto AWS.",
+        "caducidad_automatica": tipo == "PITR",
+        "alcance": alcance,
+        "advertencia": (
+            "Un JSON local no demuestra que el backup exista; solo BACKUP_AWS_VERIFIED, con "
+            "evidencia AWS autorizada, acredita existencia real."
+        ),
     }
 
 
 def plan_recuperacion_state(solicitud: Mapping[str, Any] | None) -> dict[str, Any]:
-    """Ocho requisitos del procedimiento de recuperacion del state."""
+    """Evalua precondiciones declaradas; nunca concede autorizacion real."""
     if solicitud is None:
         raise br.ErrorUso("Se requiere --solicitud con la recuperacion de state.")
     requisitos = {
         "version_identificada": bool(solicitud.get("version_id")),
-        "integridad_verificada": solicitud.get("sha256_esperado") not in (None, "")
+        "integridad_declarada": solicitud.get("sha256_esperado") not in (None, "")
         and solicitud.get("sha256_esperado") == solicitud.get("sha256_observado"),
-        "aprobacion_registrada": bool(solicitud.get("aprobacion")),
+        "aprobacion_declarada": bool(solicitud.get("aprobacion")),
         "state_actual_preservado": bool(solicitud.get("copia_state_actual")),
-        "reversion_posible": bool(solicitud.get("copia_state_actual")) and bool(solicitud.get("version_id")),
-        "escritor_unico": bool(solicitud.get("token_escritura")),
+        "reversion_declarada": bool(solicitud.get("copia_state_actual")) and bool(solicitud.get("version_id")),
+        "escritor_unico_declarado": bool(solicitud.get("token_escritura")),
         "sin_secretos_en_logs": solicitud.get("registra_secretos") is not True,
-        "gate_despliegue": bool(solicitud.get("gate")),
+        "gate_referenciado": bool(solicitud.get("gate")),
+    }
+    # Una cadena local no verifica nada: se separa lo declarado de lo verificado.
+    verificados = {
+        "integridad_declarada": False,
+        "escritor_unico_declarado": False,
+        "gate_referenciado": False,
+        "aprobacion_declarada": False,
     }
     faltan = sorted(clave for clave, valor in requisitos.items() if not valor)
     return {
         "comando": "plan-state",
-        "estado": "PLAN_LOCAL_VALIDADO" if not faltan else "RECUPERACION_RECHAZADA",
-        "requisitos": requisitos,
+        "estado": "PLAN_SINTETICO_EVALUADO" if not faltan else "RECUPERACION_RECHAZADA",
+        "precondiciones_declaradas": requisitos,
+        "precondiciones_verificadas": verificados,
         "faltantes": faltan,
+        "autorizacion_real": "DENEGADA_EN_I130_LOCAL",
         "alcance_aws": STATE_AWS_NOT_VERIFIED,
         "version_id": solicitud.get("version_id"),
         "advertencia": (
-            "Recuperar una version del state no es una operacion de datos: exige Gate, copia "
-            "previa y escritor unico. No se ejecuto ningun comando S3."
+            "Un archivo local con cadenas de aprobacion, gate o locking NO acredita autorizacion, "
+            "locking ni recuperacion real. El hash declarado no prueba la integridad de S3."
         ),
     }
 
@@ -267,7 +362,9 @@ def ejecutar(argv: Sequence[str] | None = None) -> tuple[int, dict[str, Any]]:
     bloqueantes = (
         "INCUMPLE_SIMULADO",
         "NO_EXISTE",
-        "CADUCADO",
+        "FUERA_DE_RETENCION",
+        "FECHA_FUTURA",
+        "PUNTO_FUERA_DE_VENTANA",
         "RETENCION_INVALIDA",
         "TABLA_NO_COINCIDE",
         "RECUPERACION_RECHAZADA",

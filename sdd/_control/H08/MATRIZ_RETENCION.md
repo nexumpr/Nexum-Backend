@@ -12,12 +12,12 @@
 | Activo | Retención declarada | Límite técnico | Mecanismo de caducidad |
 |---|---|---|---|
 | DynamoDB (PITR) | 35 d | **35 d** (máximo de PITR) | AWS descarta automáticamente |
-| DynamoDB (backup on-demand) | 30 d | Manual | Borrado por procedimiento autorizado |
+| DynamoDB (backup on-demand) | 30 d | Retención aprobada (sin el límite de 35 d del PITR) | **No caduca solo**: requiere borrado autorizado |
 | Terraform state (S3) | 30 d | Versionado sin límite | Lifecycle de versiones no actuales (I-070) |
 | Secretos | — | — | Rotación RFC-004 (no aprobada) |
 
-La retención nunca supera el máximo del mecanismo: prometer 40 días de PITR sería falso y el módulo
-falla la `precondition` si se intenta.
+El PITR nunca supera 35 días (límite del mecanismo). El backup on-demand usa la retención aprobada y
+**no** se le aplica ese máximo: no caduca automáticamente y su borrado exige procedimiento autorizado.
 
 ## 2. Borrado de cuenta frente a retención
 

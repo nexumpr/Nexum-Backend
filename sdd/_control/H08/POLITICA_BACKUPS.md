@@ -63,7 +63,7 @@ real en AWS con duración registrada, y eso exige el Gate de despliegue.
 | State (`S3_STANDARD_GB_MES`, 3 GB) | 0.069 USD/mes |
 | **Residente** | **0.0009 USD/h · 0.9720 USD/45 d** |
 | **Opcional (backup)** | 0.0004 USD/h · 0.4320 USD/45 d |
-| **Total** | **0.0013 USD/h · 1.4336 USD/45 d** |
+| **Total** | **0.0013 USD/h · 1.4336 USD/45 d** (itemización; el modelo H05 ya contiene estas líneas, incremento 0.0000) |
 | Restore de verificación (2 GB) | 0.3000 USD por ejecución |
 
 `DDB_RESTORE_GB` (0.15) y `DDB_BACKUP_GB_MES` (0.10) son `VERIFIED_AWS` del catálogo de I-000.
