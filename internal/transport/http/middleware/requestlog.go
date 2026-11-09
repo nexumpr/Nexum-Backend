@@ -3,14 +3,11 @@ package middleware
 import (
 	"log/slog"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/nexumpr/Nexum-Backend/internal/infrastructure/telemetry"
 )
-
-var patronUUID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // RequestLogOptions configura el registro canónico de peticiones (I-110, INF-110-01).
 type RequestLogOptions struct {
