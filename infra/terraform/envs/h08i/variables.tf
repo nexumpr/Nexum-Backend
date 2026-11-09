@@ -205,3 +205,9 @@ variable "secretos_gestor_iac_arn" {
   type        = string
   default     = ""
 }
+
+variable "artefactos_publicador_arn" {
+  description = "ARN del rol de CI que publica binarios y SBOM en el bucket de artefactos. Vacio = plan fail-closed."
+  type        = string
+  default     = ""
+}

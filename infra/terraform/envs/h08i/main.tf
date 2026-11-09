@@ -153,6 +153,28 @@ module "dynamodb" {
 
 # --- I-060: IAM runtime + trust-only OIDC contracts ------------------------
 
+
+# ARTIFACT_DELIVERY: nombre determinista del bucket de artefactos. Se replica aqui
+# para no crear un ciclo artefactos -> iam -> artefactos al conceder GetObject al
+# runtime. Una prueba de contrato verifica que coincide con modules/artefactos.
+data "aws_caller_identity" "para_artefactos" {}
+
+locals {
+  artefactos_bucket = lower("nexum-${var.entorno}-artefactos-${data.aws_caller_identity.para_artefactos.account_id}")
+}
+
+module "artefactos" {
+  source = "../../modules/artefactos"
+
+  proyecto        = "nexum"
+  entorno         = var.entorno
+  etiquetas       = var.etiquetas
+  prefijo         = "nexum/releases/"
+  rol_runtime_arn = module.iam.runtime_role_arn
+  publicador_arn  = var.artefactos_publicador_arn
+  gestor_iac_arn  = var.secretos_gestor_iac_arn
+}
+
 module "secretos" {
   source = "../../modules/secretos"
 
@@ -180,7 +202,7 @@ module "iam" {
 
   # Los objetos exactos esperan I-080; los log groups/sink los define I-110.
   # Listas vacías significan que NO se concede acceso S3/CloudWatch.
-  artifact_object_arns      = var.iam_artifact_object_arns
+  artifact_object_arns      = concat(var.iam_artifact_object_arns, ["arn:aws:s3:::${local.artefactos_bucket}/nexum/releases/*"])
   secretos_object_arns      = [module.secretos.secrets_prefix_arn]
   cloudwatch_log_group_arns = var.iam_cloudwatch_log_group_arns
 
