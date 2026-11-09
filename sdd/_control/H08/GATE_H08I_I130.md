@@ -97,3 +97,26 @@ el SDD/hashes permanezcan íntegros.
 |---|---|
 | 2026-11-09 | `APRUEBO_GATE_I130_LOCAL` concedido; rama `feat/h08i-i130-backup` creada desde `main` `31d2512` (incluye el cierre documental de I-120) |
 | 2026-11-09 | Implementación local completada; verificación, PR y CI por el agente; merge pendiente de autorización humana ligada a PR + HEAD |
+
+## 9. Ampliación v2 (2026-11-09)
+
+- **INF-130-01:** matriz de 6 capas con `RTO_RPO_PENDING_HUMAN_APPROVAL`; medición determinista de las
+  13 fases del runbook y comparación con RTO/RPO. Una simulación no acredita cumplimiento.
+- **INF-130-02:** vigencia de backup (inexistente, caducado, otra tabla, retención inválida) y
+  confirmación de que el proveedor AWS fijado **no** expone `aws_dynamodb_backup`; el backup on-demand
+  queda como procedimiento externo.
+- **INF-130-03:** procedimiento de recuperación de state en 8 pasos con hash, copia previa, Gate y
+  escritor único; `TERRAFORM_STATE_RECOVERY_AWS_NOT_VERIFIED`.
+- **INF-130-04:** validador de integridad financiera con 13 códigos (dinero en centavos, duplicados,
+  idempotencia, aportaciones divididas, no distribuidos, reversiones, referencias, aislamiento) y
+  comprobación de que el restore no recupera TTL/streams/PITR/IAM/alarmas/tags.
+- **INF-130-05:** política de privacidad con 7 conceptos; una restauración antigua no reactiva cuentas
+  eliminadas ni sesiones revocadas.
+- **INF-130-06:** runbook de 13 fases con responsable, evidencia, criterio, riesgo, rollback, tiempo,
+  coste y estado.
+- **FinOps:** matriz 2 GB vs 3 GB con `ESTIMADO`/`PRESUPUESTADO`/`VERIFICADO_EN_CUENTA`/`CONSUMO_REAL`;
+  total con I-130 114.4949 USD frente a 120.0000 verificados (margen ≈ 5.06), sin `BLOCKED_FINOPS`.
+
+Evidencia: 104 pruebas de respaldo (39 base + 42 de integridad/recuperación + 23 previas), 321 de
+Terraform, `fmt`/`validate`, SDD y SHA-256 PASS. `AWS_NOT_RUN`, `RESTORE_AWS_NOT_RUN`,
+`RTO_RPO_PENDING_HUMAN_APPROVAL`.

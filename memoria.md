@@ -589,3 +589,14 @@
 - Documentos: `POLITICA_BACKUPS.md`, `PRUEBAS_RESTORE.md`, `MATRIZ_RETENCION.md`, `MATRIZ_INF_130.md` y Gate.
 - Pruebas: 39 de respaldo/restauracion y 20 de contrato Terraform; `fmt`/`init -backend=false`/`validate` PASS.
 - Discrepancia documentada: spec §8 presupuesta 2 GB y el inventario usa 3 GB; se mantiene 3 GB y se registra para ratificacion humana.
+
+### I-130 ampliacion v2 (2026-11-09)
+
+- **RTO/RPO:** `verificar_recuperacion.py matriz-rto-rpo` expone 6 capas (propuesto, ratificado, medido, capacidad teorica, simulacion, AWS) y declara `RTO_RPO_PENDING_HUMAN_APPROVAL`; `medir-recuperacion` exige las 13 fases del runbook en orden y compara duracion con RTO y perdida con RPO. Una simulacion no cambia el objetivo medido.
+- **Backups:** `estado-backup` valida existencia, tabla, retencion (<= 35 d) y caducidad. Se confirmo con `terraform validate` que el proveedor AWS fijado no expone `aws_dynamodb_backup`; el backup on-demand queda como procedimiento externo bloqueado por Gate.
+- **State:** `plan-state` exige 8 requisitos (version, hash, aprobacion, copia previa, reversion, escritor unico, sin secretos, Gate); `concurrencia` bloquea escritores simultaneos. Alcance `TERRAFORM_STATE_RECOVERY_AWS_NOT_VERIFIED`.
+- **Integridad financiera:** `verificar_integridad_financiera.py` con 13 codigos sobre dataset 100% sintetico (`tests/fixtures/respaldo/dataset_sintetico.json`): centavos enteros, sin float, duplicados, idempotencia, suma de asignaciones, no distribuidos, reversiones que netean, referencias, aislamiento, TTL, reactivacion de cuentas y sesiones.
+- **Privacidad:** `POLITICA_PRIVACIDAD_BACKUPS.md` con 7 conceptos; prohibido afirmar borrado irreversible mientras existan copias.
+- **FinOps:** `MATRIZ_FINOPS_130.md` con 2 GB vs 3 GB y 4 estados de evidencia; total con I-130 114.4949 USD frente a 120.0000 verificados.
+- **Runbook:** `RUNBOOK_RESTAURACION.md` con 13 fases y campos obligatorios.
+- Conteos: 104 pruebas de respaldo, 321 de Terraform, 148 de herramientas; SDD y SHA-256 PASS; sin AWS, sin Terraform remoto y sin merge.

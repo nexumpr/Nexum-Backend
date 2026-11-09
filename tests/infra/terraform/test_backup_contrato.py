@@ -155,5 +155,67 @@ class DocumentosObligatorios(unittest.TestCase):
         self.assertIn("RESTORE_AWS_NO_VERIFICADO", texto)
 
 
+class AmpliacionV2(unittest.TestCase):
+    """RTO/RPO, state, privacidad y FinOps documentados y verificables."""
+
+    def test_output_de_reconfiguracion_tras_restore(self) -> None:
+        outs = _leer(MODULO / "outputs.tf")
+        bloque = outs.split('output "reconfiguracion_tras_restore"')[1]
+        for campo in (
+            "ttl_atributo", "streams_habilitado", "pitr_habilitado",
+            "iam_politicas", "alarmas", "etiquetas", "escalamiento",
+        ):
+            self.assertIn(campo, bloque, campo)
+
+    def test_matriz_rto_rpo_de_seis_capas(self) -> None:
+        texto = _leer(CONTROL / "MATRIZ_RTO_RPO.md")
+        for capa in (
+            "Objetivo propuesto", "Objetivo ratificado", "Objetivo medido",
+            "Capacidad teórica", "Simulación local", "Resultado real AWS",
+        ):
+            self.assertIn(capa, texto, capa)
+        self.assertIn("RTO_RPO_PENDING_HUMAN_APPROVAL", texto)
+
+    def test_runbook_de_trece_fases(self) -> None:
+        texto = _leer(CONTROL / "RUNBOOK_RESTAURACION.md")
+        for fase in (
+            "Incidente", "Contención", "Pausa controlada", "Identificación del respaldo",
+            "Verificación de integridad", "Revisión FinOps", "Gate humano",
+            "Restore aislado", "Validación financiera", "Reconciliación",
+            "Reanudación", "Monitoreo", "Cierre",
+        ):
+            self.assertIn(fase, texto, fase)
+        self.assertIn("RESTORE_AWS_NOT_RUN", texto)
+
+    def test_procedimiento_de_state_con_ocho_pasos(self) -> None:
+        texto = _leer(CONTROL / "PROCEDIMIENTO_STATE_RECOVERY.md")
+        for paso in (
+            "Identificar versión exacta", "Verificar integridad", "Registrar aprobación",
+            "Preservar el state actual", "Garantizar reversión",
+            "Rechazar escrituras concurrentes", "No exponer secretos", "Gate de despliegue",
+        ):
+            self.assertIn(paso, texto, paso)
+        self.assertIn("TERRAFORM_STATE_RECOVERY_AWS_NOT_VERIFIED", texto)
+
+    def test_privacidad_siete_conceptos(self) -> None:
+        texto = _leer(CONTROL / "POLITICA_PRIVACIDAD_BACKUPS.md")
+        for concepto in (
+            "Eliminación de cuenta solicitada", "Desactivación de acceso",
+            "Eliminación de datos activos", "Expiración de copias",
+            "Retención por obligación", "Eliminación definitiva",
+            "Restauración",
+        ):
+            self.assertIn(concepto, texto, concepto)
+        self.assertIn("CUENTA_ELIMINADA_REACTIVADA", texto)
+        self.assertIn("SESION_REVOCADA_REACTIVADA", texto)
+
+    def test_finops_2_vs_3_gb(self) -> None:
+        texto = _leer(CONTROL / "MATRIZ_FINOPS_130.md")
+        self.assertIn("2 GB", texto)
+        self.assertIn("3 GB", texto)
+        for estado in ("ESTIMADO", "PRESUPUESTADO", "VERIFICADO_EN_CUENTA", "CONSUMO_REAL"):
+            self.assertIn(estado, texto, estado)
+        self.assertIn("NOT_VERIFIED", texto)
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

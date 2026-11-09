@@ -18,3 +18,17 @@ output "estado_despliegue" {
   description = "Sin AWS aplicado: nada creado"
   value       = "NO_CREADO"
 }
+
+output "reconfiguracion_tras_restore" {
+  description = "Configuracion que un restore de datos NO recupera por si solo"
+  value = {
+    ttl_atributo       = "requiere reconfiguracion"
+    streams_habilitado = "requiere reconfiguracion"
+    pitr_habilitado    = "requiere reconfiguracion"
+    iam_politicas      = "requiere reconfiguracion"
+    alarmas            = "requiere reconfiguracion"
+    etiquetas          = "requiere reconfiguracion"
+    escalamiento       = "requiere reconfiguracion"
+    nota               = "Restaurar datos no restaura la infraestructura de la tabla."
+  }
+}

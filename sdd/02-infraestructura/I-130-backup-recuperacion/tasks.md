@@ -91,3 +91,13 @@ Gate `APRUEBO_GATE_I130_LOCAL`. Rama `feat/h08i-i130-backup`. Nada se despliega:
 - **T-130-06 (Runbook):** IMPLEMENTADO_LOCAL en `PRUEBAS_RESTORE.md` §2.
 - **T-130-90 (Riesgos):** PITR/backup de pago presupuestado (0.9690 USD/mes declarado, no medido); perdida de datos mitigada por restauracion aislada; restore de aportaciones divididas cubierto por invariante aritmetica. Los tres CONDICIONADOS a verificacion real.
 - **T-130-99 (Ratificacion):** REVIEW pendiente; merge requiere autorizacion humana ligada a PR + HEAD.
+
+### Ampliacion v2 (2026-11-09)
+
+- **T-130-01:** matriz de 6 capas y medicion de 13 fases; `RTO_RPO_PENDING_HUMAN_APPROVAL`. Pruebas: `MatrizRTOyRPO`, `MedicionDeRecuperacion`.
+- **T-130-02:** vigencia de backup y confirmacion de que no existe recurso declarativo de backup en el proveedor fijado. Pruebas: `VigenciaDeBackup`.
+- **T-130-03:** recuperacion de state en 8 pasos y concurrencia. Pruebas: `RecuperacionDeState`, `ConcurrenciaYCLI`.
+- **T-130-04:** integridad financiera (13 codigos) y reconfiguracion posterior al restore. Pruebas: `test_integridad_financiera.py`.
+- **T-130-05:** politica de privacidad; prohibida la reactivacion de cuentas y sesiones. Pruebas: `PrivacidadTrasRestore`.
+- **T-130-06:** runbook de 13 fases con campos obligatorios.
+- **FinOps:** matriz 2 GB vs 3 GB con cuatro estados de evidencia.

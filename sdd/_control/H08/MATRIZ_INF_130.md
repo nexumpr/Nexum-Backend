@@ -66,6 +66,19 @@ verificación con Gate.
 | `borrado_copias` / `permitir_destroy_datos` en Terraform | validación permanente en `false` |
 | Backup on-demand declarativo en Terraform | **no existe** en el proveedor: procedimiento fuera de IaC |
 
+## 8.1 Ampliacion de cierre (2026-11-09)
+
+| Aporte nuevo | Artefacto | Pruebas |
+|---|---|---|
+| Matriz RTO/RPO de 6 capas + `RTO_RPO_PENDING_HUMAN_APPROVAL` | `MATRIZ_RTO_RPO.md`, `verificar_recuperacion.py` | `MatrizRTOyRPO` |
+| Medicion determinista de 13 fases (RTO) y perdida maxima (RPO) | `RUNBOOK_RESTAURACION.md` | `MedicionDeRecuperacion` |
+| Vigencia de backup (inexistente, caducado, otra tabla, retencion) | `verificar_recuperacion.py estado-backup` | `VigenciaDeBackup` |
+| Recuperacion de state en 8 pasos + escritor unico | `PROCEDIMIENTO_STATE_RECOVERY.md` | `RecuperacionDeState`, `ConcurrenciaYCLI` |
+| Integridad financiera (13 codigos de violacion) | `verificar_integridad_financiera.py` | `test_integridad_financiera.py` |
+| Privacidad: no reactivar cuentas ni sesiones | `POLITICA_PRIVACIDAD_BACKUPS.md` | `PrivacidadTrasRestore` |
+| FinOps 2 GB vs 3 GB con 4 estados de evidencia | `MATRIZ_FINOPS_130.md` | `MATRIZ_FINOPS_130` |
+| Reconfiguracion posterior al restore | `outputs.tf` | contrato Terraform |
+
 ## 9. Dependencias y bloqueos
 
 | Elemento | Estado |
