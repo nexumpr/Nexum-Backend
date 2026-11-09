@@ -1,8 +1,8 @@
 // Fixture deliberadamente inseguro para la prueba negativa de Semgrep (RFC-008).
 // NO se usa en produccion: solo lo analiza el paso de prueba negativa del job
 // `sast-semgrep` para demostrar que las reglas reales detectan patrones reales.
-// El escaneo principal excluye este directorio mediante `paths.exclude` en
-// herramientas/semgrep/nexum.yml (no con banderas del CLI).
+// Vive fuera de tests/ porque Semgrep aplica su .semgrepignore por defecto a tests/.
+// El escaneo principal no apunta a este directorio; se analiza solo en su paso negativo.
 package inseguro
 
 import (

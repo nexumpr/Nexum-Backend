@@ -1,6 +1,6 @@
 """Verifica la prueba negativa de Semgrep (RFC-008).
 
-El job `sast-semgrep` ejecuta las reglas reales contra `tests/fixtures/semgrep/inseguro`
+El job `sast-semgrep` ejecuta las reglas reales contra `herramientas/semgrep/fixtures/inseguro`
 y exige que **todas** las reglas propias detecten su patron. Si una regla deja de
 detectar, este verificador falla: la prueba negativa no puede pasar por accidente.
 
@@ -53,7 +53,7 @@ def verificar(ruta: Path, codigo: int) -> tuple[bool, list[str]]:
         return False, problemas
 
     rutas = {str(item.get("path", "")) for item in resultados}
-    if not any("tests/fixtures/semgrep" in ruta.replace("\\", "/") for ruta in rutas):
+    if not any("herramientas/semgrep/fixtures" in ruta.replace("\\", "/") for ruta in rutas):
         problemas.append("los hallazgos no corresponden al fixture esperado")
 
     detectadas = _ids(reporte)

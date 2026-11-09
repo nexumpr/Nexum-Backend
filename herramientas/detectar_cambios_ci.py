@@ -42,6 +42,7 @@ EXACTOS: dict[str, tuple[str, ...]] = {
     "go.mod": ("go", "completo"),
     "go.sum": ("go", "completo"),
     ".trivyignore.yaml": ("completo",),
+    ".semgrepignore": ("completo",),
     ".gitleaks.toml": ("completo",),
     ".gitleaks-baseline.json": ("completo",),
     "opencode.json": ("completo",),

@@ -281,10 +281,10 @@ class ReglasSemgrep(unittest.TestCase):
             ruta.write_text(
                 json.dumps({
                     "results": [
-                        {"check_id": "herramientas.semgrep.nexum-tls-skip-verify", "path": "tests/fixtures/semgrep/inseguro/main.go"},
-                        {"check_id": "herramientas.semgrep.nexum-hash-debil-md5", "path": "tests/fixtures/semgrep/inseguro/main.go"},
-                        {"check_id": "herramientas.semgrep.nexum-hash-debil-sha1", "path": "tests/fixtures/semgrep/inseguro/main.go"},
-                        {"check_id": "herramientas.semgrep.nexum-http-cliente-sin-timeout", "path": "tests/fixtures/semgrep/inseguro/main.go"},
+                        {"check_id": "herramientas.semgrep.nexum-tls-skip-verify", "path": "herramientas/semgrep/fixtures/inseguro/main.go"},
+                        {"check_id": "herramientas.semgrep.nexum-hash-debil-md5", "path": "herramientas/semgrep/fixtures/inseguro/main.go"},
+                        {"check_id": "herramientas.semgrep.nexum-hash-debil-sha1", "path": "herramientas/semgrep/fixtures/inseguro/main.go"},
+                        {"check_id": "herramientas.semgrep.nexum-http-cliente-sin-timeout", "path": "herramientas/semgrep/fixtures/inseguro/main.go"},
                     ]
                 }),
                 encoding="utf-8",
@@ -312,7 +312,7 @@ class ReglasSemgrep(unittest.TestCase):
             ruta = Path(temporal) / "semgrep.json"
             ruta.write_text(
                 json.dumps({"results": [
-                    {"check_id": "x.nexum-tls-skip-verify", "path": "tests/fixtures/semgrep/inseguro/main.go"}
+                    {"check_id": "x.nexum-tls-skip-verify", "path": "herramientas/semgrep/fixtures/inseguro/main.go"}
                 ]}),
                 encoding="utf-8",
             )

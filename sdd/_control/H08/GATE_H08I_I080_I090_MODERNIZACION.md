@@ -40,7 +40,7 @@ de `tests/infra/ci` al pipeline.
 | Evaluación de mutación | `herramientas/evaluar_mutacion.py` |
 | Reglas SAST propias | `herramientas/semgrep/nexum.yml` |
 | Verificador del fixture SAST | `herramientas/verificar_fixture_semgrep.py` |
-| Fixture SAST inseguro | `tests/fixtures/semgrep/inseguro/main.go` |
+| Fixture SAST inseguro | `herramientas/semgrep/fixtures/inseguro/main.go` |
 | Fuzzing del binding | `tests/unit/transport/fuzz_binding_test.go` |
 | Integración de capas | `tests/integration/http_integracion_test.go` |
 | Contrato del CI | `tests/infra/ci/test_ci_contract.py` |

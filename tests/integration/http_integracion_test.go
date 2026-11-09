@@ -104,7 +104,7 @@ func TestIntegracionSondasYErroresEstructurales(t *testing.T) {
 		contiene string
 	}{
 		{"liveness", http.MethodGet, "/api/v1/health/live", http.StatusOK, "UP"},
-		{"readiness sin dependencias", http.MethodGet, "/api/v1/health/ready", http.StatusServiceUnavailable, "NOT_READY"},
+		{"readiness sin dependencias", http.MethodGet, "/api/v1/health/ready", http.StatusServiceUnavailable, "DOWN"},
 		{"ruta inexistente", http.MethodGet, "/api/v1/no-existe", http.StatusNotFound, "RESOURCE_NOT_FOUND"},
 		{"metodo no permitido", http.MethodDelete, "/api/v1/health/live", http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED"},
 	}

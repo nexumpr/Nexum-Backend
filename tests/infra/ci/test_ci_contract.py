@@ -21,7 +21,7 @@ RFC008 = CONTROL / "RFC-008-MODERNIZACION_CI_CD.md"
 GATE008 = CONTROL / "GATE_H08I_I080_I090_MODERNIZACION.md"
 
 SEMGREP_REGLAS = RAIZ / "herramientas" / "semgrep" / "nexum.yml"
-SEMGREP_FIXTURE = RAIZ / "tests" / "fixtures" / "semgrep" / "inseguro" / "main.go"
+SEMGREP_FIXTURE = RAIZ / "herramientas" / "semgrep" / "fixtures" / "inseguro" / "main.go"
 
 JOBS = {
     "detectar": "Deteccion de cambios",
@@ -394,7 +394,7 @@ class SastSemgrep(unittest.TestCase):
 
     def test_prueba_negativa_ejecutada(self) -> None:
         self.assertIn("verificar_fixture_semgrep.py", self.texto)
-        self.assertIn("tests/fixtures/semgrep/inseguro", self.texto)
+        self.assertIn("herramientas/semgrep/fixtures/inseguro", self.texto)
 
 
 class IntegracionYFuzzing(unittest.TestCase):

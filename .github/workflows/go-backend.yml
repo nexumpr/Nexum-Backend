@@ -423,6 +423,16 @@ jobs:
             --severity ERROR --error \
             --json --output semgrep.json \
             cmd internal pkg tests/unit tests/security tests/integration
+          python3 - <<'PY'
+          import json
+
+          with open("semgrep.json", encoding="utf-8") as manejador:
+              datos = json.load(manejador)
+          escaneados = datos.get("paths", {}).get("scanned", [])
+          print(f"archivos escaneados por Semgrep: {len(escaneados)}")
+          if len(escaneados) < 5:
+              raise SystemExit("el escaneo SAST no alcanzo archivos: falla cerrado")
+          PY
 
       - name: Publicar hallazgos SAST
         if: always()
@@ -440,7 +450,7 @@ jobs:
             --metrics=off --disable-version-check \
             --severity ERROR --error \
             --json --output "$RUNNER_TEMP/semgrep-fixture.json" \
-            tests/fixtures/semgrep/inseguro || rc=$?
+            herramientas/semgrep/fixtures/inseguro || rc=$?
           python3 herramientas/verificar_fixture_semgrep.py "$RUNNER_TEMP/semgrep-fixture.json" "$rc"
 
   integracion:
