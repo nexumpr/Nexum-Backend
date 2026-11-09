@@ -55,3 +55,8 @@
 - [ ] Metricas DynamoDB/Redis y OTel runtime: pendientes de identificadores/exportador.
 
 - [ ] Notificacion automatica de alarmas: BLOCKED_RFC007_SNS_KMS (CMK SNS no presupuestada); alarmas visibles y con runbook.
+
+- [x] RequestLogger integrado en runtime, ruta saneada y metricas loopback.
+- [x] 4 metric filters y 8 alarmas con runbook A1-A8 (2 condicionales).
+- [ ] Pipeline real de logs: agente CloudWatch (I-020) y AWS_VERIFIED NOT_RUN.
+- [ ] D-110-01 (A-090) headers de trazabilidad sin validacion estricta; Gate de A-090 requerido.

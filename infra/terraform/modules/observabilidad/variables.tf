@@ -79,3 +79,35 @@ variable "etiquetas" {
   type        = map(string)
   default     = {}
 }
+
+variable "redis_replication_group_id" {
+  description = "ID del replication group de I-050 para la alarma de conexiones; vac?o = no crear alarma"
+  type        = string
+  default     = ""
+}
+
+variable "dynamodb_table_name" {
+  description = "Nombre de la tabla de I-040 para la alarma de throttling; vac?o = no crear alarma"
+  type        = string
+  default     = ""
+}
+
+variable "umbral_429" {
+  description = "Suma de 429 en 5 minutos que dispara la alarma de rate limiting"
+  type        = number
+  default     = 50
+  validation {
+    condition     = var.umbral_429 >= 1
+    error_message = "umbral_429 debe ser >= 1."
+  }
+}
+
+variable "umbral_throttles" {
+  description = "ThrottledRequests de DynamoDB en 5 minutos que dispara la alarma"
+  type        = number
+  default     = 5
+  validation {
+    condition     = var.umbral_throttles >= 1
+    error_message = "umbral_throttles debe ser >= 1."
+  }
+}

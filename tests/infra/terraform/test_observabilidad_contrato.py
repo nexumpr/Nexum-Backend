@@ -32,10 +32,10 @@ class LogsYRetencion(unittest.TestCase):
         self.assertIn("var.retencion_dias <= 30", self.main)
         self.assertIn("no debe superar 30 d", self.main)
 
-    def test_tres_metric_filters_canonicos(self) -> None:
+    def test_cuatro_metric_filters_canonicos(self) -> None:
         filtros = [n for t, n in self.r if t == "aws_cloudwatch_log_metric_filter"]
-        self.assertEqual(sorted(filtros), ["auth_401", "errores_5xx", "readiness_no_200"])
-        for patron in ('{ $.status >= 500 }', '{ $.status = 401 }',
+        self.assertEqual(sorted(filtros), ["auth_401", "errores_5xx", "rate_limit_429", "readiness_no_200"])
+        for patron in ('{ $.status >= 500 }', '{ $.status = 401 }', '{ $.status = 429 }',
                        '{ $.route = \\"/api/v1/health/ready\\" && $.status != 200 }'):
             self.assertIn(patron, self.main, patron)
 
@@ -49,12 +49,13 @@ class AlarmasYPresupuesto(unittest.TestCase):
 
     def test_cinco_alarmas_con_umbral_y_runbook(self) -> None:
         alarmas = {n for t, n in self.r if t == "aws_cloudwatch_metric_alarm"}
-        self.assertEqual(alarmas, {"targets_sanos", "errores_5xx", "auth_401", "readiness_no_200", "logs_sin_eventos"})
+        self.assertEqual(alarmas, {"targets_sanos", "errores_5xx", "auth_401", "readiness_no_200",
+                                   "rate_limit_429", "redis_conexiones", "dynamodb_throttles", "logs_sin_eventos"})
         self.assertRegex(self.main, r'metric_name\s*=\s*"HealthyHostCount"')
         self.assertRegex(self.main, r"threshold\s*=\s*2")
         self.assertIn('comparison_operator = "LessThanThreshold"', self.main)
         self.assertIn("treat_missing_data  = \"breaching\"", self.main)
-        for runbook in ("#A1", "#A2", "#A3", "#A4", "#A5"):
+        for runbook in ("#A1", "#A2", "#A3", "#A4", "#A5", "#A6", "#A7", "#A8"):
             self.assertIn(f"MATRIZ_METRICAS_ALERTAS.md{runbook}", self.main)
 
     def test_notificacion_bloqueada_por_coste_cmk(self) -> None:
@@ -74,7 +75,7 @@ class AlarmasYPresupuesto(unittest.TestCase):
         self.assertNotIn("aws_xray_sampling_rule", tipos)
         self.assertNotIn("aws_s3_bucket", tipos)
         texto = self.main.lower()
-        self.assertNotIn("dynamodb_table", texto)
+        self.assertNotIn("aws_dynamodb_table", texto)
         self.assertNotIn("access_logs", texto)
         self.assertNotIn("0.0.0.0/0", texto)
 

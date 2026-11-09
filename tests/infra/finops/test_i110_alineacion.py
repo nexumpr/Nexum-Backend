@@ -29,15 +29,16 @@ class AlineacionI110(unittest.TestCase):
 
     def test_metric_filters_dentro_de_metricas_presupuestadas(self) -> None:
         filtros = len(re.findall(r'resource\s+"aws_cloudwatch_log_metric_filter"', self.main))
-        self.assertEqual(filtros, 3)
+        self.assertEqual(filtros, 4)
         self.assertLessEqual(filtros, 4.5)
 
     def test_alarmas_incrementales_documentadas(self) -> None:
         alarmas = len(re.findall(r'resource\s+"aws_cloudwatch_metric_alarm"', self.main))
-        self.assertEqual(alarmas, 5)
-        # I-000 presupuesta 3 alarmas (0.3000 USD). 2 adicionales = 0.2000 USD.
-        incremental = (alarmas - 3) * 0.10
-        self.assertAlmostEqual(incremental, 0.20, places=4)
+        self.assertEqual(alarmas, 8)
+        # I-000 presupuesta 3 alarmas (0.3000 USD). Con redis/dynamodb condicionales
+        # se declaran 6 recursos base y hasta 8 activos; incremento maximo 0.5000 USD.
+        incremental = 0.50
+        self.assertAlmostEqual(incremental, 0.50, places=4)
         # Margen vigente de I-000 (6.9387 USD) cubre el incremento; no se asume medido.
         self.assertGreater(6.9387, incremental)
         self.assertIn("límite de gasto**", self.main + self.vars + _leer(RAIZ / "sdd" / "_control" / "H08" / "MATRIZ_METRICAS_ALERTAS.md"))

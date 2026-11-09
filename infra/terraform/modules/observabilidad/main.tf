@@ -103,6 +103,19 @@ resource "aws_cloudwatch_metric_alarm" "targets_sanos" {
   tags                = local.etiquetas
 }
 
+resource "aws_cloudwatch_log_metric_filter" "rate_limit_429" {
+  name           = "${var.proyecto}-${var.entorno}-rate-limit-429"
+  log_group_name = aws_cloudwatch_log_group.backend.name
+  pattern        = "{ $.status = 429 }"
+
+  metric_transformation {
+    name          = "RateLimit429"
+    namespace     = local.namespace
+    value         = "1"
+    default_value = "0"
+  }
+}
+
 resource "aws_cloudwatch_metric_alarm" "errores_5xx" {
   alarm_name          = "${var.proyecto}-${var.entorno}-errores-5xx"
   alarm_description   = "Errores 5xx por encima del umbral. Runbook: MATRIZ_METRICAS_ALERTAS.md#A2"
@@ -140,6 +153,56 @@ resource "aws_cloudwatch_metric_alarm" "readiness_no_200" {
   period              = 300
   evaluation_periods  = 1
   threshold           = 1
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  tags                = local.etiquetas
+}
+
+resource "aws_cloudwatch_metric_alarm" "rate_limit_429" {
+  alarm_name          = "${var.proyecto}-${var.entorno}-rate-limit-429"
+  alarm_description   = "Rate limiting 429 por encima del umbral. Runbook: MATRIZ_METRICAS_ALERTAS.md#A6"
+  namespace           = local.namespace
+  metric_name         = "RateLimit429"
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = var.umbral_429
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  tags                = local.etiquetas
+}
+
+resource "aws_cloudwatch_metric_alarm" "redis_conexiones" {
+  count             = var.redis_replication_group_id == "" ? 0 : 1
+  alarm_name        = "${var.proyecto}-${var.entorno}-redis-sin-conexiones"
+  alarm_description = "Redis sin conexiones activas. Runbook: MATRIZ_METRICAS_ALERTAS.md#A7"
+  namespace         = "AWS/ElastiCache"
+  metric_name       = "CurrConnections"
+  dimensions = {
+    ReplicationGroupId = var.redis_replication_group_id
+  }
+  statistic           = "Maximum"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 1
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
+  tags                = local.etiquetas
+}
+
+resource "aws_cloudwatch_metric_alarm" "dynamodb_throttles" {
+  count             = var.dynamodb_table_name == "" ? 0 : 1
+  alarm_name        = "${var.proyecto}-${var.entorno}-dynamodb-throttles"
+  alarm_description = "Throttling persistente en DynamoDB. Runbook: MATRIZ_METRICAS_ALERTAS.md#A8"
+  namespace         = "AWS/DynamoDB"
+  metric_name       = "ThrottledRequests"
+  dimensions = {
+    TableName = var.dynamodb_table_name
+  }
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = var.umbral_throttles
   comparison_operator = "GreaterThanOrEqualToThreshold"
   treat_missing_data  = "notBreaching"
   tags                = local.etiquetas

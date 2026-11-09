@@ -14,13 +14,14 @@
 | `Errores5xx` | metric filter `{ $.status >= 500 }` | tasa de error servidor | Alarma A2 |
 | `Auth401` | metric filter `{ $.status = 401 }` | picos de autenticación fallida | Alarma A3 |
 | `ReadinessNo200` | metric filter `{ $.route = "/api/v1/health/ready" && $.status != 200 }` | readiness degradada | Alarma A4 |
+| `RateLimit429` | metric filter `{ $.status = 429 }` | rate limiting / abuso | Alarma A6 |
 | `IncomingLogEvents` | AWS/Logs | agente/métricas rotas | Alarma A5 |
 | `TargetResponseTime` | AWS/ApplicationELB | p50/p95/p99 en dashboard | Dashboard (no alarma) |
 | `RequestCount` | AWS/ApplicationELB | RPS | Dashboard |
 | `HTTPCode_Target_4XX/5XX` | AWS/ApplicationELB | errores por target | Dashboard |
-| `ConsumedReadCapacityUnits`, `ThrottledRequests`, `SuccessfulRequestLatency` | AWS/DynamoDB | capacidad Dynamo | Dependencia: dashboard no cableado |
-| `CurrConnections`, `Evictions`, `DatabaseMemoryUsagePercentage` | AWS/ElastiCache | Redis | Dependencia: dashboard no cableado |
-| Go runtime (`go_gc_duration_seconds`…) | expuesto por el proceso | GC/runtime | Requiere exporter/OTel; **NOT_RUN** |
+| `ConsumedReadCapacityUnits`, `ThrottledRequests`, `SuccessfulRequestLatency` | AWS/DynamoDB | capacidad Dynamo | Alarma A8 (throttles) + dashboard |
+| `CurrConnections`, `Evictions`, `DatabaseMemoryUsagePercentage` | AWS/ElastiCache | Redis | Alarma A7 (conexiones) + dashboard |
+| `nexum_http_requests_total`, `nexum_http_request_duration_seconds`, `nexum_go_*` | `/metrics` local (proceso Go) | RPS/latencia/runtime | Exportador local; agente/OTel **NOT_RUN** |
 
 **p50/p95/p99**: se obtienen de `latencyMs` en Logs Insights (`stats percentile(latencyMs, 50)`),
 no de una métrica nativa. Sin agente de logs, `NOT_RUN`.
@@ -34,6 +35,12 @@ no de una métrica nativa. Sin agente de logs, `NOT_RUN`.
 | A3 | `auth-401` | `Auth401` (Sum) | ≥ 20 / 5 min | 300 s × 1 | Alta | §3.3 |
 | A4 | `readiness-no-200` | `ReadinessNo200` (Sum) | ≥ 1 / 5 min | 300 s × 1 | Alta | §3.4 |
 | A5 | `logs-sin-eventos` | `IncomingLogEvents` (Sum) | < 1 / hora | 3600 s × 1, missing=breaching | Media | §3.5 |
+| A6 | `rate-limit-429` | `RateLimit429` (Sum) | ≥ 50 / 5 min | 300 s × 1 | Alta | §3.6 |
+| A7 | `redis-sin-conexiones` | `CurrConnections` (Maximum, `ReplicationGroupId`) | < 1 | 300 s × 2, missing=breaching | Alta | §3.7 |
+| A8 | `dynamodb-throttles` | `ThrottledRequests` (Sum, `TableName`) | ≥ 5 / 5 min | 300 s × 2 | Alta | §3.8 |
+
+A7/A8 sólo existen si se aportan `redis_replication_group_id`/`dynamodb_table_name`; en `envs/h08i`
+se cablean desde I-050/I-040. Son 8 alarmas declaradas (2 condicionales).
 
 El presupuesto (`aws_budgets_budget`, 1 USD) queda declarado **sin notificación** hasta resolver
 `RFC-007` (SNS con CMK frente a coste no presupuestado). **No es un límite de gasto** y no detiene
@@ -75,10 +82,29 @@ y con runbook. No se declara entrega de alertas verificada.
 2. Revisar permisos de escritura a CloudWatch Logs en el rol de instancia.
 3. No desactivar la alarma: la ausencia de logs es un fallo de observabilidad.
 
+### 3.6 A6 — rate limiting 429
+1. Confirmar origen y patrón (IP, ruta, ventana).
+2. Verificar que no es un cliente legítimo con reintentos agresivos.
+3. Revisar límites locales y coordinación (D-100-01/D-100-02) antes de ajustar umbrales.
+4. No desactivar el rate limiting para "bajar" la alarma.
+
+### 3.7 A7 — Redis sin conexiones
+1. Revisar `describe-cache-clusters`/`describe-replication-groups` y estado del nodo.
+2. Comprobar SG/TLS/credenciales RBAC (I-050) y readiness del backend.
+3. Si el nodo está caído, escalar; no declarar caché disponible sin conexión real.
+
+### 3.8 A8 — DynamoDB throttling
+1. Revisar `ConsumedRead/WriteCapacityUnits` y patrones de acceso.
+2. Confirmar que no hay `Scan` ni consultas no acotadas.
+3. Evaluar capacidad on-demand y claves calientes; no cambiar la tabla sin Gate.
+
 ## 4. Límites
 
 - Alarmas y logs no aplicados: `AWS_NOT_RUN`.
-- El dashboard no cablea DynamoDB/Redis hasta recibir sus identificadores; se
-  documentan como dependencia, no como verificados.
-- Go runtime/OTel no está exportado; `NOT_RUN`.
-- Las alarmas no limitan gasto; el presupuesto es informativo.
+- 8 alarmas declaradas (6 base + 2 condicionales); I-000 presupuesta 3 → **+0.5000 USD/mes**
+  estimados, no medidos. Notificación automática `BLOCKED_RFC007_SNS_KMS`.
+- El dashboard no cablea DynamoDB/Redis widgets aunque sus alarmas existan; se documentan como
+  dependencia, no como verificados.
+- Go runtime/OTel no está exportado a CloudWatch; `/metrics` local (loopback) está implementado y
+  probado, pero el agente/OTel de recolección es `NOT_RUN`.
+- Las alarmas no limitan gasto; el presupuesto es informativo y su notificación está bloqueada.

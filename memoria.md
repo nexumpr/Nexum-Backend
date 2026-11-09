@@ -521,3 +521,5 @@
 - Documentos POLITICA_LOGS.md, MATRIZ_METRICAS_ALERTAS.md y DASHBOARD_OBSERVABILIDAD.md. Agente CloudWatch (I-020) y AWS NOT_RUN; +0.2000 USD/mes estimado por 2 alarmas extra, no medido.
 
 - I-110 bloqueo de notificacion (2026-11-08): SNS con alias/aws/sns dispara Trivy AWS-0136 (HIGH). Se retiran SNS, alarm_actions y notificaciones del presupuesto para no crear CMK no presupuestada; ALERT_DELIVERY=BLOCKED_RFC007_SNS_KMS. Alarmas y dashboard permanecen; RFC-007 pendiente.
+
+- I-110 ampliacion (2026-11-08): RequestLogger en HTTPServer (campos canonicos, ruta {id}), /metrics loopback con counters/latencia/runtime, 4 metric filters y 8 alarmas (A6 429, A7 Redis, A8 DynamoDB), cableadas desde I-040/I-050. Pipeline de logs LOG_PIPELINE_IMPLEMENTED_LOCAL / AWS_VERIFIED NOT_RUN (I-010 endpoint + I-060 permisos; falta agente I-020). D-110-01 (A-090 headers sin hex/flags/limite). Coste +0.5000 USD/mes no medido; AWS_COST_REAL/CREDITS/SCP NOT_VERIFIED.

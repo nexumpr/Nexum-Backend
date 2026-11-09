@@ -92,3 +92,8 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - Pruebas: 10 de contrato Terraform, 6 de alineacion FinOps y 6 de RequestRecord.
 
 - Bloqueo SNS (2026-11-08): con alias/aws/sns Trivy marca AWS-0136 (HIGH, exige CMK). No se crea CMK por coste no presupuestado; se retiran SNS, alarm_actions y notificaciones del presupuesto. ALERT_DELIVERY = BLOCKED_RFC007_SNS_KMS; alarmas visibles con runbook; RFC-007 pendiente.
+
+- Ampliacion (2026-11-08): 4 metric filters (incluye 429), 8 alarmas (A6 rate limit, A7 Redis, A8 DynamoDB condicionales), cableadas desde I-040/I-050; RequestLogger integrado en HTTPServer con ruta saneada y metricas; /metrics loopback con counters/latencia/runtime; 3 pruebas Go nuevas y trazabilidad W3C probada.
+- Pipeline de logs: LOG_PIPELINE_IMPLEMENTED_LOCAL y AWS_VERIFIED NOT_RUN. I-010 tiene endpoint logs e I-060 permisos acotados; falta agente de CloudWatch en I-020.
+- D-110-01 (A-090): headers de tracing solo validan longitud, no hex/flags, y X-Request-ID sin limite; registrado sin corregir.
+- Coste: +0.5000 USD/mes estimado por 5 alarmas extra (no medido). Notificacion SNS BLOCKED_RFC007_SNS_KMS.
