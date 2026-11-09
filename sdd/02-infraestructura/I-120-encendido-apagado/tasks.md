@@ -101,3 +101,9 @@ Gate `APRUEBO_GATE_I120_LOCAL`. Rama `feat/h08i-i120-operacion`. Nada se desplie
 - **T-120-05:** `apply` deshabilitado, `--force`/`--yes` rechazados, autorizacion con procedencia revisada.
 - **T-120-06:** 20 categorias de prueba, reintentos, fallos parciales y concurrencia.
 - **FinOps diario:** herramienta y 18 pruebas con umbrales 45/35/30/20 y forecast.
+
+### Cierre de fail-open (2026-11-09)
+
+- **T-120-03:** allowlist fail-closed (None/vacia no autorizan; core, inexistentes y etiquetas no auxiliares rechazados). Pruebas: `AllowlistExplicita`.
+- **T-120-04:** plan obligatorio; ausente/vacio/malformado rechazado; etiquetas `PLAN_LOCAL_VALIDADO` y `PLAN_AWS_NO_VERIFICADO`. Pruebas: `PlanObligatorio`.
+- **T-120-06:** regresiones de FinOps fail-closed (13 pruebas) y de la excepcion gitleaks (3 pruebas).

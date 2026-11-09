@@ -83,6 +83,12 @@ La política vigente (D6 de I-000) los mantiene cerrados y los abre solo en vent
 El operador expone `creditos_aplicables_usd = null` y `neto_con_creditos_usd = null`
 mientras no exista evidencia autorizada: no se inventa el saldo ni el gasto.
 
+El control diario (`verificar_finops_diario.py`) solo admite cifras con bandera de
+verificación explícita: `creditos_usd`, `consumo_usd`, `forecast_usd` y `plan_activo`
+deben declararse verificados, el plan debe ser `FREE`, no se admiten negativos, `NaN`
+ni infinitos, y créditos caducados bloquean. Aun cumpliendo todo, la salida declara
+`autoriza_ejecucion_real = false`: una evidencia local no es prueba de facturación.
+
 ## 3. Residual calculado
 
 | Concepto | USD/hora | USD/45 días (1080 h) |

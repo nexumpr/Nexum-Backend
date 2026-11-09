@@ -41,8 +41,18 @@ CAMPOS_OBLIGATORIOS = (
     "horizonte_dias",
 )
 
+# Una cifra sin bandera de verificacion no sirve para decidir.
+CAMPOS_VERIFICABLES = ("plan_activo", "creditos_usd", "consumo_usd", "forecast_usd")
+
+# Requisitos de cuenta para autorizar cambios auxiliares (I-000 Gate).
+CAMPOS_CUENTA = ("cuenta_verificada", "scp_verificado")
+
+PLAN_APROBADO = "FREE"
+
 NIVELES_BLOQUEANTES = (
     "BLOQUEADO_SIN_DATOS",
+    "BLOQUEADO_PLAN_NO_APROBADO",
+    "BLOQUEADO_CREDITOS_VENCIDOS",
     "INCIDENTE_CRITICO",
     "REVISION_URGENTE",
     "BLOQUEADO",
@@ -83,10 +93,31 @@ def _decimal_obligatorio(evidencia: Mapping[str, Any], campo: str) -> Decimal:
     valor = evidencia.get(campo)
     if valor is None:
         raise ErrorEvidencia(f"Falta '{campo}': sin dato no se asume saldo ni gasto.")
+    if isinstance(valor, bool):
+        raise ErrorEvidencia(f"'{campo}' no puede ser booleano.")
+    texto = str(valor).strip().lower()
+    if texto in ("nan", "inf", "+inf", "-inf", "infinity", "-infinity"):
+        raise ErrorEvidencia(f"'{campo}' no admite NaN ni infinitos.")
     try:
-        return Decimal(str(valor))
-    except Exception as exc:  # pragma: no cover - defensivo
+        numero = Decimal(texto)
+    except Exception as exc:
         raise ErrorEvidencia(f"'{campo}' no es decimal: {exc}") from exc
+    if not numero.is_finite():
+        raise ErrorEvidencia(f"'{campo}' no admite NaN ni infinitos.")
+    if numero < 0:
+        raise ErrorEvidencia(f"'{campo}' no puede ser negativo: {numero}.")
+    return numero
+
+
+def _campos_sin_verificar(evidencia: Mapping[str, Any]) -> list[str]:
+    return [
+        campo for campo in CAMPOS_VERIFICABLES
+        if evidencia.get("verificado_" + campo) is not True
+    ]
+
+
+def _campos_cuenta_sin_verificar(evidencia: Mapping[str, Any]) -> list[str]:
+    return [campo for campo in CAMPOS_CUENTA if evidencia.get(campo) is not True]
 
 
 def datos_faltantes(evidencia: Mapping[str, Any]) -> list[str]:
@@ -120,6 +151,14 @@ def evaluar(
     """Devuelve nivel, bloqueo de auxiliares y acciones. Falla cerrado."""
     faltan = datos_faltantes(evidencia)
     base = {
+        "autoriza_ejecucion_real": False,
+        "procedencia_evidencia": "DECLARADA_LOCAL",
+        "es_prueba_independiente_de_facturacion": False,
+        "motivo_ejecucion": (
+            "I-120 LOCAL: un JSON con verificado=true no es prueba independiente de "
+            "facturacion AWS; la ejecucion real exige Gate de despliegue y datos de "
+            "facturacion autorizados."
+        ),
         "no_hace": list(NO_HACE),
         "umbrales": dict(umbrales),
         "fuente_datos": evidencia.get("fuente", "NO_DECLARADA"),
@@ -130,18 +169,34 @@ def evaluar(
         ],
     }
 
-    if faltan:
+    sin_verificar = _campos_sin_verificar(evidencia)
+    if faltan or sin_verificar:
+        motivo = "Evidencia incompleta: " + ", ".join(faltan) if faltan else (
+            "Cifras sin verificacion: " + ", ".join(sin_verificar)
+        )
         return {
             **base,
             "nivel": "BLOQUEADO_SIN_DATOS",
             "bloquea_auxiliares": True,
             "requiere_escalado": True,
-            "motivo": "Evidencia incompleta: " + ", ".join(faltan),
+            "motivo": motivo,
+            "datos_no_verificados": sin_verificar or base["datos_no_verificados"],
             "acciones": [
                 "obtener evidencia autorizada de cuenta, creditos y forecast",
                 "mantener cerradas las ventanas auxiliares",
                 "no declarar AWS_CREDITS ni AWS_COST_REAL como verificados",
             ],
+        }
+
+    plan = str(evidencia.get("plan", "")).strip().upper()
+    if plan != PLAN_APROBADO:
+        return {
+            **base,
+            "nivel": "BLOQUEADO_PLAN_NO_APROBADO",
+            "bloquea_auxiliares": True,
+            "requiere_escalado": True,
+            "motivo": f"El plan declarado ({plan or 'VACIO'}) no es {PLAN_APROBADO}: no se autoriza nada.",
+            "acciones": ["no cambiar el plan AWS y escalar al responsable"],
         }
 
     creditos = _decimal_obligatorio(evidencia, "creditos_usd")
@@ -151,7 +206,17 @@ def evaluar(
     if horizonte <= 0:
         raise ErrorEvidencia("'horizonte_dias' debe ser positivo.")
 
-    restante = creditos - consumo
+    # Semantica: si existe saldo restante explicito se usa tal cual; no se
+    # descuenta dos veces el consumo.
+    restante_explicito = evidencia.get("creditos_restante_usd")
+    if restante_explicito is not None:
+        restante = _decimal_obligatorio(evidencia, "creditos_restante_usd")
+        restante_declarado = "creditos_restante_usd"
+    else:
+        restante = creditos - consumo
+        restante_declarado = "creditos_usd-consumo_usd"
+    if restante < 0:
+        raise ErrorEvidencia("El saldo restante resulta negativo: revisar la evidencia.")
     nivel = nivel_por_saldo(restante, umbrales)
     acciones: list[str] = []
     bloquea = nivel in ("INCIDENTE_CRITICO", "REVISION_URGENTE", "BLOQUEADO")
@@ -173,17 +238,29 @@ def evaluar(
 
     vencimiento = evidencia.get("creditos_vencimiento")
     dias_para_vencer = None
+    vencido = False
     if vencimiento:
         try:
             fecha = datetime.strptime(str(vencimiento), "%Y-%m-%d").date()
             dias_para_vencer = (fecha - (hoy or date.today())).days
         except ValueError as exc:
             raise ErrorEvidencia(f"creditos_vencimiento invalido: {exc}") from exc
-        if dias_para_vencer < horizonte:
+        if dias_para_vencer < 0:
+            vencido = True
+            nivel = "BLOQUEADO_CREDITOS_VENCIDOS"
+            bloquea = True
+            acciones.append("los creditos estan vencidos: no se autoriza ningun cambio auxiliar")
+        elif dias_para_vencer < horizonte:
             bloquea = True
             acciones.append(
                 f"los creditos vencen en {dias_para_vencer} dias y el horizonte es {horizonte}"
             )
+
+    if _campos_cuenta_sin_verificar(evidencia):
+        bloquea = True
+        acciones.append(
+            "cuenta/SCP sin verificar: bloqueados los cambios auxiliares dependientes"
+        )
 
     return {
         **base,
@@ -196,6 +273,9 @@ def evaluar(
         "forecast_usd": str(cuantizar(forecast)),
         "horizonte_dias": horizonte,
         "dias_para_vencer": dias_para_vencer,
+        "creditos_vencidos": vencido,
+        "saldo_calculado_desde": restante_declarado,
+        "cuenta_sin_verificar": _campos_cuenta_sin_verificar(evidencia),
         "targets_sanos": evidencia.get("targets_sanos"),
         "dos_nodos_ok": _dos_nodos(evidencia.get("targets_sanos")),
         "acciones": acciones,

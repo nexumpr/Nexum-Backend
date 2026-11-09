@@ -215,7 +215,13 @@ def validar_inventario(inventario: Mapping[str, Any]) -> None:
 def clasificar(
     inventario: Mapping[str, Any], allowlist: Iterable[str] | None = None
 ) -> dict[str, Any]:
-    """Devuelve core, auxiliares, suspendibles y denegados con su motivo."""
+    """Clasifica y autoriza. Una allowlist vacia u omitida NO autoriza nada.
+
+    - ``core``: recursos intocables.
+    - ``auxiliares``: auxiliares coherentes del inventario (solo informativo).
+    - ``suspendibles``: interseccion auxiliar + allowlist revisada (autorizados).
+    - ``denegados``: motivo por el que no se puede operar el recurso.
+    """
     permitidos = set(allowlist or ())
     core: list[str] = []
     auxiliares: list[str] = []
@@ -237,17 +243,58 @@ def clasificar(
         if not item["suspendible"]:
             denegados[nombre] = "auxiliar no suspendible: clasificacion incoherente"
             continue
-        if permitidos and nombre not in permitidos:
+        if nombre not in permitidos:
             denegados[nombre] = "auxiliar fuera de la allowlist revisada"
             continue
         suspendibles.append(nombre)
+
+    # Una allowlist con nombres inventados tampoco autoriza: se denuncia.
+    inventario_nombres = {item["nombre"] for item in inventario["items"]}
+    for nombre in sorted(permitidos - inventario_nombres):
+        denegados[nombre] = "allowlist con recurso inexistente en el inventario"
 
     return {
         "core": sorted(core),
         "auxiliares": sorted(auxiliares),
         "suspendibles": sorted(suspendibles),
         "denegados": {k: denegados[k] for k in sorted(denegados)},
+        "allowlist": sorted(permitidos),
+        "autorizacion_operaciones": "ALLOWLIST_EXPLICITA",
     }
+
+def validar_allowlist(
+    inventario: Mapping[str, Any], allowlist: Iterable[str] | None
+) -> list[str]:
+    """La allowlist debe ser explicita, no vacia y sin core ni nombres inventados."""
+    nombres = sorted(set(allowlist or ()))
+    if not nombres:
+        raise ErrorUso(
+            "Allowlist vacia u omitida: no autoriza ningun recurso. La pertenencia "
+            "explicita a la allowlist revisada es requisito, y el inventario por si "
+            "solo no concede autorizacion."
+        )
+    por_nombre = {item["nombre"]: item for item in inventario["items"]}
+    core = {item["nombre"] for item in inventario["items"] if item["criticidad"] == "core"}
+    intrusos = [n for n in nombres if n in core]
+    if intrusos:
+        raise ErrorUso(
+            "La allowlist no puede incluir recursos core: " + ", ".join(intrusos)
+        )
+    desconocidos = [n for n in nombres if n not in por_nombre]
+    if desconocidos:
+        raise ErrorUso(
+            "La allowlist incluye recursos que no existen en el inventario: "
+            + ", ".join(desconocidos)
+        )
+    etiqueta_mala = [
+        n for n in nombres if por_nombre[n]["etiqueta_criticidad"] != "auxiliary"
+    ]
+    if etiqueta_mala:
+        raise ErrorUso(
+            "La allowlist solo admite recursos con etiqueta nexum:criticality=auxiliary: "
+            + ", ".join(etiqueta_mala)
+        )
+    return nombres
 
 
 IMPACTOS_CORE = ("NINGUNO", "VENTANA_DECLARADA", "BLOQUEANTE")
@@ -451,19 +498,38 @@ def es_estado_auxiliar(estado: str) -> bool:
 ACCIONES_PROHIBIDAS = ("delete", "destroy", "forget")
 CAMPOS_CAPACIDAD = ("desired", "desired_capacity", "desiredCapacity", "max_size")
 
+# Un JSON local no acredita el alcance de un plan Terraform real aplicado contra AWS.
+TERRAFORM_REAL_PLAN_NOT_VERIFIED = True
+
 
 def verificar_alcance_plan(
     cambios: Sequence[Mapping[str, Any]] | None,
     core: Sequence[str],
     allowlist: Sequence[str],
+    requiere_cambios: bool = True,
 ) -> dict[str, Any]:
-    """Rechaza cualquier cambio propuesto que toque el core o baje de 2 nodos.
+    """Valida un plan local contra el inventario autorizado.
 
-    No basta con mirar etiquetas: un plan manipulado podria destruir un recurso
-    core sin aparecer como operacion auxiliar.
+    Un plan ausente, vacio (cuando la operacion implica cambios) o malformado
+    **no** se acepta: falla cerrado. El resultado distingue siempre
+    ``PLAN_LOCAL_VALIDADO`` de ``PLAN_AWS_NO_VERIFICADO``.
     """
+    base = {
+        "representacion": "cambios_locales",
+        "plan_terraform_real": "TERRAFORM_REAL_PLAN_NOT_VERIFIED",
+        "alcance_aws": "PLAN_AWS_NO_VERIFICADO",
+        "requiere_cambios": requiere_cambios,
+    }
+
     if cambios is None:
-        return {"verificado": False, "motivo": "Sin plan de cambios aportado; no se asume alcance."}
+        return {
+            **base,
+            "verificado": False,
+            "ok": False,
+            "estado": "PLAN_AUSENTE",
+            "denegados": ["no se aporto plan: sin plan no se autoriza ninguna modificacion"],
+            "motivo": "Plan ausente; el alcance no se asume.",
+        }
 
     core_set = set(core)
     permitidos = set(allowlist)
@@ -472,18 +538,18 @@ def verificar_alcance_plan(
 
     for cambio in cambios:
         if not isinstance(cambio, Mapping):
-            raise ErrorUso("Cada cambio del plan debe ser un objeto.")
+            raise ErrorUso("Cada cambio del plan debe ser un objeto: plan malformado.")
         direccion = str(cambio.get("direccion", "")).strip()
         accion = str(cambio.get("accion", "")).strip().lower()
-        base = direccion.split("[")[0].strip()
+        base_direccion = direccion.split("[")[0].strip()
         if not direccion:
             raise ErrorUso("Cambio sin 'direccion': plan malformado, se falla cerrado.")
         if not accion:
             raise ErrorUso(f"Cambio sin 'accion' para {direccion}: plan malformado.")
-        if base in core_set:
+        if base_direccion in core_set:
             denegados.append(f"{direccion}: el core nunca se modifica ({accion})")
             continue
-        if base not in permitidos:
+        if base_direccion not in permitidos:
             denegados.append(f"{direccion}: recurso no declarado o fuera de allowlist")
             continue
         if accion in ACCIONES_PROHIBIDAS:
@@ -498,12 +564,17 @@ def verificar_alcance_plan(
                             f"{direccion}: {campo}={nodos_tras_cambio} rompe la doble instancia (GOV-02)"
                         )
 
+    if not cambios and requiere_cambios:
+        denegados.append("plan vacio: no justifica ningun cambio solicitado")
+
     return {
+        **base,
         "verificado": True,
         "cambios": len(cambios),
         "denegados": denegados,
         "ok": not denegados,
         "nodos_tras_cambio": nodos_tras_cambio,
+        "estado": "PLAN_LOCAL_VALIDADO" if not denegados else "PLAN_RECHAZADO",
     }
 
 
@@ -511,8 +582,14 @@ def exigir_alcance_plan(
     cambios: Sequence[Mapping[str, Any]] | None,
     core: Sequence[str],
     allowlist: Sequence[str],
+    requiere_cambios: bool = True,
 ) -> dict[str, Any]:
-    resultado = verificar_alcance_plan(cambios, core, allowlist)
+    resultado = verificar_alcance_plan(cambios, core, allowlist, requiere_cambios)
+    if not resultado.get("verificado"):
+        raise ErrorUso(
+            "Plan no verificable: se exige un plan de cambios aportado y evaluado; "
+            "sin el no se autoriza ninguna modificacion."
+        )
     if resultado.get("denegados"):
         raise ErrorUso(
             "Plan rechazado por alcance: " + "; ".join(resultado["denegados"])
@@ -752,6 +829,7 @@ def plan_suspender_aux(
     cambios_plan: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     exigir_aprobacion(aprobacion, f"APRUEBO_SUSPENDER_AUX_{entorno.upper()}")
+    validar_allowlist(inventario, allowlist)
     clasif = clasificar(inventario, allowlist)
     objetivo = sorted(set(seleccion or clasif["suspendibles"]))
     if not objetivo:
@@ -779,8 +857,11 @@ def plan_suspender_aux(
             "Suspension rechazada por impacto indirecto BLOQUEANTE sobre el core: "
             + json.dumps(impacto, ensure_ascii=False, sort_keys=True)
         )
-    alcance = exigir_alcance_plan(cambios_plan, clasif["core"], clasif["suspendibles"])
     ya_suspendidos = sorted(set(objetivo) & suspendidos_observados)
+    requiere_cambios = len(ya_suspendidos) != len(objetivo)
+    alcance = exigir_alcance_plan(
+        cambios_plan, clasif["core"], clasif["suspendibles"], requiere_cambios
+    )
     return {
         "comando": "suspender-aux",
         "objetivo": objetivo,
@@ -821,6 +902,7 @@ def plan_reanudar_aux(
     cambios_plan: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     exigir_aprobacion(aprobacion, f"APRUEBO_REANUDAR_AUX_{entorno.upper()}")
+    validar_allowlist(inventario, allowlist)
     clasif = clasificar(inventario, allowlist)
     umbrales = inventario.get("umbrales_credito_usd", {})
     evaluacion = evaluar_creditos(creditos, umbrales)
@@ -966,6 +1048,7 @@ def plan_destruir_aux(
     cambios_plan: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     exigir_aprobacion(aprobacion, f"APRUEBO_DESTRUIR_AUX_{entorno.upper()}")
+    validar_allowlist(inventario, allowlist)
     clasif = clasificar(inventario, allowlist)
     objetivo = sorted(set(seleccion or clasif["suspendibles"]))
     intrusos = [n for n in objetivo if n not in clasif["suspendibles"]]
@@ -1078,9 +1161,9 @@ def ejecutar(argv: Sequence[str] | None = None) -> tuple[int, dict[str, Any]]:
     validar_inventario(inventario)
     catalogo = cargar_catalogo(args.catalogo)
 
+    # Sin fallback: omitir --allowlist NO autoriza todos los auxiliares del
+    # inventario. Solo las operaciones de lectura admiten una allowlist vacia.
     allowlist = _lista(args.allowlist)
-    if not allowlist:
-        allowlist = [item["nombre"] for item in inventario["items"] if item["criticidad"] == "auxiliary"]
 
     observado = _leer_opcional(args.observado)
     snapshot = _leer_opcional(args.snapshot)
@@ -1088,6 +1171,7 @@ def ejecutar(argv: Sequence[str] | None = None) -> tuple[int, dict[str, Any]]:
     seleccion = _lista(args.seleccion) or None
 
     if comando == "aplicar":
+        validar_allowlist(inventario, allowlist)
         clasif = clasificar(inventario, allowlist)
         alcance = exigir_alcance_plan(cambios_plan, clasif["core"], clasif["suspendibles"])
         resultado = {

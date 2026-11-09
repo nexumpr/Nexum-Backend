@@ -86,6 +86,23 @@ recursos auxiliares. Nadie, incluido OpenCode, puede apagar un recurso core por 
   ahorro;
 - el rollback nunca destruye datos ni state, y rechaza snapshots que lo soliciten.
 
+## 4.0 Autorización previa: allowlist y plan
+
+Dos condiciones son obligatorias antes de cualquier transición que afecte a auxiliares:
+
+1. **Allowlist explícita.** Omitir `--allowlist` o pasarla vacía **no** autoriza los auxiliares
+   del inventario: `suspendibles` queda vacío y todos los auxiliares aparecen en `denegados`. El
+   inventario solo describe; no concede permiso. Una allowlist que incluya un recurso core, un
+   nombre inexistente o un recurso con etiqueta distinta de `auxiliary` se rechaza.
+2. **Plan evaluado.** `suspender-aux`, `reanudar-aux` y `destruir-aux` exigen un plan de cambios
+   aportado y validado. Sin plan, con plan vacío y modificación solicitada o con plan malformado
+   la operación se deniega (`PLAN_AUSENTE` / `PLAN_RECHAZADO`). Solo la repetición idempotente
+   (nada que cambiar) admite plan vacío.
+
+El resultado distingue siempre `PLAN_LOCAL_VALIDADO` de `PLAN_AWS_NO_VERIFICADO`: un JSON local
+no acredita el alcance de un plan Terraform aplicado contra AWS
+(`TERRAFORM_REAL_PLAN_NOT_VERIFIED`).
+
 ## 4.1 Core frente a auxiliar
 
 `OFF` es un estado **auxiliar**: `es_estado_auxiliar("OFF")` devuelve `True` y

@@ -70,3 +70,10 @@
 - [x] `MATRIZ_INF_120.md` con los seis contratos y sus pruebas.
 - [x] Excepcion gitleaks acotada a una constante de estado, sin exclusion global.
 - [ ] Restauracion real de backups: `BLOCKED_I130`.
+
+- [x] Allowlist vacia u omitida no autoriza ningun auxiliar.
+- [x] Core, nombres inexistentes y etiquetas no auxiliares se rechazan en la allowlist.
+- [x] Plan ausente o vacio con cambios se rechaza; solo la repeticion idempotente lo admite.
+- [x] `PLAN_LOCAL_VALIDADO` separado de `PLAN_AWS_NO_VERIFICADO`.
+- [x] FinOps exige banderas de verificacion, plan FREE y rechaza cifras invalidas o caducadas.
+- [x] Excepcion gitleaks limitada a un archivo y un valor constantes.

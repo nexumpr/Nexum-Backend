@@ -100,26 +100,46 @@ if __name__ == "__main__":
 class ExcepcionI120(unittest.TestCase):
     """La constante de estado de I-120 no puede abrir un agujero de seguridad."""
 
-    def test_excepcion_acotada_a_la_prueba_de_operacion(self) -> None:
-        texto = _leer()
-        bloque = texto.split("Constante de estado BLOQUEADO_*")[1].split("[[rules.allowlists]]")[0]
-        self.assertIn('condition = "AND"', bloque)
-        self.assertIn("tests/infra/operacion", bloque)
-        self.assertIn('regexTarget = "secret"', bloque)
-        self.assertIn("BLOQUEADO_", bloque)
-
-    def test_patron_solo_acepta_constantes_de_estado(self) -> None:
+    @classmethod
+    def setUpClass(cls) -> None:
         import re
 
-        patron = re.compile(r"^BLOQUEADO_[A-Z0-9]+$")
+        texto = _leer()
+        bloque = texto.split("Constante de estado BLOQUEADO_RFC004")[1].split("[[rules.allowlists]]")[0]
+        cls.bloque = bloque
+        cls.ruta = re.search(r"paths\s*=\s*\[\s*'''(.*?)'''", bloque).group(1)
+        cls.valor = re.search(r"regexes\s*=\s*\[\s*'''(.*?)'''", bloque).group(1)
+
+    def test_excepcion_en_un_unico_archivo(self) -> None:
+        import re
+
+        patron = re.compile(self.ruta)
+        self.assertTrue(patron.match("tests/infra/operacion/test_nexum_operacion.py"))
+        for ruta in (
+            "tests/infra/operacion/test_operacion_avanzada.py",
+            "tests/infra/operacion/test_nexum_operacion_v2.py",
+            "tests/infra/finops/test_finops_diario.py",
+            "herramientas/nexum_operacion.py",
+        ):
+            self.assertIsNone(patron.match(ruta), ruta)
+
+    def test_excepcion_solo_acepta_el_valor_constante(self) -> None:
+        import re
+
+        patron = re.compile(self.valor)
         self.assertTrue(patron.match("BLOQUEADO_RFC004"))
         for valor in (
+            "BLOQUEADO_RFC005",
+            "BLOQUEADO_OTRA",
             "cf73cb1ac2eb61137e33abbaced62405b445cdd4bedf269c0a64f23475a9fb19",
             "AKIAIOSFODNN7EXAMPLE",
             "sk-ant-api03-abcdefghijklmnopqrstuvwxyz",
-            "BLOQUEADO_rfc004",
         ):
             self.assertIsNone(patron.match(valor), valor)
+
+    def test_excepcion_es_and_y_sobre_el_secreto(self) -> None:
+        self.assertIn('condition = "AND"', self.bloque)
+        self.assertIn('regexTarget = "secret"', self.bloque)
 
     def test_no_existe_allowlist_global_de_ruta(self) -> None:
         texto = _leer()

@@ -21,6 +21,27 @@
 5. Toda transición exige actor identificable y runbook; el registro incluye `timestamp_utc`.
 6. Los umbrales de saldo generan aviso y escalado, **no** cortes automáticos ni `Paid`.
 
+## 1.2 Requisitos por comando
+
+| Comando | `--allowlist` | `--plan-cambios` | Efecto |
+|---|---|---|---|
+| `estado` / `status` | opcional (vacía ⇒ nada autorizado) | no | lectura |
+| `reconciliar` / `reconcile` | opcional | no | lectura y drift |
+| `encender` | no | no | plan de arranque |
+| `suspender-aux` | **obligatoria** | **obligatorio** (salvo repetición idempotente) | plan |
+| `reanudar-aux` | **obligatoria** | **obligatorio** | plan |
+| `destruir-aux` | **obligatoria** | **obligatorio** | plan |
+| `aplicar` / `apply` | **obligatoria** | **obligatorio** | **denegado** |
+
+Sin `--allowlist` no se autoriza ningún auxiliar, aunque el inventario los describa. Sin plan
+validado no se autoriza ninguna modificación. El plan se valida contra inventario y allowlist:
+cualquier cambio sobre el core, recurso desconocido, acción `delete/destroy/forget` o capacidad
+menor que 2 se rechaza.
+
+`PLAN_LOCAL_VALIDADO` significa que el plan local es coherente; **no** significa que se haya
+leído un plan Terraform real: eso queda como `TERRAFORM_REAL_PLAN_NOT_VERIFIED` y
+`PLAN_AWS_NO_VERIFICADO`.
+
 ## 2. Preparación
 
 ```powershell
@@ -140,5 +161,5 @@ apaga el core, nunca cambia el plan Free y no es un hard cap.
 ## 10. Evidencia
 
 - `terraform fmt -check`, `init -backend=false`, `validate`: PASS en local.
-- 54 pruebas del operador y el contrato estático del módulo: PASS.
+- 104 pruebas del operador, 36 de contrato Terraform y 238 de FinOps: PASS.
 - Ejecuciones reales en AWS: `NOT_RUN`. No existen recursos creados ni costo medido.

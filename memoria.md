@@ -558,3 +558,11 @@
 - **FinOps diario:** `herramientas/verificar_finops_diario.py` con umbrales `<=45` aviso, `<=35` bloqueo, `<=30` revision urgente, `<20` incidente critico y `forecast > credito restante`; sin evidencia devuelve `BLOQUEADO_SIN_DATOS`. Nunca apaga el core ni cambia el plan Free.
 - **gitleaks:** excepcion acotada dentro de `generic-api-key` (ruta `tests/infra/operacion/**` y valor `^BLOQUEADO_[A-Z0-9]+$`) para el falso positivo del commit `3f45f16`; sin allowlist global ni reglas desactivadas. Probado que un secreto real no cumple el patron.
 - Evidencia: 83 pruebas de operacion, 36 de contrato Terraform, 18 de FinOps diario, 11 de configuracion gitleaks; `terraform fmt/init -backend=false/validate` PASS; Trivy PASS.
+
+### I-120 cierre de fail-open (2026-11-09)
+
+- **Allowlist:** `clasificar(inv, None)` y `clasificar(inv, [])` dejan `suspendibles` vacio; la CLI ya no deriva la allowlist del inventario y las operaciones que mutan exigen pertenencia explicita. `validar_allowlist` rechaza core, nombres inexistentes y etiquetas distintas de `auxiliary`. Pruebas: 11 nuevas en `AllowlistExplicita`.
+- **Plan:** `exigir_alcance_plan` rechaza plan ausente, plan vacio con cambios solicitados y plan malformado; solo la repeticion idempotente admite plan vacio. La salida distingue `PLAN_LOCAL_VALIDADO` de `PLAN_AWS_NO_VERIFICADO` y expone `TERRAFORM_REAL_PLAN_NOT_VERIFIED`. Pruebas: 10 nuevas en `PlanObligatorio`.
+- **FinOps:** se exigen banderas `verificado_*`, el plan debe ser `FREE`, se rechazan negativos/NaN/infinitos, se detectan creditos vencidos y `creditos_restante_usd` evita el doble descuento del consumo. Toda salida declara `autoriza_ejecucion_real = false` y `es_prueba_independiente_de_facturacion = false`. Pruebas: 13 nuevas en `ControlesNuevos`.
+- **gitleaks:** excepcion reducida a `tests/infra/operacion/test_nexum_operacion.py` + `^BLOQUEADO_RFC004$` con `condition = "AND"`; se restauro la asercion natural de la prueba y se verifica que otras rutas y otros valores siguen detectandose.
+- Conteos: 104 pruebas de operacion, 238 de FinOps, 147 de herramientas, 36 de contrato Terraform. Sin AWS, sin Terraform remoto, sin merge.

@@ -83,6 +83,16 @@ def _item(nombre: str, **extra) -> dict:
     return base
 
 
+def _plan_aux() -> Path:
+    return _escritura(
+        [
+            {"direccion": "interface-endpoint-secretsmanager", "accion": "update"},
+            {"direccion": "interface-endpoint-ssm", "accion": "update"},
+            {"direccion": "interface-endpoint-ssmmessages", "accion": "update"},
+        ]
+    )
+
+
 def _escritura(datos: dict) -> Path:
     manejador, ruta = tempfile.mkstemp(suffix=".json")
     with open(manejador, "w", encoding="utf-8") as fh:
@@ -170,9 +180,9 @@ class CostoExacto(unittest.TestCase):
         self.assertLessEqual(Decimal(self.res["total_45d_usd"]), Decimal("102.7830"))
 
     def test_secreto_bloqueado_no_se_cuenta(self) -> None:
-        no_computable = self.res["no_computable"]
-        self.assertEqual(list(no_computable), ["secretsmanager-secretos"])
-        self.assertEqual(no_computable["secretsmanager-secretos"], "BLOQUEADO" + "_RFC004")
+        self.assertEqual(
+            self.res["no_computable"], {"secretsmanager-secretos": "BLOQUEADO_RFC004"}
+        )
         self.assertNotIn("secretsmanager-secretos", self.res["por_recurso_hora_usd"])
 
     def test_partidas_variables_se_listan_y_no_se_suman(self) -> None:
@@ -366,7 +376,10 @@ class CreditosYUmbrales(unittest.TestCase):
                 "--inventario", str(INVENTARIO),
                 "--catalogo", str(CATALOGO),
                 "--aprobacion", "APRUEBO_REANUDAR_AUX_H08I",
+                "--allowlist", "interface-endpoint-secretsmanager,interface-endpoint-ssm,interface-endpoint-ssmmessages",
+                "--plan-cambios", str(_plan_aux()),
                 "--creditos", "30",
+                "--pronostico", "20",
             ]
         )
         self.assertEqual(codigo, 1)
@@ -453,7 +466,12 @@ class SinAccesoAAWS(unittest.TestCase):
         for comando in (
             ["estado"],
             ["reconciliar"],
-            ["suspender-aux", "--aprobacion", "APRUEBO_SUSPENDER_AUX_H08I"],
+            [
+                "suspender-aux",
+                "--aprobacion", "APRUEBO_SUSPENDER_AUX_H08I",
+                "--allowlist", "interface-endpoint-secretsmanager,interface-endpoint-ssm,interface-endpoint-ssmmessages",
+                "--plan-cambios", str(_plan_aux()),
+            ],
         ):
             with self.subTest(comando=comando[0]):
                 _, resultado = op.ejecutar(

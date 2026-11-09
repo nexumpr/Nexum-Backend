@@ -29,6 +29,16 @@ def _cat() -> dict:
     return op.cargar_catalogo(CATALOGO)
 
 
+def _plan_aux() -> Path:
+    return _json(
+        [
+            {"direccion": "interface-endpoint-secretsmanager", "accion": "update"},
+            {"direccion": "interface-endpoint-ssm", "accion": "update"},
+            {"direccion": "interface-endpoint-ssmmessages", "accion": "update"},
+        ]
+    )
+
+
 def _json(datos: object) -> Path:
     manejador, ruta = tempfile.mkstemp(suffix=".json")
     with open(manejador, "w", encoding="utf-8") as fh:
@@ -122,7 +132,8 @@ class AlcanceDelPlan(unittest.TestCase):
 class EjecucionDeshabilitada(unittest.TestCase):
     def test_apply_devuelve_codigo_2(self) -> None:
         codigo, resultado = op.ejecutar(
-            ["apply", "--inventario", str(INVENTARIO), "--catalogo", str(CATALOGO)]
+            ["apply", "--inventario", str(INVENTARIO), "--catalogo", str(CATALOGO),
+             "--allowlist", ",".join(AUX), "--plan-cambios", str(_plan_aux())]
         )
         self.assertEqual(codigo, 2)
         self.assertEqual(resultado["estado"], "EJECUCION_DESHABILITADA")
@@ -149,7 +160,8 @@ class EjecucionDeshabilitada(unittest.TestCase):
     def test_suspend_aux_alias(self) -> None:
         _, resultado = op.ejecutar(
             ["suspend-aux", "--inventario", str(INVENTARIO), "--catalogo", str(CATALOGO),
-             "--aprobacion", FRASE_SUSP, "--actor", "op", "--runbook", "runbook"]
+             "--aprobacion", FRASE_SUSP, "--actor", "op", "--runbook", "runbook",
+             "--allowlist", ",".join(AUX), "--plan-cambios", str(_plan_aux())]
         )
         self.assertEqual(resultado["comando"], "suspender-aux")
 
@@ -160,6 +172,7 @@ class IdempotenciaYReintentos(unittest.TestCase):
         codigo, resultado = op.ejecutar(
             ["suspender-aux", "--inventario", str(INVENTARIO), "--catalogo", str(CATALOGO),
              "--aprobacion", FRASE_SUSP, "--actor", "op", "--runbook", "runbook",
+             "--allowlist", ",".join(AUX), "--plan-cambios", str(_json([])),
              "--observado", str(observado)]
         )
         self.assertEqual(codigo, 0)
@@ -216,7 +229,8 @@ class ImpactoYAuxiliares(unittest.TestCase):
     def test_ventana_declarada_permite_suspension(self) -> None:
         _, resultado = op.ejecutar(
             ["suspender-aux", "--inventario", str(INVENTARIO), "--catalogo", str(CATALOGO),
-             "--aprobacion", FRASE_SUSP, "--actor", "op", "--runbook", "runbook"]
+             "--aprobacion", FRASE_SUSP, "--actor", "op", "--runbook", "runbook",
+             "--allowlist", ",".join(AUX), "--plan-cambios", str(_plan_aux())]
         )
         self.assertFalse(set(resultado["objetivo"]) & set(resultado["no_tocado"]))
 
@@ -268,6 +282,7 @@ class Preservacion(unittest.TestCase):
         codigo, resultado = op.ejecutar(
             ["reanudar-aux", "--inventario", str(INVENTARIO), "--catalogo", str(CATALOGO),
              "--aprobacion", "APRUEBO_REANUDAR_AUX_H08I", "--creditos", "90",
+             "--allowlist", ",".join(AUX), "--plan-cambios", str(_plan_aux()),
              "--actor", "op", "--runbook", "runbook"]
         )
         self.assertEqual(codigo, 1)
@@ -277,10 +292,161 @@ class Preservacion(unittest.TestCase):
         codigo, resultado = op.ejecutar(
             ["reanudar-aux", "--inventario", str(INVENTARIO), "--catalogo", str(CATALOGO),
              "--aprobacion", "APRUEBO_REANUDAR_AUX_H08I", "--creditos", "90",
+             "--allowlist", ",".join(AUX), "--plan-cambios", str(_plan_aux()),
              "--pronostico", "40", "--actor", "op", "--runbook", "runbook"]
         )
         self.assertEqual(codigo, 0)
         self.assertEqual(resultado["estado"], "PLANIFICADO")
+
+
+class AllowlistExplicita(unittest.TestCase):
+    """Sin allowlist revisada no se autoriza ningun auxiliar (fail-closed)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.inv = _inv()
+
+    def test_allowlist_none_no_autoriza_nada(self) -> None:
+        clasif = op.clasificar(self.inv, None)
+        self.assertEqual(clasif["suspendibles"], [])
+        self.assertTrue(set(AUX) <= set(clasif["denegados"]))
+
+    def test_allowlist_vacia_no_autoriza_nada(self) -> None:
+        clasif = op.clasificar(self.inv, [])
+        self.assertEqual(clasif["suspendibles"], [])
+        self.assertEqual(len(clasif["denegados"]), len(AUX))
+
+    def test_auxiliar_etiquetado_sin_allowlist_no_se_autoriza(self) -> None:
+        clasif = op.clasificar(self.inv, [])
+        for nombre in AUX:
+            self.assertIn(nombre, clasif["denegados"])
+            self.assertNotIn(nombre, clasif["suspendibles"])
+        # El inventario sigue siendo visible, pero sin autorizacion de cambio.
+        self.assertTrue(set(AUX) <= set(clasif["auxiliares"]))
+
+    def test_allowlist_de_un_solo_auxiliar(self) -> None:
+        clasif = op.clasificar(self.inv, ["interface-endpoint-ssm"])
+        self.assertEqual(clasif["suspendibles"], ["interface-endpoint-ssm"])
+
+    def test_allowlist_multiple(self) -> None:
+        clasif = op.clasificar(self.inv, AUX)
+        self.assertEqual(clasif["suspendibles"], sorted(AUX))
+
+    def test_core_en_allowlist_se_rechaza(self) -> None:
+        with self.assertRaises(op.ErrorUso) as ctx:
+            op.validar_allowlist(self.inv, ["redis-oss"])
+        self.assertIn("core", str(ctx.exception))
+
+    def test_allowlist_desconocida_se_rechaza(self) -> None:
+        with self.assertRaises(op.ErrorUso):
+            op.validar_allowlist(self.inv, ["recurso-inexistente"])
+
+    def test_auxiliar_desconocido_no_se_autoriza(self) -> None:
+        clasif = op.clasificar(self.inv, AUX + ["aux-inventado"])
+        self.assertNotIn("aux-inventado", clasif["suspendibles"])
+        self.assertIn("aux-inventado", clasif["denegados"])
+
+    def test_cli_sin_allowlist_deniega(self) -> None:
+        with self.assertRaises(op.ErrorUso):
+            op.ejecutar(
+                ["suspender-aux", "--inventario", str(INVENTARIO), "--catalogo", str(CATALOGO),
+                 "--aprobacion", FRASE_SUSP, "--actor", "op", "--runbook", "runbook",
+                 "--plan-cambios", str(_plan_aux())]
+            )
+
+    def test_cli_con_allowlist_vacia_deniega(self) -> None:
+        with self.assertRaises(op.ErrorUso):
+            op.ejecutar(
+                ["suspender-aux", "--inventario", str(INVENTARIO), "--catalogo", str(CATALOGO),
+                 "--aprobacion", FRASE_SUSP, "--actor", "op", "--runbook", "runbook",
+                 "--allowlist", "", "--plan-cambios", str(_plan_aux())]
+            )
+
+    def test_lectura_con_allowlist_vacia_funciona(self) -> None:
+        codigo, resultado = op.ejecutar(
+            ["estado", "--inventario", str(INVENTARIO), "--catalogo", str(CATALOGO)]
+        )
+        self.assertEqual(codigo, 0)
+        self.assertEqual(resultado["clasificacion"]["suspendibles"], [])
+
+
+class PlanObligatorio(unittest.TestCase):
+    """Sin plan evaluado no se autoriza ninguna modificacion."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.clasif = op.clasificar(_inv(), AUX)
+
+    def test_plan_none_se_rechaza(self) -> None:
+        with self.assertRaises(op.ErrorUso):
+            op.exigir_alcance_plan(None, self.clasif["core"], self.clasif["suspendibles"])
+
+    def test_plan_vacio_con_modificacion_se_rechaza(self) -> None:
+        with self.assertRaises(op.ErrorUso) as ctx:
+            op.exigir_alcance_plan([], self.clasif["core"], self.clasif["suspendibles"])
+        self.assertIn("plan vacio", str(ctx.exception))
+
+    def test_plan_vacio_justificado_si_no_hay_cambios(self) -> None:
+        resultado = op.exigir_alcance_plan(
+            [], self.clasif["core"], self.clasif["suspendibles"], requiere_cambios=False
+        )
+        self.assertTrue(resultado["ok"])
+
+    def test_plan_valido_marca_local_y_aws_no_verificado(self) -> None:
+        resultado = op.exigir_alcance_plan(
+            [{"direccion": "interface-endpoint-ssm", "accion": "update"}],
+            self.clasif["core"], self.clasif["suspendibles"],
+        )
+        self.assertEqual(resultado["estado"], "PLAN_LOCAL_VALIDADO")
+        self.assertEqual(resultado["alcance_aws"], "PLAN_AWS_NO_VERIFICADO")
+        self.assertEqual(resultado["plan_terraform_real"], "TERRAFORM_REAL_PLAN_NOT_VERIFIED")
+        self.assertTrue(op.TERRAFORM_REAL_PLAN_NOT_VERIFIED)
+
+    def test_plan_con_core_se_rechaza(self) -> None:
+        with self.assertRaises(op.ErrorUso):
+            op.exigir_alcance_plan(
+                [{"direccion": "alb-interno", "accion": "update"}],
+                self.clasif["core"], self.clasif["suspendibles"],
+            )
+
+    def test_plan_con_recurso_fuera_de_allowlist_se_rechaza(self) -> None:
+        clasif = op.clasificar(_inv(), ["interface-endpoint-ssm"])
+        with self.assertRaises(op.ErrorUso):
+            op.exigir_alcance_plan(
+                [{"direccion": "interface-endpoint-secretsmanager", "accion": "update"}],
+                clasif["core"], clasif["suspendibles"],
+            )
+
+    def test_destruccion_indirecta_se_rechaza(self) -> None:
+        for accion in ("delete", "destroy", "forget"):
+            with self.subTest(accion=accion):
+                with self.assertRaises(op.ErrorUso):
+                    op.exigir_alcance_plan(
+                        [{"direccion": "interface-endpoint-ssm", "accion": accion}],
+                        self.clasif["core"], self.clasif["suspendibles"],
+                    )
+
+    def test_reduccion_de_asg_a_uno_se_rechaza(self) -> None:
+        with self.assertRaises(op.ErrorUso):
+            op.exigir_alcance_plan(
+                [{"direccion": "interface-endpoint-ssm", "accion": "update", "desired_capacity": 1}],
+                self.clasif["core"], self.clasif["suspendibles"],
+            )
+
+    def test_estado_aws_no_verificado_siempre(self) -> None:
+        resultado = op.verificar_alcance_plan(
+            [{"direccion": "interface-endpoint-ssm", "accion": "update"}],
+            self.clasif["core"], self.clasif["suspendibles"],
+        )
+        self.assertEqual(resultado["alcance_aws"], "PLAN_AWS_NO_VERIFICADO")
+        self.assertNotIn("aws_verificado", resultado)
+
+    def test_lectura_sin_plan_no_exige_alcance(self) -> None:
+        codigo, resultado = op.ejecutar(
+            ["reconciliar", "--inventario", str(INVENTARIO), "--catalogo", str(CATALOGO)]
+        )
+        self.assertEqual(codigo, 1)
+        self.assertEqual(resultado["estado"], "BLOQUEADO")
 
 
 if __name__ == "__main__":  # pragma: no cover

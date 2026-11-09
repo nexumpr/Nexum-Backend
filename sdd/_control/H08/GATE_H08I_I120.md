@@ -128,3 +128,30 @@ hallazgos, las suites locales pasen y el SDD/hashes permanezcan íntegros.
 Evidencia local v2: 83 pruebas de operación, 36 de contrato Terraform, 18 de FinOps diario,
 `terraform fmt/init -backend=false/validate` PASS, Trivy PASS, SDD y SHA-256 PASS.
 `AWS_NOT_RUN`, `TWO_NODES_AWS_NOT_VERIFIED`, `BLOCKED_I130`.
+
+## 10. Corrección de cierre (2026-11-09)
+
+Defectos de fail-open corregidos y verificados con pruebas negativas:
+
+- **Allowlist fail-open:** `clasificar` aceptaba auxiliares con `permitidos` vacío y la CLI
+  derivaba la allowlist del inventario cuando se omitía `--allowlist`. Ahora `None` y `[]` no
+  autorizan nada, la allowlist es obligatoria en operaciones que mutan, y se rechaza cualquier
+  allowlist con core, nombre inexistente o etiqueta distinta de `auxiliary`. La lectura sin
+  allowlist sigue mostrando el inventario.
+- **Alcance fail-open:** `exigir_alcance_plan` solo miraba `denegados` y aceptaba
+  `verificado=false`. Ahora un plan ausente, vacío con cambios solicitados o malformado se
+  rechaza; solo la repetición idempotente admite plan vacío. El resultado se etiqueta
+  `PLAN_LOCAL_VALIDADO` y el alcance AWS permanece `PLAN_AWS_NO_VERIFICADO` /
+  `TERRAFORM_REAL_PLAN_NOT_VERIFIED`.
+- **FinOps fail-open:** las banderas `verificado_*` no bloqueaban decisiones favorables. Ahora
+  son requisito, el plan debe ser `FREE`, se rechazan negativos/`NaN`/infinitos, se detectan
+  créditos caducados, el saldo restante explícito evita descontar dos veces el consumo y toda
+  salida declara `autoriza_ejecucion_real = false`.
+- **gitleaks:** la excepción se reduce a un único archivo y un único valor
+  (`test_nexum_operacion.py` + `^BLOQUEADO_RFC004$`), dentro de `generic-api-key`, con
+  `condition = "AND"`; se restauró la aserción natural de la prueba y se comprueba que otros
+  valores y otras rutas siguen detectándose.
+
+Evidencia: 104 pruebas de operación, 238 de FinOps, 36 de contrato Terraform, 11 de configuración
+gitleaks, `terraform fmt/init -backend=false/validate`, Trivy, SDD y SHA-256. `AWS_NOT_RUN`,
+`PLAN_AWS_NO_VERIFICADO`, `BLOCKED_I130`.

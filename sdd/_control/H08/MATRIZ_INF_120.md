@@ -17,7 +17,7 @@
 |---|---|---|---|
 | INF-120-01 Estados | `MAQUINA_ESTADOS_RUNTIME.md` + `transicion()` en el operador | 83 pruebas de operación | `IMPLEMENTADO_LOCAL` |
 | INF-120-02 Reanudación | `reanudar-aux` con 7 prerrequisitos y forecast | `test_operacion_avanzada` | `IMPLEMENTADO_LOCAL` |
-| INF-120-03 Suspensión auxiliar | `suspender-aux` con deny por defecto | `test_nexum_operacion` + avanzadas | `IMPLEMENTADO_LOCAL` |
+| INF-120-03 Suspensión auxiliar | `suspender-aux` con deny por defecto y allowlist explícita | `test_nexum_operacion` + avanzadas (104) | `IMPLEMENTADO_LOCAL` |
 | INF-120-04 DNS/ALB/continuidad | guardas declarativas en `modules/operacion` | contrato Terraform (36) | `IMPLEMENTADO_LOCAL` |
 | INF-120-05 Seguridad operacional | DRY_RUN, destroy separado, alcance de plan | avanzadas + contrato | `IMPLEMENTADO_LOCAL` |
 | INF-120-06 Pruebas de operación | 20 categorías cubiertas | 83 + 36 + 18 FinOps | `IMPLEMENTADO_LOCAL` |
@@ -52,9 +52,18 @@ es publicable (`dos_nodos.alcance = disponibilidad_global_del_backend`).
 ## 4. INF-120-03 — Suspensión auxiliar
 
 `suspender-aux` aplica, en este orden: etiqueta `nexum:criticality=auxiliary`,
-allowlist, coherencia de clasificación, impacto declarado, alcance del plan y
-autorización. Cualquier fallo **deniega** (código 2). Nunca acepta un recurso
-core aunque se pida por nombre.
+allowlist **explícita**, coherencia de clasificación, impacto declarado, plan
+evaluado y autorización. Cualquier fallo **deniega** (código 2). Nunca acepta un
+recurso core aunque se pida por nombre.
+
+Allowlist **fail-closed**: `None` y `[]` dejan `suspendibles` vacío; omitir
+`--allowlist` no equivale a «todos los auxiliares»; una allowlist con core, nombre
+inexistente o etiqueta distinta de `auxiliary` se rechaza. El inventario describe,
+no autoriza. Las operaciones de lectura siguen mostrando el inventario completo.
+
+Plan **fail-closed**: sin plan no hay modificación; un plan vacío con cambios
+solicitados se rechaza; el resultado se etiqueta `PLAN_LOCAL_VALIDADO` y el alcance
+AWS queda `PLAN_AWS_NO_VERIFICADO` / `TERRAFORM_REAL_PLAN_NOT_VERIFIED`.
 
 Pruebas negativas con fixtures: EC2 core, ALB core, Redis, DynamoDB, CloudFront,
 state, auxiliar autorizado, recurso sin etiqueta, recurso desconocido y auxiliar
@@ -140,4 +149,7 @@ Guardas declarativas, sin cambios de DNS ni certificados:
 3. Ningún flag habilita ejecución real.
 4. No existe `destroy-all`, `destroy-data` ni `destroy-state`.
 5. El dinero se calcula con `Decimal` y nunca se declara costo cero.
-6. Sin datos financieros no se autoriza reanudar auxiliares.
+6. Sin datos financieros verificados no se autoriza reanudar auxiliares, y ninguna
+   evidencia local habilita ejecución real.
+7. Omitir `--allowlist` no autoriza nada; el inventario no concede permiso.
+8. Ningún plan ausente o vacío justifica una modificación.

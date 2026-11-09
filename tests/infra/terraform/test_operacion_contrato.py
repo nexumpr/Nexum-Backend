@@ -213,6 +213,18 @@ class AlcanceDelPlanDeclarativo(unittest.TestCase):
         self.assertRegex(bloque, r"permite_destroy\s+= false")
         self.assertRegex(bloque, r"minimo_nodos\s+= 2")
 
+    def test_allowlist_por_defecto_vacia_deniega(self) -> None:
+        bloque = self.vars.split('variable "allowlist_auxiliar"')[1].split("variable ")[0]
+        self.assertIn("default     = []", bloque)
+        self.assertIn(
+            'recurso.criticidad == "auxiliary" && !contains(var.allowlist_auxiliar, nombre)',
+            self.main,
+        )
+
+    def test_precondition_de_denegados_impide_operar_sin_allowlist(self) -> None:
+        self.assertIn("length(local.denegados) == 0", self.main)
+        self.assertIn("deny por defecto", self.main)
+
     def test_entorno_no_declara_plan_aplicado(self) -> None:
         self.assertIn("cambios_propuestos = []", self.env)
         self.assertIn("alcance_plan", self.env)

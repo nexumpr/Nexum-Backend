@@ -31,8 +31,8 @@ regexTarget = "line"
 regexes = ['''^\s*"[A-Za-z0-9_./\\-]+":\s*"[a-f0-9]{64}"\s*,?$''']
 
 [[rules.allowlists]]
-description = "Constante de estado BLOQUEADO_* en la prueba de I-120 (no es credencial; commit 3f45f16)"
+description = "Constante de estado BLOQUEADO_RFC004 en un unico archivo de prueba (falso positivo del commit 3f45f16)"
 condition = "AND"
-paths = ['''^tests/infra/operacion/.*\.py$''']
+paths = ['''^tests/infra/operacion/test_nexum_operacion\.py$''']
 regexTarget = "secret"
-regexes = ['''^BLOQUEADO_[A-Z0-9]+$''']
+regexes = ['''^BLOQUEADO_RFC004$''']
