@@ -763,3 +763,10 @@
 - `gestor_iac_arn` validado como rol IAM, distinto de runtime y publicador; vacio o invalido falla el plan (validate local no se bloquea). Sin ARNs reales inventados ni derivacion desde STS.
 - Alcance residual declarado: el gestor puede enumerar nombres de claves, no contenidos.
 - Pruebas: 59 en `test_secretos_contrato.py`, 6 nuevas para el gestor y el resto de principales. `AWS_NOT_RUN`.
+
+### RFC-009: publicacion del repositorio (2026-11-09)
+
+- `APRUEBO_REPO_PUBLICO_CON_RFC_009`; RFC y Gate en `sdd/_control/H08/`.
+- Motivo: el CI de `main` no completa los 12 jobs (causa `NO_VERIFIED`, compatible con cupo agotado) y la proteccion de ramas estaba `BLOQUEADO_PLAN_GITHUB`.
+- Evidencia de seguridad: Gitleaks sin baseline sobre 114 commits -> 8 falsos positivos y **cero credenciales reales**; nunca existio `.env`, `.pem`, `.key`, `tfstate`, `tfvars` ni `credentials` en el historial.
+- Riesgos aceptados: arquitectura AWS visible, emails de autor y 12 ramas publicas, PR de forks ejecutando codigo sin secretos disponibles.
