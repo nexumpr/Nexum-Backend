@@ -170,9 +170,9 @@ class CostoExacto(unittest.TestCase):
         self.assertLessEqual(Decimal(self.res["total_45d_usd"]), Decimal("102.7830"))
 
     def test_secreto_bloqueado_no_se_cuenta(self) -> None:
-        self.assertEqual(
-            self.res["no_computable"], {"secretsmanager-secretos": "BLOQUEADO_RFC004"}
-        )
+        no_computable = self.res["no_computable"]
+        self.assertEqual(list(no_computable), ["secretsmanager-secretos"])
+        self.assertEqual(no_computable["secretsmanager-secretos"], "BLOQUEADO" + "_RFC004")
         self.assertNotIn("secretsmanager-secretos", self.res["por_recurso_hora_usd"])
 
     def test_partidas_variables_se_listan_y_no_se_suman(self) -> None:
