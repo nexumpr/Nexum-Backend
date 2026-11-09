@@ -75,7 +75,9 @@
       "evidencia": {
         "archivo": "tests/unit/transport/http_server_test.go",
         "prueba": "TestHTTPServerStatusesAndErrors",
-        "resultado": "PASS"
+        "resultado": "PASS",
+        "comando": "go test -count=1 -v ./tests/unit/transport/... -run '^(TestHTTPServerStatusesAndErrors)$'",
+        "job_ci": "Formato, vet, build y pruebas / Evidencia de drills I-140"
       }
     },
     {
@@ -92,7 +94,9 @@
       "evidencia": {
         "archivo": "tests/unit/financial/consistency_resilience_test.go",
         "prueba": "TestGoalReversionPreservesInvariant",
-        "resultado": "PASS"
+        "resultado": "PASS",
+        "comando": "go test -count=1 -v ./tests/unit/financial/... -run '^(TestGoalReversionPreservesInvariant|TestIdempotencyManagerBehavior)$'",
+        "job_ci": "Formato, vet, build y pruebas / Evidencia de drills I-140"
       }
     },
     {
@@ -109,7 +113,9 @@
       "evidencia": {
         "archivo": "tests/unit/financial/consistency_resilience_test.go",
         "prueba": "TestIdempotencyManagerBehavior",
-        "resultado": "PASS"
+        "resultado": "PASS",
+        "comando": "go test -count=1 -v ./tests/unit/financial/... -run '^(TestGoalReversionPreservesInvariant|TestIdempotencyManagerBehavior)$'",
+        "job_ci": "Formato, vet, build y pruebas / Evidencia de drills I-140"
       }
     },
     {
@@ -126,7 +132,9 @@
       "evidencia": {
         "archivo": "tests/unit/security/auth_service_test.go",
         "prueba": "TestRefreshTokenReplayFamilyRevocation",
-        "resultado": "PASS"
+        "resultado": "PASS",
+        "comando": "go test -count=1 -v ./tests/unit/security/... -run '^(TestRefreshTokenReplayFamilyRevocation)$'",
+        "job_ci": "Formato, vet, build y pruebas / Evidencia de drills I-140"
       }
     },
     {
@@ -143,7 +151,9 @@
       "evidencia": {
         "archivo": "tests/unit/telemetry/observability_health_test.go",
         "prueba": "TestReadinessProbeDegradation503",
-        "resultado": "PASS"
+        "resultado": "PASS",
+        "comando": "go test -count=1 -v ./tests/unit/telemetry/... -run '^(TestReadinessProbeDegradation503)$'",
+        "job_ci": "Formato, vet, build y pruebas / Evidencia de drills I-140"
       }
     },
     {
@@ -173,7 +183,9 @@
       "evidencia": {
         "archivo": "herramientas/tests/test_cd_helpers.py",
         "prueba": "DecisionRollback",
-        "resultado": "PASS"
+        "resultado": "PASS",
+        "comando": "python3 -m unittest herramientas.tests.test_cd_helpers.DecisionRollback -v",
+        "job_ci": "Formato, vet, build y pruebas / Evidencia de drills I-140"
       }
     }
   ]

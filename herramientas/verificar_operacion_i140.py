@@ -268,6 +268,9 @@ def _evidencia_valida(evidencia: Any) -> tuple[bool, str]:
         return False, "evidencia incompleta (archivo o prueba)"
     if resultado != "PASS":
         return False, "la evidencia no declara resultado PASS"
+    comando = str(evidencia.get("comando", "")).strip()
+    if not comando:
+        return False, "la evidencia no declara el comando ejecutado en CI"
     ruta = RAIZ / archivo
     if not ruta.is_file():
         return False, f"archivo de evidencia inexistente: {archivo}"
@@ -279,7 +282,14 @@ def _evidencia_valida(evidencia: Any) -> tuple[bool, str]:
     )
     if not any(patron in contenido for patron in patrones):
         return False, f"la prueba {prueba} no existe en {archivo}"
-    return True, "verificada"
+
+    # La prueba debe ejecutarse en el CI vigente: el nombre aparece en el workflow.
+    workflow = RAIZ / ".github" / "workflows" / "go-backend.yml"
+    if not workflow.is_file():
+        return False, "no se encuentra el workflow de CI"
+    if prueba not in workflow.read_text(encoding="utf-8"):
+        return False, f"la prueba {prueba} no se ejecuta en el workflow de CI"
+    return True, "verificada contra archivo y workflow de CI"
 
 
 def validar_drills(datos: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -477,6 +487,30 @@ ALIAS_RECURSOS = {
 ESTADOS_PRECIO_VALIDOS = ("VERIFIED_AWS", "DOC_OFICIAL", "DOC_ONLY", "SUPUESTO")
 
 
+def consolidar_partidas(partidas: list[Mapping[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Una sola contabilizacion por (sku, base); cantidades distintas son conflicto."""
+    unicas: list[dict[str, Any]] = []
+    conflictos: list[dict[str, Any]] = []
+    vistas: dict[tuple[str, str], Mapping[str, Any]] = {}
+    for partida in partidas:
+        clave = (str(partida.get("sku")), str(partida.get("base")))
+        previa = vistas.get(clave)
+        if previa is None:
+            vistas[clave] = partida
+            unicas.append(dict(partida))
+            continue
+        if str(previa.get("cantidad")) != str(partida.get("cantidad")):
+            conflictos.append(
+                {
+                    "sku": clave[0],
+                    "base": clave[1],
+                    "cantidad_previa": str(previa.get("cantidad")),
+                    "cantidad_nueva": str(partida.get("cantidad")),
+                }
+            )
+    return unicas, conflictos
+
+
 def _precio(catalogo: Mapping[str, Any], sku: str) -> tuple[Decimal | None, str]:
     """(precio, estado). Un precio ausente devuelve None, nunca 0."""
     datos = catalogo.get("items", {}).get(sku, {})
@@ -508,11 +542,15 @@ def costos_activo(activo: Mapping[str, Any], catalogo: Mapping[str, Any]) -> dic
         importe = precio * Decimal(str(cantidad))
         if base == "hora":
             hora += importe
-            partidas.append({"sku": sku, "base": base, "importe": str(importe), "estado": estado})
+            partidas.append(
+                {"sku": sku, "base": base, "importe": str(importe.quantize(Decimal("0.0001"))), "estado": estado}
+            )
         elif base == "mes":
             mes += importe
             hora += importe / Decimal("730")
-            partidas.append({"sku": sku, "base": base, "importe": str(importe), "estado": estado})
+            partidas.append(
+                {"sku": sku, "base": base, "importe": str(importe.quantize(Decimal("0.0001"))), "estado": estado}
+            )
         else:
             partidas.append({"sku": sku, "base": base, "importe": None, "estado": estado})
 
@@ -581,6 +619,7 @@ def inventario_infraestructura() -> dict[str, Any]:
             set(existente["dependencias"]) | set(datos["dependencias"])
         )
         existente["etiquetas"] = {**existente["etiquetas"], **datos["etiquetas"]}
+        # Se conservan las fuentes, pero cada cargo se contabiliza una sola vez.
         existente["partidas"] = existente["partidas"] + datos["partidas"]
         # El estado mas restrictivo gana.
         orden = ["DECLARADO_NO_CREADO", "OPCIONAL_NO_CREADO", "BLOQUEADO_RFC004"]
@@ -626,8 +665,13 @@ def inventario_infraestructura() -> dict[str, Any]:
 
     recursos: list[dict[str, Any]] = []
     precios_desconocidos: set[str] = set()
+    conflictos_partidas: list[dict[str, Any]] = []
     for clave in sorted(consolidado):
         datos = consolidado[clave]
+        partidas_unicas, conflictos = consolidar_partidas(datos["partidas"])
+        for conflicto in conflictos:
+            conflictos_partidas.append({"recurso": clave, **conflicto})
+        datos = {**datos, "partidas": partidas_unicas}
         costos = costos_activo(datos, catalogo)
         precios_desconocidos.update(costos["precios_desconocidos"])
         recursos.append(
@@ -666,6 +710,14 @@ def inventario_infraestructura() -> dict[str, Any]:
         problemas.append(
             "precios no verificados: " + ", ".join(sorted(precios_desconocidos))
         )
+    if conflictos_partidas:
+        problemas.append(
+            "partidas contradictorias entre fuentes: "
+            + "; ".join(
+                f"{c['recurso']}/{c['sku']} {c['cantidad_previa']} vs {c['cantidad_nueva']}"
+                for c in conflictos_partidas
+            )
+        )
 
     return {
         "comando": "inventario",
@@ -678,6 +730,7 @@ def inventario_infraestructura() -> dict[str, Any]:
             r["nombre"] for r in recursos if r["owner"] == "PENDIENTE_DECLARACION"
         ),
         "precios_desconocidos": sorted(precios_desconocidos),
+        "conflictos_partidas": conflictos_partidas,
         "capacidad_asg": asg,
         "problemas": problemas,
         "estado": "INVENTARIO_TRAZABLE" if not problemas else "INVENTARIO_INCOMPLETO",

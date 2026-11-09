@@ -102,3 +102,22 @@ plan/apply/destroy`, sin AWS, sin despliegue y sin drills reales.
 
 Evidencia: 167 pruebas en `tests/infra/operacion` (104 de I-120 + 63 de I-140), SDD y SHA-256 PASS.
 `AWS_NOT_RUN`, `DRILLS_AWS_NOT_RUN`, `AWS_COST_REAL_NOT_VERIFIED`.
+
+## 9. Corrección de revisión (2026-11-09)
+
+- **A — costos duplicados (defecto real, corregido).** La consolidación concatenaba partidas y facturaba
+  dos veces PITR y S3: `dynamodb-core` daba 1.9500 USD/mes (debía 1.3500) y `terraform-state-s3`
+  0.1380 (debía 0.0690). Ahora cada cargo se contabiliza una vez por `(sku, base)`, ambas fuentes se
+  conservan como trazabilidad, los cargos distintos se mantienen y una cantidad contradictoria se
+  informa como conflicto sin elegir en silencio.
+- **B — análisis del ASG (ya corregido antes, verificado).** La comprobación no depende del formateo:
+  acepta alineación, tabulaciones y espacios irregulares; exige `asg_capacidad = 2`, la restricción
+  `== 2` y los tres campos ligados a la variable. Se añadieron pruebas con formato real, con
+  tabulaciones, con capacidad 1 y con `max_size` desligado.
+- **C — evidencia de drills (precisión corregida).** El validador comprueba trazabilidad (archivo,
+  presencia de la prueba y ejecución en el workflow de CI mediante pasos con `-run` focalizado); **no**
+  ejecuta las pruebas ni sustituye el log de GitHub Actions. Se añadieron dos pasos de CI con los
+  nombres exactos y la documentación se ajustó para no atribuir garantías que el validador no da.
+
+Evidencia: 181 pruebas en `tests/infra/operacion` (104 de I-120 + 77 de I-140); `AWS_NOT_RUN`,
+`DRILLS_AWS_NOT_RUN`, `AWS_COST_REAL_NOT_VERIFIED`.

@@ -657,3 +657,10 @@
 - **Consolidacion:** se detectan recursos repetidos entre I-120 e I-130 (`dynamodb-core`, `terraform-state`, `secretos-bootstrap`), se suman fuentes y partidas sin duplicar costos y se conservan los recursos distintos del mismo servicio.
 - **Owners y ASG:** owners y etiquetas se derivan de fuentes declarativas y lo no declarado queda `PENDIENTE_DECLARACION`; la capacidad del ASG se contrasta con `modules/computo` (min=desired=max=2) sin afirmar instancias reales.
 - Conteos: 63 pruebas de I-140 (suite de operacion 167). Sin AWS y sin merge.
+
+### I-140 cierre de revisión (2026-11-09)
+
+- **Costos duplicados (defecto real):** la consolidacion concatenaba partidas y facturaba PITR y S3 dos veces (`dynamodb-core` 1.9500 en vez de 1.3500; `terraform-state-s3` 0.1380 en vez de 0.0690). Ahora cada cargo se contabiliza una vez por `(sku, base)`, se conservan ambas fuentes y un conflicto de cantidad se informa sin elegir en silencio.
+- **ASG:** la comprobacion ya admitia la alineacion real; se verifico con formato de Terraform, tabulaciones, capacidad 1 y `max_size` desligado.
+- **Evidencia de drills:** el validador comprueba archivo, presencia de la prueba y que su nombre se ejecuta en el workflow de CI (pasos `-run` focalizados); no ejecuta pruebas ni sustituye el log de CI. La documentacion se corrigio para no atribuir garantias inexistentes.
+- Conteos: 77 pruebas de I-140 (suite de operacion 181). Sin AWS y sin merge.

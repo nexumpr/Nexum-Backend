@@ -317,6 +317,29 @@ class EvidenciaDeDrills(unittest.TestCase):
                 drill["evidencia"] = evidencia
         return datos
 
+    def test_evidencia_debe_declarar_comando_de_ci(self) -> None:
+        datos = copy.deepcopy(self.base)
+        for drill in datos["drills"]:
+            if drill["id"] == "idempotencia":
+                drill["evidencia"].pop("comando", None)
+        resultado = op.validar_drills(datos)
+        self.assertEqual(resultado["estado"], "PLAN_RECHAZADO")
+        self.assertTrue(any("comando" in p for p in resultado["problemas"]))
+
+    def test_prueba_que_no_corre_en_ci_se_rechaza(self) -> None:
+        datos = self._con_evidencia(
+            "idempotencia",
+            {
+                "archivo": "tests/unit/security/auth_service_test.go",
+                "prueba": "TestAuthMiddleware",
+                "resultado": "PASS",
+                "comando": "go test ./...",
+            },
+        )
+        resultado = op.validar_drills(datos)
+        self.assertEqual(resultado["estado"], "PLAN_RECHAZADO")
+        self.assertTrue(any("workflow de CI" in p for p in resultado["problemas"]))
+
     def test_plan_actual_tiene_evidencia_verificable(self) -> None:
         resultado = op.validar_drills(self.base)
         self.assertEqual(resultado["estado"], "PLAN_VALIDO")
@@ -336,7 +359,7 @@ class EvidenciaDeDrills(unittest.TestCase):
     def test_archivo_de_evidencia_inexistente(self) -> None:
         datos = self._con_evidencia(
             "idempotencia",
-            {"archivo": "tests/unit/no-existe_test.go", "prueba": "TestX", "resultado": "PASS"},
+            {"archivo": "tests/unit/no-existe_test.go", "prueba": "TestX", "resultado": "PASS", "comando": "go test ./..."},
         )
         resultado = op.validar_drills(datos)
         self.assertEqual(resultado["estado"], "PLAN_RECHAZADO")
@@ -349,6 +372,7 @@ class EvidenciaDeDrills(unittest.TestCase):
                 "archivo": "tests/unit/financial/consistency_resilience_test.go",
                 "prueba": "TestInventado",
                 "resultado": "PASS",
+                "comando": "go test ./...",
             },
         )
         resultado = op.validar_drills(datos)
@@ -488,6 +512,130 @@ class CostesDelInventario(unittest.TestCase):
         self.assertEqual(self.inv["existe_en_aws"], "NOT_VERIFIED")
         self.assertEqual(self.inv["costo_observado"], "NOT_VERIFIED")
         self.assertFalse(self.inv["aws_consultado"])
+
+
+class CostesSinDuplicacion(unittest.TestCase):
+    """PITR y S3 se contabilizan una sola vez aunque aparezcan en dos fuentes."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalogo = json.loads(
+            (RAIZ / "infra" / "finops" / "precios_us-east-2.json").read_text(encoding="utf-8")
+        )
+        cls.inv = op.inventario_infraestructura()
+        cls.por_nombre = {r["nombre"]: r for r in cls.inv["recursos"]}
+
+    def test_pitr_solo_se_factura_una_vez(self) -> None:
+        core = self.por_nombre["dynamodb-core"]
+        # storage 3 x 0.25 = 0.75 y PITR 3 x 0.20 = 0.60 -> 1.35, no 1.95
+        self.assertEqual(core["costo_mes_usd"], "1.3500")
+        pitr = [p for p in core["partidas"] if p["sku"] == "DDB_PITR_GB_MES"]
+        self.assertEqual(len(pitr), 1)
+        self.assertEqual(pitr[0]["importe"], "0.6000")
+
+    def test_state_s3_solo_se_factura_una_vez(self) -> None:
+        state = self.por_nombre["terraform-state-s3"]
+        # 3 x 0.023 = 0.069, no 0.138
+        self.assertEqual(state["costo_mes_usd"], "0.0690")
+        s3 = [p for p in state["partidas"] if p["sku"] == "S3_STANDARD_GB_MES"]
+        self.assertEqual(len(s3), 1)
+        self.assertEqual(s3[0]["importe"], "0.0690")
+
+    def test_ambas_fuentes_se_conservan_como_trazabilidad(self) -> None:
+        core = self.por_nombre["dynamodb-core"]
+        self.assertEqual(len(core["fuentes"]), 2)
+        self.assertIn("I-120", " ".join(core["fuentes"]))
+        self.assertIn("I-130", " ".join(core["fuentes"]))
+
+    def test_cargos_distintos_del_mismo_recurso_se_conservan(self) -> None:
+        core = self.por_nombre["dynamodb-core"]
+        skus = {p["sku"] for p in core["partidas"]}
+        self.assertIn("DDB_STORAGE_GB_MES", skus)
+        self.assertIn("DDB_PITR_GB_MES", skus)
+        self.assertIn("DDB_RRU_MILLON", skus)
+
+    def test_partidas_identicas_se_consolidan(self) -> None:
+        unicas, conflictos = op.consolidar_partidas(
+            [
+                {"sku": "DDB_PITR_GB_MES", "base": "mes", "cantidad": "3"},
+                {"sku": "DDB_PITR_GB_MES", "base": "mes", "cantidad": "3"},
+                {"sku": "DDB_STORAGE_GB_MES", "base": "mes", "cantidad": "3"},
+            ]
+        )
+        self.assertEqual(len(unicas), 2)
+        self.assertEqual(conflictos, [])
+
+    def test_cantidades_contradictorias_se_informan(self) -> None:
+        unicas, conflictos = op.consolidar_partidas(
+            [
+                {"sku": "DDB_PITR_GB_MES", "base": "mes", "cantidad": "3"},
+                {"sku": "DDB_PITR_GB_MES", "base": "mes", "cantidad": "5"},
+            ]
+        )
+        self.assertEqual(len(unicas), 1)
+        self.assertEqual(len(conflictos), 1)
+        self.assertEqual(conflictos[0]["cantidad_previa"], "3")
+        self.assertEqual(conflictos[0]["cantidad_nueva"], "5")
+
+    def test_inventario_real_sin_conflictos(self) -> None:
+        self.assertEqual(self.inv["conflictos_partidas"], [])
+        self.assertEqual(self.inv["estado"], "INVENTARIO_TRAZABLE")
+
+
+class FormatoDelASG(unittest.TestCase):
+    """La validacion del ASG no depende del formateo de Terraform."""
+
+    def _modulo(self, main: str, variables: str) -> Path:
+        base = Path(tempfile.mkdtemp())
+        (base / "main.tf").write_text(main, encoding="utf-8")
+        (base / "variables.tf").write_text(variables, encoding="utf-8")
+        return base
+
+    VARIABLES = 'variable "asg_capacidad" {\n  type    = number\n  default = 2\n}\n'
+
+    def test_formato_terraform_con_alineacion(self) -> None:
+        main = (
+            "min_size            = var.asg_capacidad\n"
+            "desired_capacity    = var.asg_capacidad\n"
+            "max_size            = var.asg_capacidad\n"
+            "condition = var.asg_capacidad == 2\n"
+        )
+        self.assertTrue(op.capacidad_asg_declarada(self._modulo(main, self.VARIABLES))["ok"])
+
+    def test_formato_con_tabulaciones_y_espacios_irregulares(self) -> None:
+        main = (
+            "min_size\t= var.asg_capacidad\n"
+            "desired_capacity   =   var.asg_capacidad\n"
+            "  max_size = var.asg_capacidad\n"
+            "condition = var.asg_capacidad == 2\n"
+        )
+        self.assertTrue(op.capacidad_asg_declarada(self._modulo(main, self.VARIABLES))["ok"])
+
+    def test_capacidad_uno_se_rechaza(self) -> None:
+        main = (
+            "min_size = var.asg_capacidad\n"
+            "desired_capacity = var.asg_capacidad\n"
+            "max_size = var.asg_capacidad\n"
+            "condition = var.asg_capacidad == 1\n"
+        )
+        resultado = op.capacidad_asg_declarada(self._modulo(main, self.VARIABLES))
+        self.assertFalse(resultado["ok"])
+
+    def test_max_size_desligado_se_rechaza(self) -> None:
+        main = (
+            "min_size = var.asg_capacidad\n"
+            "desired_capacity = var.asg_capacidad\n"
+            "max_size = 4\n"
+            "condition = var.asg_capacidad == 2\n"
+        )
+        resultado = op.capacidad_asg_declarada(self._modulo(main, self.VARIABLES))
+        self.assertFalse(resultado["ok"])
+        self.assertFalse(resultado["min_desired_max_ligados"])
+
+    def test_modulo_real_declara_dos(self) -> None:
+        resultado = op.capacidad_asg_declarada()
+        self.assertTrue(resultado["ok"])
+        self.assertEqual(resultado["declarada"], 2)
 
 
 if __name__ == "__main__":  # pragma: no cover
