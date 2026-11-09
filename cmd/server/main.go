@@ -36,26 +36,29 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	// I-040/I-050: dependencias REALES. Si una no esta configurada no se registra y
 	// readiness responde 503 (no se declara disponibilidad sin evidencia).
 	cfgDeps := healthinfra.DesdeEntorno()
-	if cfgDeps.TablaDynamoDB != "" {
-		clienteDynamo, err := healthinfra.ClienteDynamoDB(ctx, cfgDeps)
-		if err != nil {
-			logger.Error("dynamodb no configurado; readiness devolvera 503", slog.String("error", err.Error()))
-		} else {
-			tabla := cfgDeps.TablaDynamoDB
-			health.RegisterDependency("dynamodb", func(ctx context.Context) error {
-				return healthinfra.ComprobarDynamoDB(ctx, clienteDynamo, tabla)
-			})
-		}
+	// Ambas dependencias son OBLIGATORIAS: si falta configuracion o el cliente no se
+	// puede construir, se registra una comprobacion que falla y readiness responde 503.
+	clienteDynamo, errDynamo := healthinfra.ClienteDynamoDB(ctx, cfgDeps)
+	if errDynamo != nil {
+		logger.Error("dynamodb no inicializable; readiness devolvera 503", slog.String("error", errDynamo.Error()))
+		causa := errDynamo
+		health.RegisterDependency("dynamodb", func(context.Context) error { return causa })
+	} else {
+		tabla := cfgDeps.TablaDynamoDB
+		health.RegisterDependency("dynamodb", func(ctx context.Context) error {
+			return healthinfra.ComprobarDynamoDB(ctx, clienteDynamo, tabla)
+		})
 	}
-	if cfgDeps.RedisAddr != "" {
-		clienteRedis, err := healthinfra.ClienteRedis(cfgDeps)
-		if err != nil {
-			logger.Error("redis no configurado; readiness devolvera 503", slog.String("error", err.Error()))
-		} else {
-			health.RegisterDependency("redis", func(ctx context.Context) error {
-				return healthinfra.ComprobarRedis(ctx, clienteRedis)
-			})
-		}
+	clienteRedis, errRedis := healthinfra.ClienteRedis(cfgDeps)
+	if errRedis != nil {
+		logger.Error("redis no inicializable; readiness devolvera 503", slog.String("error", errRedis.Error()))
+		causa := errRedis
+		health.RegisterDependency("redis", func(context.Context) error { return causa })
+	} else {
+		health.RegisterDependency("redis", func(ctx context.Context) error {
+			return healthinfra.ComprobarRedis(ctx, clienteRedis)
+		})
+		defer func() { _ = clienteRedis.Close() }()
 	}
 
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)

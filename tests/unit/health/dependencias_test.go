@@ -1,10 +1,14 @@
 package health_test
 
 import (
+	"bufio"
 	"context"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,9 +20,41 @@ import (
 	healthinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/health"
 )
 
-// servidorRESP levanta un servidor TCP minimo que responde segun el comando.
-// go-redis envia HELLO al conectar; responder +PONG a HELLO rompe el handshake,
-// asi que el doble distingue comandos como lo haria Redis.
+// leerComando interpreta un comando RESP (array de bulk strings) desde el stream.
+// Es necesario porque go-redis puede enviar un comando en varias lecturas TCP.
+func leerComando(lector *bufio.Reader) ([]string, error) {
+	cabecera, err := lector.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasPrefix(cabecera, "*") {
+		return nil, fmt.Errorf("se esperaba array RESP, recibido %q", cabecera)
+	}
+	total, err := strconv.Atoi(strings.TrimSpace(cabecera[1:]))
+	if err != nil {
+		return nil, err
+	}
+	partes := make([]string, 0, total)
+	for i := 0; i < total; i++ {
+		longitud, err := lector.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+		n, err := strconv.Atoi(strings.TrimSpace(longitud[1:]))
+		if err != nil {
+			return nil, err
+		}
+		contenido := make([]byte, n+2) // incluye CRLF
+		if _, err := io.ReadFull(lector, contenido); err != nil {
+			return nil, err
+		}
+		partes = append(partes, string(contenido[:n]))
+	}
+	return partes, nil
+}
+
+// servidorRESP levanta un servidor TCP que habla RESP de verdad y responde segun el
+// comando: HELLO con error (go-redis cae a RESP2), PING con la respuesta indicada.
 func servidorRESP(t *testing.T, respuestaPing string) string {
 	t.Helper()
 	escucha, err := net.Listen("tcp", "127.0.0.1:0")
@@ -34,17 +70,19 @@ func servidorRESP(t *testing.T, respuestaPing string) string {
 			}
 			go func(c net.Conn) {
 				defer func() { _ = c.Close() }()
-				buffer := make([]byte, 1024)
+				lector := bufio.NewReader(c)
 				for {
-					leidos, err := c.Read(buffer)
-					if err != nil || leidos == 0 {
+					partes, err := leerComando(lector)
+					if err != nil {
 						return
 					}
-					comando := strings.ToUpper(string(buffer[:leidos]))
-					switch {
-					case strings.Contains(comando, "HELLO"):
+					if len(partes) == 0 {
+						continue
+					}
+					switch strings.ToUpper(partes[0]) {
+					case "HELLO":
 						_, _ = c.Write([]byte("-ERR unknown command 'HELLO'\r\n"))
-					case strings.Contains(comando, "PING"):
+					case "PING":
 						_, _ = c.Write([]byte(respuestaPing))
 					default:
 						_, _ = c.Write([]byte("+OK\r\n"))
