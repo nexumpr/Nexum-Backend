@@ -554,7 +554,7 @@ class ExcepcionTrivyAcotada(unittest.TestCase):
         self.assertNotIn("id: *", texto)
         self.assertNotIn('"*"', texto)
         # AWS-0132 queda acotada a dos rutas concretas: state (I-070) y secretos (RFC-004).
-        self.assertEqual(texto.count("- id: AWS-0132"), 2)
+        self.assertEqual(texto.count("- id: AWS-0132"), 3)
 
 
 class Documentacion(unittest.TestCase):
