@@ -1,0 +1,255 @@
+{
+  "version": "1.0.0",
+  "entorno": "h08i",
+  "region": "us-east-2",
+  "spec": "I-120-encendido-apagado",
+  "fecha_corte": "2026-11-09",
+  "catalogo_precios": "infra/finops/precios_us-east-2.json",
+  "politica": {
+    "core": "24x7 e intocable: ningun comando auxiliar puede detener, escalar por debajo de 2, eliminar ni destruir estos recursos.",
+    "auxiliary": "Suspendible solo dentro de ventanas de mantenimiento, con aprobacion humana por entorno y allowlist revisada.",
+    "deny_por_defecto": "Un recurso sin etiqueta nexum:criticality valida, o no declarado en este inventario, se deniega siempre.",
+    "prohibido": "destroy-data, destroy-state y destroy-all no existen como capacidades; el operador rechaza cualquier intento.",
+    "dos_nodos": "Se exigen 2 targets sanos para publicar; 1 nodo no puede presentarse como doble instancia."
+  },
+  "umbrales_credito_usd": {
+    "aviso": "45",
+    "bloqueo_auxiliares": "35",
+    "incidente_critico": "20",
+    "fuente": "I-120 spec seccion 10 y Gate H08-I/I-000"
+  },
+  "items": [
+    {
+      "nombre": "asg-backend",
+      "componente": "computo",
+      "tipo": "aws_autoscaling_group",
+      "criticidad": "core",
+      "etiqueta_criticidad": "core",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": false,
+      "motivo": "Dos instancias Go simultaneas (GOV-02); detenerlas rompe la API y no ahorra ALB ni Redis.",
+      "partidas": [
+        { "sku": "EC2_T4G_MICRO_HORA", "cantidad": "2", "base": "hora", "nota": "2 x t4g.micro, cpu_credits=standard (I-020)" },
+        { "sku": "EBS_GP3_GB_MES", "cantidad": "30", "base": "mes", "nota": "Volumenes root residentes; persisten con las instancias" }
+      ],
+      "dependencias": ["I-020"]
+    },
+    {
+      "nombre": "alb-interno",
+      "componente": "balanceo",
+      "tipo": "aws_lb",
+      "criticidad": "core",
+      "etiqueta_criticidad": "core",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": false,
+      "motivo": "ALB no tiene API Stop: cortar costo exige eliminarlo y reprovisionar, con perdida de disponibilidad (spec seccion 9).",
+      "partidas": [
+        { "sku": "ALB_HORA", "cantidad": "1", "base": "hora" },
+        { "sku": "ALB_LCU_HORA", "cantidad": "1", "base": "hora", "nota": "1 LCU supuesto; el consumo real no se mide en local" }
+      ],
+      "dependencias": ["I-030"]
+    },
+    {
+      "nombre": "cloudfront-distribucion",
+      "componente": "balanceo",
+      "tipo": "aws_cloudfront_distribution",
+      "criticidad": "core",
+      "etiqueta_criticidad": "core",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": false,
+      "motivo": "Unico acceso HTTPS publico (D2). CloudFront cobra por uso: su costo de existencia es 0, el egreso varia.",
+      "partidas": [
+        { "sku": "CLOUDFRONT_VPC_ORIGIN", "cantidad": "1", "base": "existencia", "nota": "Sin cargo segun documentacion oficial" },
+        { "sku": "CLOUDFRONT_CERTIFICADO", "cantidad": "1", "base": "existencia", "nota": "Certificado por defecto *.cloudfront.net, sin ACM ni dominio" },
+        { "sku": "EGRESO_INTERNET_GB", "cantidad": null, "base": "variable", "nota": "Depende de trafico real; no medido (AWS_NOT_RUN)" }
+      ],
+      "dependencias": ["I-030", "RFC-005"]
+    },
+    {
+      "nombre": "redis-oss",
+      "componente": "cache",
+      "tipo": "aws_elasticache_replication_group",
+      "criticidad": "core",
+      "etiqueta_criticidad": "core",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": false,
+      "motivo": "Cache distribuido compartido por los 2 nodos (GOV-05); no existe API Stop ni se admite cache en memoria.",
+      "partidas": [
+        { "sku": "ELASTICACHE_REDIS_T4G_MICRO_HORA", "cantidad": "1", "base": "hora" },
+        { "sku": "ELASTICACHE_INTERAZ_GB", "cantidad": null, "base": "variable", "nota": "Transferencia inter-AZ real no medida" }
+      ],
+      "dependencias": ["I-050"]
+    },
+    {
+      "nombre": "dynamodb-core",
+      "componente": "datos",
+      "tipo": "aws_dynamodb_table",
+      "criticidad": "core",
+      "etiqueta_criticidad": "core",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": false,
+      "motivo": "Datos del usuario; el ahorro nunca puede tocar la tabla. PITR y storage persisten por existencia.",
+      "partidas": [
+        { "sku": "DDB_STORAGE_GB_MES", "cantidad": "3", "base": "mes", "nota": "Cantidad presupuestada por I-000; el consumo real no se mide" },
+        { "sku": "DDB_PITR_GB_MES", "cantidad": "3", "base": "mes" },
+        { "sku": "DDB_RRU_MILLON", "cantidad": null, "base": "variable" },
+        { "sku": "DDB_WRU_MILLON", "cantidad": null, "base": "variable" }
+      ],
+      "dependencias": ["I-040"]
+    },
+    {
+      "nombre": "terraform-state-s3",
+      "componente": "estado",
+      "tipo": "aws_s3_bucket",
+      "criticidad": "core",
+      "etiqueta_criticidad": "core",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": false,
+      "motivo": "State con prevent_destroy: destruirlo impide reconciliar y recuperar la infraestructura (I-070).",
+      "partidas": [
+        { "sku": "S3_STANDARD_GB_MES", "cantidad": "3", "base": "mes", "nota": "Cantidad presupuestada por I-000" },
+        { "sku": "S3_SOLICITUDES_LOTE", "cantidad": null, "base": "variable" }
+      ],
+      "dependencias": ["I-070"]
+    },
+    {
+      "nombre": "log-group-backend",
+      "componente": "observabilidad",
+      "tipo": "aws_cloudwatch_log_group",
+      "criticidad": "core",
+      "etiqueta_criticidad": "core",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": false,
+      "motivo": "Logs permanentes (D6 de I-000) y fuente de los metric filters de I-110.",
+      "partidas": [
+        { "sku": "CW_LOGS_ALMACEN_GB_MES", "cantidad": "4.5", "base": "mes", "nota": "Retencion 7 dias" },
+        { "sku": "CW_LOGS_INGESTA_GB", "cantidad": null, "base": "variable" }
+      ],
+      "dependencias": ["I-110"]
+    },
+    {
+      "nombre": "alarmas-cloudwatch",
+      "componente": "observabilidad",
+      "tipo": "aws_cloudwatch_metric_alarm",
+      "criticidad": "core",
+      "etiqueta_criticidad": "core",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": false,
+      "motivo": "8 alarmas declaradas (A1..A8). I-000 presupuesto 3; I-110 anade 5 (+0.5000 USD/mes estimado).",
+      "partidas": [
+        { "sku": "CW_ALARMA_MES", "cantidad": "8", "base": "mes" }
+      ],
+      "dependencias": ["I-110"]
+    },
+    {
+      "nombre": "interface-endpoint-logs",
+      "componente": "red",
+      "tipo": "aws_vpc_endpoint",
+      "criticidad": "core",
+      "etiqueta_criticidad": "core",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": false,
+      "motivo": "Endpoint permanente de logs (D6). Sin el, las instancias no pueden entregar logs.",
+      "partidas": [
+        { "sku": "VPC_INTERFACE_ENDPOINT_HORA", "cantidad": "2", "base": "hora", "nota": "2 AZ" }
+      ],
+      "dependencias": ["I-010"]
+    },
+    {
+      "nombre": "red-vpc",
+      "componente": "red",
+      "tipo": "aws_vpc",
+      "criticidad": "core",
+      "etiqueta_criticidad": "core",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": false,
+      "motivo": "VPC, subredes privadas, IGW (requisito de VPC Origins), route tables, NACL y security groups: sin cargo por existencia.",
+      "partidas": [],
+      "dependencias": ["I-010"]
+    },
+    {
+      "nombre": "gateway-endpoints",
+      "componente": "red",
+      "tipo": "aws_vpc_endpoint",
+      "criticidad": "core",
+      "etiqueta_criticidad": "core",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": false,
+      "motivo": "Gateway endpoints S3 y DynamoDB: sin cargo por hora (documentacion oficial).",
+      "partidas": [
+        { "sku": "VPC_GATEWAY_ENDPOINT", "cantidad": "2", "base": "existencia" }
+      ],
+      "dependencias": ["I-010"]
+    },
+    {
+      "nombre": "interface-endpoint-secretsmanager",
+      "componente": "red",
+      "tipo": "aws_vpc_endpoint",
+      "criticidad": "auxiliary",
+      "etiqueta_criticidad": "auxiliary",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": true,
+      "motivo": "Solo necesario en ventanas de mantenimiento (RFC-004/rotacion). Fuera de ventana se elimina y recrea.",
+      "partidas": [
+        { "sku": "VPC_INTERFACE_ENDPOINT_HORA", "cantidad": "2", "base": "hora", "nota": "2 AZ" }
+      ],
+      "dependencias": ["I-010", "RFC-004"]
+    },
+    {
+      "nombre": "interface-endpoint-ssm",
+      "componente": "red",
+      "tipo": "aws_vpc_endpoint",
+      "criticidad": "auxiliary",
+      "etiqueta_criticidad": "auxiliary",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": true,
+      "motivo": "Acceso de mantenimiento por SSM en ventana; no permanente (D6).",
+      "partidas": [
+        { "sku": "VPC_INTERFACE_ENDPOINT_HORA", "cantidad": "2", "base": "hora" }
+      ],
+      "dependencias": ["I-010"]
+    },
+    {
+      "nombre": "interface-endpoint-ssmmessages",
+      "componente": "red",
+      "tipo": "aws_vpc_endpoint",
+      "criticidad": "auxiliary",
+      "etiqueta_criticidad": "auxiliary",
+      "estado_recurso": "DECLARADO_NO_CREADO",
+      "suspendible": true,
+      "motivo": "Canal de sesiones SSM en ventana; no permanente (D6).",
+      "partidas": [
+        { "sku": "VPC_INTERFACE_ENDPOINT_HORA", "cantidad": "2", "base": "hora" }
+      ],
+      "dependencias": ["I-010"]
+    },
+    {
+      "nombre": "dynamodb-backup-programado",
+      "componente": "datos",
+      "tipo": "aws_dynamodb_backup",
+      "criticidad": "core",
+      "etiqueta_criticidad": "core",
+      "estado_recurso": "PRESUPUESTADO_NO_CREADO",
+      "suspendible": false,
+      "motivo": "I-040 no crea backups programados; la partida de I-000 sigue presupuestada y I-130 es NOT_AUTHORIZED.",
+      "partidas": [
+        { "sku": "DDB_BACKUP_GB_MES", "cantidad": "3", "base": "mes" }
+      ],
+      "dependencias": ["I-040", "I-130"]
+    },
+    {
+      "nombre": "secretsmanager-secretos",
+      "componente": "seguridad",
+      "tipo": "aws_secretsmanager_secret",
+      "criticidad": "core",
+      "etiqueta_criticidad": "core",
+      "estado_recurso": "BLOQUEADO_RFC004",
+      "suspendible": false,
+      "motivo": "RFC-004 sigue PROPUESTO: no se declara el secreto como creado ni su costo como medido.",
+      "partidas": [
+        { "sku": "SECRETS_SECRETO_MES", "cantidad": null, "base": "variable" }
+      ],
+      "dependencias": ["RFC-004"]
+    }
+  ]
+}

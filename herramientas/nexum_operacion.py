@@ -1,0 +1,824 @@
+"""Operador determinista de encendido/apagado de Nexum-Backend (spec I-120).
+
+Reglas que este programa hace cumplir:
+
+- **Nunca** habla con AWS ni con Terraform: no importa boto3 ni ``subprocess``.
+  Todo lo que produce es un *plan* local reproducible (``AWS_NOT_RUN``).
+- El *core* (2 EC2 Go, ALB, CloudFront, Redis, DynamoDB, state) es 24x7 e
+  intocable: ningun comando auxiliar puede detenerlo, escalarlo por debajo de 2,
+  eliminarlo ni destruirlo.
+- ``criticality=auxiliary`` solo se opera si figura en la allowlist revisada.
+- Un recurso sin etiqueta ``nexum:criticality`` valida, desconocido o incoherente
+  se **deniega** siempre (deny por defecto).
+- ``destroy-data``, ``destroy-state`` y ``destroy-all`` **no existen** como
+  capacidades; se rechazan con codigo 2 y sin efecto.
+- El dinero se calcula con ``Decimal`` (R-030): nunca float.
+
+Codigos de salida: 0 correcto, 1 denegado/bloqueado, 2 uso invalido o prohibido.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hmac
+import json
+import sys
+from datetime import datetime, timezone
+from decimal import Decimal, ROUND_HALF_UP
+from pathlib import Path
+from typing import Any, Iterable, Mapping, Sequence
+
+RAIZ = Path(__file__).resolve().parents[1]
+INVENTARIO_DEFECTO = RAIZ / "infra" / "terraform" / "operacion" / "inventario.json"
+CATALOGO_DEFECTO = RAIZ / "infra" / "finops" / "precios_us-east-2.json"
+
+CUATRO_DECIMALES = Decimal("0.0001")
+HORAS_MES = Decimal("730")  # 24 x 365 / 12, convencion de facturacion AWS
+HORAS_45_DIAS = Decimal("1080")
+
+CRITICIDADES_VALIDAS = ("core", "auxiliary")
+BASES_VALIDAS = ("hora", "mes", "existencia", "variable")
+
+ESTADOS_RESIDUAL = ("DECLARADO_NO_CREADO", "PRESUPUESTADO_NO_CREADO")
+ESTADOS_NO_COMPUTABLES = ("BLOQUEADO_RFC004",)
+
+ESTADOS_RUNTIME = ("OFF", "STARTING", "ON_2_HEALTHY", "DRAINING", "ERROR", "COST_REVIEW")
+
+TRANSICIONES = {
+    "OFF": ("STARTING",),
+    "STARTING": ("ON_2_HEALTHY", "DRAINING", "ERROR"),
+    "ON_2_HEALTHY": ("DRAINING", "COST_REVIEW", "ERROR"),
+    "DRAINING": ("OFF", "ERROR"),
+    "COST_REVIEW": ("ON_2_HEALTHY", "DRAINING", "ERROR"),
+    "ERROR": ("DRAINING", "STARTING"),
+}
+
+# Nombres que un operador podria teclear y que este Gate no autoriza jamas.
+COMANDOS_PROHIBIDOS = frozenset(
+    {
+        "destroy-all",
+        "destroy-all-resources",
+        "destruir-todo",
+        "destruir_todo",
+        "destruir-datos",
+        "destruir_datos",
+        "destroy-data",
+        "destruir-estado",
+        "destruir_estado",
+        "destroy-state",
+        "destroy-infra",
+        "terraform-apply",
+        "terraform-destroy",
+        "apply",
+        "destroy",
+    }
+)
+
+DESTRUIR_DATOS_MSG = (
+    "PROHIBIDO: destroy-data no existe en I-120. DynamoDB nunca se destruye por "
+    "rutina de ahorro (spec I-120 seccion 9; constitution R-035)."
+)
+DESTRUIR_ESTADO_MSG = (
+    "PROHIBIDO: destroy-state no existe en I-120. El state Terraform tiene "
+    "prevent_destroy y perderlo impide reconciliar (I-070)."
+)
+DESTRUIR_TODO_MSG = (
+    "PROHIBIDO: destroy-all no existe. Los destroys estan separados por diseno "
+    "(spec I-120 INF-120-05: destroy-runtime / destroy-data / destroy-state)."
+)
+
+
+class ErrorUso(Exception):
+    """Uso invalido o comando prohibido (codigo 2)."""
+
+
+class ErrorInventario(Exception):
+    """Inventario malformado (codigo 2). No se tolera a la baja."""
+
+
+# --------------------------------------------------------------------------- #
+# Carga y validacion
+# --------------------------------------------------------------------------- #
+
+
+def cargar_json(ruta: Path | str) -> Any:
+    return json.loads(Path(ruta).read_text(encoding="utf-8"))
+
+
+def cargar_inventario(ruta: Path | str = INVENTARIO_DEFECTO) -> dict[str, Any]:
+    datos = cargar_json(ruta)
+    if not isinstance(datos, dict) or not isinstance(datos.get("items"), list):
+        raise ErrorInventario("El inventario debe ser un objeto con lista 'items'.")
+    if not datos["items"]:
+        raise ErrorInventario(
+            "Inventario vacio: una lista vacia haria creer que no hay core que proteger."
+        )
+    return datos
+
+
+def cargar_catalogo(ruta: Path | str = CATALOGO_DEFECTO) -> dict[str, Any]:
+    datos = cargar_json(ruta)
+    if not isinstance(datos, dict) or not isinstance(datos.get("items"), dict):
+        raise ErrorInventario("El catalogo de precios debe exponer 'items'.")
+    return datos
+
+
+def _decimal(valor: Any, campo: str) -> Decimal:
+    if valor is None:
+        raise ErrorInventario(f"Cantidad nula en '{campo}'.")
+    try:
+        return Decimal(str(valor))
+    except Exception as exc:  # pragma: no cover - defensivo
+        raise ErrorInventario(f"Cantidad no decimal en '{campo}': {exc}") from exc
+
+
+def validar_item(item: Mapping[str, Any]) -> None:
+    obligatorios = (
+        "nombre",
+        "componente",
+        "tipo",
+        "criticidad",
+        "etiqueta_criticidad",
+        "estado_recurso",
+        "suspendible",
+    )
+    for campo in obligatorios:
+        if campo not in item:
+            raise ErrorInventario(f"Item sin campo obligatorio '{campo}': {item!r}")
+    if item["criticidad"] not in CRITICIDADES_VALIDAS:
+        raise ErrorInventario(
+            f"criticality invalida en '{item['nombre']}': {item['criticidad']!r}. "
+            "Solo se admite core o auxiliary; cualquier otro valor se deniega."
+        )
+    if not isinstance(item["suspendible"], bool):
+        raise ErrorInventario(f"'suspendible' debe ser booleano en '{item['nombre']}'.")
+    for partida in item.get("partidas", []) or []:
+        if partida.get("base") not in BASES_VALIDAS:
+            raise ErrorInventario(
+                f"Base de partida invalida en '{item['nombre']}': {partida.get('base')!r}"
+            )
+        if "sku" not in partida:
+            raise ErrorInventario(f"Partida sin sku en '{item['nombre']}'.")
+
+
+def validar_inventario(inventario: Mapping[str, Any]) -> None:
+    vistos: set[str] = set()
+    for item in inventario["items"]:
+        validar_item(item)
+        nombre = item["nombre"]
+        if nombre in vistos:
+            raise ErrorInventario(f"Recurso duplicado en el inventario: {nombre}")
+        vistos.add(nombre)
+
+
+# --------------------------------------------------------------------------- #
+# Clasificacion (deny por defecto)
+# --------------------------------------------------------------------------- #
+
+
+def clasificar(
+    inventario: Mapping[str, Any], allowlist: Iterable[str] | None = None
+) -> dict[str, Any]:
+    """Devuelve core, auxiliares, suspendibles y denegados con su motivo."""
+    permitidos = set(allowlist or ())
+    core: list[str] = []
+    auxiliares: list[str] = []
+    suspendibles: list[str] = []
+    denegados: dict[str, str] = {}
+
+    for item in inventario["items"]:
+        nombre = item["nombre"]
+        if item["etiqueta_criticidad"] != item["criticidad"]:
+            denegados[nombre] = "etiqueta_criticidad no coincide con criticidad"
+            continue
+        if item["criticidad"] == "core":
+            if item["suspendible"]:
+                denegados[nombre] = "recurso core marcado como suspendible"
+                continue
+            core.append(nombre)
+            continue
+        auxiliares.append(nombre)
+        if not item["suspendible"]:
+            denegados[nombre] = "auxiliar no suspendible: clasificacion incoherente"
+            continue
+        if permitidos and nombre not in permitidos:
+            denegados[nombre] = "auxiliar fuera de la allowlist revisada"
+            continue
+        suspendibles.append(nombre)
+
+    return {
+        "core": sorted(core),
+        "auxiliares": sorted(auxiliares),
+        "suspendibles": sorted(suspendibles),
+        "denegados": {k: denegados[k] for k in sorted(denegados)},
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Coste exacto (Decimal, R-030)
+# --------------------------------------------------------------------------- #
+
+
+def precio_sku(catalogo: Mapping[str, Any], sku: str) -> Decimal:
+    items = catalogo["items"]
+    if sku not in items:
+        raise ErrorInventario(f"SKU desconocido en el catalogo de precios: {sku}")
+    bruto = items[sku].get("precio_usd")
+    if bruto is None:
+        raise ErrorInventario(
+            f"SKU sin precio verificado: {sku}. No se admite inferir un precio."
+        )
+    return Decimal(str(bruto))
+
+
+def costo_horario_item(item: Mapping[str, Any], catalogo: Mapping[str, Any]) -> Decimal:
+    """Coste por hora de un item. 'existencia' y 'variable' no aportan coste fijo."""
+    total = Decimal("0")
+    for partida in item.get("partidas", []) or []:
+        base = partida.get("base")
+        if base in ("existencia", "variable") or partida.get("cantidad") is None:
+            continue
+        precio = precio_sku(catalogo, partida["sku"])
+        cantidad = _decimal(partida["cantidad"], f"{item['nombre']}.{partida['sku']}")
+        importe = precio * cantidad
+        total += importe if base == "hora" else importe / HORAS_MES
+    return total
+
+
+def residual(
+    inventario: Mapping[str, Any], catalogo: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Coste que persiste por existencia (no depende del trafico).
+
+    Se separa lo que el codigo declara (``DECLARADO_NO_CREADO``) de lo que solo
+    esta presupuestado en I-000 (``PRESUPUESTADO_NO_CREADO``) y de lo bloqueado
+    (``BLOQUEADO_RFC004``), que no se suma.
+    """
+    residente = Decimal("0")
+    presupuestado = Decimal("0")
+    no_computable: dict[str, str] = {}
+    variable: list[str] = []
+    detalle: dict[str, str] = {}
+
+    for item in inventario["items"]:
+        if item["criticidad"] != "core":
+            continue
+        estado = item["estado_recurso"]
+        if estado in ESTADOS_NO_COMPUTABLES:
+            no_computable[item["nombre"]] = estado
+            continue
+        if estado not in ESTADOS_RESIDUAL:
+            no_computable[item["nombre"]] = f"estado no reconocido: {estado}"
+            continue
+        if any((p.get("base") == "variable") for p in item.get("partidas", []) or []):
+            variable.append(item["nombre"])
+        coste = costo_horario_item(item, catalogo)
+        detalle[item["nombre"]] = str(cuantizar(coste))
+        if estado == "DECLARADO_NO_CREADO":
+            residente += coste
+        else:
+            presupuestado += coste
+
+    total_hora = residente + presupuestado
+    return {
+        "por_recurso_hora_usd": {k: detalle[k] for k in sorted(detalle)},
+        "residente_hora_usd": str(cuantizar(residente)),
+        "presupuestado_hora_usd": str(cuantizar(presupuestado)),
+        "total_hora_usd": str(cuantizar(total_hora)),
+        "residente_45d_usd": str(cuantizar(residente * HORAS_45_DIAS)),
+        "presupuestado_45d_usd": str(cuantizar(presupuestado * HORAS_45_DIAS)),
+        "total_45d_usd": str(cuantizar(total_hora * HORAS_45_DIAS)),
+        "no_computable": {k: no_computable[k] for k in sorted(no_computable)},
+        "componentes_variables": sorted(variable),
+        "moneda": "USD",
+        "horas_mes": str(HORAS_MES),
+        "advertencia": (
+            "Solo coste fijo por existencia. Las partidas variables (RRU/WRU, "
+            "ingesta, egreso CloudFront, solicitudes S3, interferencia Redis) y "
+            "las reservas de I-000 NO se incluyen ni se declaran cero."
+        ),
+    }
+
+
+def cuantizar(valor: Decimal) -> Decimal:
+    return valor.quantize(CUATRO_DECIMALES, rounding=ROUND_HALF_UP)
+
+
+def ahorro_auxiliares(
+    inventario: Mapping[str, Any], catalogo: Mapping[str, Any], nombres: Sequence[str]
+) -> dict[str, str]:
+    total = Decimal("0")
+    detalle: dict[str, str] = {}
+    por_nombre = {item["nombre"]: item for item in inventario["items"]}
+    for nombre in nombres:
+        item = por_nombre.get(nombre)
+        if item is None:
+            raise ErrorInventario(f"Recurso inexistente en el inventario: {nombre}")
+        coste = costo_horario_item(item, catalogo)
+        detalle[nombre] = str(cuantizar(coste))
+        total += coste
+    return {
+        "por_recurso_hora_usd": {k: detalle[k] for k in sorted(detalle)},
+        "total_hora_usd": str(cuantizar(total)),
+        "total_45d_usd": str(cuantizar(total * HORAS_45_DIAS)),
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Maquina de estados
+# --------------------------------------------------------------------------- #
+
+
+def transicion(
+    desde: str,
+    hacia: str,
+    actor: str | None,
+    runbook: str | None,
+    ahora: str | None = None,
+) -> dict[str, Any]:
+    if desde not in ESTADOS_RUNTIME:
+        raise ErrorUso(f"Estado de origen desconocido: {desde!r}")
+    if hacia not in ESTADOS_RUNTIME:
+        raise ErrorUso(f"Estado de destino desconocido: {hacia!r}")
+    if desde == hacia:
+        return {
+            "permitida": True,
+            "idempotente": True,
+            "desde": desde,
+            "hacia": hacia,
+            "actor": actor,
+            "runbook": runbook,
+        }
+    if hacia not in TRANSICIONES[desde]:
+        raise ErrorUso(
+            f"Transicion no permitida: {desde} -> {hacia}. "
+            f"Desde {desde} solo se admite {', '.join(TRANSICIONES[desde])}."
+        )
+    if not actor:
+        raise ErrorUso("Toda transicion exige --actor identificable.")
+    if not runbook:
+        raise ErrorUso("Toda transicion exige --runbook (procedimiento aplicado).")
+    marca = ahora or datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return {
+        "permitida": True,
+        "idempotente": False,
+        "desde": desde,
+        "hacia": hacia,
+        "actor": actor,
+        "runbook": runbook,
+        "timestamp_utc": marca,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Aprobaciones y umbrales
+# --------------------------------------------------------------------------- #
+
+
+def exigir_aprobacion(token: str | None, esperado: str) -> None:
+    if not token:
+        raise ErrorUso(
+            f"Falta aprobacion humana explicita. Se esperaba la frase exacta: {esperado}"
+        )
+    if not hmac.compare_digest(token.strip(), esperado):
+        raise ErrorUso(
+            "Aprobacion invalida: la frase no coincide exactamente con "
+            f"{esperado} (distingue mayusculas y entorno)."
+        )
+
+
+def evaluar_creditos(
+    creditos: str | Decimal | None, umbrales: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Aplica los umbrales de I-120 seccion 10. Sin dato no se asume nada."""
+    if creditos is None:
+        return {
+            "estado": "BLOQUEADO",
+            "motivo": "Creditos no verificados (AWS_NOT_RUN): no se asume saldo ni se declara cero.",
+            "umbrales": dict(umbrales),
+        }
+    valor = Decimal(str(creditos))
+    aviso = Decimal(str(umbrales.get("aviso", "45")))
+    bloqueo = Decimal(str(umbrales.get("bloqueo_auxiliares", "35")))
+    critico = Decimal(str(umbrales.get("incidente_critico", "20")))
+    if valor < critico:
+        estado, motivo = "INCIDENTE_CRITICO", "Saldo por debajo del umbral critico: escalar al responsable."
+    elif valor < bloqueo:
+        estado, motivo = "BLOQUEADO", "Saldo por debajo del umbral de bloqueo de auxiliares."
+    elif valor < aviso:
+        estado, motivo = "AVISO", "Saldo por debajo del umbral de aviso; mantener ventanas al minimo."
+    else:
+        estado, motivo = "OK", "Saldo por encima del umbral de aviso."
+    return {
+        "estado": estado,
+        "motivo": motivo,
+        "creditos_usd": str(cuantizar(valor)),
+        "umbrales": dict(umbrales),
+        "advertencia": "Los umbrales generan alertas, no cortes automaticos, y no autorizan plan Paid.",
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Planes por comando
+# --------------------------------------------------------------------------- #
+
+
+def _titulo(texto: str) -> dict[str, str]:
+    return {"mensaje": texto}
+
+
+def plan_estado(
+    inventario: Mapping[str, Any],
+    catalogo: Mapping[str, Any],
+    allowlist: Sequence[str],
+    observado: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    clasif = clasificar(inventario, allowlist)
+    estado = (observado or {}).get("estado", "DESCONOCIDO")
+    return {
+        "comando": "estado",
+        "estado_runtime": estado,
+        "estado_origen": "observado" if observado else "DESCONOCIDO (sin evidencia AWS)",
+        "clasificacion": clasif,
+        "residual": residual(inventario, catalogo),
+        "dos_nodos": _dos_nodos(
+            (observado or {}).get("targets_sanos"),
+            (observado or {}).get("minimo_instancias", 2),
+        ),
+        "advertencia": "Estado leido de un archivo observado; este Gate no consulta AWS.",
+    }
+
+
+def _dos_nodos(targets: Any, minimo: int = 2) -> dict[str, Any]:
+    sano = False
+    cantidad = None
+    if targets is not None:
+        try:
+            cantidad = int(targets)
+        except (TypeError, ValueError):
+            raise ErrorUso(f"targets_sanos invalido: {targets!r}")
+        sano = cantidad >= int(minimo)
+    return {
+        "targets_sanos": cantidad,
+        "minimo_requerido": int(minimo),
+        "cumple_doble_instancia": sano,
+        "publicable": sano,
+        "motivo": (
+            "2 o mas targets sanos"
+            if sano
+            else "No se puede publicar el servicio: 1 nodo no es doble instancia (GOV-02)."
+        ),
+    }
+
+
+def plan_encender(
+    inventario: Mapping[str, Any],
+    catalogo: Mapping[str, Any],
+    allowlist: Sequence[str],
+    observado: Mapping[str, Any] | None,
+    aprobacion: str | None,
+    entorno: str,
+    actor: str | None,
+    runbook: str | None,
+    ahora: str | None,
+) -> dict[str, Any]:
+    exigir_aprobacion(aprobacion, f"APRUEBO_ENCENDER_{entorno.upper()}")
+    obs = observado or {}
+    desde = obs.get("estado", "OFF")
+    dos = _dos_nodos(obs.get("targets_sanos"), 2)
+    hacia = "ON_2_HEALTHY" if dos["cumple_doble_instancia"] else "STARTING"
+    registro = transicion(desde, hacia, actor, runbook, ahora)
+    return {
+        "comando": "encender",
+        "transicion": registro,
+        "dos_nodos": dos,
+        "acciones": [
+            "verificar plan Free, creditos y cuota antes de publicar",
+            "desiredCapacity=2 (min=desired=max)",
+            "comprobar 2 targets sanos en /api/v1/health/live y readiness segun Gate",
+            "no exponer la URL publica hasta ON_2_HEALTHY",
+        ],
+        "residual": residual(inventario, catalogo),
+        "ejecutado_en_aws": False,
+        "advertencia": "Plan local. Terraform apply/AWS exige Gate independiente (AWS_NOT_RUN).",
+    }
+
+
+def plan_suspender_aux(
+    inventario: Mapping[str, Any],
+    catalogo: Mapping[str, Any],
+    allowlist: Sequence[str],
+    aprobacion: str | None,
+    entorno: str,
+    seleccion: Sequence[str] | None,
+    actor: str | None,
+    runbook: str | None,
+    observado: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    exigir_aprobacion(aprobacion, f"APRUEBO_SUSPENDER_AUX_{entorno.upper()}")
+    clasif = clasificar(inventario, allowlist)
+    objetivo = sorted(set(seleccion or clasif["suspendibles"]))
+    if not objetivo:
+        raise ErrorUso(
+            "No hay recursos auxiliares autorizados: revisar allowlist antes de suspender."
+        )
+    intrusos = [n for n in objetivo if n not in clasif["suspendibles"]]
+    if intrusos:
+        raise ErrorUso(
+            "Se intento suspender recursos no autorizados: "
+            + ", ".join(sorted(intrusos))
+            + ". El core, los desconocidos y los no etiquetados se deniegan siempre."
+        )
+    suspendidos_observados = set((observado or {}).get("recursos_suspendidos", []) or [])
+    core_tocado = sorted(suspendidos_observados & set(clasif["core"]))
+    if core_tocado:
+        raise ErrorUso(
+            "El core figura suspendido en el estado observado: "
+            + ", ".join(core_tocado)
+            + ". Es un incidente, no un ahorro."
+        )
+    return {
+        "comando": "suspender-aux",
+        "objetivo": objetivo,
+        "ahorro": ahorro_auxiliares(inventario, catalogo, objetivo),
+        "residual_tras_suspender": residual(inventario, catalogo),
+        "no_tocado": clasif["core"],
+        "denegados": clasif["denegados"],
+        "actor": actor,
+        "runbook": runbook,
+        "ejecutado_en_aws": False,
+    }
+
+
+def plan_reanudar_aux(
+    inventario: Mapping[str, Any],
+    catalogo: Mapping[str, Any],
+    allowlist: Sequence[str],
+    aprobacion: str | None,
+    entorno: str,
+    creditos: str | None,
+    actor: str | None,
+    runbook: str | None,
+) -> dict[str, Any]:
+    exigir_aprobacion(aprobacion, f"APRUEBO_REANUDAR_AUX_{entorno.upper()}")
+    clasif = clasificar(inventario, allowlist)
+    umbrales = inventario.get("umbrales_credito_usd", {})
+    evaluacion = evaluar_creditos(creditos, umbrales)
+    bloqueado = evaluacion["estado"] in ("BLOQUEADO", "INCIDENTE_CRITICO")
+    return {
+        "comando": "reanudar-aux",
+        "objetivo": clasif["suspendibles"],
+        "creditos": evaluacion,
+        "estado": "BLOQUEADO" if bloqueado else "PLANIFICADO",
+        "acciones": [
+            "terraform plan contra el state remoto preservado (I-070)",
+            "verificar prerrequisitos, cuota y creditos",
+            "aplicar de forma idempotente tras aprobacion por ambiente",
+            "pruebas funcionales sin regenerar secretos ni sustituir datos",
+        ],
+        "actor": actor,
+        "runbook": runbook,
+        "ejecutado_en_aws": False,
+    }
+
+
+def plan_reconciliar(
+    inventario: Mapping[str, Any],
+    catalogo: Mapping[str, Any],
+    allowlist: Sequence[str],
+    observado: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    clasif = clasificar(inventario, allowlist)
+    if observado is None:
+        return {
+            "comando": "reconciliar",
+            "estado": "BLOQUEADO",
+            "motivo": "Sin inventario observado no se declara convergencia ni se asume estado.",
+            "residual": residual(inventario, catalogo),
+        }
+    presentes = set(observado.get("recursos_presentes", []) or [])
+    ausentes_core = sorted(set(clasif["core"]) - presentes)
+    sobrantes = sorted(presentes - set(clasif["core"]) - set(clasif["suspendibles"]))
+    drift = bool(ausentes_core or sobrantes)
+    return {
+        "comando": "reconciliar",
+        "estado": "DRIFT" if drift else "CONVERGENTE",
+        "core_ausente": ausentes_core,
+        "no_declarados_presentes": sobrantes,
+        "dos_nodos": _dos_nodos(observado.get("targets_sanos"), 2),
+        "acciones_sugeridas": [
+            "revisar el plan de Terraform, no aplicar a ciegas",
+            "no recrear recursos core ausentes sin diagnostico previo",
+        ]
+        if drift
+        else [],
+        "ejecutado_en_aws": False,
+    }
+
+
+def plan_rollback(
+    inventario: Mapping[str, Any],
+    catalogo: Mapping[str, Any],
+    allowlist: Sequence[str],
+    snapshot: Mapping[str, Any] | None,
+    actor: str | None,
+    runbook: str | None,
+) -> dict[str, Any]:
+    if snapshot is None:
+        raise ErrorUso("Rollback exige --snapshot con el estado deseado anterior.")
+    if not actor or not runbook:
+        raise ErrorUso("Rollback exige --actor y --runbook.")
+    for prohibido in ("destroy_datos", "destroy_estado", "destroy_all"):
+        if snapshot.get(prohibido):
+            raise ErrorUso(
+                f"El snapshot solicita '{prohibido}': el rollback nunca destruye datos ni estado."
+            )
+    clasif = clasificar(inventario, allowlist)
+    deseados = set(snapshot.get("recursos_deseados", []) or [])
+    no_autorizados = sorted(deseados - set(clasif["core"]) - set(clasif["suspendibles"]))
+    if no_autorizados:
+        raise ErrorUso(
+            "El snapshot incluye recursos no autorizados: " + ", ".join(no_autorizados)
+        )
+    return {
+        "comando": "rollback",
+        "estado_anterior": snapshot.get("estado", "DESCONOCIDO"),
+        "recursos_deseados": sorted(deseados) or sorted(clasif["core"]),
+        "core_protegido": clasif["core"],
+        "actor": actor,
+        "runbook": runbook,
+        "datos_destruidos": False,
+        "estado_destruido": False,
+        "ejecutado_en_aws": False,
+    }
+
+
+def plan_destruir_aux(
+    inventario: Mapping[str, Any],
+    catalogo: Mapping[str, Any],
+    allowlist: Sequence[str],
+    aprobacion: str | None,
+    entorno: str,
+    seleccion: Sequence[str] | None,
+    actor: str | None,
+    runbook: str | None,
+) -> dict[str, Any]:
+    exigir_aprobacion(aprobacion, f"APRUEBO_DESTRUIR_AUX_{entorno.upper()}")
+    clasif = clasificar(inventario, allowlist)
+    objetivo = sorted(set(seleccion or clasif["suspendibles"]))
+    intrusos = [n for n in objetivo if n not in clasif["suspendibles"]]
+    if intrusos:
+        raise ErrorUso(
+            "destroy-runtime solo alcanza auxiliares en allowlist; se intento: "
+            + ", ".join(sorted(intrusos))
+        )
+    return {
+        "comando": "destruir-aux",
+        "objetivo": objetivo,
+        "ahorro": ahorro_auxiliares(inventario, catalogo, objetivo),
+        "residual_tras_destruir": residual(inventario, catalogo),
+        "core_intacto": clasif["core"],
+        "datos_destruidos": False,
+        "estado_destruido": False,
+        "actor": actor,
+        "runbook": runbook,
+        "ejecutado_en_aws": False,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# CLI
+# --------------------------------------------------------------------------- #
+
+
+def construir_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="nexum_operacion.py",
+        description="Operador local y determinista de encendido/apagado (I-120). Nunca ejecuta AWS.",
+    )
+    parser.add_argument("comando", help="estado | plan | encender | suspender-aux | reanudar-aux | reconciliar | rollback | destruir-aux")
+    parser.add_argument("--inventario", default=str(INVENTARIO_DEFECTO))
+    parser.add_argument("--catalogo", default=str(CATALOGO_DEFECTO))
+    parser.add_argument("--entorno", default="h08i")
+    parser.add_argument("--allowlist", default=None, help="Lista separada por comas; por defecto la del inventario auxiliar")
+    parser.add_argument("--observado", default=None, help="JSON con el estado observado (nunca se consulta AWS)")
+    parser.add_argument("--snapshot", default=None, help="JSON con el estado deseado anterior para rollback")
+    parser.add_argument("--seleccion", default=None, help="Subconjunto de auxiliares separado por comas")
+    parser.add_argument("--aprobacion", default=None)
+    parser.add_argument("--creditos", default=None, help="Creditos declarados en USD (evidencia externa)")
+    parser.add_argument("--actor", default=None)
+    parser.add_argument("--runbook", default=None)
+    parser.add_argument("--ahora", default=None, help="Marca ISO-8601 para pruebas deterministas")
+    parser.add_argument("--json", action="store_true", dest="salida_json")
+    parser.add_argument("--salida", default=None, help="Ruta opcional donde escribir el plan JSON")
+    return parser
+
+
+def _lista(valor: str | None) -> list[str]:
+    if not valor:
+        return []
+    return [parte.strip() for parte in valor.split(",") if parte.strip()]
+
+
+def _leer_opcional(ruta: str | None) -> Any:
+    return cargar_json(ruta) if ruta else None
+
+
+def ejecutar(argv: Sequence[str] | None = None) -> tuple[int, dict[str, Any]]:
+    parser = construir_parser()
+    args = parser.parse_args(list(argv) if argv is not None else None)
+
+    comando = args.comando.strip().lower()
+    if comando in COMANDOS_PROHIBIDOS:
+        if comando in ("destruir-datos", "destruir_datos", "destroy-data"):
+            raise ErrorUso(DESTRUIR_DATOS_MSG)
+        if comando in ("destruir-estado", "destruir_estado", "destroy-state"):
+            raise ErrorUso(DESTRUIR_ESTADO_MSG)
+        raise ErrorUso(DESTRUIR_TODO_MSG)
+
+    inventario = cargar_inventario(args.inventario)
+    validar_inventario(inventario)
+    catalogo = cargar_catalogo(args.catalogo)
+
+    allowlist = _lista(args.allowlist)
+    if not allowlist:
+        allowlist = [item["nombre"] for item in inventario["items"] if item["criticidad"] == "auxiliary"]
+
+    observado = _leer_opcional(args.observado)
+    snapshot = _leer_opcional(args.snapshot)
+    seleccion = _lista(args.seleccion) or None
+
+    if comando == "estado":
+        resultado = plan_estado(inventario, catalogo, allowlist, observado)
+    elif comando == "plan":
+        resultado = plan_encender(
+            inventario, catalogo, allowlist, observado, args.aprobacion, args.entorno,
+            args.actor, args.runbook, args.ahora,
+        )
+    elif comando == "encender":
+        resultado = plan_encender(
+            inventario, catalogo, allowlist, observado, args.aprobacion, args.entorno,
+            args.actor, args.runbook, args.ahora,
+        )
+    elif comando == "suspender-aux":
+        resultado = plan_suspender_aux(
+            inventario, catalogo, allowlist, args.aprobacion, args.entorno,
+            seleccion, args.actor, args.runbook, observado,
+        )
+    elif comando == "reanudar-aux":
+        resultado = plan_reanudar_aux(
+            inventario, catalogo, allowlist, args.aprobacion, args.entorno,
+            args.creditos, args.actor, args.runbook,
+        )
+    elif comando == "reconciliar":
+        resultado = plan_reconciliar(inventario, catalogo, allowlist, observado)
+    elif comando == "rollback":
+        resultado = plan_rollback(
+            inventario, catalogo, allowlist, snapshot, args.actor, args.runbook
+        )
+    elif comando == "destruir-aux":
+        resultado = plan_destruir_aux(
+            inventario, catalogo, allowlist, args.aprobacion, args.entorno,
+            seleccion, args.actor, args.runbook,
+        )
+    else:
+        raise ErrorUso(
+            f"Comando desconocido: {comando!r}. Solo existen: estado, plan, encender, "
+            "suspender-aux, reanudar-aux, reconciliar, rollback, destruir-aux."
+        )
+
+    resultado["entorno"] = args.entorno
+    resultado["generado_utc"] = args.ahora or datetime.now(timezone.utc).isoformat(timespec="seconds")
+    resultado["aws_consultado"] = False
+    resultado["terraform_ejecutado"] = False
+
+    codigo = 0
+    if resultado.get("estado") == "BLOQUEADO":
+        codigo = 1
+    if args.salida:
+        Path(args.salida).write_text(
+            json.dumps(resultado, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    return codigo, resultado
+
+
+def imprimir(resultado: Mapping[str, Any]) -> None:
+    print(json.dumps(resultado, ensure_ascii=False, indent=2, sort_keys=True))
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    try:
+        codigo, resultado = ejecutar(argv)
+    except ErrorUso as exc:
+        print(f"DENEGADO: {exc}", file=sys.stderr)
+        return 2
+    except ErrorInventario as exc:
+        print(f"INVENTARIO_INVALIDO: {exc}", file=sys.stderr)
+        return 2
+    imprimir(resultado)
+    return codigo
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

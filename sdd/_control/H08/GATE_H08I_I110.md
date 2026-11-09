@@ -72,3 +72,17 @@ SDD y SHA-256.
 
 Merge requiere autorización humana ligada a PR y HEAD exactos. No se declara `AWS_DEPLOYED`,
 `OBSERVABILITY_VERIFIED` ni `PRODUCTION_READY`. I-120 no se inicia sin su Gate.
+
+## 6. Registro de integración — 2026-11-09
+
+- `APRUEBO_MERGE_PR_31_SHA_c8f1049bdbcdc88ea51aa1fd07ada3b5ca8a940b` concedido por el responsable;
+  HEAD verificado por igualdad exacta y `--match-head-commit` antes de fusionar.
+- **PR #31 `MERGED`** (`2026-11-09T01:40:17Z`), merge commit y `main` = **`071478a1d23ff2da44bb7b7ee94d9fc98c686fa9`**;
+  `git pull --ff-only` dejó `main` local igual a `origin/main`.
+- CI pre-merge: 7/7 PASS (runs 42545254647 y 42545254656) sobre el HEAD autorizado.
+- CI post-merge en `main`: **SDD documental `success`** (run 42546793045) y **Go Backend CI `success`**
+  (run 42546793065, seis jobs en verde).
+- Estado: **INTEGRADO_MAIN — NO DESPLEGADO**. `AWS_NOT_RUN`, `LOG_PIPELINE_AWS_VERIFIED = NOT_RUN`,
+  `ALERT_DELIVERY = BLOCKED_RFC007_SNS_KMS`, `DAST_NOT_RUN`. Defectos `D-100-01`, `D-100-02` y `D-110-01`
+  permanecen abiertos; RFC-004, H-01 y RFC-006 no cambian.
+- Este registro es documental: no se tocó Terraform, Go, OpenAPI ni workflows tras el merge.

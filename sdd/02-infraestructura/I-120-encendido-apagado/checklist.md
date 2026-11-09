@@ -46,3 +46,18 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+## Verificacion de implementacion local (2026-11-09)
+
+- [x] Modulo Terraform de guardas sin recursos AWS (`infra/terraform/modules/operacion`).
+- [x] Inventario declarativo unico leido por Terraform y por el operador.
+- [x] Allowlist auxiliar explicita y separada del inventario.
+- [x] Deny por defecto ante recurso sin etiqueta, desconocido o incoherente.
+- [x] Core marcado como suspendible falla el plan y se deniega en el operador.
+- [x] `destroy-data`, `destroy-state` y `destroy-all` rechazados por diseno.
+- [x] Doble instancia exigida para publicar (`targets_sanos >= 2`).
+- [x] Residual calculado con `Decimal`, separado en residente/presupuestado/variable/bloqueado.
+- [x] Umbrales 45/35/20 aplicados; sin saldo verificado se declara BLOQUEADO.
+- [x] 54 pruebas del operador, 27 de contrato Terraform y 7 de alineacion FinOps.
+- [ ] Ejecucion real OFF/ON con inventario y facturacion: `NOT_RUN` (requiere Gate de despliegue).
+- [ ] Backups de DynamoDB: bloqueados por I-130 `NOT_AUTHORIZED`.

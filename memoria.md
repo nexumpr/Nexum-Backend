@@ -525,3 +525,24 @@
 - I-110 ampliacion (2026-11-08): RequestLogger en HTTPServer (campos canonicos, ruta {id}), /metrics loopback con counters/latencia/runtime, 4 metric filters y 8 alarmas (A6 429, A7 Redis, A8 DynamoDB), cableadas desde I-040/I-050. Pipeline de logs LOG_PIPELINE_IMPLEMENTED_LOCAL / AWS_VERIFIED NOT_RUN (I-010 endpoint + I-060 permisos; falta agente I-020). D-110-01 (A-090 headers sin hex/flags/limite). Coste +0.5000 USD/mes no medido; AWS_COST_REAL/CREDITS/SCP NOT_VERIFIED.
 
 - I-110 correccion final (2026-11-08): ALB suffix app/... (sin loadbalancer/) validado por terraform test en CI; Logs Insights pct(); rutas desconocidas -> /unknown y max 500 series con dropped; AWS Budgets email directo sin SNS (emails_presupuesto vacio); ALERT_DELIVERY sigue BLOCKED_RFC007_SNS_KMS. D-110-01 abierto.
+
+### I-110: cierre post-merge (2026-11-09)
+
+- **PR #31 MERGED** (merge `071478a1d23ff2da44bb7b7ee94d9fc98c686fa9`), HEAD autorizado `c8f1049bdbcdc88ea51aa1fd07ada3b5ca8a940b` verificado con `--match-head-commit`. `main` local = `origin/main` por fast-forward.
+- CI del PR 7/7 PASS (runs 42545254647 y 42545254656); CI de `main`: SDD documental run 42546793045 SUCCESS y Go Backend CI run 42546793065 SUCCESS (seis jobs).
+- Estado: **INTEGRADO_MAIN - NO DESPLEGADO**. `AWS_NOT_RUN`; `LOG_PIPELINE_AWS_VERIFIED = NOT_RUN` (agente CloudWatch depende de I-020); `ALERT_DELIVERY = BLOCKED_RFC007_SNS_KMS`; `DAST_NOT_RUN`.
+- Correcciones integradas: dimensiones ALB `app/<nombre>/<id>` y TargetGroup `targetgroup/...` evaluadas por `terraform test`; Logs Insights con `pct()`; rutas no registradas -> `/unknown` y 500 series maximo con `nexum_metrics_series_dropped_total`; AWS Budgets con email directo sin SNS (`emails_presupuesto` vacio).
+- Defectos abiertos sin cambios: `D-100-01`, `D-100-02`, `D-110-01`. RFC-004, H-01 (TLSv1), RFC-006 y `AWS_SCP_NOT_VERIFIED` intactos. readiness 503 por diseno.
+- Registro documental; no se modifico Terraform, Go, OpenAPI ni workflows tras el merge. I-120 sigue `NOT_AUTHORIZED` hasta `APRUEBO_GATE_I120_LOCAL`.
+
+### I-120: encendido/apagado implementado en local (2026-11-09)
+
+- Gate `APRUEBO_GATE_I120_LOCAL` registrado en `sdd/_control/H08/GATE_H08I_I120.md`; rama `feat/h08i-i120-operacion` desde `main` `071478a1` (incluye el cierre documental de I-110). `AWS_NOT_RUN`, `INFRA_NOT_DEPLOYED`.
+- Modulo `infra/terraform/modules/operacion`: solo guardas (`terraform_data`), sin recursos AWS; 5 preconditions (denegados, core suspendible, allowlist desconocida, componentes core faltantes, destroys en false) y validaciones permanentes de `destroy_datos`/`destroy_estado`/`max_denegados`.
+- Inventario unico `infra/terraform/operacion/inventario.json` (16 recursos) leido por `envs/h08i/operacion.tf` con `jsondecode(file(...))` y por el operador. Allowlist auxiliar explicita en el entorno, no derivada del JSON.
+- `herramientas/nexum_operacion.py`: 8 comandos (`estado`, `plan`, `encender`, `suspender-aux`, `reanudar-aux`, `reconciliar`, `rollback`, `destruir-aux`), codigos 0/1/2, aprobaciones exactas por entorno, sin SDK de AWS ni procesos externos; todo plan declara `aws_consultado=false`.
+- Prohibiciones efectivas: `destroy-data`, `destroy-state`, `destroy-all` y alias rechazados con mensaje especifico; el core no se puede suspender ni destruir ni aunque se pida por nombre; core suspendido observado se trata como incidente.
+- Residual: 0.0902 USD/h; 96.9973 residente + 0.4438 presupuestado = 97.4412 USD/45 d; auxiliares 0.0600 USD/h (64.8000/45 d si estuvieran siempre activos, frente a 1.4400 por ventana de 24 h de I-000). `secretsmanager` no computable (`BLOQUEADO_RFC004`); partidas variables excluidas y no declaradas cero.
+- Documentos: `MAQUINA_ESTADOS_RUNTIME.md`, `RUNBOOK_START_STOP.md`, `INVENTARIO_RESIDUAL.md`.
+- Pruebas: 54 operador + 27 contrato Terraform + 7 alineacion FinOps; `fmt`/`init -backend=false`/`validate` PASS; Trivy PASS.
+- Sin recursos AWS, sin `terraform plan/apply/destroy`, sin Cost Explorer. Bloqueos vigentes: I-130 (backups), RFC-004, H-01, RFC-007, `AWS_SCP_NOT_VERIFIED`, readiness 503, D-100-01/02, D-110-01.

@@ -78,3 +78,16 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+## Implementacion H08-I (2026-11-09) — LOCAL, sin AWS
+
+Gate `APRUEBO_GATE_I120_LOCAL`. Rama `feat/h08i-i120-operacion`. Nada se despliega: `AWS_NOT_RUN`.
+
+- **T-120-01 (Estados):** IMPLEMENTADO_LOCAL. Seis estados en `MAQUINA_ESTADOS_RUNTIME.md` y en el operador; transiciones con actor, runbook y timestamp; `OFF -> ON_2_HEALTHY` prohibida. Evidencia: `tests/infra/operacion` (54 OK).
+- **T-120-02 (Encender):** IMPLEMENTADO_LOCAL. `encender` exige aprobacion exacta `APRUEBO_ENCENDER_<ENTORNO>`, actor y runbook; no alcanza `ON_2_HEALTHY` sin 2 targets sanos. Ejecucion real: NOT_RUN.
+- **T-120-03 (Apagar):** IMPLEMENTADO_LOCAL. Core intocable 24x7 (spec seccion 9); solo auxiliares en allowlist. Residual enumerado en `INVENTARIO_RESIDUAL.md` (0.0902 USD/h; 97.4412 USD/45 d), con partidas variables y bloqueadas excluidas explicitamente.
+- **T-120-04 (DNS/ALB):** IMPLEMENTADO_LOCAL como decision: ALB no se apaga (no existe API Stop). Sin cambios de DNS ni de I-030.
+- **T-120-05 (Seguridad):** IMPLEMENTADO_LOCAL. `destroy-data`, `destroy-state` y `destroy-all` no existen: comandos rechazados (codigo 2) y variables con validacion permanente en `false`. Deny por defecto en inventario, modulo y operador.
+- **T-120-06 (Prueba):** PENDIENTE_AWS. La prueba OFF/ON con inventario y facturacion reales requiere Gate de despliegue; hoy `AWS_NOT_RUN` y `AWS_COST_REAL = NOT_VERIFIED`.
+- **T-120-90 (Riesgos):** R01 (apagado incompleto) mitigado por politica core + residual documentado; R02 (destroy de datos) mitigado por capacidad inexistente; R03 (gasto con runtime OFF) mitigado por residual enumerado. Los tres quedan CONDICIONADOS a verificacion real.
+- **T-120-99 (Ratificacion):** REVIEW pendiente; merge requiere autorizacion humana ligada a PR + HEAD.
