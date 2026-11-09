@@ -257,6 +257,9 @@ jobs:
       - name: Evidencia de drills I-140 (Python)
         run: python3 -m unittest herramientas.tests.test_cd_helpers.DecisionRollback -v
 
+      - name: Dependencias de herramientas (fijadas)
+        run: python3 -m pip install --disable-pip-version-check -r herramientas/requirements.txt
+
       - name: Pruebas de contrato Terraform e IaC
         run: python3 -m unittest discover -s tests/infra/terraform
 
@@ -269,18 +272,37 @@ jobs:
       - name: Controles de respaldo y restauracion I-130
         run: python3 -m unittest discover -s tests/infra/respaldo
 
+      - name: Contratos de publicacion y compatibilidad I-150
+        run: python3 -m unittest discover -s tests/infra/publicacion
+
   contratos:
     name: Contratos OpenAPI y herramientas
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout
+      - name: Checkout (historia completa para comparar con main)
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      - name: Dependencias de herramientas (fijadas)
+        run: python3 -m pip install --disable-pip-version-check -r herramientas/requirements.txt
 
       - name: Validacion OpenAPI H06
         run: python3 sdd/03-endpoints/herramientas/validar_h06.py
+
+      - name: Compatibilidad de contrato (breaking changes)
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
+            echo "::error::No se pudo resolver origin/main; la comparacion falla cerrada."
+            exit 2
+          fi
+          git show origin/main:sdd/03-endpoints/openapi/nexum-api-v1.json > "$RUNNER_TEMP/contrato-base.json"
+          python3 herramientas/comparar_contrato_api.py \
+            --base "$RUNNER_TEMP/contrato-base.json" \
+            --actual sdd/03-endpoints/openapi/nexum-api-v1.json
 
       - name: Pruebas de herramientas y validadores
         run: python3 -m unittest discover -s herramientas/tests

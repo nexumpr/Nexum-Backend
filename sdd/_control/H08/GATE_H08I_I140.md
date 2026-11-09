@@ -121,3 +121,20 @@ Evidencia: 167 pruebas en `tests/infra/operacion` (104 de I-120 + 63 de I-140), 
 
 Evidencia: 181 pruebas en `tests/infra/operacion` (104 de I-120 + 77 de I-140); `AWS_NOT_RUN`,
 `DRILLS_AWS_NOT_RUN`, `AWS_COST_REAL_NOT_VERIFIED`.
+## 10. Registro de integración — 2026-11-09
+
+- `APRUEBO_MERGE_PR_34_SHA_9a2438a5fc456e4c074b418a8a77386038105313` concedido por el responsable;
+  HEAD verificado por igualdad exacta y `--match-head-commit`; 7/7 checks `pass` y `MERGEABLE`/`CLEAN`.
+- **PR #34 `MERGED`** (`2026-11-09T06:01:40Z`); merge commit y `main` =
+  **`7d1418ad3b7ef7f9d95a6cc1fcf27bf55038d241`** (padres `da2aee1` y `9a2438a`); `git pull --ff-only`
+  dejó `main` local idéntico a `origin/main`.
+- CI post-merge sobre `main` en `7d1418a`: **SDD documental `success`** (run `42570609853`) y
+  **Go Backend CI `success`** (run `42570609883`, seis jobs en verde, incluidos los dos pasos de
+  evidencia de drills).
+- Estado: **INTEGRADO_MAIN — NO DESPLEGADO**. `AWS_NOT_RUN`, `DRILLS_AWS_NOT_RUN`, `DAST_NOT_RUN`,
+  `AWS_COST_REAL_NOT_VERIFIED`.
+- Bloqueos sin cambios: RFC-004, H-01, RFC-006 (vence 2026-12-02 o Gate AWS), RFC-007, D-100-01,
+  D-100-02, D-110-01, `ARTIFACT_DELIVERY`, agente CloudWatch (I-020), readiness 503, OIDC/SCP
+  `NOT_VERIFIED`, branch protection `BLOQUEADO_PLAN_GITHUB`, créditos `NOT_VERIFIED`, `BLOCKED_I130`
+  de I-120 y RTO/RPO sin ratificar.
+- Este registro es documental: no se modificó Terraform, Go, OpenAPI ni workflows tras el merge.

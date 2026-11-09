@@ -664,3 +664,44 @@
 - **ASG:** la comprobacion ya admitia la alineacion real; se verifico con formato de Terraform, tabulaciones, capacidad 1 y `max_size` desligado.
 - **Evidencia de drills:** el validador comprueba archivo, presencia de la prueba y que su nombre se ejecuta en el workflow de CI (pasos `-run` focalizados); no ejecuta pruebas ni sustituye el log de CI. La documentacion se corrigio para no atribuir garantias inexistentes.
 - Conteos: 77 pruebas de I-140 (suite de operacion 181). Sin AWS y sin merge.
+
+### I-140: cierre post-merge (2026-11-09)
+
+- **PR #34 MERGED** (merge `7d1418ad3b7ef7f9d95a6cc1fcf27bf55038d241`), HEAD autorizado `9a2438a5fc456e4c074b418a8a77386038105313` verificado con `--match-head-commit`; merge con padres `da2aee1` y `9a2438a`; `main` local = `origin/main`.
+- CI del PR 7/7 PASS (runs 42569817107 y 42569817154); CI de `main` en `7d1418a`: SDD documental run 42570609853 SUCCESS y Go Backend CI run 42570609883 SUCCESS (seis jobs, con los pasos de evidencia de drills).
+- Estado: **INTEGRADO_MAIN - NO DESPLEGADO**. `AWS_NOT_RUN`; `DRILLS_AWS_NOT_RUN`; `DAST_NOT_RUN`; `AWS_COST_REAL_NOT_VERIFIED`.
+- Integrado: 12 runbooks, matriz S1–S3, 12 drills con evidencia ejecutada en CI, 12 A + 16 I + 75 E trazados, inventario con costos consolidados (PITR 0.6000, S3 0.0690) y ASG a 2 instancias declaradas.
+- Registro documental en el arbol de trabajo; se publicara en el PR de la siguiente spec autorizada (I-150), sin abrir PR solo para el estado.
+- Bloqueos intactos: RFC-004, H-01, RFC-006, RFC-007, D-100-01/02, D-110-01, ARTIFACT_DELIVERY, agente CloudWatch, readiness 503, OIDC/SCP, branch protection, creditos, BLOCKED_I130 y RTO/RPO sin ratificar. I-150 sigue `NOT_AUTHORIZED`.
+
+### I-150: publicacion y compatibilidad implementadas en local (2026-11-09)
+
+- Gate `APRUEBO_GATE_I150_LOCAL` registrado en `sdd/_control/H08/GATE_H08I_I150.md`; rama `feat/h08i-i150-publicacion` desde `main` `7d1418a` (incluye el cierre documental de I-140). `AWS_NOT_RUN`.
+- `herramientas/verificar_publicacion_i150.py`: `contrato` (3.1.0, `/api/v1`, `traceId`, dinero string, cabeceras), `publicacion` (checksum SHA-256 recalculado y CORS con allowlist, `*` prohibido), `compatibilidad` (75 filas, 33 M · 23 S · 12 E · 7 O), `evidencia` (13 pruebas, `PASS` sin AWS/huella rechazado), `deprecacion` (SemVer, RFC, CI) y `alcance` (Mobile fuera del gate).
+- Documentos: `MATRIZ_COMPATIBILIDAD_75.md`, `PLAN_PUB_OPENAPI.md`, `PLAN_EVIDENCIA_HTTP.md`, `MATRIZ_INF_150.md` y Gate.
+- 45 pruebas nuevas en `tests/infra/publicacion`; HTTP real, TLS y dos nodos siguen `NOT_RUN`.
+- INF-150-07 (CDN/moderacion) `NO_APLICA_HOY`: el inventario actual no expone endpoints de medios.
+- Sin AWS, sin publicar el contrato y sin merge.
+
+### I-150 ampliacion (2026-11-09)
+
+- **Paridad:** `paridad` contrasta JSON (75 operaciones / 55 rutas), YAML (75/55) y la matriz H06 (`x-nexum-catalog-id` y `operationId = nexum_eNNN`).
+- **Matriz:** `MATRIZ_COMPATIBILIDAD_75.md` ampliada a 19 columnas por operacion, con prueba positiva, negativa, dependencias y estado HTTP.
+- **Compatibilidad:** `herramientas/comparar_contrato_api.py` detecta ruta/metodo eliminado, `operationId` cambiado, parametro o campo obligatorio nuevo, tipo y enum incompatibles, respuesta eliminada y cambios de seguridad; se ejecuta en GitHub Actions contra `origin/main` y falla cerrado si no puede comparar. Corregido un defecto real: `_esquema` no resolvia `$ref` en forma de objeto, por lo que tipo/enum no se detectaban.
+- **Evidencia HTTP:** cuatro niveles separados (estatica local, HTTP local, HTTP AWS, persistencia/dos nodos) y generador de comandos `curl` que no los ejecuta.
+- **Frontera:** `FRONTERA_RESPONSABILIDAD.md` con Mobile/Play/landing fuera del gate.
+- **Contenido:** 0 operaciones con medios y 3 con texto libre de usuario (E028, E030, E075); `MODERACION_CDN_I150.md` documenta el criterio sin declarar moderacion operativa.
+- Pruebas: 70 en `tests/infra/publicacion`. Sin AWS, sin HTTP real y sin merge.
+
+### I-150 correccion de revision (2026-11-09)
+
+- **Paridad semantica:** `estructura_yaml` implementa un parser de bloque sin dependencias y `paridad` compara por operacion metodo+ruta, `operationId`, `x-nexum-catalog-id`, `security`, parametros (nombre, ubicacion, obligatoriedad), `requestBody` y respuestas (codigo y `$ref`). Un cambio solo en YAML con el mismo numero de operaciones produce `PARIDAD_ROTA`; tabulaciones, claves duplicadas y `$ref` irresolubles fallan cerrado.
+- **Breaking changes:** se anaden `PROPIEDAD_RESPUESTA_ELIMINADA`, `TIPO_RESPUESTA_CAMBIADO`, `ENUM_RESPUESTA_REDUCIDO`, `REQUERIDO_RESPUESTA_NUEVO`, `ESQUEMA_RESPUESTA_CAMBIADO` y `SCOPES_CAMBIADOS`; la seguridad efectiva respeta operacion sobre global (incluido `security: []`); `$ref` roto lanza `ErrorComparacion` (codigo 2); una excepcion solo cuenta si su RFC esta ratificada en un documento de `sdd/_control/H08`.
+- **INF-150-07:** `MODERACION_CDN_I150.md` documenta E028, E030 y E075 con separacion validacion/sanitizacion/moderacion, punto de control previo a persistir, codigos de rechazo, PII, evaluacion de servicio cloud (local, Amazon Comprehend sin precio verificado y externo rechazado), CDN descartada por CloudFront D2 y `BLOCKED_DEPENDENCY`; `contenido` rechaza cualquier operacion con texto que no figure en el diseno.
+- Pruebas: 96 en `tests/infra/publicacion`. Sin AWS, sin HTTP real y sin merge.
+
+### I-150 correccion final (2026-11-09)
+
+- **A — parser YAML:** se retira el parser artesanal y se adopta **PyYAML 6.0.2** fijado en `herramientas/requirements.txt` e instalado en CI. Un cargador propio rechaza claves duplicadas en cualquier profundidad (ruta, operacion, propiedad) y el YAML invalido falla cerrado. `paridad` compara ademas `components.schemas` (tipo, required, enum, items, additionalProperties, composicion y $ref) y `securitySchemes`: 88 esquemas contrastados; un cambio aislado de tipo o enum en el YAML produce `PARIDAD_ROTA`.
+- **B — excepciones:** se elimina la aprobacion por coincidencia textual. Solo cuenta un registro `sdd/_control/H08/EXCEPCIONES_COMPATIBILIDAD_API.json` con alcance `API_COMPATIBILIDAD`, codigo, ruta, metodo, RFC, aprobador, `gate_documento` con `APRUEBO` y RFC, y vigencia no vencida. RFC-004/005/006/007 se rechazan como autorizacion de API. Sin registro aprobado, toda excepcion se rechaza y el comparador falla cerrado.
+- Pruebas: 110 en `tests/infra/publicacion`. Sin AWS, sin HTTP real y sin merge.

@@ -1,0 +1,11 @@
+{
+  "fuera_de_alcance": [
+    "android",
+    "play-store",
+    "pantallas-mobile",
+    "pruebas-mobile",
+    "landing"
+  ],
+  "bloquea_por_mobile": false,
+  "gate_mobile_requerido": false
+}

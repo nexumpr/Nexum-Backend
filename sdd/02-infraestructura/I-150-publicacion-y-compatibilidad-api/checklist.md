@@ -47,3 +47,25 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+- [x] OpenAPI 3.1.0 con `/api/v1`, `traceId` y dinero como string.
+- [x] Artefacto con checksum verificado por el validador.
+- [x] CORS con allowlist; `*` prohibido.
+- [x] Matriz de 75 operaciones con clases 33/23/12/7.
+- [x] 13 pruebas HTTP en `NOT_RUN`; prohibido `PASS` sin AWS y sin huella.
+- [x] SemVer, deprecacion y deteccion de breaking changes en CI.
+- [x] Mobile y landing fuera del gate.
+- [ ] HTTP real, TLS y dos nodos: `NOT_RUN` (requieren Gate de despliegue).
+- [x] Paridad JSON/YAML/matriz con 75 operaciones y `operationId` trazados.
+- [x] Matriz ampliada con pruebas positiva y negativa por operacion.
+- [x] Comparador de breaking changes ejecutado en CI contra `origin/main`.
+- [x] Cuatro niveles de evidencia HTTP separados; comandos `curl` generados sin ejecutar.
+- [x] Frontera de responsabilidad documentada y validada.
+- [x] Inventario de contenido: 0 medios y 3 operaciones con texto libre con criterio documentado.
+- [x] Paridad semantica por operacion (metodo, ruta, operationId, seguridad, parametros, respuestas).
+- [x] Breaking changes en respuestas y seguridad efectiva con scopes.
+- [x] Excepciones solo con RFC ratificada verificable.
+- [x] Moderacion: tres operaciones documentadas y `BLOCKED_DEPENDENCY` para servicio externo.
+- [x] PyYAML fijado y usado con rechazo de claves duplicadas.
+- [x] Paridad semantica de `components.schemas` YAML/JSON.
+- [x] Excepciones de breaking changes solo con autorizacion humana especifica de API.
+- [x] RFC de infraestructura (incluida RFC-006) rechazadas como excepcion de API.
