@@ -15,7 +15,7 @@
 | INF-150-04 Evidencia HTTP | `PLAN_EVIDENCIA_HTTP.md` con 13 pruebas `NOT_RUN` | `EvidenciaHTTP` | `IMPLEMENTADO_LOCAL` |
 | INF-150-05 Cambio | `deprecacion` (SemVer, RFC, CI) + `comparar_contrato_api.py` ejecutado en GitHub Actions contra `origin/main` | `Deprecacion`, `Comparador` | `IMPLEMENTADO_LOCAL` |
 | INF-150-06 Alcance | `alcance` + `FRONTERA_RESPONSABILIDAD.md` exigen Mobile/Play/landing fuera del gate | `Alcance` | `IMPLEMENTADO_LOCAL` |
-| INF-150-07 CDN/moderación | `contenido` escanea los 75 contratos (0 medios, 0 texto libre) y `MODERACION_CDN_I150.md` fija el criterio de activación | `Contenido` | `NO_APLICA_HOY` |
+| INF-150-07 CDN/moderación | `contenido` escanea los 75 contratos (0 medios, 3 operaciones con texto libre: E028, E030, E075) y `MODERACION_CDN_I150.md` define validación, sanitización, moderación, punto de control y evaluación de servicio | `Contenido`, `Moderacion` | `DISEÑO_LOCAL_COMPLETO — IMPLEMENTACIÓN_CLOUD_PENDIENTE` (`BLOCKED_DEPENDENCY` para moderación externa) |
 
 ## Invariantes
 
@@ -25,7 +25,8 @@
 4. Ninguna prueba HTTP se declara `PASS` sin ejecución autorizada y huella.
 5. La URL del contrato permanece documental hasta el despliegue.
 6. Un cambio incompatible exige nueva versión de API o RFC aprobada; el check de CI falla cerrado.
-7. La moderación solo se declara operativa con servicio desplegado y evidencia.
+7. La moderación solo se declara operativa con servicio desplegado y evidencia; hoy está
+   `BLOCKED_DEPENDENCY` (servicio y precio sin aprobar) y `moderacion_operativa = false`.
 
 ## Dependencias y bloqueos
 

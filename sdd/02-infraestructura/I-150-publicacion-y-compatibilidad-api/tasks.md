@@ -109,3 +109,9 @@ Gate `APRUEBO_GATE_I150_LOCAL`. Rama `feat/h08i-i150-publicacion`. Ninguna prueb
 - **Cambio:** `comparar_contrato_api.py` en CI contra `origin/main`, con excepciones solo por RFC aprobada.
 - **Frontera:** `FRONTERA_RESPONSABILIDAD.md` y validacion de que Mobile no es gate.
 - **Contenido:** `contenido` detecta texto libre en E028, E030 y E075; `MODERACION_CDN_I150.md` fija el criterio.
+
+### Correccion de revision (2026-11-09)
+
+- **Paridad semantica:** parser de bloque del YAML que reconstruye la estructura y compara por operacion (metodo+ruta, operationId, catalogo, seguridad, parametros, requestBody y respuestas); rechaza tabulaciones, duplicados y `$ref` irresolubles.
+- **Breaking changes:** comparador ampliado a respuestas (propiedad, tipo, enum, requerido, esquema) y seguridad efectiva con scopes; `$ref` roto falla cerrado; excepcion solo con RFC ratificada en `sdd/_control/H08`.
+- **INF-150-07:** `MODERACION_CDN_I150.md` en `DISEÑO_LOCAL_COMPLETO — IMPLEMENTACIÓN_CLOUD_PENDIENTE` con las 3 operaciones y `BLOCKED_DEPENDENCY` para moderacion externa; el validador rechaza contenido sin tratamiento.

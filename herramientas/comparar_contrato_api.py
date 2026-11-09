@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -26,8 +27,14 @@ CODIGOS = (
     "TIPO_CAMBIADO",
     "ENUM_REDUCIDO",
     "RESPUESTA_ELIMINADA",
+    "ESQUEMA_RESPUESTA_CAMBIADO",
+    "PROPIEDAD_RESPUESTA_ELIMINADA",
+    "TIPO_RESPUESTA_CAMBIADO",
+    "ENUM_RESPUESTA_REDUCIDO",
+    "REQUERIDO_RESPUESTA_NUEVO",
     "SEGURIDAD_ENDURECIDA",
     "SEGURIDAD_RELAJADA",
+    "SCOPES_CAMBIADOS",
 )
 
 
@@ -54,14 +61,34 @@ def operaciones(contrato: Mapping[str, Any]) -> dict[tuple[str, str], Mapping[st
 
 
 def _esquema(contrato: Mapping[str, Any], referencia: Any) -> Mapping[str, Any]:
-    """Acepta un $ref suelto o el objeto schema completo con $ref."""
+    """Acepta un $ref suelto o el objeto schema completo; un $ref roto falla cerrado."""
     destino = referencia
     if isinstance(referencia, Mapping):
         destino = referencia.get("$ref")
     if not isinstance(destino, str) or not destino.startswith("#/components/schemas/"):
         return referencia if isinstance(referencia, Mapping) and "$ref" not in referencia else {}
     nombre = destino.rsplit("/", 1)[-1]
-    return ((contrato.get("components") or {}).get("schemas") or {}).get(nombre, {})
+    resuelto = ((contrato.get("components") or {}).get("schemas") or {}).get(nombre)
+    if resuelto is None:
+        raise ErrorComparacion(f"$ref irresoluble: {destino}")
+    return resuelto
+
+
+def _ref_respuesta(cuerpo: Any) -> str:
+    esquema = ((cuerpo or {}).get("content") or {}).get("application/json", {}).get("schema") or {}
+    return str(esquema.get("$ref") or "")
+
+
+def _seguridad_efectiva(contrato: Mapping[str, Any], operacion: Mapping[str, Any]) -> list[dict[str, list[str]]]:
+    """`security` de la operacion si existe (incluido []), si no la global."""
+    valor = operacion["security"] if "security" in operacion else contrato.get("security")
+    if not isinstance(valor, list):
+        return []
+    normal: list[dict[str, list[str]]] = []
+    for requisito in valor:
+        if isinstance(requisito, Mapping):
+            normal.append({str(k): sorted(map(str, v or [])) for k, v in requisito.items()})
+    return normal
 
 
 def _campos_requeridos(esquema: Mapping[str, Any]) -> set[str]:
@@ -170,26 +197,118 @@ def comparar(base: Mapping[str, Any], actual: Mapping[str, Any]) -> list[dict[st
                     }
                 )
 
-        respuestas_previas = set((anterior.get("responses") or {}).keys())
-        respuestas_nuevas = set((nueva.get("responses") or {}).keys())
-        for codigo in sorted(respuestas_previas - respuestas_nuevas):
+        respuestas_previas = (anterior.get("responses") or {})
+        respuestas_nuevas = (nueva.get("responses") or {})
+        for codigo in sorted(set(respuestas_previas) - set(respuestas_nuevas)):
             roturas.append(
                 {"codigo": "RESPUESTA_ELIMINADA", "ruta": ruta, "metodo": metodo, "detalle": codigo}
             )
+        for codigo in sorted(set(respuestas_previas) & set(respuestas_nuevas)):
+            ref_previo = _ref_respuesta(respuestas_previas[codigo])
+            ref_nuevo = _ref_respuesta(respuestas_nuevas[codigo])
+            if ref_previo and ref_nuevo and ref_previo != ref_nuevo:
+                roturas.append(
+                    {
+                        "codigo": "ESQUEMA_RESPUESTA_CAMBIADO",
+                        "ruta": ruta,
+                        "metodo": metodo,
+                        "detalle": f"{codigo}: {ref_previo} -> {ref_nuevo}",
+                    }
+                )
+                continue
+            esquema_previo = _esquema(base, ref_previo or respuestas_previas[codigo])
+            esquema_nuevo = _esquema(actual, ref_nuevo or respuestas_nuevas[codigo])
+            props_previas = _propiedades(esquema_previo)
+            props_nuevas = _propiedades(esquema_nuevo)
+            for campo in sorted(set(props_previas) - set(props_nuevas)):
+                roturas.append(
+                    {
+                        "codigo": "PROPIEDAD_RESPUESTA_ELIMINADA",
+                        "ruta": ruta,
+                        "metodo": metodo,
+                        "detalle": f"{codigo}.{campo}",
+                    }
+                )
+            for campo in sorted(set(props_previas) & set(props_nuevas)):
+                if _tipo(props_previas[campo]) != _tipo(props_nuevas[campo]):
+                    roturas.append(
+                        {
+                            "codigo": "TIPO_RESPUESTA_CAMBIADO",
+                            "ruta": ruta,
+                            "metodo": metodo,
+                            "detalle": f"{codigo}.{campo}: {_tipo(props_previas[campo])} -> {_tipo(props_nuevas[campo])}",
+                        }
+                    )
+                enums_previos = _enums(props_previas[campo])
+                enums_nuevos = _enums(props_nuevas[campo])
+                if enums_previos and enums_previos - enums_nuevos:
+                    roturas.append(
+                        {
+                            "codigo": "ENUM_RESPUESTA_REDUCIDO",
+                            "ruta": ruta,
+                            "metodo": metodo,
+                            "detalle": f"{codigo}.{campo}",
+                        }
+                    )
+            for campo in sorted(_campos_requeridos(esquema_nuevo) - _campos_requeridos(esquema_previo)):
+                roturas.append(
+                    {
+                        "codigo": "REQUERIDO_RESPUESTA_NUEVO",
+                        "ruta": ruta,
+                        "metodo": metodo,
+                        "detalle": f"{codigo}.{campo}",
+                    }
+                )
 
-        seguridad_prev = bool(anterior.get("security"))
-        seguridad_nueva = bool(nueva.get("security"))
-        seguridad_global_prev = bool(base.get("security"))
-        seguridad_global_nueva = bool(actual.get("security"))
-        if (seguridad_nueva or seguridad_global_nueva) and not (seguridad_prev or seguridad_global_prev):
-            roturas.append({"codigo": "SEGURIDAD_ENDURECIDA", "ruta": ruta, "metodo": metodo})
-        if (seguridad_prev or seguridad_global_prev) and not (seguridad_nueva or seguridad_global_nueva):
-            roturas.append({"codigo": "SEGURIDAD_RELAJADA", "ruta": ruta, "metodo": metodo})
+        seguridad_prev = _seguridad_efectiva(base, anterior)
+        seguridad_nueva = _seguridad_efectiva(actual, nueva)
+        if seguridad_prev != seguridad_nueva:
+            if seguridad_nueva and not seguridad_prev:
+                roturas.append({"codigo": "SEGURIDAD_ENDURECIDA", "ruta": ruta, "metodo": metodo})
+            elif seguridad_prev and not seguridad_nueva:
+                roturas.append({"codigo": "SEGURIDAD_RELAJADA", "ruta": ruta, "metodo": metodo})
+            else:
+                scopes_previos = {s for req in seguridad_prev for v in req.values() for s in v}
+                scopes_nuevos = {s for req in seguridad_nueva for v in req.values() for s in v}
+                if scopes_previos != scopes_nuevos:
+                    roturas.append(
+                        {
+                            "codigo": "SCOPES_CAMBIADOS",
+                            "ruta": ruta,
+                            "metodo": metodo,
+                            "detalle": f"{sorted(scopes_previos)} -> {sorted(scopes_nuevos)}",
+                        }
+                    )
+                else:
+                    roturas.append(
+                        {"codigo": "SEGURIDAD_ENDURECIDA", "ruta": ruta, "metodo": metodo,
+                         "detalle": "esquema de seguridad distinto"}
+                    )
 
     return roturas
 
 
+RAIZ_CONTROL = Path(__file__).resolve().parents[1] / "sdd" / "_control" / "H08"
+
+
+def _rfc_ratificada(identificador: str) -> bool:
+    """La excepcion exige un documento de control con el RFC y marca de aprobacion."""
+    if not isinstance(identificador, str) or not identificador.strip():
+        return False
+    patron = re.compile(re.escape(identificador.strip()), re.IGNORECASE)
+    for documento in RAIZ_CONTROL.rglob("*.md"):
+        try:
+            texto = documento.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if patron.search(documento.name) or patron.search(texto):
+            if re.search(r"APROBAD[OA]|Ratificad[oa]", texto) and patron.search(texto):
+                return True
+    return False
+
+
 def excepciones_aprobadas(datos: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """Solo cuentan excepciones con RFC ratificada en un documento de control."""
     if not datos:
         return []
     lista = datos.get("excepciones") if isinstance(datos, Mapping) else None
@@ -199,7 +318,9 @@ def excepciones_aprobadas(datos: Mapping[str, Any] | None) -> list[dict[str, Any
     for excepcion in lista:
         if not isinstance(excepcion, Mapping):
             raise ErrorComparacion("excepcion malformada")
-        if excepcion.get("estado") != "APPROVED" or not excepcion.get("rfc"):
+        if excepcion.get("estado") != "APPROVED":
+            continue
+        if not _rfc_ratificada(str(excepcion.get("rfc", ""))):
             continue
         aprobadas.append(excepcion)
     return aprobadas

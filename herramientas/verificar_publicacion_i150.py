@@ -344,72 +344,263 @@ CLAVES_CONTENIDO = ("text", "content", "message", "description", "body", "commen
 FORMATOS_MEDIA = ("binary", "base64", "byte")
 
 
-def _rutas_yaml(texto_yaml: str) -> set[str]:
-    rutas = set()
-    for linea in texto_yaml.splitlines():
-        coincidencia = re.match(r"^  (/api/v1/[^:]+):\s*$", linea)
-        if coincidencia:
-            rutas.add(coincidencia.group(1))
-    return rutas
+def _lineas_yaml(texto_yaml: str) -> list[tuple[int, str]]:
+    resultado: list[tuple[int, str]] = []
+    for numero, linea in enumerate(texto_yaml.splitlines(), start=1):
+        limpia = linea.rstrip()
+        if not limpia.strip() or limpia.lstrip().startswith("#"):
+            continue
+        sangria = len(limpia) - len(limpia.lstrip(" \t"))
+        if "\t" in limpia[:sangria]:
+            raise ErrorUso(f"YAML con tabulaciones en la linea {numero}")
+        resultado.append((sangria, limpia.strip()))
+    return resultado
 
 
-def _operaciones_yaml(texto_yaml: str) -> int:
-    return len(re.findall(r"^    (?:get|post|put|patch|delete):\s*$", texto_yaml, flags=re.MULTILINE))
+def _escalar(valor: str) -> Any:
+    limpio = valor.strip()
+    if limpio.startswith("'") and limpio.endswith("'") and len(limpio) > 1:
+        return limpio[1:-1]
+    if limpio.startswith('"') and limpio.endswith('"') and len(limpio) > 1:
+        return limpio[1:-1]
+    if limpio == "[]":
+        return []
+    if limpio == "{}":
+        return {}
+    if limpio.lower() in ("true", "false"):
+        return limpio.lower() == "true"
+    if limpio.startswith("["):
+        interior = limpio[1:-1] if limpio.endswith("]") else limpio[1:]
+        return [_escalar(parte) for parte in interior.split(",") if parte.strip()]
+    return limpio
 
 
-def validar_paridad() -> dict[str, Any]:
-    """JSON, YAML y matriz deben describir las mismas 75 operaciones."""
+def _parse_mapa(lineas: list[tuple[int, str]], indice: int, sangria: int) -> tuple[dict[str, Any], int]:
+    resultado: dict[str, Any] = {}
+    while indice < len(lineas):
+        nivel, contenido = lineas[indice]
+        if nivel < sangria:
+            break
+        if nivel > sangria:
+            indice += 1
+            continue
+        if contenido.startswith("- "):
+            break
+        clave, _, resto = contenido.partition(":")
+        clave = clave.strip().strip("'\"")
+        resto = resto.strip()
+        if clave in resultado:
+            raise ErrorUso(f"clave duplicada en YAML: {clave}")
+        indice += 1
+        if resto:
+            resultado[clave] = _escalar(resto)
+            continue
+        if indice < len(lineas) and lineas[indice][0] > sangria:
+            hijo, indice = _parse(lineas, indice, lineas[indice][0])
+            resultado[clave] = hijo
+        elif indice < len(lineas) and lineas[indice][0] == sangria and lineas[indice][1].startswith("- "):
+            hijo, indice = _parse_lista(lineas, indice, sangria)
+            resultado[clave] = hijo
+        else:
+            resultado[clave] = None
+    return resultado, indice
+
+
+def _parse_lista(lineas: list[tuple[int, str]], indice: int, sangria: int) -> tuple[list[Any], int]:
+    resultado: list[Any] = []
+    while indice < len(lineas):
+        nivel, contenido = lineas[indice]
+        if nivel != sangria or not contenido.startswith("- "):
+            break
+        elemento = contenido[2:].strip()
+        indice += 1
+        if not elemento:
+            if indice < len(lineas) and lineas[indice][0] > sangria:
+                valor, indice = _parse(lineas, indice, lineas[indice][0])
+                resultado.append(valor)
+            else:
+                resultado.append(None)
+            continue
+        if ":" in elemento:
+            clave, _, resto = elemento.partition(":")
+            clave = clave.strip().strip("'\"")
+            resto = resto.strip()
+            item: dict[str, Any] = {clave: (_escalar(resto) if resto else None)}
+            if indice < len(lineas) and lineas[indice][0] > sangria:
+                extra, indice = _parse_mapa(lineas, indice, lineas[indice][0])
+                item.update(extra)
+            resultado.append(item)
+        else:
+            resultado.append(_escalar(elemento))
+    return resultado, indice
+
+
+def _parse(lineas: list[tuple[int, str]], indice: int, sangria: int) -> tuple[Any, int]:
+    if indice < len(lineas) and lineas[indice][0] == sangria and lineas[indice][1].startswith("- "):
+        return _parse_lista(lineas, indice, sangria)
+    return _parse_mapa(lineas, indice, sangria)
+
+
+def estructura_yaml(texto_yaml: str) -> dict[str, Any]:
+    """Parsea el YAML (subconjunto de bloque) y devuelve la estructura equivalente."""
+    lineas = _lineas_yaml(texto_yaml)
+    if not lineas:
+        raise ErrorUso("YAML vacio")
+    if lineas[0][0] != 0:
+        raise ErrorUso("YAML malformado: la raiz debe empezar en la columna 0")
+    estructura, consumidas = _parse_mapa(lineas, 0, 0)
+    if consumidas != len(lineas):
+        raise ErrorUso(
+            f"YAML no consumido por completo ({consumidas} de {len(lineas)} lineas): estructura no soportada"
+        )
+    return estructura
+
+
+def _refs_json(nodo: Any) -> set[str]:
+    encontrados: set[str] = set()
+    if isinstance(nodo, Mapping):
+        for clave, valor in nodo.items():
+            if clave == "$ref" and isinstance(valor, str):
+                encontrados.add(valor)
+            else:
+                encontrados |= _refs_json(valor)
+    elif isinstance(nodo, list):
+        for valor in nodo:
+            encontrados |= _refs_json(valor)
+    return encontrados
+
+
+def _seguridad(valor: Any) -> list[dict[str, list[str]]]:
+    if not isinstance(valor, list):
+        return []
+    normal: list[dict[str, list[str]]] = []
+    for requisito in valor:
+        if isinstance(requisito, Mapping):
+            normal.append({str(k): sorted(map(str, v or [])) for k, v in requisito.items()})
+    return normal
+
+
+def _params(valor: Any) -> list[tuple[str, str, bool]]:
+    normal: list[tuple[str, str, bool]] = []
+    for parametro in valor or []:
+        if not isinstance(parametro, Mapping):
+            continue
+        if parametro.get("$ref"):
+            normal.append((str(parametro["$ref"]), "", False))
+            continue
+        normal.append(
+            (
+                str(parametro.get("name", "")),
+                str(parametro.get("in", "")),
+                bool(parametro.get("required")),
+            )
+        )
+    return sorted(normal)
+
+
+def _respuestas(valor: Any) -> dict[str, str]:
+    normal: dict[str, str] = {}
+    for codigo, cuerpo in (valor or {}).items():
+        if not isinstance(cuerpo, Mapping):
+            normal[str(codigo)] = ""
+            continue
+        esquema = ((cuerpo.get("content") or {}).get("application/json") or {}).get("schema") or {}
+        normal[str(codigo)] = str(esquema.get("$ref") or esquema.get("type") or "")
+    return normal
+
+
+def _ref_cuerpo(valor: Any) -> str:
+    esquema = ((valor or {}).get("content") or {}).get("application/json", {}).get("schema") or {}
+    return str(esquema.get("$ref") or "")
+
+
+def validar_paridad(ruta_yaml: Path | None = None) -> dict[str, Any]:
+    """Paridad semantica JSON ↔ YAML ↔ matriz, operacion por operacion."""
     if not OPENAPI_JSON.is_file() or not YAML.is_file() or not MATRIZ_CSV.is_file():
         raise ErrorUso("Faltan JSON, YAML o la matriz H06.")
     datos = cargar_json(OPENAPI_JSON)
-    texto_yaml = YAML.read_text(encoding="utf-8")
+    origen_yaml = Path(ruta_yaml) if ruta_yaml else YAML
+    if not origen_yaml.is_file():
+        raise ErrorUso(f"Falta el YAML {origen_yaml}")
+    estructura = estructura_yaml(origen_yaml.read_text(encoding="utf-8"))
     filas = leer_matriz()
 
     problemas: list[str] = []
-    ops_json = {
-        (ruta, metodo)
-        for ruta, item in (datos.get("paths") or {}).items()
-        for metodo in item
-        if metodo in METODOS_OPENAPI
+    rutas_json = datos.get("paths") or {}
+    rutas_yaml = estructura.get("paths") or {}
+    esquemas = (datos.get("components") or {}).get("schemas") or {}
+    parametros_componentes = (datos.get("components") or {}).get("parameters") or {}
+    refs_validas = {f"#/components/schemas/{n}" for n in esquemas} | {
+        f"#/components/parameters/{n}" for n in parametros_componentes
     }
-    rutas_json = {ruta for ruta, _ in ops_json}
-    rutas_yaml = _rutas_yaml(texto_yaml)
-    ops_yaml = _operaciones_yaml(texto_yaml)
 
-    if len(ops_json) != 75:
-        problemas.append(f"JSON declara {len(ops_json)} operaciones, se esperan 75")
-    if ops_yaml != 75:
-        problemas.append(f"YAML declara {ops_yaml} operaciones, se esperan 75")
-    if rutas_json != rutas_yaml:
-        solo_json = sorted(rutas_json - rutas_yaml)[:5]
-        solo_yaml = sorted(rutas_yaml - rutas_json)[:5]
-        problemas.append(f"rutas divergentes JSON/YAML: {solo_json} / {solo_yaml}")
+    ops_json = {(ruta, m) for ruta, item in rutas_json.items() for m in item if m in METODOS_OPENAPI}
+    ops_yaml = {
+        (ruta, m)
+        for ruta, item in rutas_yaml.items()
+        if isinstance(item, Mapping)
+        for m in item
+        if m in METODOS_OPENAPI
+    }
+    for ruta, metodo in sorted(ops_json - ops_yaml):
+        problemas.append(f"YAML sin {metodo.upper()} {ruta}")
+    for ruta, metodo in sorted(ops_yaml - ops_json):
+        problemas.append(f"YAML con {metodo.upper()} {ruta} inexistente en JSON")
+    if len(ops_json) != 75 or len(ops_yaml) != 75:
+        problemas.append(f"operaciones JSON={len(ops_json)} YAML={len(ops_yaml)}, se esperan 75")
 
+    for ruta, metodo in sorted(ops_json & ops_yaml):
+        op_json = rutas_json[ruta][metodo]
+        op_yaml = rutas_yaml[ruta][metodo]
+        etiqueta = f"{metodo.upper()} {ruta}"
+
+        if op_json.get("operationId") != op_yaml.get("operationId"):
+            problemas.append(f"{etiqueta}: operationId difiere")
+        if op_json.get("x-nexum-catalog-id") != op_yaml.get("x-nexum-catalog-id"):
+            problemas.append(f"{etiqueta}: x-nexum-catalog-id difiere")
+        if _seguridad(op_json.get("security")) != _seguridad(op_yaml.get("security")):
+            problemas.append(f"{etiqueta}: seguridad difiere")
+        if _params(op_json.get("parameters")) != _params(op_yaml.get("parameters")):
+            problemas.append(f"{etiqueta}: parametros difieren")
+        if _ref_cuerpo(op_json.get("requestBody")) != _ref_cuerpo(op_yaml.get("requestBody")):
+            problemas.append(f"{etiqueta}: requestBody difiere")
+        respuestas_json = _respuestas(op_json.get("responses"))
+        respuestas_yaml = _respuestas(op_yaml.get("responses"))
+        if respuestas_json != respuestas_yaml:
+            problemas.append(f"{etiqueta}: respuestas difieren")
+
+        for referencia in _refs_json(op_yaml) | _refs_json(op_json):
+            if referencia not in refs_validas:
+                problemas.append(f"{etiqueta}: $ref irresoluble {referencia}")
+
+    ids_csv = {fila.get("id") for fila in filas}
     catalogo = {
-        str((op or {}).get("x-nexum-catalog-id"))
-        for item in (datos.get("paths") or {}).values()
+        str(op.get("x-nexum-catalog-id"))
+        for item in rutas_json.values()
         for op in item.values()
         if isinstance(op, Mapping)
     }
-    ids_csv = {fila.get("id") for fila in filas}
     if catalogo != ids_csv:
         problemas.append("x-nexum-catalog-id no coincide con la matriz H06")
     for fila in filas:
         esperado = "nexum_" + str(fila.get("id")).lower()
-        operacion = (datos.get("paths") or {}).get(fila.get("ruta"), {}).get(str(fila.get("metodo")).lower(), {})
+        operacion = (rutas_json.get(fila.get("ruta")) or {}).get(str(fila.get("metodo")).lower(), {})
         if operacion.get("operationId") != esperado:
             problemas.append(f"{fila.get('id')}: operationId distinto de {esperado}")
 
     return {
         "comando": "paridad",
         "operaciones_json": len(ops_json),
-        "operaciones_yaml": ops_yaml,
+        "operaciones_yaml": len(ops_yaml),
         "rutas_json": len(rutas_json),
         "rutas_yaml": len(rutas_yaml),
         "filas_matriz": len(filas),
         "problemas": problemas,
         "estado": "PARIDAD_OK" if not problemas else "PARIDAD_ROTA",
-        "advertencia": "Paridad documental; no acredita handlers ni respuestas HTTP.",
+        "advertencia": (
+            "Paridad semantica (metodo, ruta, operationId, seguridad, parametros, requestBody y "
+            "respuestas) contra el YAML real; no acredita handlers ni HTTP."
+        ),
     }
 
 
@@ -418,9 +609,9 @@ def validar_paridad() -> dict[str, Any]:
 # --------------------------------------------------------------------------- #
 
 
-def escanear_contenido() -> dict[str, Any]:
+def escanear_contenido(contrato: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Clasifica operaciones con contenido de usuario y exige diseño de moderacion."""
-    datos = cargar_json(OPENAPI_JSON)
+    datos = contrato if contrato is not None else cargar_json(OPENAPI_JSON)
     esquemas = (datos.get("components") or {}).get("schemas") or {}
     media: list[str] = []
     texto_libre: list[str] = []
@@ -448,6 +639,20 @@ def escanear_contenido() -> dict[str, Any]:
     if media and not diseno.is_file():
         problemas.append("hay operaciones con medios y falta MODERACION_CDN_I150.md")
 
+    # Cada operacion con contenido debe figurar en el diseno (fail-closed).
+    if (media or texto_libre) and not diseno.is_file():
+        problemas.append("hay operaciones con contenido y falta MODERACION_CDN_I150.md")
+    if diseno.is_file():
+        documento = diseno.read_text(encoding="utf-8")
+        for entrada in sorted(set(media) | set(texto_libre)):
+            identificador = entrada.split(":")[0]
+            if identificador not in documento:
+                problemas.append(f"{identificador} con contenido sin tratamiento documentado")
+        if not re.search(r"DISEÑO_LOCAL_COMPLETO|DISENO_LOCAL_COMPLETO", documento):
+            problemas.append("el diseno no declara su estado local")
+        if "moderacion_operativa" not in documento and "moderación operativa" not in documento.lower():
+            problemas.append("el diseno no declara que la moderacion no esta operativa")
+
     return {
         "comando": "contenido",
         "operaciones_con_media": sorted(set(media)),
@@ -456,6 +661,7 @@ def escanear_contenido() -> dict[str, Any]:
         "problemas": problemas,
         "estado": "CONTENIDO_CUBIERTO" if not problemas else "CONTENIDO_SIN_DISENO",
         "moderacion_operativa": False,
+        "estado_diseno": "DISEÑO_LOCAL_COMPLETO — IMPLEMENTACIÓN_CLOUD_PENDIENTE",
         "advertencia": (
             "Ningun servicio de moderacion o CDN esta desplegado; el diseno no acredita moderacion real."
         ),

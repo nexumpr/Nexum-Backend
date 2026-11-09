@@ -331,23 +331,17 @@ class ParidadDeContratos(unittest.TestCase):
         self.assertEqual(resultado["rutas_yaml"], 55)
         self.assertEqual(resultado["filas_matriz"], 75)
 
-    def test_yaml_con_ruta_extra_se_detecta(self) -> None:
-        texto = pub.YAML.read_text(encoding="utf-8").replace(
-            "  /api/v1/auth/register:", "  /api/v1/inventada:\n    get:\n      operationId: x\n  /api/v1/auth/register:", 1
+    def test_estructura_yaml_expone_rutas(self) -> None:
+        estructura = pub.estructura_yaml(pub.YAML.read_text(encoding="utf-8"))
+        self.assertEqual(len(estructura["paths"]), 55)
+        self.assertIn("/api/v1/health/live", estructura["paths"])
+
+    def test_estructura_yaml_cuenta_operaciones(self) -> None:
+        estructura = pub.estructura_yaml(pub.YAML.read_text(encoding="utf-8"))
+        operaciones = sum(
+            1 for item in estructura["paths"].values() for m in item if m in pub.METODOS_OPENAPI
         )
-        rutas = pub._rutas_yaml(texto)
-        self.assertIn("/api/v1/inventada", rutas)
-        self.assertGreater(len(rutas), 55)
-
-    def test_operaciones_yaml_contadas(self) -> None:
-        texto = pub.YAML.read_text(encoding="utf-8")
-        self.assertEqual(pub._operaciones_yaml(texto), 75)
-
-    def test_rutas_yaml_extraidas(self) -> None:
-        texto = pub.YAML.read_text(encoding="utf-8")
-        rutas = pub._rutas_yaml(texto)
-        self.assertEqual(len(rutas), 55)
-        self.assertIn("/api/v1/health/live", rutas)
+        self.assertEqual(operaciones, 75)
 
 
 class ContenidoYModeracion(unittest.TestCase):
@@ -505,6 +499,200 @@ class ComparadorDeContratos(unittest.TestCase):
         workflow = (RAIZ / ".github" / "workflows" / "go-backend.yml").read_text(encoding="utf-8")
         self.assertIn("comparar_contrato_api.py", workflow)
         self.assertIn("origin/main", workflow)
+
+
+class ParidadSemanticaYAML(unittest.TestCase):
+    """Un cambio solo en el YAML, con el mismo numero de operaciones, se detecta."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.yaml = pub.YAML.read_text(encoding="utf-8")
+
+    def _paridad(self, texto_yaml: str) -> dict:
+        ruta = Path(tempfile.mkdtemp()) / "mutado.yaml"
+        ruta.write_text(texto_yaml, encoding="utf-8")
+        return pub.validar_paridad(ruta_yaml=ruta)
+
+    def test_base_sin_cambios_es_paridad_ok(self) -> None:
+        self.assertEqual(self._paridad(self.yaml)["estado"], "PARIDAD_OK")
+
+    def test_post_cambiado_a_put(self) -> None:
+        texto = self.yaml.replace("  /api/v1/auth/login:\n    post:", "  /api/v1/auth/login:\n    put:", 1)
+        resultado = self._paridad(texto)
+        self.assertEqual(resultado["estado"], "PARIDAD_ROTA")
+        self.assertTrue(any("PUT" in p or "POST" in p for p in resultado["problemas"]))
+
+    def test_operation_id_cambiado(self) -> None:
+        texto = self.yaml.replace("operationId: nexum_e002", "operationId: nexum_e999", 1)
+        self.assertEqual(self._paridad(texto)["estado"], "PARIDAD_ROTA")
+
+    def test_esquema_de_respuesta_cambiado(self) -> None:
+        texto = self.yaml.replace("$ref: '#/components/schemas/AuthTokens'", "$ref: '#/components/schemas/UserProfile'", 1)
+        self.assertEqual(self._paridad(texto)["estado"], "PARIDAD_ROTA")
+
+    def test_autorizacion_modificada(self) -> None:
+        texto = self.yaml.replace("      security: []\n      parameters: []", "      security:\n      - BearerAuth: []\n      parameters: []", 1)
+        self.assertEqual(self._paridad(texto)["estado"], "PARIDAD_ROTA")
+
+    def test_parametro_obligatorio_adicional(self) -> None:
+        texto = self.yaml.replace(
+            "      parameters:\n      - name: limit",
+            "      parameters:\n      - name: extra\n        in: query\n        required: true\n      - name: limit",
+            1,
+        )
+        self.assertEqual(self._paridad(texto)["estado"], "PARIDAD_ROTA")
+
+    def test_respuesta_eliminada(self) -> None:
+        texto = self.yaml.replace("        '409':", "        '499':", 1)
+        self.assertEqual(self._paridad(texto)["estado"], "PARIDAD_ROTA")
+
+    def test_ref_irresoluble(self) -> None:
+        texto = self.yaml.replace("$ref: '#/components/schemas/AuthTokens'", "$ref: '#/components/schemas/NoExiste'", 1)
+        resultado = self._paridad(texto)
+        self.assertEqual(resultado["estado"], "PARIDAD_ROTA")
+        self.assertTrue(any("irresoluble" in p for p in resultado["problemas"]))
+
+    def test_tabulaciones_rechazadas(self) -> None:
+        texto = self.yaml.replace("  /api/v1/auth/login:", "\t/api/v1/auth/login:", 1)
+        with self.assertRaises(pub.ErrorUso):
+            self._paridad(texto)
+
+    def test_ruta_duplicada_rechazada(self) -> None:
+        texto = self.yaml.replace(
+            "  /api/v1/auth/refresh:",
+            "  /api/v1/auth/login:\n    post:\n      operationId: nexum_e002\n  /api/v1/auth/refresh:",
+            1,
+        )
+        with self.assertRaises(pub.ErrorUso):
+            self._paridad(texto)
+
+
+class RespuestasYSeguridad(unittest.TestCase):
+    """El comparador cubre respuestas y seguridad efectiva."""
+
+    @staticmethod
+    def _contrato(seguridad_op=None, seguridad_global=None, respuesta=None) -> dict:
+        operacion = {
+            "operationId": "nexum_e001",
+            "responses": {"200": respuesta or {"description": "ok", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/A"}}}}},
+        }
+        if seguridad_op is not None:
+            operacion["security"] = seguridad_op
+        contrato = {
+            "openapi": "3.1.0",
+            "paths": {"/api/v1/x": {"post": operacion}},
+            "components": {"schemas": {"A": {"type": "object", "properties": {
+                "campo": {"type": "string"},
+                "estado": {"type": "string", "enum": ["a", "b"]},
+            }, "required": ["campo"]}}},
+        }
+        if seguridad_global is not None:
+            contrato["security"] = seguridad_global
+        return contrato
+
+    def test_propiedad_de_respuesta_eliminada(self) -> None:
+        actual = self._contrato()
+        actual["components"]["schemas"]["A"]["properties"].pop("estado")
+        roturas = cmp.comparar(self._contrato(), actual)
+        self.assertTrue(any(r["codigo"] == "PROPIEDAD_RESPUESTA_ELIMINADA" for r in roturas))
+
+    def test_tipo_de_respuesta_cambiado(self) -> None:
+        actual = self._contrato()
+        actual["components"]["schemas"]["A"]["properties"]["campo"]["type"] = "integer"
+        roturas = cmp.comparar(self._contrato(), actual)
+        self.assertTrue(any(r["codigo"] == "TIPO_RESPUESTA_CAMBIADO" for r in roturas))
+
+    def test_enum_de_respuesta_reducido(self) -> None:
+        actual = self._contrato()
+        actual["components"]["schemas"]["A"]["properties"]["estado"]["enum"] = ["a"]
+        roturas = cmp.comparar(self._contrato(), actual)
+        self.assertTrue(any(r["codigo"] == "ENUM_RESPUESTA_REDUCIDO" for r in roturas))
+
+    def test_requerido_nuevo_en_respuesta(self) -> None:
+        actual = self._contrato()
+        actual["components"]["schemas"]["A"]["required"] = ["campo", "estado"]
+        roturas = cmp.comparar(self._contrato(), actual)
+        self.assertTrue(any(r["codigo"] == "REQUERIDO_RESPUESTA_NUEVO" for r in roturas))
+
+    def test_esquema_de_respuesta_cambiado(self) -> None:
+        actual = self._contrato(respuesta={"description": "ok", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/B"}}}})
+        actual["components"]["schemas"]["B"] = {"type": "object", "properties": {}}
+        roturas = cmp.comparar(self._contrato(), actual)
+        self.assertTrue(any(r["codigo"] == "ESQUEMA_RESPUESTA_CAMBIADO" for r in roturas))
+
+    def test_seguridad_global_cambiada(self) -> None:
+        base = self._contrato(seguridad_global=[])
+        actual = self._contrato(seguridad_global=[{"BearerAuth": []}])
+        roturas = cmp.comparar(base, actual)
+        self.assertTrue(any(r["codigo"] == "SEGURIDAD_ENDURECIDA" for r in roturas))
+
+    def test_seguridad_de_operacion_cambiada(self) -> None:
+        base = self._contrato(seguridad_op=[{"BearerAuth": []}])
+        actual = self._contrato(seguridad_op=[])
+        roturas = cmp.comparar(base, actual)
+        self.assertTrue(any(r["codigo"] == "SEGURIDAD_RELAJADA" for r in roturas))
+
+    def test_scopes_cambiados(self) -> None:
+        base = self._contrato(seguridad_op=[{"BearerAuth": ["read"]}])
+        actual = self._contrato(seguridad_op=[{"BearerAuth": ["read", "write"]}])
+        roturas = cmp.comparar(base, actual)
+        self.assertTrue(any(r["codigo"] == "SCOPES_CAMBIADOS" for r in roturas))
+
+    def test_herencia_global_no_marca_ruptura_si_es_igual(self) -> None:
+        base = self._contrato(seguridad_global=[{"BearerAuth": []}])
+        actual = self._contrato(seguridad_global=[{"BearerAuth": []}])
+        self.assertEqual(cmp.comparar(base, actual), [])
+
+    def test_ref_irresoluble_falla_cerrado(self) -> None:
+        actual = self._contrato()
+        actual["components"]["schemas"] = {}
+        with self.assertRaises(cmp.ErrorComparacion):
+            cmp.comparar(self._contrato(), actual)
+
+    def test_rfc_inexistente_no_aprueba_excepcion(self) -> None:
+        datos = {"excepciones": [{"codigo": "RUTA_ELIMINADA", "ruta": "/x", "metodo": "*", "estado": "APPROVED", "rfc": "RFC-999"}]}
+        self.assertEqual(cmp.excepciones_aprobadas(datos), [])
+
+    def test_rfc_ratificada_aprueba_excepcion(self) -> None:
+        datos = {"excepciones": [{"codigo": "RUTA_ELIMINADA", "ruta": "/x", "metodo": "*", "estado": "APPROVED", "rfc": "RFC-006"}]}
+        self.assertEqual(len(cmp.excepciones_aprobadas(datos)), 1)
+
+    def test_contrato_base_ausente_falla_cerrado(self) -> None:
+        with self.assertRaises(cmp.ErrorComparacion):
+            cmp.cargar("no-existe.json")
+
+
+class ModeracionTextoLibre(unittest.TestCase):
+    """INF-150-07: las tres operaciones documentadas y una nueva no pasa desapercibida."""
+
+    def test_operaciones_documentadas(self) -> None:
+        documento = (RAIZ / "sdd" / "_control" / "H08" / "MODERACION_CDN_I150.md").read_text(encoding="utf-8")
+        for identificador in ("E028", "E030", "E075"):
+            self.assertIn(identificador, documento)
+        self.assertIn("BLOCKED_DEPENDENCY", documento)
+        self.assertIn("moderacion_operativa", documento)
+
+    def test_no_se_declara_no_aplica(self) -> None:
+        documento = (RAIZ / "sdd" / "_control" / "H08" / "MATRIZ_INF_150.md").read_text(encoding="utf-8")
+        self.assertNotIn("NO_APLICA_HOY", documento)
+
+    def test_operacion_nueva_con_texto_sin_diseno_se_rechaza(self) -> None:
+        contrato = {
+            "openapi": "3.1.0",
+            "paths": {"/api/v1/nuevo": {"post": {
+                "operationId": "nexum_e900",
+                "x-nexum-catalog-id": "E900",
+                "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Nuevo"}}}},
+                "responses": {"200": {"description": "ok"}},
+            }}},
+            "components": {"schemas": {"Nuevo": {"type": "object", "properties": {"texto": {"type": "string"}}}}},
+        }
+        resultado = pub.escanear_contenido(contrato)
+        self.assertEqual(resultado["estado"], "CONVENIO_INVALIDO" if False else "CONTENIDO_SIN_DISENO")
+        self.assertTrue(any("E900" in p for p in resultado["problemas"]))
+
+    def test_moderacion_nunca_operativa(self) -> None:
+        self.assertFalse(pub.escanear_contenido()["moderacion_operativa"])
 
 
 if __name__ == "__main__":  # pragma: no cover

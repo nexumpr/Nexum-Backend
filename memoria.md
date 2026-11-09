@@ -692,3 +692,10 @@
 - **Frontera:** `FRONTERA_RESPONSABILIDAD.md` con Mobile/Play/landing fuera del gate.
 - **Contenido:** 0 operaciones con medios y 3 con texto libre de usuario (E028, E030, E075); `MODERACION_CDN_I150.md` documenta el criterio sin declarar moderacion operativa.
 - Pruebas: 70 en `tests/infra/publicacion`. Sin AWS, sin HTTP real y sin merge.
+
+### I-150 correccion de revision (2026-11-09)
+
+- **Paridad semantica:** `estructura_yaml` implementa un parser de bloque sin dependencias y `paridad` compara por operacion metodo+ruta, `operationId`, `x-nexum-catalog-id`, `security`, parametros (nombre, ubicacion, obligatoriedad), `requestBody` y respuestas (codigo y `$ref`). Un cambio solo en YAML con el mismo numero de operaciones produce `PARIDAD_ROTA`; tabulaciones, claves duplicadas y `$ref` irresolubles fallan cerrado.
+- **Breaking changes:** se anaden `PROPIEDAD_RESPUESTA_ELIMINADA`, `TIPO_RESPUESTA_CAMBIADO`, `ENUM_RESPUESTA_REDUCIDO`, `REQUERIDO_RESPUESTA_NUEVO`, `ESQUEMA_RESPUESTA_CAMBIADO` y `SCOPES_CAMBIADOS`; la seguridad efectiva respeta operacion sobre global (incluido `security: []`); `$ref` roto lanza `ErrorComparacion` (codigo 2); una excepcion solo cuenta si su RFC esta ratificada en un documento de `sdd/_control/H08`.
+- **INF-150-07:** `MODERACION_CDN_I150.md` documenta E028, E030 y E075 con separacion validacion/sanitizacion/moderacion, punto de control previo a persistir, codigos de rechazo, PII, evaluacion de servicio cloud (local, Amazon Comprehend sin precio verificado y externo rechazado), CDN descartada por CloudFront D2 y `BLOCKED_DEPENDENCY`; `contenido` rechaza cualquier operacion con texto que no figure en el diseno.
+- Pruebas: 96 en `tests/infra/publicacion`. Sin AWS, sin HTTP real y sin merge.

@@ -61,3 +61,7 @@
 - [x] Cuatro niveles de evidencia HTTP separados; comandos `curl` generados sin ejecutar.
 - [x] Frontera de responsabilidad documentada y validada.
 - [x] Inventario de contenido: 0 medios y 3 operaciones con texto libre con criterio documentado.
+- [x] Paridad semantica por operacion (metodo, ruta, operationId, seguridad, parametros, respuestas).
+- [x] Breaking changes en respuestas y seguridad efectiva con scopes.
+- [x] Excepciones solo con RFC ratificada verificable.
+- [x] Moderacion: tres operaciones documentadas y `BLOCKED_DEPENDENCY` para servicio externo.
