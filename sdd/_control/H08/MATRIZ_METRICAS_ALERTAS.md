@@ -23,7 +23,7 @@
 | `CurrConnections`, `Evictions`, `DatabaseMemoryUsagePercentage` | AWS/ElastiCache | Redis | Alarma A7 (conexiones) + dashboard |
 | `nexum_http_requests_total`, `nexum_http_request_duration_seconds`, `nexum_go_*` | `/metrics` local (proceso Go) | RPS/latencia/runtime | Exportador local; agente/OTel **NOT_RUN** |
 
-**p50/p95/p99**: se obtienen de `latencyMs` en Logs Insights (`stats percentile(latencyMs, 50)`),
+**p50/p95/p99**: se obtienen de `latencyMs` en Logs Insights (`stats pct(latencyMs, 50)`),
 no de una métrica nativa. Sin agente de logs, `NOT_RUN`.
 
 ## 2. Alarmas declaradas
@@ -42,16 +42,18 @@ no de una métrica nativa. Sin agente de logs, `NOT_RUN`.
 A7/A8 sólo existen si se aportan `redis_replication_group_id`/`dynamodb_table_name`; en `envs/h08i`
 se cablean desde I-050/I-040. Son 8 alarmas declaradas (2 condicionales).
 
-El presupuesto (`aws_budgets_budget`, 1 USD) queda declarado **sin notificación** hasta resolver
-`RFC-007` (SNS con CMK frente a coste no presupuestado). **No es un límite de gasto** y no detiene
-recursos. Las alarmas existen y se ven en consola/dashboard, pero no envían notificación automática.
+El presupuesto (`aws_budgets_budget`, 1 USD) admite **notificación directa por email sin SNS**
+(`subscriber_email_addresses`) mediante la variable externa `emails_presupuesto`, vacía por defecto y sin
+direcciones reales en Git. Si no hay destinatario configurado, no se declara notificación funcional.
+**No es un límite de gasto** y no detiene recursos.
 
-## 2.1 Bloqueo de notificación (RFC-007)
+## 2.1 Bloqueo de notificación de alarmas (RFC-007)
 
 `aws_sns_topic` con `alias/aws/sns` dispara Trivy AWS-0136 (HIGH: exige CMK de cliente); una CMK tiene
-coste mensual no presupuestado y no se crea unilateralmente. Se retiraron SNS, `alarm_actions` y las
-notificaciones del presupuesto. `ALERT_DELIVERY = BLOCKED_RFC007_SNS_KMS`; las alarmas siguen visibles
-y con runbook. No se declara entrega de alertas verificada.
+coste mensual no presupuestado y no se crea unilateralmente. Se retiraron SNS y `alarm_actions`.
+`ALERT_DELIVERY = BLOCKED_RFC007_SNS_KMS`. Las notificaciones de AWS Budgets por email son una capacidad
+distinta y no dependen de SNS; su estado es `IMPLEMENTADO_LOCAL` sin destinatario verificado. Las alarmas
+siguen visibles y con runbook.
 
 ## 3. Runbooks
 
@@ -107,4 +109,8 @@ y con runbook. No se declara entrega de alertas verificada.
   dependencia, no como verificados.
 - Go runtime/OTel no está exportado a CloudWatch; `/metrics` local (loopback) está implementado y
   probado, pero el agente/OTel de recolección es `NOT_RUN`.
-- Las alarmas no limitan gasto; el presupuesto es informativo y su notificación está bloqueada.
+- Las alarmas no limitan gasto; el presupuesto es informativo y su notificación por email requiere
+  destinatario autorizado.
+- **Rutas y cardinalidad**: las rutas no registradas se registran como `/unknown`; `/metrics` limita a 500
+  series y descarta el resto (`nexum_metrics_series_dropped_total`). No se usan IDs, correos ni tokens
+  como etiquetas.

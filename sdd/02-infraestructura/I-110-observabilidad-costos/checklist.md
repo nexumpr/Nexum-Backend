@@ -60,3 +60,8 @@
 - [x] 4 metric filters y 8 alarmas con runbook A1-A8 (2 condicionales).
 - [ ] Pipeline real de logs: agente CloudWatch (I-020) y AWS_VERIFIED NOT_RUN.
 - [ ] D-110-01 (A-090) headers de trazabilidad sin validacion estricta; Gate de A-090 requerido.
+
+- [x] Dimensiones ALB/TG evaluadas por terraform test, no solo validate.
+- [x] Consultas Logs Insights con pct() y contrato que rechaza percentile().
+- [x] Rutas desconocidas /unknown y cardinalidad acotada a 500 series.
+- [x] AWS Budgets con notificacion email declarativa sin SNS; ALERT_DELIVERY CloudWatch sigue bloqueado.

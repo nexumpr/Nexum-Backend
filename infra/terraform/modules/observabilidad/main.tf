@@ -10,8 +10,9 @@ terraform {
 }
 
 locals {
-  # Dimensiones de ALB/TG: se derivan del ARN para no modificar I-030.
-  alb_suffix = replace(var.alb_arn, "/^arn:aws:elasticloadbalancing:[^:]+:[0-9]+:/", "")
+  # Dimensiones de ALB/TG derivadas del ARN (sin modificar I-030).
+  # LoadBalancer espera `app/<nombre>/<id>`; TargetGroup espera `targetgroup/<nombre>/<id>`.
+  alb_suffix = replace(var.alb_arn, "/^arn:aws:elasticloadbalancing:[^:]+:[0-9]+:loadbalancer//", "")
   tg_suffix  = replace(var.target_group_arn, "/^arn:aws:elasticloadbalancing:[^:]+:[0-9]+:/", "")
   namespace  = "Nexum/Observabilidad"
   etiquetas = merge({
@@ -232,7 +233,18 @@ resource "aws_budgets_budget" "mensual" {
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
-
+  # AWS Budgets admite email directo sin SNS. S?lo se declara si hay destinatario
+  # externo configurado; no se versionan direcciones reales.
+  dynamic "notification" {
+    for_each = length(var.emails_presupuesto) > 0 ? [85, 100] : []
+    content {
+      comparison_operator        = "GREATER_THAN"
+      threshold                  = notification.value
+      threshold_type             = "PERCENTAGE"
+      notification_type          = notification.value == 100 ? "FORECASTED" : "ACTUAL"
+      subscriber_email_addresses = var.emails_presupuesto
+    }
+  }
 }
 
 resource "aws_cloudwatch_dashboard" "observabilidad" {

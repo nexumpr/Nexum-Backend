@@ -18,10 +18,13 @@ type metricKey struct {
 
 // Metrics mantiene contadores y latencias acotadas por ruta plantilla y estado.
 // No usa identificadores de usuario ni rutas crudas (cardinalidad limitada).
+const maxSeries = 500
+
 type Metrics struct {
 	mu        sync.Mutex
 	requests  map[metricKey]uint64
 	durations map[metricKey]float64
+	dropped   uint64
 }
 
 // NewMetrics crea un registro de métricas vacío.
@@ -39,6 +42,11 @@ func (m *Metrics) Observe(method, route string, status int, latency time.Duratio
 	}
 	key := metricKey{Method: strings.ToUpper(method), Route: route, Status: status}
 	m.mu.Lock()
+	if _, existe := m.requests[key]; !existe && len(m.requests) >= maxSeries {
+		m.dropped++
+		m.mu.Unlock()
+		return
+	}
 	m.requests[key]++
 	m.durations[key] += latency.Seconds()
 	m.mu.Unlock()
@@ -82,6 +90,10 @@ func (m *Metrics) Handler() http.Handler {
 		}
 		m.mu.Unlock()
 		lineas = append(lineas,
+			"# TYPE nexum_metrics_series gauge",
+			fmt.Sprintf("nexum_metrics_series %d", len(claves)),
+			"# TYPE nexum_metrics_series_dropped_total counter",
+			fmt.Sprintf("nexum_metrics_series_dropped_total %d", m.dropped),
 			"# TYPE nexum_go_goroutines gauge",
 			fmt.Sprintf("nexum_go_goroutines %d", runtime.NumGoroutine()),
 			"# TYPE nexum_go_mem_alloc_bytes gauge",

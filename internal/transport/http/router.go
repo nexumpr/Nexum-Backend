@@ -61,6 +61,21 @@ func (rt *Router) RegisterHealth(hr *HealthRegistry) {
 }
 
 // RegisterMetrics conecta el registro de métricas y expone /metrics (sólo loopback).
+// TemplateFor devuelve la plantilla registrada para una ruta conocida o /unknown.
+// Las rutas no registradas nunca devuelven segmentos arbitrarios (PII/cardinalidad).
+func (rt *Router) TemplateFor(path string) string {
+	switch path {
+	case "/health", "/ready", "/metrics":
+		return path
+	}
+	rt.mu.RLock()
+	defer rt.mu.RUnlock()
+	if _, existe := rt.routes[path]; existe {
+		return path
+	}
+	return "/unknown"
+}
+
 func (rt *Router) RegisterMetrics(m *telemetry.Metrics) {
 	rt.mu.Lock()
 	rt.metrics = m

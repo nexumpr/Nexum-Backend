@@ -239,6 +239,14 @@ jobs:
       - name: Vigencia de la excepcion RFC-006
         run: python3 herramientas/verificar_vigencia_rfc006.py
 
+      - name: Terraform test del módulo de observabilidad
+        working-directory: infra/terraform/modules/observabilidad
+        env:
+          TF_DATA_DIR: ${{ runner.temp }}/tf-test-observabilidad
+        run: |
+          terraform init -backend=false -input=false
+          terraform test
+
       - name: Pruebas de contrato Terraform e IaC
         run: python3 -m unittest discover -s tests/infra/terraform
 

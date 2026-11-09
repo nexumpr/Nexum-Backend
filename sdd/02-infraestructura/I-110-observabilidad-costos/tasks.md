@@ -97,3 +97,6 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - Pipeline de logs: LOG_PIPELINE_IMPLEMENTED_LOCAL y AWS_VERIFIED NOT_RUN. I-010 tiene endpoint logs e I-060 permisos acotados; falta agente de CloudWatch en I-020.
 - D-110-01 (A-090): headers de tracing solo validan longitud, no hex/flags, y X-Request-ID sin limite; registrado sin corregir.
 - Coste: +0.5000 USD/mes estimado por 5 alarmas extra (no medido). Notificacion SNS BLOCKED_RFC007_SNS_KMS.
+
+- Correccion final (2026-11-08): dimensiones ALB/TG corregidas (app/... sin loadbalancer/) con dimensiones.tftest.hcl ejecutado por terraform test en CI; consultas Logs Insights pasan a pct(); rutas desconocidas -> /unknown y metricas limitadas a 500 series con contador de descartes; AWS Budgets admite emails directos sin SNS (variable vacia por defecto); ALERT_DELIVERY sigue BLOCKED_RFC007_SNS_KMS.
+- Pruebas: contrato Terraform 12, adversariales de ruta (UUID/email/nombre/token/encoded/larga/miles) y cardinalidad; Go build/vet PASS.

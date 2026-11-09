@@ -26,7 +26,7 @@ SOURCE '/nexum/h08i/backend'
 -- Latencia p50/p95/p99 a partir de los logs (no es métrica nativa)
 SOURCE '/nexum/h08i/backend'
 | fields latencyMs, route
-| stats percentile(latencyMs, 50) as p50, percentile(latencyMs, 95) as p95, percentile(latencyMs, 99) as p99 by route
+| stats pct(latencyMs, 50) as p50, pct(latencyMs, 95) as p95, pct(latencyMs, 99) as p99 by route
 
 -- Errores por ruta y traza
 SOURCE '/nexum/h08i/backend'

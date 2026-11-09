@@ -14,11 +14,12 @@ var patronUUID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{
 
 // RequestLogOptions configura el registro canónico de peticiones (I-110, INF-110-01).
 type RequestLogOptions struct {
-	Logger      *slog.Logger
-	Service     string
-	Environment string
-	InstanceID  string
-	Metrics     *telemetry.Metrics
+	Logger        *slog.Logger
+	Service       string
+	Environment   string
+	InstanceID    string
+	Metrics       *telemetry.Metrics
+	RouteResolver func(string) string
 }
 
 // RequestLogger emite un registro estructurado por petición y actualiza métricas.
@@ -43,7 +44,12 @@ func RequestLogger(opts RequestLogOptions) Middleware {
 			next.ServeHTTP(rec, r)
 			duracion := time.Since(inicio)
 
-			ruta := SanitizeRoute(r.URL.Path)
+			ruta := "/unknown"
+			if opts.RouteResolver != nil {
+				if plantilla := opts.RouteResolver(r.URL.Path); plantilla != "" {
+					ruta = plantilla
+				}
+			}
 			status := rec.status
 			if status == 0 {
 				status = http.StatusOK
@@ -79,41 +85,6 @@ func RequestLogger(opts RequestLogOptions) Middleware {
 			}
 		})
 	}
-}
-
-// SanitizeRoute convierte segmentos con UUID o numéricos en `{id}`.
-func SanitizeRoute(path string) string {
-	if path == "" {
-		return "/"
-	}
-	partes := strings.Split(path, "/")
-	for i, parte := range partes {
-		if parte == "" {
-			continue
-		}
-		if patronUUID.MatchString(parte) || esNumerico(parte) || (len(parte) >= 24 && esHex(parte)) {
-			partes[i] = "{id}"
-		}
-	}
-	return strings.Join(partes, "/")
-}
-
-func esNumerico(valor string) bool {
-	for _, c := range valor {
-		if c < '0' || c > '9' {
-			return false
-		}
-	}
-	return valor != ""
-}
-
-func esHex(valor string) bool {
-	for _, c := range valor {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
-			return false
-		}
-	}
-	return true
 }
 
 type statusRecorder struct {

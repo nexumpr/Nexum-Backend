@@ -64,10 +64,12 @@ class AlarmasYPresupuesto(unittest.TestCase):
         self.assertIn('"NOT_CONFIGURED_BLOCKED_RFC007_SNS_KMS"', _leer(MODULO / "outputs.tf"))
         self.assertIn("RFC007", _leer(MODULO / "outputs.tf"))
 
-    def test_presupuesto_declarativo_sin_notificacion_sns(self) -> None:
+    def test_presupuesto_declarativo_sin_sns(self) -> None:
         self.assertIn(("aws_budgets_budget", "mensual"), self.r)
         self.assertRegex(self.main, r'limit_amount\s*=\s*tostring\(var\.presupuesto_usd\)')
-        self.assertNotIn("notification {", self.main)
+        self.assertIn('dynamic "notification"', self.main)
+        self.assertIn("subscriber_email_addresses = var.emails_presupuesto", self.main)
+        self.assertIn('default     = []', self.vars.split('variable "emails_presupuesto"')[1].split("}")[0])
         self.assertIn("límite de gasto", _leer(MODULO / "outputs.tf") + _leer(RAIZ / "sdd" / "_control" / "H08" / "MATRIZ_METRICAS_ALERTAS.md"))
 
     def test_sin_recursos_de_cost_extra(self) -> None:
@@ -86,6 +88,29 @@ class DashboardYCableado(unittest.TestCase):
         cls.main = _leer(MODULO / "main.tf")
         cls.env = _leer(ENV / "main.tf")
         cls.outs = _leer(MODULO / "outputs.tf")
+
+    def test_dimension_alb_sin_prefijo_loadbalancer(self) -> None:
+        import re
+        arn = "arn:aws:elasticloadbalancing:us-east-2:123456789012:loadbalancer/app/nexum-alb/abc123"
+        patron = r"^arn:aws:elasticloadbalancing:[^:]+:[0-9]+:loadbalancer/"
+        self.assertEqual(re.sub(patron, "", arn), "app/nexum-alb/abc123")
+        self.assertIn("loadbalancer//", self.main)
+        self.assertIn('aws_cloudwatch_metric_alarm" "targets_sanos"', self.main)
+        self.assertIn('"AWS/ApplicationELB"', self.main)
+        self.assertIn("LoadBalancer = local.alb_suffix", self.main)
+        self.assertIn("TargetGroup  = local.tg_suffix", self.main)
+        testfile = MODULO / "dimensiones.tftest.hcl"
+        self.assertTrue(testfile.is_file())
+        contenido = _leer(testfile)
+        self.assertIn('local.alb_suffix == "app/nexum-alb/abc123"', contenido)
+        self.assertIn('local.tg_suffix == "targetgroup/nexum-tg/def456"', contenido)
+
+    def test_consultas_logs_insights_usan_pct(self) -> None:
+        for nombre in ("DASHBOARD_OBSERVABILIDAD.md", "MATRIZ_METRICAS_ALERTAS.md"):
+            texto = _leer(RAIZ / "sdd" / "_control" / "H08" / nombre)
+            self.assertNotIn("percentile(", texto, nombre)
+            self.assertIn("pct(latencyMs", texto, nombre)
+        self.assertIn("SOURCE '", _leer(RAIZ / "sdd" / "_control" / "H08" / "DASHBOARD_OBSERVABILIDAD.md"))
 
     def test_dashboard_condicional_sin_pii(self) -> None:
         self.assertIn(("aws_cloudwatch_dashboard", "observabilidad"), [(t, n) for t, n in recursos(self.main)])

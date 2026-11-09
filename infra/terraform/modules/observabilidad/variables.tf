@@ -111,3 +111,13 @@ variable "umbral_throttles" {
     error_message = "umbral_throttles debe ser >= 1."
   }
 }
+
+variable "emails_presupuesto" {
+  description = "Destinatarios externos para AWS Budgets (sin SNS). Vac?o por defecto; nunca se versionan direcciones reales."
+  type        = list(string)
+  default     = []
+  validation {
+    condition     = alltrue([for email in var.emails_presupuesto : can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", email))])
+    error_message = "emails_presupuesto debe contener direcciones con formato b?sico."
+  }
+}

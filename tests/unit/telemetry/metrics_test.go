@@ -49,3 +49,24 @@ func TestMetricsSoloLoopback(t *testing.T) {
 		t.Errorf("origen no loopback debe recibir 403, obtenido %d", rec.Code)
 	}
 }
+
+func TestMetricsCardinalidadAcotada(t *testing.T) {
+	m := infraTelemetry.NewMetrics()
+	for i := 0; i < 2000; i++ {
+		m.Observe(http.MethodGet, "/ruta/unica/"+strings.Repeat("x", i%20)+string(rune('a'+i%26)), 200, time.Millisecond)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, req)
+	cuerpo := rec.Body.String()
+	if !strings.Contains(cuerpo, "nexum_metrics_series 500") {
+		t.Errorf("se esperaban 500 series máximas:\n%s", cuerpo)
+	}
+	if !strings.Contains(cuerpo, "nexum_metrics_series_dropped_total") {
+		t.Errorf("falta contador de series descartadas")
+	}
+	if strings.Count(cuerpo, "nexum_http_requests_total{") > 500 {
+		t.Errorf("se expusieron más de 500 series")
+	}
+}

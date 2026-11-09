@@ -36,9 +36,16 @@ iniciar I-120/I-140.
   bloqueante para observabilidad real, no corregida aquí.
 - **AWS `NOT_RUN`**: ningún log group, alarma, SNS o presupuesto creado.
 - **Notificación de alarmas**: `aws_sns_topic` con clave gestionada por AWS dispara Trivy AWS-0136; una CMK
-  de cliente tiene coste no presupuestado. Se retiraron SNS, `alarm_actions` y notificaciones del
-  presupuesto. `ALERT_DELIVERY = BLOCKED_RFC007_SNS_KMS`; RFC-007 pendiente. Las alarmas se ven en
-  consola/dashboard y conservan runbook, pero no envían aviso automático.
+  de cliente tiene coste no presupuestado. Se retiraron SNS y `alarm_actions`.
+  `ALERT_DELIVERY = BLOCKED_RFC007_SNS_KMS`. Las notificaciones de **AWS Budgets por email** son una
+  capacidad distinta (sin SNS), implementadas con `emails_presupuesto` vacío por defecto; sin destinatario
+  verificado no se declaran funcionales.
+- **Dimensiones ALB**: `LoadBalancer` se deriva a `app/<nombre>/<id>` (sin `loadbalancer/`) y `TargetGroup`
+  a `targetgroup/<nombre>/<id>`; `dimensiones.tftest.hcl` evalúa los valores en CI con `terraform test`.
+- **Logs Insights**: consultas con `pct(latencyMs, N)` (no `percentile`); validación estática, ejecución
+  real `NOT_RUN`.
+- **Rutas y cardinalidad**: rutas no registradas → `/unknown`; métricas limitadas a 500 series con contador
+  de descartes; sin PII, IDs ni tokens en etiquetas.
 - **Coste**: 4 metric filters + 8 alarmas; I-000 presupuesta 3 alarmas, por lo que hay **+0.5000 USD/mes**
   estimados (no medidos). El margen de 6.9387 USD lo cubre, pero no se declara medido.
 - **Pipeline de logs**: `LOG_PIPELINE_IMPLEMENTED_LOCAL`; `LOG_PIPELINE_AWS_VERIFIED = NOT_RUN`. I-010 ya
