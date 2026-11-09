@@ -70,3 +70,34 @@ de `tests/infra/ci` al pipeline.
 El primer despliegue AWS requiere un Gate independiente que declare plan FREE vigente,
 créditos, IAM, TLS, SKU de Redis, backups y verificación de dos nodos. Este Gate **no**
 habilita ese paso ni lo prepara como ejecución.
+
+## 7. Registro de integracion — 2026-11-09
+
+- `APRUEBO_MERGE_PR_36_SHA_17fc73d45a7528a05f3e17767c9e30b7605d82f5` concedido por el
+  responsable; HEAD verificado por igualdad exacta y `--match-head-commit`; **13/13**
+  checks en `pass` (`validar` incluido) y `MERGEABLE`/`CLEAN`.
+- **PR #36 `MERGED`** (`2026-11-09T15:47:20Z`); merge commit y `main` =
+  **`a441a0cada5c22fc3bdf9c094c7d11bc8aa2540c`** (padres `1e910d2` y `17fc73d`);
+  `git pull --ff-only` dejo `main` local identico a `origin/main`.
+- CI post-merge sobre `main` en `a441a0c`: **Go Backend CI `success`** (run
+  `42648177960`) y **SDD documental `success`** (run `42648178034`).
+- Estado: **INTEGRADO_MAIN — NO DESPLEGADO**. `AWS_NOT_RUN`, `DEPLOY_NOT_RUN`,
+  `HTTP_AWS_NOT_RUN`, `TWO_NODES_AWS_NOT_VERIFIED`, `DAST_NOT_RUN`.
+
+## 8. Correccion D-01 — deteccion en commits de merge (2026-11-09)
+
+- **Defecto observado en la ejecucion post-merge**: en el run `42648177960` solo se
+  ejecutaron `detectar`, `secretos` y los consolidadores; el resto quedo `skipped` y el
+  Quality Gate lo acepto.
+- **Causa raiz**: `git show --name-only <merge>` devuelve **vacio** (git no muestra el
+  diff de un merge por defecto) y `archivos_desde_git` aceptaba ese vacio como «sin
+  cambios», cortocircuitando antes de la comparacion con el primer padre.
+- **Correccion**: se prueba **primero** `git diff --name-only <sha>^1 <sha>`, despues
+  `git show`, y una salida vacia **ya no** se acepta como «sin cambios»: se pasa a la
+  siguiente estrategia y, si todas quedan vacias, se devuelve `None` para activar el
+  perfil completo (fail-closed).
+- **Pruebas nuevas**: merge con `show` vacio y diff contra el primer padre con rutas;
+  todas las estrategias vacias -> `None`; `workflow_dispatch` -> `None`; el PR usa
+  `base...head` como primera estrategia.
+- Alcance: unicamente la herramienta de deteccion y sus pruebas. Sin AWS, sin cambios en
+  el grafo, sin cambios en `cd-backend.yml`.

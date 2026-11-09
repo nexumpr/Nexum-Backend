@@ -21,6 +21,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Callable
 
 CAMPOS = ("go", "api", "sdd", "infra", "completo")
 
@@ -92,28 +93,58 @@ def clasificar(archivos: list[str]) -> dict[str, bool]:
     return perfil
 
 
-def archivos_desde_git(evento: str, base: str, head: str, timeout: int = 60) -> list[str] | None:
-    """Lista los archivos cambiados. Devuelve None si no se puede determinar."""
+def _ejecutar_git(comando: list[str], timeout: int) -> tuple[int, str]:
+    """Ejecuta git y devuelve (codigo, salida). No lanza: el fallo se trata arriba."""
+    try:
+        resultado = subprocess.run(comando, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return 1, ""
+    return resultado.returncode, resultado.stdout
+
+
+def estrategias(evento: str, base: str, head: str) -> list[list[str]]:
+    """Orden de intentos para obtener los archivos cambiados.
+
+    En un commit de **merge**, `git show --name-only` no devuelve rutas (git no
+    difunde el diff de un merge salvo con `--first-parent`/`-m`). Por eso la
+    comparacion con el primer padre se intenta **antes** que `git show`: de lo
+    contrario el detector concluiria «sin cambios» y omitiria todos los jobs.
+    """
+    intentos: list[list[str]] = []
+    if evento == "pull_request" and base and head:
+        intentos.append(["git", "diff", "--name-only", f"{base}...{head}"])
+        intentos.append(["git", "diff", "--name-only", base, head])
+    if head:
+        intentos.append(["git", "diff", "--name-only", f"{head}^1", head])
+        intentos.append(["git", "show", "--pretty=", "--name-only", head])
+    intentos.append(["git", "diff", "--name-only", "HEAD~1", "HEAD"])
+    return intentos
+
+
+def archivos_desde_git(
+    evento: str,
+    base: str,
+    head: str,
+    timeout: int = 60,
+    ejecutar: Callable[[list[str]], tuple[int, str]] | None = None,
+) -> list[str] | None:
+    """Lista los archivos cambiados. Devuelve None si no se puede determinar.
+
+    Una salida vacia **no** se acepta como «sin cambios»: se prueba la siguiente
+    estrategia y, si todas quedan vacias, se devuelve None para que el llamador
+    active el perfil completo (fail-closed).
+    """
     if evento == "workflow_dispatch":
         return None
 
-    intentos: list[list[str]] = []
-    if evento == "pull_request":
-        if base and head:
-            intentos.append(["git", "diff", "--name-only", f"{base}...{head}"])
-            intentos.append(["git", "diff", "--name-only", base, head])
-    if head:
-        intentos.append(["git", "show", "--pretty=", "--name-only", head])
-    intentos.append(["git", "diff", "--name-only", "HEAD~1", "HEAD"])
-
-    for comando in intentos:
-        try:
-            resultado = subprocess.run(
-                comando, capture_output=True, text=True, timeout=timeout, check=True
-            )
-        except (OSError, subprocess.SubprocessError):
+    ejecutor = ejecutar or (lambda comando: _ejecutar_git(comando, timeout))
+    for comando in estrategias(evento, base, head):
+        codigo, salida = ejecutor(comando)
+        if codigo != 0:
             continue
-        return [linea for linea in resultado.stdout.splitlines() if linea.strip()]
+        rutas = [linea for linea in salida.splitlines() if linea.strip()]
+        if rutas:
+            return rutas
     return None
 
 

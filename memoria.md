@@ -731,3 +731,10 @@
 - Pruebas locales: 179 herramientas, 62 contrato de CI, 321 Terraform, 258 FinOps, 181 operacion, 129 respaldo, 110 publicacion; `SDD_DOCUMENTAL_PASS` y `H06_CONTRACT_PASS`; `go build`/`go vet`/`gofmt` limpios.
 - Limitacion verificada: el binario de Semgrep queda bloqueado por la politica de Control de aplicaciones de Windows (`WinError 4551`), igual que `go test`; la validacion efectiva ocurre en el runner Linux.
 - Sin AWS: `AWS_NOT_RUN`, `DEPLOY_NOT_RUN`, `HTTP_AWS_NOT_RUN`, `TWO_NODES_AWS_NOT_VERIFIED`, `DAST_NOT_RUN`.
+
+### Cierre post-merge RFC-008 y correccion D-01 (2026-11-09)
+
+- `APRUEBO_MERGE_PR_36_SHA_17fc73d45a7528a05f3e17767c9e30b7605d82f5`; HEAD verificado con `--match-head-commit`; 13/13 checks en `pass`.
+- **PR #36 MERGED** (merge `a441a0cada5c22fc3bdf9c094c7d11bc8aa2540c`, padres `1e910d2` y `17fc73d`); CI de `main`: Go Backend CI run 42648177960 success y SDD documental run 42648178034 success.
+- **Defecto D-01 detectado por la propia ejecucion post-merge**: en un commit de merge `git show --name-only` devuelve vacio y el detector lo interpretaba como «sin cambios», dejando `skipped` ocho jobs. Corregido: se compara con el primer padre antes de `git show` y una salida vacia ya **no** se acepta; si ninguna estrategia devuelve rutas, el perfil se fuerza a completo (fail-closed). Con pruebas nuevas del caso merge.
+- Estado: **INTEGRADO_MAIN — NO DESPLEGADO**. `AWS_NOT_RUN`, `DEPLOY_NOT_RUN`, `HTTP_AWS_NOT_RUN`, `TWO_NODES_AWS_NOT_VERIFIED`, `DAST_NOT_RUN`, `MUTATION = BLOCKED_TECNICO_MUTACION`.
