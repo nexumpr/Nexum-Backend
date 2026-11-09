@@ -738,3 +738,28 @@
 - **PR #36 MERGED** (merge `a441a0cada5c22fc3bdf9c094c7d11bc8aa2540c`, padres `1e910d2` y `17fc73d`); CI de `main`: Go Backend CI run 42648177960 success y SDD documental run 42648178034 success.
 - **Defecto D-01 detectado por la propia ejecucion post-merge**: en un commit de merge `git show --name-only` devuelve vacio y el detector lo interpretaba como «sin cambios», dejando `skipped` ocho jobs. Corregido: se compara con el primer padre antes de `git show` y una salida vacia ya **no** se acepta; si ninguna estrategia devuelve rutas, el perfil se fuerza a completo (fail-closed). Con pruebas nuevas del caso merge.
 - Estado: **INTEGRADO_MAIN — NO DESPLEGADO**. `AWS_NOT_RUN`, `DEPLOY_NOT_RUN`, `HTTP_AWS_NOT_RUN`, `TWO_NODES_AWS_NOT_VERIFIED`, `DAST_NOT_RUN`, `MUTATION = BLOCKED_TECNICO_MUTACION`.
+
+### Cierre post-merge PR #37 y verificacion de D-01 (2026-11-09)
+
+- `APRUEBO_MERGE_PR_37_SHA_d2708abc4c742642c1ab9641f441aa5efa406c1b`; HEAD verificado con `--match-head-commit`; 13/13 checks en `pass`.
+- **PR #37 MERGED** (merge `2ebc9f2398ad344fa826ed0cf88fe07b4710fedc`, padres `a441a0c` y `d2708ab`); `main` local = `origin/main`.
+- **D-01 confirmado corregido de extremo a extremo**: el run post-merge `42650883409` ejecuto **12/12 jobs en `success`** sin omisiones, frente a los **8 `skipped`** del run `42648177960` sobre el merge anterior. Deteccion local sobre `2ebc9f2`: 8 archivos y perfil completo.
+- CI de `main` en `2ebc9f2`: Go Backend CI run 42650883409 success y SDD documental run 42650883410 success.
+- Estado: **INTEGRADO_MAIN — NO DESPLEGADO**. `AWS_NOT_RUN`, `DEPLOY_NOT_RUN`, `HTTP_AWS_NOT_RUN`, `TWO_NODES_AWS_NOT_VERIFIED`, `DAST_NOT_RUN`, `MUTATION = BLOCKED_TECNICO_MUTACION`.
+
+### RFC-004 opcion B aprobada e implementada en local (2026-11-09)
+
+- `APRUEBO_RFC004_OPCION_B` concedido; Gate `sdd/_control/H08/GATE_H08I_RFC004_OPCION_B.md`. Sin AWS.
+- Modulo `infra/terraform/modules/secretos`: bucket privado (Block Public Access completo, `BucketOwnerEnforced`), versionado, SSE-S3, lifecycle de versiones no actuales (30 d), politica que deniega sin TLS y fuera del rol, `force_destroy = false`, preconditions de prefijo, retencion y ARN de rol.
+- IAM: `runtime_secretos` con `s3:GetObject` **solo** sobre el prefijo; variable validada que rechaza el bucket completo; `count` 0 por defecto para no alterar el resto.
+- Bootstrap: `SECRETOS_URI` + `python3` valida `{version, variables{...}}`, exige `APP_ENV`, rechaza claves y valores invalidos, escribe `/etc/nexum/backend.env` atomico en `0640 root:nexum` y **falla cerrado** si el bundle falta o es invalido.
+- Excepcion acotada de Trivy `AWS-0132` solo para `modules/secretos/main.tf`, justificada por la RFC aprobada (SSE-S3 sin CMK).
+- `fmt`/`validate` PASS. `AWS_NOT_RUN`; el bucket y el bundle **no** existen.
+
+### RFC-004: excepcion de ListBucket para el rol gestor IaC (2026-11-09)
+
+- Defecto real: el Deny global de `s3:ListBucket` habria impedido el refresh de `aws_s3_bucket` (HeadBucket exige esa accion en hashicorp/aws v5.72.0), rompiendo plan/apply tras instalar la policy.
+- Correccion: Deny global se mantiene para `ListBucketVersions` y `ListBucketMultipartUploads`; `ListBucket` se deniega con `ArnNotEquals aws:PrincipalArn` y valor unico `var.gestor_iac_arn`. La excepcion es ausencia de Deny, no un Allow: el rol necesita IAM propio y no obtiene acceso a objetos.
+- `gestor_iac_arn` validado como rol IAM, distinto de runtime y publicador; vacio o invalido falla el plan (validate local no se bloquea). Sin ARNs reales inventados ni derivacion desde STS.
+- Alcance residual declarado: el gestor puede enumerar nombres de claves, no contenidos.
+- Pruebas: 59 en `test_secretos_contrato.py`, 6 nuevas para el gestor y el resto de principales. `AWS_NOT_RUN`.

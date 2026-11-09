@@ -174,3 +174,14 @@ variable "unidad_sha256" {
   type        = string
   default     = ""
 }
+
+variable "secretos_s3_uri" {
+  description = "URI S3 del bundle de secretos (RFC-004). Vacio = sin bundle; el bootstrap falla cerrado."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.secretos_s3_uri == "" || can(regex("^s3://[a-z0-9.-]+/.+$", var.secretos_s3_uri))
+    error_message = "secretos_s3_uri debe ser una URI s3:// de un objeto."
+  }
+}

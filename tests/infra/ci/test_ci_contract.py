@@ -460,8 +460,12 @@ class EscaneoIaCReal(unittest.TestCase):
         self.assertIn("--ignorefile .trivyignore.yaml", self.bloque)
         self.assertNotIn("--ignore-policy", self.bloque)
         ids = re.findall(r"(?m)^\s*-\s+id:\s*(\S+)\s*$", self.ignore)
+        # RFC-004 (2026-11-09): AWS-0132 queda acotada a dos rutas (state y secretos).
         self.assertEqual(set(ids), {"AWS-0011", "AWS-0054", "AWS-0132"}, ids)
-        self.assertEqual(len(re.findall(r"(?m)^\s*statement:", self.ignore)), 3)
+        self.assertEqual(len(ids), 4, ids)
+        self.assertEqual(len(re.findall(r"(?m)^\s*statement:", self.ignore)), 4)
+        self.assertIn('"modules/secretos/main.tf"', self.ignore)
+        self.assertIn("APRUEBO_RFC004_OPCION_B", self.ignore)
         self.assertNotIn('"*"', self.ignore)
         self.assertNotIn("id: *", self.ignore)
         self.assertIn("RFC-006", self.ignore)

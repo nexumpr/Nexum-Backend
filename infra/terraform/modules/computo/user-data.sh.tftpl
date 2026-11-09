@@ -19,6 +19,7 @@ BINARIO_URI="${artefacto_uri}"
 BINARIO_SHA="${artefacto_sha}"
 UNIDAD_URI="${unidad_uri}"
 UNIDAD_SHA="${unidad_sha}"
+SECRETOS_URI="${secretos_uri}"
 SERVICIO="${servicio}"
 USUARIO="nexum"
 DIR_BIN="/opt/nexum/bin"
@@ -35,7 +36,7 @@ fail() { printf '%s\n' "[bootstrap][ERROR] $*" >&2; exit 1; }
 [[ "$(id -u)" -eq 0 ]] || fail "debe ejecutarse como root (cloud-init)"
 
 # Herramientas indispensables en AL2023 (documentadas en el README).
-for cmd in aws sha256sum install systemctl curl; do
+for cmd in aws sha256sum install systemctl curl python3; do
   command -v "$cmd" >/dev/null 2>&1 || fail "falta la herramienta '$cmd' en la AMI"
 done
 
@@ -71,9 +72,72 @@ install -m 0644 -o root -g root "$TMP/$SERVICIO.service" "/etc/systemd/system/$S
 [[ -x "$DIR_BIN/nexum-backend" ]] || fail "el binario no quedo ejecutable"
 [[ -f "/etc/systemd/system/$SERVICIO.service" ]] || fail "la unidad no quedo instalada"
 
+# Configuracion (RFC-004 opcion B): el bundle vive en un bucket privado con SSE-S3 y
+# se lee por el gateway endpoint de S3 con el rol de instancia (solo GetObject sobre
+# el prefijo). El objeto lo publica el operador fuera de banda; aqui no hay secretos.
+#
+# Estructura esperada del bundle:
+#   {"version": "v1", "variables": {"APP_ENV": "PRODUCTION", ...}}
+#
+# La escritura es atomica y con permisos restrictivos (0640 root:nexum). Cualquier
+# anomalia aborta: la instancia no se declara sana y el ASG la reemplaza.
+if [[ -n "$SECRETOS_URI" ]]; then
+  log "descargando bundle de secretos"
+  aws s3 cp --only-show-errors "$SECRETOS_URI" "$TMP/secrets.json" \
+    || fail "no se pudo descargar el bundle de secretos desde $SECRETOS_URI"
+  [[ -s "$TMP/secrets.json" ]] || fail "el bundle de secretos esta vacio"
+
+  python3 - "$TMP/secrets.json" "$ENV_FILE" <<'PY' || fail "bundle de secretos invalido"
+import json
+import os
+import re
+import sys
+
+origen, destino = sys.argv[1], sys.argv[2]
+
+try:
+    with open(origen, encoding="utf-8") as manejador:
+        datos = json.load(manejador)
+except (OSError, ValueError) as exc:
+    sys.exit(f"bundle ilegible: {exc}")
+
+if not isinstance(datos, dict):
+    sys.exit("bundle malformado: la raiz debe ser un objeto")
+
+version = datos.get("version")
+if not isinstance(version, str) or not version.strip():
+    sys.exit("bundle sin campo 'version'")
+
+variables = datos.get("variables")
+if not isinstance(variables, dict) or not variables:
+    sys.exit("bundle sin campo 'variables'")
+
+lineas = []
+for clave, valor in variables.items():
+    if not isinstance(clave, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]{1,63}", clave):
+        sys.exit(f"clave invalida: {clave!r}")
+    if not isinstance(valor, str) or "\n" in valor or "\r" in valor or "\x00" in valor:
+        sys.exit(f"valor invalido para {clave}")
+    lineas.append(f"{clave}={valor}")
+
+if not any(linea.startswith("APP_ENV=") for linea in lineas):
+    sys.exit("bundle sin la variable obligatoria APP_ENV")
+
+temporal = destino + ".nuevo"
+with open(temporal, "w", encoding="utf-8") as manejador:
+    manejador.write("\n".join(lineas) + "\n")
+os.chmod(temporal, 0o640)
+os.replace(temporal, destino)
+print(f"[bootstrap] configuracion instalada (version {version}, {len(lineas)} variables)")
+PY
+
+  chown root:"$USUARIO" "$ENV_FILE" || fail "no se pudo ajustar el propietario de $ENV_FILE"
+  chmod 0640 "$ENV_FILE" || fail "no se pudo ajustar el modo de $ENV_FILE"
+fi
+
 # Configuracion indispensable: sin ella el backend no puede operar.
 if [[ ! -f "$ENV_FILE" ]]; then
-  fail "falta $ENV_FILE (secretos/configuracion no suministrados; ver RFC-004)"
+  fail "falta $ENV_FILE (bundle de secretos no suministrado; ver RFC-004)"
 fi
 
 systemctl daemon-reload || fail "daemon-reload fallo"

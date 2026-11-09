@@ -108,6 +108,7 @@ resource "aws_launch_template" "backend" {
 
   user_data = base64encode(
     templatefile("${path.module}/user-data.sh.tftpl", {
+      secretos_uri  = var.secretos_s3_uri
       artefacto_uri = local.artefacto_uri
       artefacto_sha = local.artefacto_sha
       unidad_uri    = local.unidad_uri

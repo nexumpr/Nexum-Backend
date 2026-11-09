@@ -187,3 +187,21 @@ variable "iam_apply_environment_protected" {
   type        = bool
   default     = false
 }
+
+variable "secretos_version" {
+  description = "Version del bundle de secretos a fijar en el bootstrap (RFC-004). Vacio = sin bundle."
+  type        = string
+  default     = ""
+}
+
+variable "secretos_publicador_arn" {
+  description = "ARN de la identidad IAM que publica el bundle de secretos (RFC-004). Vacio = plan falla cerrado."
+  type        = string
+  default     = ""
+}
+
+variable "secretos_gestor_iac_arn" {
+  description = "ARN del rol IAM que ejecuta Terraform sobre el bucket de secretos (RFC-004). Vacio = plan fail-closed."
+  type        = string
+  default     = ""
+}

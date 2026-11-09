@@ -168,7 +168,8 @@ class GitHubOIDC(unittest.TestCase):
         for name in ("ci_validation", "terraform_plan", "terraform_apply"):
             self.assertIn(("aws_iam_role", name), self.r)
         policies = {n for t, n in self.r if t == "aws_iam_role_policy"}
-        self.assertEqual(policies, {"runtime", "terraform_apply_pass_runtime"})
+        # RFC-004 (2026-11-09): se anade una policy acotada de lectura del bundle de secretos.
+        self.assertEqual(policies, {"runtime", "terraform_apply_pass_runtime", "runtime_secretos"})
         self.assertIn("NONE_I070_BACKEND_AND_RESOURCE_INVENTORY_PENDING", _leer(MODULO / "outputs.tf"))
         self.assertIn("NONE_I080_I090_AND_DEPLOYMENT_GATE_PENDING", _leer(MODULO / "outputs.tf"))
 
