@@ -1,6 +1,7 @@
 package telemetry_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -53,7 +54,7 @@ func TestMetricsSoloLoopback(t *testing.T) {
 func TestMetricsCardinalidadAcotada(t *testing.T) {
 	m := infraTelemetry.NewMetrics()
 	for i := 0; i < 2000; i++ {
-		m.Observe(http.MethodGet, "/ruta/unica/"+strings.Repeat("x", i%20)+string(rune('a'+i%26)), 200, time.Millisecond)
+		m.Observe(http.MethodGet, fmt.Sprintf("/ruta/unica/%d", i), 200, time.Millisecond)
 	}
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	req.RemoteAddr = "127.0.0.1:12345"
