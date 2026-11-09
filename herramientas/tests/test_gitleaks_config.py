@@ -57,13 +57,14 @@ class ConfiguracionGitleaks(unittest.TestCase):
     def test_no_excluye_carpetas_ni_reglas(self) -> None:
         for prohibido in ("disabledRules", "stopwords", "'''sdd/'''", "'''sdd\\'"):
             self.assertNotIn(prohibido, self.sin_comentarios)
-        # Cada ruta autorizada es un archivo concreto, nunca un prefijo de carpeta.
-        rutas = re.findall(r"paths\s*=\s*\[\s*'''(.*?)'''", self.sin_comentarios)
-        self.assertEqual(len(rutas), 2, "solo el manifiesto y la prueba de I-120")
-        self.assertEqual(len([r for r in rutas if "BASELINE_SHA256" in r]), 1)
-        self.assertEqual(len([r for r in rutas if "tests/infra/operacion" in r]), 1)
-        for ruta in rutas:
-            self.assertTrue(ruta.endswith("$"), f"la ruta debe estar anclada: {ruta}")
+        # Cada ruta autorizada es un archivo concreto y anclado, nunca un prefijo.
+        self.assertIn("paths = ['''^sdd/_control/H07/BASELINE_SHA256\\.json$''']", self.sin_comentarios)
+        self.assertIn("'''^tests/infra/operacion/test_nexum_operacion\\.py$'''", self.sin_comentarios)
+        self.assertIn("'''^tests/infra/respaldo/test_backup_restore\\.py$'''", self.sin_comentarios)
+        self.assertEqual(self.sin_comentarios.count("tests/infra/operacion/"), 1)
+        self.assertEqual(self.sin_comentarios.count("tests/infra/respaldo/"), 1)
+        self.assertNotIn("tests/infra/**", self.sin_comentarios)
+        self.assertEqual(self.sin_comentarios.count("[allowlist]"), 0, "sin allowlist global")
 
     def test_patron_cubre_todos_los_documentos_secretos_sin_ocultar_credenciales(self) -> None:
         """El manifiesto declara ruta + digest; la excepción sólo cubre ese formato."""
