@@ -1,0 +1,124 @@
+{
+  "version": "1.0.0",
+  "cliente": "independiente del Backend (curl o cliente HTTP propio)",
+  "ejecucion": "NOT_RUN",
+  "pruebas": [
+    {
+      "id": "health-live",
+      "metodo": "GET",
+      "ruta": "/api/v1/health/live",
+      "esperado": "200",
+      "cliente_independiente": true,
+      "requiere_aws": true,
+      "estado": "NOT_RUN"
+    },
+    {
+      "id": "health-ready",
+      "metodo": "GET",
+      "ruta": "/api/v1/health/ready",
+      "esperado": "200 o 503 segun dependencias",
+      "cliente_independiente": true,
+      "requiere_aws": true,
+      "estado": "NOT_RUN"
+    },
+    {
+      "id": "registro",
+      "metodo": "POST",
+      "ruta": "/api/v1/auth/register",
+      "esperado": "201",
+      "cliente_independiente": true,
+      "requiere_aws": true,
+      "estado": "NOT_RUN"
+    },
+    {
+      "id": "login",
+      "metodo": "POST",
+      "ruta": "/api/v1/auth/login",
+      "esperado": "200",
+      "cliente_independiente": true,
+      "requiere_aws": true,
+      "estado": "NOT_RUN"
+    },
+    {
+      "id": "logout",
+      "metodo": "POST",
+      "ruta": "/api/v1/auth/logout",
+      "esperado": "204",
+      "cliente_independiente": true,
+      "requiere_aws": true,
+      "estado": "NOT_RUN"
+    },
+    {
+      "id": "endpoint-adicional-1",
+      "metodo": "GET",
+      "ruta": "/api/v1/movimientos",
+      "esperado": "200 paginado",
+      "cliente_independiente": true,
+      "requiere_aws": true,
+      "estado": "NOT_RUN"
+    },
+    {
+      "id": "endpoint-adicional-2",
+      "metodo": "POST",
+      "ruta": "/api/v1/movimientos",
+      "esperado": "201 idempotente",
+      "cliente_independiente": true,
+      "requiere_aws": true,
+      "estado": "NOT_RUN"
+    },
+    {
+      "id": "endpoint-adicional-3",
+      "metodo": "GET",
+      "ruta": "/api/v1/metas",
+      "esperado": "200",
+      "cliente_independiente": true,
+      "requiere_aws": true,
+      "estado": "NOT_RUN"
+    },
+    {
+      "id": "endpoint-adicional-4",
+      "metodo": "GET",
+      "ruta": "/api/v1/estadisticas/resumen",
+      "esperado": "200",
+      "cliente_independiente": true,
+      "requiere_aws": true,
+      "estado": "NOT_RUN"
+    },
+    {
+      "id": "errores-401-403-404",
+      "metodo": "GET",
+      "ruta": "/api/v1/usuarios/perfil",
+      "esperado": "401/403/404 con traceId",
+      "cliente_independiente": true,
+      "requiere_aws": true,
+      "estado": "NOT_RUN"
+    },
+    {
+      "id": "tls-ca-valida",
+      "metodo": "GET",
+      "ruta": "https://api.nexum.example/api/v1/health/live",
+      "esperado": "CA publica valida",
+      "cliente_independiente": true,
+      "requiere_aws": true,
+      "estado": "NOT_RUN"
+    },
+    {
+      "id": "persistencia-dynamodb",
+      "metodo": "POST",
+      "ruta": "/api/v1/movimientos",
+      "esperado": "lectura posterior identica",
+      "cliente_independiente": true,
+      "requiere_aws": true,
+      "estado": "NOT_RUN"
+    },
+    {
+      "id": "dos-nodos",
+      "metodo": "GET",
+      "ruta": "/api/v1/health/live",
+      "esperado": "dos IDs distintos",
+      "cliente_independiente": true,
+      "requiere_aws": true,
+      "estado": "NOT_RUN"
+    }
+  ]
+}

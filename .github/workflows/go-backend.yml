@@ -269,6 +269,9 @@ jobs:
       - name: Controles de respaldo y restauracion I-130
         run: python3 -m unittest discover -s tests/infra/respaldo
 
+      - name: Contratos de publicacion y compatibilidad I-150
+        run: python3 -m unittest discover -s tests/infra/publicacion
+
   contratos:
     name: Contratos OpenAPI y herramientas
     runs-on: ubuntu-latest

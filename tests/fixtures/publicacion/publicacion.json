@@ -1,0 +1,26 @@
+{
+  "url_publica": "https://api.nexum.example/",
+  "artefacto_openapi": {
+    "ruta": "sdd/03-endpoints/openapi/nexum-api-v1.json",
+    "sha256": "0a1e41b73230c0566ec6c6e8af871731937de6ccc5637ad39dbc552d65542308"
+  },
+  "openapi_version": "3.1.0",
+  "cors": {
+    "origenes": [
+      "https://app.nexum.example"
+    ],
+    "credenciales": false,
+    "metodos": [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE"
+    ]
+  },
+  "ejemplos": {
+    "con_credenciales": false,
+    "con_datos_personales": false
+  },
+  "estado_publicacion": "NOT_RUN"
+}

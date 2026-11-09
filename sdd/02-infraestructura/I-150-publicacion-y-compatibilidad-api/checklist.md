@@ -47,3 +47,11 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+- [x] OpenAPI 3.1.0 con `/api/v1`, `traceId` y dinero como string.
+- [x] Artefacto con checksum verificado por el validador.
+- [x] CORS con allowlist; `*` prohibido.
+- [x] Matriz de 75 operaciones con clases 33/23/12/7.
+- [x] 13 pruebas HTTP en `NOT_RUN`; prohibido `PASS` sin AWS y sin huella.
+- [x] SemVer, deprecacion y deteccion de breaking changes en CI.
+- [x] Mobile y landing fuera del gate.
+- [ ] HTTP real, TLS y dos nodos: `NOT_RUN` (requieren Gate de despliegue).

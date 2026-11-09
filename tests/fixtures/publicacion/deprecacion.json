@@ -1,0 +1,10 @@
+{
+  "version_api": "v1",
+  "politica": {
+    "esquema": "semver",
+    "ventana_deprecacion": "una version menor completa antes de retirar",
+    "breaking_change": "nueva_version_api",
+    "requiere_rfc": true,
+    "detectado_en_ci": true
+  }
+}

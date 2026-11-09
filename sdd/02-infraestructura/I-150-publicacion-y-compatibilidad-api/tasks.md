@@ -87,3 +87,16 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+## Implementacion H08-I (2026-11-09) — LOCAL, sin AWS
+
+Gate `APRUEBO_GATE_I150_LOCAL`. Rama `feat/h08i-i150-publicacion`. Ninguna prueba HTTP se ejecuto.
+
+- **T-150-01 (Contrato):** IMPLEMENTADO_LOCAL. OpenAPI 3.1.0, `/api/v1`, `traceId`, dinero como string y cabeceras verificadas por validador.
+- **T-150-02 (Descubrimiento):** IMPLEMENTADO_LOCAL. Plan de publicacion con checksum recalculado y CORS con allowlist; publicacion real `NOT_RUN`.
+- **T-150-03 (Compatibilidad):** IMPLEMENTADO_LOCAL. Matriz de 75 operaciones con clases 33/23/12/7 y campos obligatorios.
+- **T-150-04 (Evidencia HTTP):** IMPLEMENTADO_LOCAL. 13 pruebas planificadas en `NOT_RUN`; un `PASS` sin AWS o sin huella se rechaza.
+- **T-150-05 (Cambio):** IMPLEMENTADO_LOCAL. SemVer, ventana de deprecacion, RFC y deteccion en CI exigidos.
+- **T-150-06 (Alcance):** IMPLEMENTADO_LOCAL. Mobile, Play Store y landing fuera del gate.
+- **T-150-07 (CDN/moderacion):** NO_APLICA_HOY; el inventario no expone EPs de medios.
+- **T-150-99 (Ratificacion):** REVIEW pendiente; merge requiere autorizacion humana ligada a PR + HEAD.
