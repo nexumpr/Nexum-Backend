@@ -54,6 +54,9 @@ class BucketDeArtefactos(unittest.TestCase):
             [
                 "DenegarSinTLS",
                 "DenegarEscrituraAlRuntime",
+                "DenegarLecturaAlPublicador",
+                "DenegarBorradoAlPublicador",
+                "DenegarPublicacionSinSSE",
                 "PermitirPublicacionAlPublicador",
                 "DenegarAPrincipalsNoAutorizados",
                 "DenegarListBucket",
@@ -98,6 +101,29 @@ class BucketDeArtefactos(unittest.TestCase):
         self.assertIn('"s3://${aws_s3_bucket.artefactos.bucket}/${var.prefijo}"', self.outputs)
 
 
+    def test_prefijo_unico_entre_modulo_cd_y_verificador(self) -> None:
+        # El prefijo debe ser identico en bucket, IAM, LT, verificador y bootstrap.
+        variables = _leer(MODULO / "variables.tf")
+        self.assertIn('default     = "releases/"', variables)
+        self.assertIn('prefijo = "releases/"', re.sub(r"[ \t]+", " ", _leer(ENVS / "main.tf")))
+        self.assertIn("/releases/*", _leer(ENVS / "main.tf"))
+        verificador = _leer(RAIZ / "herramientas" / "verificar_lt_release.py")
+        self.assertIn('releases/{release_id}/nexum-backend-linux-arm64', verificador)
+        cd = _leer(RAIZ / ".github" / "workflows" / "cd-backend.yml")
+        self.assertIn('CLAVE="releases/$IN_RELEASE_ID/nexum-backend-linux-arm64"', cd)
+
+    def test_cd_exige_sse_al_publicar(self) -> None:
+        cd = _leer(RAIZ / ".github" / "workflows" / "cd-backend.yml")
+        self.assertIn("--server-side-encryption AES256", cd)
+        self.assertIn('--if-none-match "*"', cd)
+
+    def test_publicador_no_lee_no_borra_y_exige_sse(self) -> None:
+        sids = re.findall(r'sid\s*=\s*"([A-Za-z]+)"', self.main)
+        for sid in ("DenegarLecturaAlPublicador", "DenegarBorradoAlPublicador", "DenegarPublicacionSinSSE"):
+            self.assertIn(sid, sids, sid)
+        self.assertIn('variable = "s3:x-amz-server-side-encryption"', self.main)
+
+
 class CableadoYNombreDeterminista(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -125,7 +151,7 @@ class CableadoYNombreDeterminista(unittest.TestCase):
     def test_runtime_recibe_el_prefijo_de_releases(self) -> None:
         compacto = re.sub(r"[ \t]+", " ", self.envs)
         self.assertIn("artifact_object_arns", compacto)
-        self.assertIn("arn:aws:s3:::${local.artefactos_bucket}/nexum/releases/*", compacto)
+        self.assertIn("arn:aws:s3:::${local.artefactos_bucket}/releases/*", compacto)
 
     def test_publicador_por_variable_fail_closed(self) -> None:
         self.assertIn('variable "artefactos_publicador_arn"', self.variables)

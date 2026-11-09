@@ -17,7 +17,7 @@ variable "etiquetas" {
 variable "prefijo" {
   description = "Prefijo S3 de los releases (debe terminar en '/')."
   type        = string
-  default     = "nexum/releases/"
+  default     = "releases/"
 
   validation {
     condition     = endswith(var.prefijo, "/")

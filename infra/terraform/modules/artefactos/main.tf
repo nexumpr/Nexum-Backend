@@ -117,6 +117,57 @@ data "aws_iam_policy_document" "artefactos" {
     }
   }
 
+  # 2b. El publicador NO lee los artefactos por el hecho de ser publicador.
+  statement {
+    sid    = "DenegarLecturaAlPublicador"
+    effect = "Deny"
+
+    actions   = ["s3:GetObject", "s3:GetObjectVersion"]
+    resources = ["${aws_s3_bucket.artefactos.arn}/*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [var.publicador_arn]
+    }
+  }
+
+  # 2c. El publicador NO borra, aunque su IAM sea amplio.
+  statement {
+    sid    = "DenegarBorradoAlPublicador"
+    effect = "Deny"
+
+    actions = [
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion",
+    ]
+    resources = ["${aws_s3_bucket.artefactos.arn}/*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [var.publicador_arn]
+    }
+  }
+
+  # 2d. Publicar sin SSE-S3 queda denegado aunque una policy de identidad lo permita.
+  statement {
+    sid    = "DenegarPublicacionSinSSE"
+    effect = "Deny"
+
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.artefactos.arn}/*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [var.publicador_arn]
+    }
+
+    condition {
+      test     = "StringNotEquals"
+      variable = "s3:x-amz-server-side-encryption"
+      values   = ["AES256"]
+    }
+  }
+
   # 3. El publicador de CI solo escribe, y solo en el prefijo de releases.
   statement {
     sid    = "PermitirPublicacionAlPublicador"

@@ -221,6 +221,7 @@ jobs:
             --bucket "$ARTIFACT_BUCKET" --key "$CLAVE" \
             --body release/nexum-backend-linux-arm64 \
             --checksum-algorithm SHA256 \
+            --server-side-encryption AES256 \
             --if-none-match "*" > put.json || PUT=$?
           HEAD=0
           aws s3api head-object --bucket "$ARTIFACT_BUCKET" --key "$CLAVE" \
