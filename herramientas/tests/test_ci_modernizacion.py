@@ -105,6 +105,48 @@ class DetectorDeCambios(unittest.TestCase):
     def test_workflow_dispatch_no_es_determinable(self) -> None:
         self.assertIsNone(detector.archivos_desde_git("workflow_dispatch", "", ""))
 
+    def test_merge_usa_el_primer_padre_antes_que_git_show(self) -> None:
+        # Reproduce el defecto D-01: en un merge, `git show --name-only` devuelve vacio.
+        llamadas: list[list[str]] = []
+
+        def falso(comando: list[str]) -> tuple[int, str]:
+            llamadas.append(comando)
+            if comando[1] == "diff" and comando[-2].endswith("^1"):
+                return 0, "cmd/server/main.go\ninternal/system/context.go\n"
+            return 0, ""
+
+        rutas = detector.archivos_desde_git("push", "", "a441a0c", ejecutar=falso)
+        self.assertEqual(rutas, ["cmd/server/main.go", "internal/system/context.go"])
+        self.assertTrue(llamadas[0][-2].endswith("^1"), llamadas[0])
+        self.assertTrue(detector.clasificar(rutas)["go"])
+
+    def test_salida_vacia_no_se_acepta_como_sin_cambios(self) -> None:
+        llamadas: list[list[str]] = []
+
+        def falso(comando: list[str]) -> tuple[int, str]:
+            llamadas.append(comando)
+            return 0, ""
+
+        self.assertIsNone(detector.archivos_desde_git("push", "", "a441a0c", ejecutar=falso))
+        self.assertEqual(len(llamadas), len(detector.estrategias("push", "", "a441a0c")))
+
+    def test_codigo_distinto_de_cero_no_se_acepta(self) -> None:
+        def falso(comando: list[str]) -> tuple[int, str]:
+            return 128, "fatal: bad revision\n"
+
+        self.assertIsNone(detector.archivos_desde_git("push", "", "a441a0c", ejecutar=falso))
+
+    def test_pull_request_usa_la_base_como_primera_estrategia(self) -> None:
+        llamadas: list[list[str]] = []
+
+        def falso(comando: list[str]) -> tuple[int, str]:
+            llamadas.append(comando)
+            return 0, "pkg/httputil/json.go\n"
+
+        rutas = detector.archivos_desde_git("pull_request", "base123", "head456", ejecutar=falso)
+        self.assertEqual(rutas, ["pkg/httputil/json.go"])
+        self.assertIn("base123...head456", llamadas[0])
+
     def test_salida_en_formato_github(self) -> None:
         with tempfile.TemporaryDirectory() as temporal:
             salida = Path(temporal) / "out.txt"

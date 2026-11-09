@@ -321,6 +321,13 @@ class DeteccionYQualityGate(unittest.TestCase):
         self.assertIn("PERFIL_COMPLETO", script)
         self.assertIn("COMPLETO_POR_DESCONOCIMIENTO", script)
 
+    def test_detector_cubre_commits_de_merge(self) -> None:
+        # Defecto D-01: `git show` sobre un merge devuelve vacio; se compara con el primer padre.
+        script = _leer(RAIZ / "herramientas" / "detectar_cambios_ci.py")
+        self.assertIn('f"{head}^1"', script)
+        self.assertIn("def estrategias", script)
+        self.assertIn("if rutas:", script)
+
     def test_quality_gate_usa_resultados_reales(self) -> None:
         bloque = "\n".join(self.bloques["quality-gate"])
         self.assertIn("toJSON(needs)", bloque)

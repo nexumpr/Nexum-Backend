@@ -153,3 +153,12 @@ protección de ramas (`BLOQUEADO_PLAN_GITHUB`).
 `APRUEBO_GATE_I080_I090_MODERNIZACION_LOCAL` (2026-11-09), registrada en
 `sdd/_control/H08/GATE_H08I_I080_I090_MODERNIZACION.md`. Es una autorización **local**:
 no autoriza merge, ni AWS, ni Terraform remoto, ni despliegue.
+
+## 9. Defecto D-01 corregido tras el merge
+
+La primera ejecucion post-merge dejo al descubierto que el detector aceptaba como
+«sin cambios» la salida vacia de `git show` sobre un commit de merge, omitiendo los ocho
+jobs de validacion. Corregido en el mismo instrumento (herramienta de deteccion y sus
+pruebas) el 2026-11-09: se compara contra el primer padre y una salida vacia ya no
+cortocircuita; si ninguna estrategia devuelve rutas, el perfil pasa a `completo`.
+Detalle y evidencia en el Gate §8.
