@@ -55,3 +55,9 @@
 - [x] SemVer, deprecacion y deteccion de breaking changes en CI.
 - [x] Mobile y landing fuera del gate.
 - [ ] HTTP real, TLS y dos nodos: `NOT_RUN` (requieren Gate de despliegue).
+- [x] Paridad JSON/YAML/matriz con 75 operaciones y `operationId` trazados.
+- [x] Matriz ampliada con pruebas positiva y negativa por operacion.
+- [x] Comparador de breaking changes ejecutado en CI contra `origin/main`.
+- [x] Cuatro niveles de evidencia HTTP separados; comandos `curl` generados sin ejecutar.
+- [x] Frontera de responsabilidad documentada y validada.
+- [x] Inventario de contenido: 0 medios y 3 operaciones con texto libre con criterio documentado.

@@ -332,6 +332,161 @@ def validar_evidencia(datos: Mapping[str, Any] | None) -> dict[str, Any]:
     }
 
 
+
+# --------------------------------------------------------------------------- #
+# INF-150-01b paridad YAML / JSON / matriz
+# --------------------------------------------------------------------------- #
+
+YAML = ENDPOINTS / "openapi" / "nexum-api-v1.yaml"
+METODOS_OPENAPI = ("get", "post", "put", "patch", "delete")
+
+CLAVES_CONTENIDO = ("text", "content", "message", "description", "body", "comment")
+FORMATOS_MEDIA = ("binary", "base64", "byte")
+
+
+def _rutas_yaml(texto_yaml: str) -> set[str]:
+    rutas = set()
+    for linea in texto_yaml.splitlines():
+        coincidencia = re.match(r"^  (/api/v1/[^:]+):\s*$", linea)
+        if coincidencia:
+            rutas.add(coincidencia.group(1))
+    return rutas
+
+
+def _operaciones_yaml(texto_yaml: str) -> int:
+    return len(re.findall(r"^    (?:get|post|put|patch|delete):\s*$", texto_yaml, flags=re.MULTILINE))
+
+
+def validar_paridad() -> dict[str, Any]:
+    """JSON, YAML y matriz deben describir las mismas 75 operaciones."""
+    if not OPENAPI_JSON.is_file() or not YAML.is_file() or not MATRIZ_CSV.is_file():
+        raise ErrorUso("Faltan JSON, YAML o la matriz H06.")
+    datos = cargar_json(OPENAPI_JSON)
+    texto_yaml = YAML.read_text(encoding="utf-8")
+    filas = leer_matriz()
+
+    problemas: list[str] = []
+    ops_json = {
+        (ruta, metodo)
+        for ruta, item in (datos.get("paths") or {}).items()
+        for metodo in item
+        if metodo in METODOS_OPENAPI
+    }
+    rutas_json = {ruta for ruta, _ in ops_json}
+    rutas_yaml = _rutas_yaml(texto_yaml)
+    ops_yaml = _operaciones_yaml(texto_yaml)
+
+    if len(ops_json) != 75:
+        problemas.append(f"JSON declara {len(ops_json)} operaciones, se esperan 75")
+    if ops_yaml != 75:
+        problemas.append(f"YAML declara {ops_yaml} operaciones, se esperan 75")
+    if rutas_json != rutas_yaml:
+        solo_json = sorted(rutas_json - rutas_yaml)[:5]
+        solo_yaml = sorted(rutas_yaml - rutas_json)[:5]
+        problemas.append(f"rutas divergentes JSON/YAML: {solo_json} / {solo_yaml}")
+
+    catalogo = {
+        str((op or {}).get("x-nexum-catalog-id"))
+        for item in (datos.get("paths") or {}).values()
+        for op in item.values()
+        if isinstance(op, Mapping)
+    }
+    ids_csv = {fila.get("id") for fila in filas}
+    if catalogo != ids_csv:
+        problemas.append("x-nexum-catalog-id no coincide con la matriz H06")
+    for fila in filas:
+        esperado = "nexum_" + str(fila.get("id")).lower()
+        operacion = (datos.get("paths") or {}).get(fila.get("ruta"), {}).get(str(fila.get("metodo")).lower(), {})
+        if operacion.get("operationId") != esperado:
+            problemas.append(f"{fila.get('id')}: operationId distinto de {esperado}")
+
+    return {
+        "comando": "paridad",
+        "operaciones_json": len(ops_json),
+        "operaciones_yaml": ops_yaml,
+        "rutas_json": len(rutas_json),
+        "rutas_yaml": len(rutas_yaml),
+        "filas_matriz": len(filas),
+        "problemas": problemas,
+        "estado": "PARIDAD_OK" if not problemas else "PARIDAD_ROTA",
+        "advertencia": "Paridad documental; no acredita handlers ni respuestas HTTP.",
+    }
+
+
+# --------------------------------------------------------------------------- #
+# INF-150-07 inventario de contenido y moderacion
+# --------------------------------------------------------------------------- #
+
+
+def escanear_contenido() -> dict[str, Any]:
+    """Clasifica operaciones con contenido de usuario y exige diseño de moderacion."""
+    datos = cargar_json(OPENAPI_JSON)
+    esquemas = (datos.get("components") or {}).get("schemas") or {}
+    media: list[str] = []
+    texto_libre: list[str] = []
+
+    for ruta, item in (datos.get("paths") or {}).items():
+        for metodo, operacion in (item or {}).items():
+            if metodo not in METODOS_OPENAPI or not isinstance(operacion, Mapping):
+                continue
+            identificador = str(operacion.get("x-nexum-catalog-id") or f"{metodo.upper()} {ruta}")
+            cuerpo = ((operacion.get("requestBody") or {}).get("content") or {}).get("application/json") or {}
+            referencia = (cuerpo.get("schema") or {}).get("$ref", "")
+            nombre = referencia.rsplit("/", 1)[-1] if referencia else ""
+            propiedades = ((esquemas.get(nombre) or {}).get("properties") or {})
+            for campo, propiedad in propiedades.items():
+                if not isinstance(propiedad, Mapping):
+                    continue
+                formato = str(propiedad.get("format", ""))
+                if formato in FORMATOS_MEDIA:
+                    media.append(f"{identificador}:{campo}")
+                elif any(clave in campo.lower() for clave in CLAVES_CONTENIDO) and formato not in ("email", "date", "date-time", "uuid"):
+                    texto_libre.append(f"{identificador}:{campo}")
+
+    diseno = CONTROL / "MODERACION_CDN_I150.md"
+    problemas: list[str] = []
+    if media and not diseno.is_file():
+        problemas.append("hay operaciones con medios y falta MODERACION_CDN_I150.md")
+
+    return {
+        "comando": "contenido",
+        "operaciones_con_media": sorted(set(media)),
+        "operaciones_con_texto_libre": sorted(set(texto_libre)),
+        "diseno_moderacion": diseno.is_file(),
+        "problemas": problemas,
+        "estado": "CONTENIDO_CUBIERTO" if not problemas else "CONTENIDO_SIN_DISENO",
+        "moderacion_operativa": False,
+        "advertencia": (
+            "Ningun servicio de moderacion o CDN esta desplegado; el diseno no acredita moderacion real."
+        ),
+    }
+
+
+# --------------------------------------------------------------------------- #
+# INF-150-04 comandos de evidencia (sin ejecutar HTTP)
+# --------------------------------------------------------------------------- #
+
+
+def generar_comandos(datos: Mapping[str, Any]) -> list[str]:
+    comandos: list[str] = []
+    base = str(datos.get("url_base") or "<URL_PUBLICA_HTTPS>").rstrip("/")
+    for prueba in datos.get("pruebas", []):
+        metodo = str(prueba.get("metodo", "GET")).upper()
+        ruta = str(prueba.get("ruta", ""))
+        esperado = prueba.get("esperado", "")
+        if ruta.startswith("https://"):
+            url = ruta
+        else:
+            url = f"{base}{ruta}"
+        extra = ""
+        if metodo in ("POST", "PUT", "PATCH"):
+            extra = ' -H "Content-Type: application/json" -d @cuerpo_sintetico.json'
+        if prueba.get("auth"):
+            extra += ' -H "Authorization: Bearer $TOKEN_SINTETICO"'
+        comandos.append(f"# esperado: {esperado}\ncurl -sS -o /dev/null -w '%{{http_code}}' -X {metodo} '{url}'{extra}")
+    return comandos
+
+
 # --------------------------------------------------------------------------- #
 # INF-150-05 deprecacion
 # --------------------------------------------------------------------------- #
@@ -410,11 +565,18 @@ def construir_parser() -> argparse.ArgumentParser:
     parser.add_argument("--datos", default=None)
     parser.add_argument("--openapi", default=None)
     parser.add_argument("--salida", default=None)
+    parser.add_argument(
+        "--comandos",
+        action="store_true",
+        help="Genera los comandos curl de evidencia sin ejecutarlos",
+    )
     return parser
 
 
 BLOQUEANTES = (
     "CONTRATO_RECHAZADO",
+    "PARIDAD_ROTA",
+    "CONTENIDO_SIN_DISENO",
     "PUBLICACION_RECHAZADA",
     "MATRIZ_INCOMPATIBLE",
     "PLAN_RECHAZADO",
@@ -440,11 +602,18 @@ def ejecutar(argv: Sequence[str] | None = None) -> tuple[int, dict[str, Any]]:
         resultado = validar_deprecacion(datos)
     elif comando == "alcance":
         resultado = validar_alcance(datos)
+    elif comando == "paridad":
+        resultado = validar_paridad()
+    elif comando == "contenido":
+        resultado = escanear_contenido()
     else:
         raise ErrorUso(
-            f"Comando desconocido: {comando!r}. Solo existen: contrato, publicacion, "
-            "compatibilidad, evidencia, deprecacion, alcance."
+            f"Comando desconocido: {comando!r}. Solo existen: contrato, paridad, publicacion, "
+            "compatibilidad, evidencia, deprecacion, alcance, contenido."
         )
+
+    if comando == "evidencia" and getattr(args, "comandos", False):
+        resultado["comandos"] = generar_comandos(datos or {})
 
     resultado["aws_consultado"] = False
     if args.salida:

@@ -11,6 +11,18 @@
 > Ninguna prueba se ejecutó contra AWS. Una fila `PASS` exigiría ejecución autorizada y huella de la
 > respuesta; el validador rechaza `PASS` sin AWS o sin evidencia.
 
+## Niveles de evidencia (no se mezclan)
+
+| Nivel | Qué prueba | Estado |
+|---|---|---|
+| 1. Verificación estática local | contrato, paridad YAML/JSON/matriz, CORS y checksum | `PASS` local |
+| 2. HTTP local | solo con servidor Go funcional en la máquina | `NOT_RUN` |
+| 3. HTTP público AWS | URL CloudFront real, CA válida y dos nodos | `NOT_RUN` |
+| 4. Persistencia y dos nodos | DynamoDB real y paso por ambas instancias | `NOT_RUN` |
+
+Un mock local **no** acredita el nivel 3 ni el 4. `HTTP_AWS_PASS` solo puede declararse tras ejecución
+real autorizada, con huella de cada respuesta.
+
 | ID | Método | Ruta | Esperado | AWS | Estado |
 |---|---|---|---|---|---|
 | `health-live` | GET | `/api/v1/health/live` | 200 | Sí | **NOT_RUN** |

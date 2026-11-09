@@ -285,6 +285,15 @@ jobs:
       - name: Validacion OpenAPI H06
         run: python3 sdd/03-endpoints/herramientas/validar_h06.py
 
+      - name: Compatibilidad de contrato (breaking changes)
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+          git show origin/main:sdd/03-endpoints/openapi/nexum-api-v1.json > "$RUNNER_TEMP/contrato-base.json"
+          python3 herramientas/comparar_contrato_api.py \
+            --base "$RUNNER_TEMP/contrato-base.json" \
+            --actual sdd/03-endpoints/openapi/nexum-api-v1.json
+
       - name: Pruebas de herramientas y validadores
         run: python3 -m unittest discover -s herramientas/tests
 

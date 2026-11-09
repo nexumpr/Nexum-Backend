@@ -14,6 +14,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(RAIZ / "herramientas"))
 
+import comparar_contrato_api as cmp  # noqa: E402
 import verificar_publicacion_i150 as pub  # noqa: E402
 
 FIXTURES = RAIZ / "tests" / "fixtures" / "publicacion"
@@ -316,6 +317,194 @@ class CliYSeguridad(unittest.TestCase):
             "urllib.request", "requests.",
         ):
             self.assertNotIn(prohibido, fuente)
+
+
+class ParidadDeContratos(unittest.TestCase):
+    """JSON, YAML y matriz deben describir las mismas 75 operaciones."""
+
+    def test_paridad_ok(self) -> None:
+        resultado = pub.validar_paridad()
+        self.assertEqual(resultado["estado"], "PARIDAD_OK")
+        self.assertEqual(resultado["operaciones_json"], 75)
+        self.assertEqual(resultado["operaciones_yaml"], 75)
+        self.assertEqual(resultado["rutas_json"], 55)
+        self.assertEqual(resultado["rutas_yaml"], 55)
+        self.assertEqual(resultado["filas_matriz"], 75)
+
+    def test_yaml_con_ruta_extra_se_detecta(self) -> None:
+        texto = pub.YAML.read_text(encoding="utf-8").replace(
+            "  /api/v1/auth/register:", "  /api/v1/inventada:\n    get:\n      operationId: x\n  /api/v1/auth/register:", 1
+        )
+        rutas = pub._rutas_yaml(texto)
+        self.assertIn("/api/v1/inventada", rutas)
+        self.assertGreater(len(rutas), 55)
+
+    def test_operaciones_yaml_contadas(self) -> None:
+        texto = pub.YAML.read_text(encoding="utf-8")
+        self.assertEqual(pub._operaciones_yaml(texto), 75)
+
+    def test_rutas_yaml_extraidas(self) -> None:
+        texto = pub.YAML.read_text(encoding="utf-8")
+        rutas = pub._rutas_yaml(texto)
+        self.assertEqual(len(rutas), 55)
+        self.assertIn("/api/v1/health/live", rutas)
+
+
+class ContenidoYModeracion(unittest.TestCase):
+    """INF-150-07: sin medios ni texto libre en el catalogo actual."""
+
+    def test_escaneo_actual_sin_media(self) -> None:
+        resultado = pub.escanear_contenido()
+        self.assertEqual(resultado["estado"], "CONTENIDO_CUBIERTO")
+        self.assertEqual(resultado["operaciones_con_media"], [])
+
+    def test_texto_libre_de_usuario_detectado(self) -> None:
+        # E028/E030 (descripcion de movimiento) y E075 (texto de voz).
+        libre = " ".join(pub.escanear_contenido()["operaciones_con_texto_libre"])
+        for identificador in ("E028", "E030", "E075"):
+            self.assertIn(identificador, libre)
+
+    def test_no_declara_moderacion_operativa(self) -> None:
+        resultado = pub.escanear_contenido()
+        self.assertFalse(resultado["moderacion_operativa"])
+        self.assertIn("no acredita", resultado["advertencia"])
+
+    def test_diseno_de_moderacion_documentado(self) -> None:
+        self.assertTrue((RAIZ / "sdd" / "_control" / "H08" / "MODERACION_CDN_I150.md").is_file())
+
+    def test_frontera_documentada(self) -> None:
+        texto = (RAIZ / "sdd" / "_control" / "H08" / "FRONTERA_RESPONSABILIDAD.md").read_text(encoding="utf-8")
+        for elemento in ("android", "Play Store", "landing", "Ninguno"):
+            self.assertIn(elemento, texto)
+
+
+class GeneradorDeComandos(unittest.TestCase):
+    def test_genera_un_curl_por_prueba_sin_ejecutar(self) -> None:
+        datos = _fixture("evidencia.json")
+        comandos = pub.generar_comandos(datos)
+        self.assertEqual(len(comandos), len(datos["pruebas"]))
+        self.assertTrue(all("curl" in c for c in comandos))
+        self.assertTrue(any("POST" in c for c in comandos))
+
+    def test_comandos_usan_marcador_y_no_url_real(self) -> None:
+        comandos = pub.generar_comandos(_fixture("evidencia.json"))
+        relativos = [c for c in comandos if "https://" not in c.split("curl", 1)[1].split("-X", 1)[1]]
+        self.assertTrue(relativos)
+        self.assertTrue(all("URL_PUBLICA_HTTPS" in c for c in relativos))
+
+    def test_cli_evidencia_con_comandos(self) -> None:
+        codigo, resultado = pub.ejecutar(
+            ["evidencia", "--datos", str(FIXTURES / "evidencia.json"), "--comandos"]
+        )
+        self.assertEqual(codigo, 0)
+        self.assertEqual(len(resultado["comandos"]), 13)
+
+
+class ComparadorDeContratos(unittest.TestCase):
+    """INF-150-05: cambios incompatibles detectados y excepciones por RFC."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.base = json.loads(OPENAPI.read_text(encoding="utf-8"))
+        cls.actual = json.loads(OPENAPI.read_text(encoding="utf-8"))
+
+    def _roturas(self, mutar) -> list[dict]:
+        actual = copy.deepcopy(self.actual)
+        mutar(actual)
+        return cmp.comparar(self.base, actual)
+
+    def test_contratos_iguales_son_compatibles(self) -> None:
+        self.assertEqual(cmp.comparar(self.base, self.actual), [])
+
+    def test_ruta_eliminada(self) -> None:
+        roturas = self._roturas(lambda d: d["paths"].pop("/api/v1/auth/login"))
+        self.assertTrue(any(r["codigo"] == "RUTA_ELIMINADA" for r in roturas))
+
+    def test_metodo_eliminado(self) -> None:
+        roturas = self._roturas(lambda d: d["paths"]["/api/v1/auth/login"].pop("post"))
+        # Si la ruta queda sin metodos se reporta como ruta eliminada; ambos son ruptura.
+        self.assertTrue(any(r["codigo"] in ("METODO_ELIMINADO", "RUTA_ELIMINADA") for r in roturas))
+
+    def test_operation_id_cambiado(self) -> None:
+        roturas = self._roturas(
+            lambda d: d["paths"]["/api/v1/auth/login"]["post"].update({"operationId": "otro"})
+        )
+        self.assertTrue(any(r["codigo"] == "OPERATION_ID_CAMBIADO" for r in roturas))
+
+    def test_parametro_requerido_nuevo(self) -> None:
+        def mutar(contrato):
+            contrato["paths"]["/api/v1/auth/login"]["post"].setdefault("parameters", []).append(
+                {"name": "obligatorio", "in": "query", "required": True}
+            )
+        self.assertTrue(any(r["codigo"] == "PARAMETRO_REQUERIDO_NUEVO" for r in self._roturas(mutar)))
+
+    def test_respuesta_eliminada(self) -> None:
+        roturas = self._roturas(
+            lambda d: d["paths"]["/api/v1/auth/login"]["post"]["responses"].pop("200")
+        )
+        self.assertTrue(any(r["codigo"] == "RESPUESTA_ELIMINADA" for r in roturas))
+
+    def test_tipo_cambiado(self) -> None:
+        base = {
+            "openapi": "3.1.0",
+            "paths": {"/api/v1/x": {"post": {
+                "operationId": "nexum_e001",
+                "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/A"}}}},
+                "responses": {"200": {"description": "ok"}},
+            }}},
+            "components": {"schemas": {"A": {"type": "object", "properties": {"campo": {"type": "string"}}}}},
+        }
+        actual = copy.deepcopy(base)
+        actual["components"]["schemas"]["A"]["properties"]["campo"]["type"] = "integer"
+        roturas = cmp.comparar(base, actual)
+        self.assertTrue(any(r["codigo"] == "TIPO_CAMBIADO" for r in roturas))
+        self.assertTrue(any(r["codigo"] == "TIPO_CAMBIADO" for r in roturas))
+
+    def test_enum_reducido(self) -> None:
+        base = {
+            "openapi": "3.1.0",
+            "paths": {"/api/v1/x": {"post": {
+                "operationId": "nexum_e001",
+                "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/A"}}}},
+                "responses": {"200": {"description": "ok"}},
+            }}},
+            "components": {"schemas": {"A": {"type": "object", "properties": {
+                "estado": {"type": "string", "enum": ["a", "b"]}
+            }}}},
+        }
+        actual = copy.deepcopy(base)
+        actual["components"]["schemas"]["A"]["properties"]["estado"]["enum"] = ["a"]
+        roturas = cmp.comparar(base, actual)
+        self.assertTrue(any(r["codigo"] == "ENUM_REDUCIDO" for r in roturas))
+        self.assertTrue(any(r["codigo"] == "ENUM_REDUCIDO" for r in roturas))
+
+    def test_seguridad_endurecida(self) -> None:
+        roturas = self._roturas(
+            lambda d: d["paths"]["/api/v1/auth/login"]["post"].update({"security": [{"bearerAuth": []}]})
+        )
+        self.assertTrue(any(r["codigo"] == "SEGURIDAD_ENDURECIDA" for r in roturas))
+
+    def test_excepcion_aprobada_cubre_la_rotura(self) -> None:
+        roturas = [{"codigo": "RUTA_ELIMINADA", "ruta": "/api/v1/x", "metodo": "*"}]
+        excepciones = [{"codigo": "RUTA_ELIMINADA", "ruta": "/api/v1/x", "metodo": "*", "estado": "APPROVED", "rfc": "RFC-008"}]
+        restantes, cubiertas = cmp.aplicar_excepciones(roturas, excepciones)
+        self.assertEqual(restantes, [])
+        self.assertEqual(len(cubiertas), 1)
+
+    def test_excepcion_sin_rfc_no_aplica(self) -> None:
+        datos = {"excepciones": [{"codigo": "RUTA_ELIMINADA", "ruta": "/x", "metodo": "*", "estado": "APPROVED"}]}
+        self.assertEqual(cmp.excepciones_aprobadas(datos), [])
+
+    def test_cli_compatible_y_no_comparable(self) -> None:
+        self.assertEqual(
+            cmp.main(["--base", str(OPENAPI), "--actual", str(OPENAPI)]), 0
+        )
+        self.assertEqual(cmp.main(["--base", "no-existe.json", "--actual", str(OPENAPI)]), 2)
+
+    def test_ci_ejecuta_el_comparador(self) -> None:
+        workflow = (RAIZ / ".github" / "workflows" / "go-backend.yml").read_text(encoding="utf-8")
+        self.assertIn("comparar_contrato_api.py", workflow)
+        self.assertIn("origin/main", workflow)
 
 
 if __name__ == "__main__":  # pragma: no cover

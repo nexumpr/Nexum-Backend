@@ -100,3 +100,12 @@ Gate `APRUEBO_GATE_I150_LOCAL`. Rama `feat/h08i-i150-publicacion`. Ninguna prueb
 - **T-150-06 (Alcance):** IMPLEMENTADO_LOCAL. Mobile, Play Store y landing fuera del gate.
 - **T-150-07 (CDN/moderacion):** NO_APLICA_HOY; el inventario no expone EPs de medios.
 - **T-150-99 (Ratificacion):** REVIEW pendiente; merge requiere autorizacion humana ligada a PR + HEAD.
+
+### Ampliacion de alcance (2026-11-09)
+
+- **Paridad:** comando `paridad` contrasta JSON (75/55), YAML (75/55) y matriz H06 con `operationId`.
+- **Matriz:** 19 columnas por operacion, incluidas pruebas positiva/negativa y estado HTTP.
+- **Evidencia HTTP:** cuatro niveles separados y generador de `curl` que no ejecuta nada.
+- **Cambio:** `comparar_contrato_api.py` en CI contra `origin/main`, con excepciones solo por RFC aprobada.
+- **Frontera:** `FRONTERA_RESPONSABILIDAD.md` y validacion de que Mobile no es gate.
+- **Contenido:** `contenido` detecta texto libre en E028, E030 y E075; `MODERACION_CDN_I150.md` fija el criterio.

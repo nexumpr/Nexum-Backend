@@ -74,3 +74,23 @@ Terraform/Trivy/Gitleaks/Go pasen y SDD/SHA-256 permanezcan íntegros.
 |---|---|
 | 2026-11-09 | `APRUEBO_GATE_I150_LOCAL` concedido; rama `feat/h08i-i150-publicacion` desde `main` `7d1418a` (incluye el cierre documental de I-140) |
 | 2026-11-09 | Implementación local completada; PR y CI por el agente; merge pendiente de autorización humana ligada a PR + HEAD |
+
+## 8. Ampliación de alcance (2026-11-09)
+
+- **INF-150-01:** nuevo comando `paridad` que contrasta JSON (75 operaciones, 55 rutas) con YAML
+  (75/55) y con la matriz H06 (`x-nexum-catalog-id` y `operationId = nexum_eNNN`).
+- **INF-150-03:** matriz ampliada a 19 columnas por operación (clase, método, ruta, operación, entrada,
+  salida, status, auth, idempotencia, paginación, persistencia, prueba positiva, prueba negativa,
+  requisito, dependencias, estado de contrato y estado HTTP).
+- **INF-150-04:** cuatro niveles de evidencia separados (estática local, HTTP local, HTTP AWS y
+  persistencia/dos nodos) y generador de comandos `curl` que **no** los ejecuta.
+- **INF-150-05:** `herramientas/comparar_contrato_api.py` detecta ruta/método eliminado,
+  `operationId` cambiado, parámetro o campo obligatorio nuevo, tipo y enum incompatibles, respuesta
+  eliminada y cambios de seguridad; se ejecuta en GitHub Actions contra `origin/main` y falla cerrado
+  si no puede comparar. Las excepciones exigen RFC en estado `APPROVED`.
+- **INF-150-06:** `FRONTERA_RESPONSABILIDAD.md` con el reparto explícito y validación de que Mobile no
+  es gate.
+- **INF-150-07:** `contenido` escanea los 75 contratos: **0 operaciones con medios y 0 con texto libre**;
+  se documenta el criterio de activación futura sin declarar moderación operativa.
+
+`HTTP_VERIFIED` y `TWO_NODES_VERIFIED` siguen `NOT_RUN`.

@@ -682,3 +682,13 @@
 - 45 pruebas nuevas en `tests/infra/publicacion`; HTTP real, TLS y dos nodos siguen `NOT_RUN`.
 - INF-150-07 (CDN/moderacion) `NO_APLICA_HOY`: el inventario actual no expone endpoints de medios.
 - Sin AWS, sin publicar el contrato y sin merge.
+
+### I-150 ampliacion (2026-11-09)
+
+- **Paridad:** `paridad` contrasta JSON (75 operaciones / 55 rutas), YAML (75/55) y la matriz H06 (`x-nexum-catalog-id` y `operationId = nexum_eNNN`).
+- **Matriz:** `MATRIZ_COMPATIBILIDAD_75.md` ampliada a 19 columnas por operacion, con prueba positiva, negativa, dependencias y estado HTTP.
+- **Compatibilidad:** `herramientas/comparar_contrato_api.py` detecta ruta/metodo eliminado, `operationId` cambiado, parametro o campo obligatorio nuevo, tipo y enum incompatibles, respuesta eliminada y cambios de seguridad; se ejecuta en GitHub Actions contra `origin/main` y falla cerrado si no puede comparar. Corregido un defecto real: `_esquema` no resolvia `$ref` en forma de objeto, por lo que tipo/enum no se detectaban.
+- **Evidencia HTTP:** cuatro niveles separados (estatica local, HTTP local, HTTP AWS, persistencia/dos nodos) y generador de comandos `curl` que no los ejecuta.
+- **Frontera:** `FRONTERA_RESPONSABILIDAD.md` con Mobile/Play/landing fuera del gate.
+- **Contenido:** 0 operaciones con medios y 3 con texto libre de usuario (E028, E030, E075); `MODERACION_CDN_I150.md` documenta el criterio sin declarar moderacion operativa.
+- Pruebas: 70 en `tests/infra/publicacion`. Sin AWS, sin HTTP real y sin merge.
