@@ -1,0 +1,192 @@
+{
+  "version": "1.0.0",
+  "drills": [
+    {
+      "id": "caida-instancia-a",
+      "componente": "computo",
+      "esperado": "1 target sano",
+      "criterio": "responde 200 y el ASG repone",
+      "rollback": "restaurar capacidad",
+      "requiere_aws": true,
+      "estado": "NOT_RUN_AWS",
+      "accion": "drenar instancia A",
+      "datos_sinteticos": true,
+      "demuestra_aws": false
+    },
+    {
+      "id": "continuidad-b",
+      "componente": "computo",
+      "esperado": "B atiende el 100%",
+      "criterio": "2 targets sanos al final",
+      "rollback": "reponer A",
+      "requiere_aws": true,
+      "estado": "NOT_RUN_AWS",
+      "accion": "verificar continuidad",
+      "datos_sinteticos": true,
+      "demuestra_aws": false
+    },
+    {
+      "id": "reemplazo-target",
+      "componente": "balanceo",
+      "esperado": "target fuera del pool",
+      "criterio": "HealthyHostCount vuelve a 2",
+      "rollback": "cancelar refresh",
+      "requiere_aws": true,
+      "estado": "NOT_RUN_AWS",
+      "accion": "refresh controlado",
+      "datos_sinteticos": true,
+      "demuestra_aws": false
+    },
+    {
+      "id": "redis-no-disponible",
+      "componente": "cache",
+      "esperado": "lecturas sin cache",
+      "criterio": "auth fail-closed sin 5xx",
+      "rollback": "restablecer endpoint",
+      "requiere_aws": true,
+      "estado": "NOT_RUN_AWS",
+      "accion": "simular indisponibilidad",
+      "datos_sinteticos": true,
+      "demuestra_aws": false
+    },
+    {
+      "id": "dynamo-throttling",
+      "componente": "datos",
+      "esperado": "throttling controlado",
+      "criterio": "backoff efectivo sin Scan",
+      "rollback": "detener carga",
+      "requiere_aws": true,
+      "estado": "NOT_RUN_AWS",
+      "accion": "carga sintetica",
+      "datos_sinteticos": true,
+      "demuestra_aws": false
+    },
+    {
+      "id": "timeouts-reintentos",
+      "componente": "transporte",
+      "esperado": "timeouts acotados",
+      "criterio": "sin efectos duplicados",
+      "rollback": "ninguno",
+      "requiere_aws": false,
+      "estado": "LOCAL_PASS",
+      "accion": "pruebas de timeouts",
+      "datos_sinteticos": true,
+      "demuestra_aws": false,
+      "evidencia": {
+        "archivo": "tests/unit/transport/http_server_test.go",
+        "prueba": "TestHTTPServerStatusesAndErrors",
+        "resultado": "PASS",
+        "comando": "go test -count=1 -v ./tests/unit/transport/... -run '^(TestHTTPServerStatusesAndErrors)$'",
+        "job_ci": "Formato, vet, build y pruebas / Evidencia de drills I-140"
+      }
+    },
+    {
+      "id": "operacion-financiera-parcial",
+      "componente": "datos",
+      "esperado": "escritura parcial",
+      "criterio": "invariantes de saldo",
+      "rollback": "descartar fixture",
+      "requiere_aws": false,
+      "estado": "LOCAL_PASS",
+      "accion": "fixtures A-070",
+      "datos_sinteticos": true,
+      "demuestra_aws": false,
+      "evidencia": {
+        "archivo": "tests/unit/financial/consistency_resilience_test.go",
+        "prueba": "TestGoalReversionPreservesInvariant",
+        "resultado": "PASS",
+        "comando": "go test -count=1 -v ./tests/unit/financial/... -run '^(TestGoalReversionPreservesInvariant|TestIdempotencyManagerBehavior)$'",
+        "job_ci": "Formato, vet, build y pruebas / Evidencia de drills I-140"
+      }
+    },
+    {
+      "id": "idempotencia",
+      "componente": "datos",
+      "esperado": "repeticion de clave",
+      "criterio": "respuesta identica",
+      "rollback": "ninguno",
+      "requiere_aws": false,
+      "estado": "LOCAL_PASS",
+      "accion": "pruebas de idempotencia",
+      "datos_sinteticos": true,
+      "demuestra_aws": false,
+      "evidencia": {
+        "archivo": "tests/unit/financial/consistency_resilience_test.go",
+        "prueba": "TestIdempotencyManagerBehavior",
+        "resultado": "PASS",
+        "comando": "go test -count=1 -v ./tests/unit/financial/... -run '^(TestGoalReversionPreservesInvariant|TestIdempotencyManagerBehavior)$'",
+        "job_ci": "Formato, vet, build y pruebas / Evidencia de drills I-140"
+      }
+    },
+    {
+      "id": "revocacion-rotacion-jwt",
+      "componente": "identidad",
+      "esperado": "tokens invalidados",
+      "criterio": "sesiones revocadas no se reactivan",
+      "rollback": "restaurar claves",
+      "requiere_aws": false,
+      "estado": "LOCAL_PASS",
+      "accion": "pruebas A-050",
+      "datos_sinteticos": true,
+      "demuestra_aws": false,
+      "evidencia": {
+        "archivo": "tests/unit/security/auth_service_test.go",
+        "prueba": "TestRefreshTokenReplayFamilyRevocation",
+        "resultado": "PASS",
+        "comando": "go test -count=1 -v ./tests/unit/security/... -run '^(TestRefreshTokenReplayFamilyRevocation)$'",
+        "job_ci": "Formato, vet, build y pruebas / Evidencia de drills I-140"
+      }
+    },
+    {
+      "id": "health-readiness",
+      "componente": "observabilidad",
+      "esperado": "readiness 503",
+      "criterio": "liveness 200 y readiness 503",
+      "rollback": "ninguno",
+      "requiere_aws": false,
+      "estado": "LOCAL_PASS",
+      "accion": "pruebas A-090",
+      "datos_sinteticos": true,
+      "demuestra_aws": false,
+      "evidencia": {
+        "archivo": "tests/unit/telemetry/observability_health_test.go",
+        "prueba": "TestReadinessProbeDegradation503",
+        "resultado": "PASS",
+        "comando": "go test -count=1 -v ./tests/unit/telemetry/... -run '^(TestReadinessProbeDegradation503)$'",
+        "job_ci": "Formato, vet, build y pruebas / Evidencia de drills I-140"
+      }
+    },
+    {
+      "id": "perdida-observabilidad",
+      "componente": "observabilidad",
+      "esperado": "logs no llegan",
+      "criterio": "alarma de ausencia",
+      "rollback": "restaurar agente",
+      "requiere_aws": true,
+      "estado": "BLOCKED_DEPENDENCY",
+      "accion": "simular ausencia",
+      "datos_sinteticos": true,
+      "demuestra_aws": false,
+      "dependencia": "I-020 (agente CloudWatch)"
+    },
+    {
+      "id": "riesgo-rollback",
+      "componente": "despliegue",
+      "esperado": "rollback a LT previa",
+      "criterio": "2 targets sanos",
+      "rollback": "reaplicar LT",
+      "requiere_aws": false,
+      "estado": "LOCAL_PASS",
+      "accion": "simulador I-090",
+      "datos_sinteticos": true,
+      "demuestra_aws": false,
+      "evidencia": {
+        "archivo": "herramientas/tests/test_cd_helpers.py",
+        "prueba": "DecisionRollback",
+        "resultado": "PASS",
+        "comando": "python3 -m unittest herramientas.tests.test_cd_helpers.DecisionRollback -v",
+        "job_ci": "Formato, vet, build y pruebas / Evidencia de drills I-140"
+      }
+    }
+  ]
+}

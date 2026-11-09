@@ -620,3 +620,47 @@
 - **Concurrencia:** `SOLICITUD_INCOMPLETA` sin identidad; coincidencia de tokens -> `ESCRITOR_UNICO_SIMULADO` con `verificado_en_aws=false`; I-070 sigue siendo la autoridad del locking.
 - Pruebas tautologicas revisadas y sustituidas por aserciones con valores esperados calculados desde el catalogo y el Gate de I-000.
 - Conteos: 129 pruebas de respaldo, 258 de FinOps, 321 de Terraform. Sin AWS, sin Terraform remoto, sin merge.
+
+### I-130: cierre post-merge (2026-11-09)
+
+- **PR #33 MERGED** (merge `da2aee149551b583a13b68276ac4d97058d225da`), HEAD autorizado `2634e5bffea0c0598784a13e43d557e810e85b56` verificado con `--match-head-commit`; `main` local = `origin/main` por fast-forward.
+- CI del PR 7/7 PASS (runs 42562971029 y 42562971023); CI de `main` en `da2aee1`: SDD documental run 42563665183 SUCCESS y Go Backend CI run 42563665206 SUCCESS (seis jobs).
+- Estado: **INTEGRADO_MAIN - NO DESPLEGADO**. `AWS_NOT_RUN`; `RESTORE_AWS_NOT_RUN`; `RTO_RPO_PENDING_HUMAN_APPROVAL`; `BACKUP_AWS_NOT_VERIFIED`; `DAST_NOT_RUN`; `BLOCKED_I130` de I-120 sigue abierto.
+- Integrado: verificacion AWS deshabilitada en local, PITR 1..35 d separado de on-demand, state con 8 precondiciones declaradas, restore aislado con 16 codigos de integridad, privacidad sin reactivacion, runbook de 13 fases y FinOps conciliado contra el presupuesto vigente de I-000 (incremento 0.0000, margen teorico 6.9387 no disponible).
+- Registro documental en el arbol de trabajo; se publicara en el PR de la siguiente spec autorizada (no se abre PR solo para el estado).
+- Bloqueos intactos: RFC-004, H-01, RFC-006, RFC-007, ARTIFACT_DELIVERY, agente CloudWatch (I-020), ALERT_DELIVERY, readiness 503, OIDC, AWS_SCP_NOT_VERIFIED, branch protection, D-100-01, D-100-02, D-110-01. I-140 sigue `NOT_AUTHORIZED`.
+
+### I-140: operacion e incidentes implementados en local (2026-11-09)
+
+- Gate `APRUEBO_GATE_I140_LOCAL` registrado en `sdd/_control/H08/GATE_H08I_I140.md`; rama `feat/h08i-i140-operacion` desde `main` `da2aee1` (incluye el cierre documental de I-130). `AWS_NOT_RUN`.
+- `RUNBOOK_OPERATIVO.md`: 10 procedimientos (deployment, health-fail, dynamo-throttle, redis-unavailable, certificados, rotacion-secretos, auth-inesperado, presupuesto, incidente, eliminacion-iac) con 8 campos y estado `DOCUMENTADO_NO_EJECUTADO`.
+- `MATRIZ_INCIDENTES.md`: S1–S4 con notificacion, escalamiento y rollback; tiempos `PENDIENTE_DE_RATIFICACION_HUMANA` (no se declara SLA).
+- `PLAN_PRUEBAS_OPERACION.md`: 5 drills (aislar instancia A, reemplazo de target, fallo Redis, cuota Dynamo, rotacion JWT), todos `NOT_RUN` y con datos sinteticos.
+- `herramientas/verificar_operacion_i140.py`: `runbooks`, `prioridades`, `drills`, `inventario` (deriva recursos del codigo, `existe_en_aws = NOT_VERIFIED`) y `acceso` (sin root, sin SSH publico, identidades temporales, SSM en ventana).
+- 36 pruebas nuevas en `tests/infra/operacion/test_i140_operacion.py`; la suite de operacion suma 140.
+- Sin AWS, sin terraform remoto, sin drills reales y sin merge.
+
+### I-140 alcance ampliado (2026-11-09)
+
+- **INF-140-01:** `RUNBOOK_OPERATIVO.md` reescrito con 12 procedimientos (deploy/rollback, health, instancia perdida, Dynamo, Redis, HTTPS/CloudFront, rotacion de secretos y JWT, 401/403, incidente de seguridad, presupuesto, restauracion y eliminacion IaC) y 13 campos; el validador rechaza comandos `aws ... delete/terminate/destroy`.
+- **INF-140-02:** `MATRIZ_INCIDENTES.md` con S1–S3, ciclo de 10 fases y tiempos `PENDIENTE_DECISION_HUMANA`; el validador rechaza severidad desconocida, incidente sin propietario, S1/S2 sin escalamiento, datos sensibles, evidencia AWS simulada y tiempos contradictorios.
+- **INF-140-03:** `PLAN_PRUEBAS_OPERACION.md` con 12 drills y estados `LOCAL_PASS`/`LOCAL_FAIL`/`NOT_RUN_AWS`/`BLOCKED_DEPENDENCY`; se rechaza `demuestra_aws=true`, `EJECUTADO_AWS` y acciones destructivas.
+- **INF-140-04:** `MATRIZ_INF_140.md` generada con 12 A, 16 I y 75 E y criterios cloud `NOT_RUN`; los contratos E son OpenAPI sin handler.
+- **INF-140-05:** `ACCESO_OPERACIONAL.md` con identidades temporales, SSM en ventana, auditoria y minimo privilegio; se rechazan root, SSH publico, claves estaticas y cambio de SCP.
+- **INF-140-06:** `INVENTARIO_INFRAESTRUCTURA.md` derivado de I-120/I-130 y catalogo: 17 recursos core y 3 auxiliares con owner, criticidad, costo estimado y `AWS_NOT_VERIFIED`.
+- Pruebas: 45 nuevas (suite de operacion 149). Sin AWS, sin drills reales y sin merge.
+
+### I-140 correccion final (2026-11-09)
+
+- **Evidencia de drills:** `validar_drills` exige para `LOCAL_PASS` un `evidencia` con archivo y prueba existentes (se comprueba que la prueba aparece en el archivo), resultado `PASS` y sin duplicados. Seis drills quedan con evidencia real; cinco `NOT_RUN_AWS` y uno `BLOCKED_DEPENDENCY` (I-020). Un JSON editado a mano ya no puede fabricar `LOCAL_PASS`.
+- **Costes del inventario:** `costos_activo` incluye partidas mensuales (÷730 solo para la vista horaria), separa USD/h, USD/mes y consumo variable, y anula el total cuando falta un precio (`precios_desconocidos`), en lugar de contarlo como 0.
+- **Consolidacion:** se detectan recursos repetidos entre I-120 e I-130 (`dynamodb-core`, `terraform-state`, `secretos-bootstrap`), se suman fuentes y partidas sin duplicar costos y se conservan los recursos distintos del mismo servicio.
+- **Owners y ASG:** owners y etiquetas se derivan de fuentes declarativas y lo no declarado queda `PENDIENTE_DECLARACION`; la capacidad del ASG se contrasta con `modules/computo` (min=desired=max=2) sin afirmar instancias reales.
+- Conteos: 63 pruebas de I-140 (suite de operacion 167). Sin AWS y sin merge.
+
+### I-140 cierre de revisión (2026-11-09)
+
+- **Costos duplicados (defecto real):** la consolidacion concatenaba partidas y facturaba PITR y S3 dos veces (`dynamodb-core` 1.9500 en vez de 1.3500; `terraform-state-s3` 0.1380 en vez de 0.0690). Ahora cada cargo se contabiliza una vez por `(sku, base)`, se conservan ambas fuentes y un conflicto de cantidad se informa sin elegir en silencio.
+- **ASG:** la comprobacion ya admitia la alineacion real; se verifico con formato de Terraform, tabulaciones, capacidad 1 y `max_size` desligado.
+- **Evidencia de drills:** el validador comprueba archivo, presencia de la prueba y que su nombre se ejecuta en el workflow de CI (pasos `-run` focalizados); no ejecuta pruebas ni sustituye el log de CI. La documentacion se corrigio para no atribuir garantias inexistentes.
+- Conteos: 77 pruebas de I-140 (suite de operacion 181). Sin AWS y sin merge.

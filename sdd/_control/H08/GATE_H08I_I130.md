@@ -165,3 +165,21 @@ Evidencia: 126 pruebas de respaldo, 15 de conciliación FinOps, 321 de Terraform
 
 Evidencia: 129 pruebas de respaldo, 258 de FinOps y 321 de Terraform; `AWS_NOT_RUN`,
 `RESTORE_AWS_NOT_RUN`, `RTO_RPO_PENDING_HUMAN_APPROVAL`.
+## 12. Registro de integración — 2026-11-09
+
+- `APRUEBO_MERGE_PR_33_SHA_2634e5bffea0c0598784a13e43d557e810e85b56` concedido por el responsable;
+  HEAD verificado por igualdad exacta y `--match-head-commit`; 7/7 checks `pass` y `MERGEABLE`/`CLEAN`.
+- **PR #33 `MERGED`** (`2026-11-09T04:46:48Z`); merge commit y `main` =
+  **`da2aee149551b583a13b68276ac4d97058d225da`**; `git pull --ff-only` dejó `main` local idéntico a
+  `origin/main`.
+- CI post-merge sobre `main` en `da2aee1`: **SDD documental `success`** (run `42563665183`) y
+  **Go Backend CI `success`** (run `42563665206`, seis jobs en verde).
+- Estado: **INTEGRADO_MAIN — NO DESPLEGADO**. `AWS_NOT_RUN`, `RESTORE_AWS_NOT_RUN`,
+  `RTO_RPO_PENDING_HUMAN_APPROVAL`, `BACKUP_AWS_NOT_VERIFIED`, `DAST_NOT_RUN`.
+- Se conservan: RFC-004, H-01, RFC-006, RFC-007, `ARTIFACT_DELIVERY`, agente CloudWatch (I-020),
+  `ALERT_DELIVERY = BLOCKED_RFC007_SNS_KMS`, readiness 503, OIDC, `AWS_SCP_NOT_VERIFIED`, branch
+  protection `BLOQUEADO_PLAN_GITHUB`, `D-100-01`, `D-100-02`, `D-110-01`.
+- `BLOCKED_I130` de I-120 sigue abierto: solo se cierra con un restore verificado en AWS, no con esta
+  integración. Decisiones humanas pendientes: ratificación RTO/RPO, retención, 2 GB vs 3 GB y
+  autorización de ejecución real.
+- Este registro es documental: no se modificó Terraform, Go, OpenAPI ni workflows tras el merge.

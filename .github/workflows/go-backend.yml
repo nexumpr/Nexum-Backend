@@ -247,6 +247,16 @@ jobs:
           terraform init -backend=false -input=false
           terraform test
 
+      - name: Evidencia de drills I-140 (Go)
+        run: |
+          go test -count=1 -v ./tests/unit/transport/... -run '^(TestHTTPServerStatusesAndErrors)$'
+          go test -count=1 -v ./tests/unit/financial/... -run '^(TestGoalReversionPreservesInvariant|TestIdempotencyManagerBehavior)$'
+          go test -count=1 -v ./tests/unit/security/... -run '^(TestRefreshTokenReplayFamilyRevocation)$'
+          go test -count=1 -v ./tests/unit/telemetry/... -run '^(TestReadinessProbeDegradation503)$'
+
+      - name: Evidencia de drills I-140 (Python)
+        run: python3 -m unittest herramientas.tests.test_cd_helpers.DecisionRollback -v
+
       - name: Pruebas de contrato Terraform e IaC
         run: python3 -m unittest discover -s tests/infra/terraform
 
