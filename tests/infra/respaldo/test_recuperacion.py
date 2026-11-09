@@ -47,10 +47,15 @@ class MatrizRTOyRPO(unittest.TestCase):
         self.assertEqual(matriz["estado"], rec.RTO_RPO_PENDING)
         self.assertFalse(matriz["objetivo_ratificado"]["aprobado"])
 
-    def test_ratificacion_se_refleja(self) -> None:
+    def test_ratificacion_local_no_acredita(self) -> None:
         inventario = _inv()
-        inventario["ratificacion_objetivos"] = {"aprobado": True, "fecha": "2026-11-09", "referencia": "RFC-X"}
-        self.assertEqual(rec.matriz_rto_rpo(inventario)["estado"], "RATIFICADO")
+        inventario["ratificacion_objetivos"] = {
+            "aprobado": True, "fecha": "2026-11-09", "referencia": "sdd/_control/H08/GATE_H08I_I130.md",
+        }
+        matriz = rec.matriz_rto_rpo(inventario)
+        self.assertTrue(matriz["ratificacion_declarada"])
+        self.assertFalse(matriz["ratificacion_verificable"])
+        self.assertEqual(matriz["estado"], rec.RTO_RPO_PENDING)
 
     def test_simulacion_no_acredita_cumplimiento(self) -> None:
         matriz = rec.matriz_rto_rpo(_inv())
@@ -217,12 +222,28 @@ class VigenciaDeBackup(unittest.TestCase):
         with self.assertRaises(br.ErrorUso):
             rec.evaluar_backup(solicitud, date(2026, 11, 9))
 
-    def test_evidencia_aws_verificada(self) -> None:
+    def test_evidencia_aws_fabricada_no_acredita(self) -> None:
         solicitud = self._solicitud(
-            evidencia_aws={"verificado_por_aws": True, "huella_sha256": "a" * 64}
+            evidencia_aws={
+                "verificado_por_aws": True,
+                "huella_sha256": "a" * 64,
+                "gate": "APRUEBO_BACKUP_AWS_VERIFICADO",
+            }
         )
+        resultado = rec.evaluar_backup(solicitud, date(2026, 11, 9))
+        self.assertEqual(resultado["alcance"], "BACKUP_AWS_NOT_VERIFIED")
+        self.assertFalse(resultado["verificacion_aws"]["habilitada"])
+
+    def test_huella_ficticia_se_rechaza(self) -> None:
+        solicitud = self._solicitud(evidencia_aws={"verificado_por_aws": True, "huella_sha256": "cualquier-texto"})
         self.assertEqual(
-            rec.evaluar_backup(solicitud, date(2026, 11, 9))["alcance"], "BACKUP_AWS_VERIFIED"
+            rec.evaluar_backup(solicitud, date(2026, 11, 9))["estado"], "EVIDENCIA_MALFORMADA"
+        )
+
+    def test_evidencia_malformada_se_rechaza(self) -> None:
+        solicitud = self._solicitud(evidencia_aws="si")
+        self.assertEqual(
+            rec.evaluar_backup(solicitud, date(2026, 11, 9))["estado"], "EVIDENCIA_MALFORMADA"
         )
 
     def test_sin_evidencia_aws_no_se_declara_verificado(self) -> None:
@@ -286,9 +307,19 @@ class RecuperacionDeState(unittest.TestCase):
 
 
 class ConcurrenciaYCLI(unittest.TestCase):
-    def test_escritor_unico(self) -> None:
+    def test_escritor_unico_es_simulado(self) -> None:
         resultado = rec.verificar_concurrencia({"token_activo": "lock-1", "solicitante": "lock-1"})
         self.assertTrue(resultado["permite"])
+        self.assertEqual(resultado["estado"], "ESCRITOR_UNICO_SIMULADO")
+        self.assertFalse(resultado["verificado_en_aws"])
+
+    def test_sin_identidad_se_rechaza(self) -> None:
+        for solicitud in ({}, {"token_activo": "lock-1"}, {"solicitante": "lock-1"}):
+            with self.subTest(solicitud=solicitud):
+                resultado = rec.verificar_concurrencia(solicitud)
+                self.assertEqual(resultado["estado"], "SOLICITUD_INCOMPLETA")
+                self.assertFalse(resultado["permite"])
+                self.assertTrue(resultado["faltantes"])
 
     def test_escritor_concurrente(self) -> None:
         resultado = rec.verificar_concurrencia({"token_activo": "lock-2", "solicitante": "lock-1"})

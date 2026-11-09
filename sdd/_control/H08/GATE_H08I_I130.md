@@ -147,3 +147,21 @@ Terraform, `fmt`/`validate`, SDD y SHA-256 PASS. `AWS_NOT_RUN`, `RESTORE_AWS_NOT
 
 Evidencia: 126 pruebas de respaldo, 15 de conciliación FinOps, 321 de Terraform. `AWS_NOT_RUN`,
 `RESTORE_AWS_NOT_RUN`, `RTO_RPO_PENDING_HUMAN_APPROVAL`.
+
+## 11. Cierre focalizado (2026-11-09)
+
+- **Evidencias AWS:** se elimina la posibilidad de `BACKUP_AWS_VERIFIED` y `medido_verificable=true` con
+  datos locales. `evaluar_evidencia_aws` valida forma (bandera, gate y huella de 64 hex) pero **no**
+  veracidad: `VERIFICACION_AWS_HABILITADA = False` y `GATES_AUTENTICADOS` vacío. Evidencia malformada →
+  `EVIDENCIA_MALFORMADA`; evidencia bien formada → `BACKUP_AWS_NOT_VERIFIED`.
+- **RTO/RPO:** `validar_objetivos` ya no devuelve `MEDIDO` con `medido=true`; se expone
+  `medido_declarado`. La matriz mantiene `RTO_RPO_PENDING_HUMAN_APPROVAL` y añade
+  `ratificacion_declarada` sin acreditación.
+- **FinOps:** la conciliación usa el presupuesto **vigente de I-000** (102.7830 bruto / 113.0613 con
+  margen / 120.0000 declarados), no la base histórica de 84.0580. Incremento I-130 = 0.0000; margen
+  teórico 6.9387 USD declarado como *no disponible en AWS*.
+- **Concurrencia:** se rechaza sin identidad de escritor (`SOLICITUD_INCOMPLETA`) y la coincidencia de
+  tokens solo produce `ESCRITOR_UNICO_SIMULADO`, sin acreditar lock real.
+
+Evidencia: 129 pruebas de respaldo, 258 de FinOps y 321 de Terraform; `AWS_NOT_RUN`,
+`RESTORE_AWS_NOT_RUN`, `RTO_RPO_PENDING_HUMAN_APPROVAL`.

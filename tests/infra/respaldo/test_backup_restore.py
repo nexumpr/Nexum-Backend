@@ -61,10 +61,13 @@ class ObjetivosRTOyRPO(unittest.TestCase):
         with self.assertRaises(br.ErrorInventario):
             br.validar_objetivos(inventario)
 
-    def test_objetivo_medido_se_declara(self) -> None:
+    def test_medido_local_no_cambia_el_estado(self) -> None:
         inventario = _inv()
         inventario["objetivos"]["medido"] = True
-        self.assertEqual(br.validar_objetivos(inventario)["estado"], "MEDIDO")
+        resultado = br.validar_objetivos(inventario)
+        self.assertTrue(resultado["medido_declarado"])
+        self.assertFalse(resultado["medido"])
+        self.assertEqual(resultado["estado"], br.RTO_RPO_NO_MEDIDO)
 
 
 class InventarioDeActivos(unittest.TestCase):

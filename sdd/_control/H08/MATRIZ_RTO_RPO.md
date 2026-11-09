@@ -19,8 +19,15 @@
 | Simulación local | suma de fases declaradas | pérdida máxima declarada | `verificar_recuperacion.py` | `SIMULADO` (no acredita) |
 | Resultado real AWS | — | — | Gate de despliegue | `NOT_RUN` |
 
-**Regla:** una simulación local nunca cambia `objetivo_medido`. Solo un restore real medido puede
-declarar cumplimiento.
+**Regla:** ninguna evidencia local acredita nada. `medido_declarado` puede ser `true` y el estado sigue
+`RTO_RPO_PENDING_HUMAN_APPROVAL`; `medido_verificable` permanece `false` porque la verificación AWS está
+**deshabilitada** en I-130 LOCAL (`VERIFICACION_AWS_HABILITADA = False`, lista de Gates autenticados
+vacía). Lo mismo aplica a `ratificacion_declarada`: aunque un JSON local traiga `aprobado`, `fecha` y
+`referencia`, no acredita una decisión humana independiente.
+
+**Contrato futuro:** para acreditar hará falta evidencia con procedencia autenticada (Gate registrado en
+`GATES_AUTENTICADOS`), huella de la respuesta cruda y ejecución bajo autorización independiente. Ese
+contrato está definido pero **no habilitado** en este PR.
 
 ## 2. Fases medidas (runbook INF-130-06)
 

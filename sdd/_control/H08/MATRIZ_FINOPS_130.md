@@ -6,6 +6,7 @@
 | Versión | 0.2.0 |
 | Estado | **IMPLEMENTADO_LOCAL — NO DESPLEGADO** |
 | Conciliación | `herramientas/conciliar_finops_130.py` |
+| Presupuesto vigente | I-000: bruto **102.7830**, con margen 10 % **113.0613**, créditos declarados **120.0000** |
 | Costo observado | `CONSUMO_REAL = NOT_VERIFIED` |
 
 ## 1. Conclusión de la conciliación
@@ -20,6 +21,10 @@ state) con precios idénticos a los del catálogo:
 | S3 Terraform-state | 3 GB-mes × 0.023 | 3 GB-mes × 0.023 | **0.0000** |
 | DynamoDB restore | 2 GB × 0.15 (eventual) | no habilitado | **0.0000** |
 | **Total** | | | **0.0000 USD** |
+
+El modelo V3 (84.0580 USD) es la base **histórica**; el presupuesto vigente es el de I-000
+(102.7830 bruto / 113.0613 con margen). La conciliación usa el vigente y el modelo solo como referencia
+por SKU.
 
 **No se añade 1.4336 USD al presupuesto**: esa cifra es la *itemización* de líneas que el modelo ya
 contiene. Sumarla otra vez sería doble conteo. `1.4336 USD/45 d` es el importe de las líneas de I-130
@@ -57,10 +62,20 @@ Adoptar 2 GB reduciría el modelo en 0.4779 USD/45 d; no se cambia el compromiso
 
 ## 5. Decisión
 
-`VIABILIDAD_LOCAL_SIN_EVIDENCIA_DE_CUENTA`. **No** se declara `NO_BLOCKED_FINOPS` como PASS: falta
-evidencia de cuenta y de créditos. Tampoco hay `BLOCKED_FINOPS`: con el modelo vigente el margen local
-es amplio, pero **los créditos declarados no son saldo comprobado** y no se presenta la incertidumbre
-como un aprobado.
+`VIABILIDAD_LOCAL_SIN_EVIDENCIA_DE_CUENTA`. **No** se declara `NO_BLOCKED_FINOPS` como PASS.
+
+| Concepto | Valor |
+|---|---|
+| Presupuesto vigente con margen | 113.0613 USD |
+| Incremento I-130 | 0.0000 USD |
+| Créditos declarados | 120.0000 USD |
+| **Margen teórico** | **6.9387 USD** |
+| ¿Es dinero disponible en AWS? | **No** (`margen_teorico_es_dinero_disponible = false`) |
+| Créditos verificados | `null` / `NOT_VERIFIED` |
+| Consumo real | `NOT_VERIFIED` |
+
+El margen es aritmética sobre cifras declaradas, no saldo comprobado. Cualquier decisión de despliegue
+que dependa de créditos queda bloqueada hasta verificación autorizada.
 
 ```powershell
 py -3.13 herramientas/conciliar_finops_130.py

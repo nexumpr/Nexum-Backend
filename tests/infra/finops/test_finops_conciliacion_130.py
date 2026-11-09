@@ -92,9 +92,12 @@ class SinDobleConteo(unittest.TestCase):
 
 class Bloqueos(unittest.TestCase):
     def test_margen_negativo_bloquea(self) -> None:
-        modelo = _modelo()
-        modelo["creditos_declarados_usd"] = 1
-        resultado = cf.conciliar(modelo, _inv(), _cat())
+        original = dict(cf.PRESUPUESTO_VIGENTE)
+        try:
+            cf.PRESUPUESTO_VIGENTE["creditos_declarados_usd"] = "100.0000"
+            resultado = cf.conciliar(_modelo(), _inv(), _cat())
+        finally:
+            cf.PRESUPUESTO_VIGENTE.update(original)
         self.assertTrue(resultado["bloqueo_presupuestario_local"])
         self.assertEqual(resultado["decision"], "BLOCKED_FINOPS")
 
@@ -112,11 +115,43 @@ class Bloqueos(unittest.TestCase):
         self.assertEqual(cf.main([]), 0)
 
     def test_cli_sale_uno_con_bloqueo(self) -> None:
-        modelo = _modelo()
-        modelo["creditos_declarados_usd"] = 1
-        ruta = _json(modelo)
-        self.assertEqual(cf.main(["--modelo", str(ruta)]), 1)
+        original = dict(cf.PRESUPUESTO_VIGENTE)
+        try:
+            cf.PRESUPUESTO_VIGENTE["creditos_declarados_usd"] = "100.0000"
+            codigo = cf.main([])
+        finally:
+            cf.PRESUPUESTO_VIGENTE.update(original)
+        self.assertEqual(codigo, 1)
 
+
+class PresupuestoVigente(unittest.TestCase):
+    """La conciliacion usa el presupuesto ratificado de I-000, no la base historica."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.resultado = cf.conciliar(_modelo(), _inv(), _cat())
+        cls.gate = (RAIZ / "sdd" / "_control" / "H08" / "GATE_H08I_I000.md").read_text(encoding="utf-8")
+
+    def test_fuente_del_presupuesto_es_el_gate_de_i000(self) -> None:
+        self.assertIn("GATE_H08I_I000", self.resultado["modelo_historico_superado_por"])
+        for cifra in ("102.7830", "113.0613", "120.0000"):
+            self.assertIn(cifra, self.gate, cifra)
+
+    def test_margen_teorico_calculado_desde_el_presupuesto_vigente(self) -> None:
+        self.assertEqual(self.resultado["presupuesto_vigente_bruto_45d_usd"], "102.7830")
+        self.assertEqual(self.resultado["presupuesto_vigente_con_margen_45d_usd"], "113.0613")
+        self.assertEqual(self.resultado["margen_local_45d_usd"], "6.9387")
+
+    def test_margen_no_es_dinero_disponible(self) -> None:
+        self.assertFalse(self.resultado["margen_teorico_es_dinero_disponible"])
+        self.assertIsNone(self.resultado["creditos_verificados_usd"])
+
+    def test_incremento_sigue_siendo_cero(self) -> None:
+        self.assertEqual(self.resultado["incremento_i130_45d_usd"], "0.0000")
+
+    def test_decision_no_afirma_ausencia_de_bloqueo(self) -> None:
+        self.assertEqual(self.resultado["decision"], "VIABILIDAD_LOCAL_SIN_EVIDENCIA_DE_CUENTA")
+        self.assertNotIn("NO_BLOCKED", self.resultado["decision"])
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

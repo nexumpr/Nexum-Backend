@@ -611,3 +611,12 @@
 - **RTO/RPO:** `medido=true` no acredita (`medido_declarado` vs `medido_verificable`); la ratificacion exige referencia y fecha.
 - **FinOps:** `conciliar_finops_130.py` concilia por SKU contra el modelo H05 V3. Incremento real **0.0000 USD** (sin doble conteo de 1.4336); diferencia 2 vs 3 GB -0.4779 USD; decision `VIABILIDAD_LOCAL_SIN_EVIDENCIA_DE_CUENTA`.
 - Conteos: 126 pruebas de respaldo, 15 de conciliacion FinOps, 321 de Terraform. Sin AWS, sin Terraform remoto, sin merge.
+
+### I-130 cierre focalizado (2026-11-09)
+
+- **Evidencias AWS:** `evaluar_evidencia_aws` valida estructura pero no veracidad; `VERIFICACION_AWS_HABILITADA = False` y `GATES_AUTENTICADOS` vacio, por lo que ningun JSON local produce `BACKUP_AWS_VERIFIED` ni `medido_verificable`. Evidencia malformada -> `EVIDENCIA_MALFORMADA`; bien formada -> `BACKUP_AWS_NOT_VERIFIED`.
+- **RTO/RPO:** `validar_objetivos` devuelve siempre `OBJETIVO_PROPUESTO_NO_MEDIDO` con `medido_declarado`; la matriz expone `ratificacion_declarada` pero mantiene `RTO_RPO_PENDING_HUMAN_APPROVAL`.
+- **FinOps:** se usa el presupuesto vigente de I-000 (102.7830 bruto, 113.0613 con margen, 120.0000 declarados); el modelo 84.0580 queda como historico. Incremento I-130 0.0000 y margen teorico 6.9387 USD que **no** es dinero disponible; creditos verificados `null`.
+- **Concurrencia:** `SOLICITUD_INCOMPLETA` sin identidad; coincidencia de tokens -> `ESCRITOR_UNICO_SIMULADO` con `verificado_en_aws=false`; I-070 sigue siendo la autoridad del locking.
+- Pruebas tautologicas revisadas y sustituidas por aserciones con valores esperados calculados desde el catalogo y el Gate de I-000.
+- Conteos: 129 pruebas de respaldo, 258 de FinOps, 321 de Terraform. Sin AWS, sin Terraform remoto, sin merge.

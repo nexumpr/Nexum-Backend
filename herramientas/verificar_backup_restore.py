@@ -39,6 +39,47 @@ ESTADOS_PROTEGIDOS = ("DECLARADO_NO_CREADO", "OPCIONAL_NO_CREADO", "BLOQUEADO_RF
 RESTORE_AWS = "RESTORE_AWS_NO_VERIFICADO"
 RTO_RPO_NO_MEDIDO = "OBJETIVO_PROPUESTO_NO_MEDIDO"
 
+# En I-130 LOCAL ninguna evidencia controlada por el agente puede acreditar AWS.
+# El contrato de verificacion autenticada queda definido pero DESHABILITADO.
+VERIFICACION_AWS_HABILITADA = False
+GATES_AUTENTICADOS: tuple[str, ...] = ()
+
+
+def evaluar_evidencia_aws(evidencia: Any) -> dict[str, Any]:
+    """Valida forma y estructura; nunca acredita veracidad en I-130 LOCAL."""
+    if evidencia is None:
+        return {"presente": False, "bien_formada": False, "acreditada": False, "motivo": "sin evidencia"}
+    if not isinstance(evidencia, Mapping):
+        return {
+            "presente": True,
+            "bien_formada": False,
+            "acreditada": False,
+            "motivo": "evidencia malformada: se esperaba un objeto",
+        }
+    huella = str(evidencia.get("huella_sha256", ""))
+    campos_ok = (
+        evidencia.get("verificado_por_aws") is True
+        and isinstance(evidencia.get("gate"), str)
+        and bool(evidencia.get("gate"))
+        and len(huella) == 64
+        and all(c in "0123456789abcdef" for c in huella.lower())
+    )
+    acreditada = bool(
+        campos_ok
+        and VERIFICACION_AWS_HABILITADA
+        and evidencia.get("gate") in GATES_AUTENTICADOS
+    )
+    return {
+        "presente": True,
+        "bien_formada": campos_ok,
+        "acreditada": acreditada,
+        "motivo": (
+            "verificacion AWS deshabilitada en I-130 LOCAL: un JSON local no acredita la nube"
+            if campos_ok
+            else "evidencia incompleta o malformada (bandera, gate o huella)"
+        ),
+    }
+
 COMANDOS_PROHIBIDOS = frozenset(
     {
         "destroy-data",
@@ -180,11 +221,12 @@ def validar_objetivos(inventario: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "rto_horas": str(rto),
         "rpo_horas": str(rpo),
-        "medido": bool(objetivos.get("medido")),
-        "estado": "MEDIDO" if objetivos.get("medido") else RTO_RPO_NO_MEDIDO,
+        "medido_declarado": bool(objetivos.get("medido")),
+        "medido": False,
+        "estado": RTO_RPO_NO_MEDIDO,
         "advertencia": (
-            "Un objetivo no medido no es un objetivo cumplido: se exige restore real "
-            "en AWS con duracion registrada para declararlo MEDIDO."
+            "Un objetivo no medido no es un objetivo cumplido: ningun valor local cambia el "
+            "estado; se exige restore real con duracion registrada y Gate independiente."
         ),
     }
 

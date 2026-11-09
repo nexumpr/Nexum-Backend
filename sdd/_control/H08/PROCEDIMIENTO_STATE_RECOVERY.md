@@ -46,8 +46,10 @@ alcance `TERRAFORM_STATE_RECOVERY_AWS_NOT_VERIFIED`.
 py -3.13 herramientas/verificar_recuperacion.py concurrencia --solicitud lock.json
 ```
 
-`ESCRITOR_CONCURRENTE` bloquea la operación. Un `terraform init`/`apply` simultáneo sobre el mismo
-state es un fallo, no un caso a tolerar.
+`ESCRITOR_CONCURRENTE` bloquea la operación y `SOLICITUD_INCOMPLETA` la rechaza si falta identidad de
+escritor (`token_activo` o `solicitante`). `ESCRITOR_UNICO_SIMULADO` solo indica coherencia del escenario
+local: **no** acredita un lock real de S3. I-070 sigue siendo la autoridad del locking y no se implementa
+ni ejecuta ningún mecanismo remoto en I-130.
 
 ## 4. Lo que este procedimiento no hace
 

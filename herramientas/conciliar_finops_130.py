@@ -37,6 +37,16 @@ CONCEPTO_POR_SKU = {
 
 EVENTUAL = {"DDB_RESTORE_GB"}
 
+# Presupuesto VIGENTE ratificado en I-000 (Gate H08-I/I-000, registro de cierre):
+# bruto 79.0430 + conectividad 23.7400 = 102.7830; con margen 10 % = 113.0613
+# sobre 120.0000 creditos declarados. El modelo V3 (84.0580) es historico previo.
+PRESUPUESTO_VIGENTE = {
+    "bruto_45d_usd": "102.7830",
+    "con_margen_10_usd": "113.0613",
+    "creditos_declarados_usd": "120.0000",
+    "fuente": "sdd/_control/H08/GATE_H08I_I000.md (registro de cierre I-000)",
+}
+
 
 class ErrorConciliacion(Exception):
     """Modelo o inventario incompletos (codigo 2)."""
@@ -166,17 +176,24 @@ def conciliar(
         )
 
     total_modelo = Decimal(str(modelo.get("estimado_total_45d_usd", "0")))
-    creditos = Decimal(str(modelo.get("creditos_declarados_usd", "0")))
-    margen = creditos - (total_modelo + incremento)
+    vigente_bruto = Decimal(PRESUPUESTO_VIGENTE["bruto_45d_usd"])
+    vigente_margen = Decimal(PRESUPUESTO_VIGENTE["con_margen_10_usd"])
+    creditos = Decimal(PRESUPUESTO_VIGENTE["creditos_declarados_usd"])
+    margen = creditos - (vigente_margen + incremento)
     return {
         "filas": filas,
         "total_modelo_45d_usd": str(cuantizar(total_modelo)),
+        "modelo_historico_superado_por": PRESUPUESTO_VIGENTE["fuente"],
+        "presupuesto_vigente_bruto_45d_usd": str(cuantizar(vigente_bruto)),
+        "presupuesto_vigente_con_margen_45d_usd": str(cuantizar(vigente_margen)),
         "incremento_i130_45d_usd": str(cuantizar(incremento)),
         "recurrente_i130_45d_usd": str(cuantizar(recurrente)),
         "eventual_i130_45d_usd": str(cuantizar(eventual)),
         "delta_2_vs_3gb_45d_usd": str(cuantizar(recurrente / cantidad_referencia * (Decimal("2") - cantidad_referencia))),
         "creditos_declarados_usd": str(cuantizar(creditos)),
+        "creditos_verificados_usd": None,
         "margen_local_45d_usd": str(cuantizar(margen)),
+        "margen_teorico_es_dinero_disponible": False,
         "estados_evidencia": {
             "estimado": "CALCULADO",
             "presupuestado": "MODELO_H05_V3",

@@ -51,8 +51,9 @@ def matriz_rto_rpo(inventario: Mapping[str, Any]) -> dict[str, Any]:
     ratificado = bool(ratificacion.get("aprobado")) and bool(ratificacion.get("referencia")) and bool(
         ratificacion.get("fecha")
     )
-    medicion = inventario.get("medicion_aws") or {}
-    medido_verificable = bool(medicion.get("verificado_por_aws")) and bool(medicion.get("huella_sha256"))
+    medicion = inventario.get("medicion_aws")
+    evaluacion_medicion = br.evaluar_evidencia_aws(medicion)
+    medido_verificable = evaluacion_medicion["acreditada"]
     return {
         "comando": "matriz-rto-rpo",
         "objetivo_propuesto": {
@@ -77,12 +78,14 @@ def matriz_rto_rpo(inventario: Mapping[str, Any]) -> dict[str, Any]:
         },
         "simulacion_local": {"estado": "SIMULADO_CON_FIXTURES", "acredita_cumplimiento": False},
         "resultado_aws": {"estado": "NOT_RUN", "medido": False},
-        "estado": "RATIFICADO" if ratificado else RTO_RPO_PENDING,
+        "estado": RTO_RPO_PENDING,
+        "ratificacion_declarada": ratificado,
         "ratificacion_verificable": False,
-        "medicion_verificable": False,
+        "medicion_verificable": medido_verificable,
+        "medicion_evidencia": evaluacion_medicion,
         "advertencia": (
-            "Una simulacion local no declara RTO/RPO cumplidos; solo el restore real medido "
-            "puede cambiar objetivo_medido."
+            "Ningun JSON local ratifica objetivos ni acredita medicion: el estado permanece "
+            "RTO_RPO_PENDING_HUMAN_APPROVAL hasta una decision humana registrada y un restore real."
         ),
     }
 
@@ -233,9 +236,17 @@ def evaluar_backup(
                 "retencion_dias": retencion,
             }
 
-    evidencia = solicitud.get("evidencia_aws") or {}
-    verificado_aws = bool(evidencia.get("verificado_por_aws")) and bool(evidencia.get("huella_sha256"))
-    alcance = "BACKUP_AWS_VERIFIED" if verificado_aws else "BACKUP_AWS_NOT_VERIFIED"
+    evaluacion = br.evaluar_evidencia_aws(solicitud.get("evidencia_aws"))
+    if evaluacion["presente"] and not evaluacion["bien_formada"]:
+        return {
+            "comando": "estado-backup",
+            "tipo": tipo,
+            "estado": "EVIDENCIA_MALFORMADA",
+            "valido": False,
+            "alcance": "BACKUP_AWS_NOT_VERIFIED",
+            "motivo": evaluacion["motivo"],
+        }
+    alcance = "BACKUP_AWS_VERIFIED" if evaluacion["acreditada"] else "BACKUP_AWS_NOT_VERIFIED"
     return {
         "comando": "estado-backup",
         "tipo": tipo,
@@ -245,6 +256,11 @@ def evaluar_backup(
         "retencion_dias": retencion,
         "caducidad_automatica": tipo == "PITR",
         "alcance": alcance,
+        "verificacion_aws": {
+            "habilitada": br.VERIFICACION_AWS_HABILITADA,
+            "acreditada": evaluacion["acreditada"],
+            "motivo": evaluacion["motivo"],
+        },
         "advertencia": (
             "Un JSON local no demuestra que el backup exista; solo BACKUP_AWS_VERIFIED, con "
             "evidencia AWS autorizada, acredita existencia real."
@@ -297,18 +313,35 @@ def verificar_concurrencia(solicitud: Mapping[str, Any] | None) -> dict[str, Any
         raise br.ErrorUso("Se requiere --solicitud con 'token_activo' y 'solicitante'.")
     activo = solicitud.get("token_activo")
     solicitante = solicitud.get("solicitante")
-    if activo and activo != solicitante:
+    faltantes = [
+        nombre
+        for nombre, valor in (("token_activo", activo), ("solicitante", solicitante))
+        if not isinstance(valor, str) or not valor.strip()
+    ]
+    if faltantes:
+        return {
+            "comando": "concurrencia",
+            "estado": "SOLICITUD_INCOMPLETA",
+            "permite": False,
+            "faltantes": faltantes,
+            "motivo": "sin identidad de escritor no se puede evaluar concurrencia",
+            "verificado_en_aws": False,
+        }
+    if activo.strip() != solicitante.strip():
         return {
             "comando": "concurrencia",
             "estado": "ESCRITOR_CONCURRENTE",
             "permite": False,
             "motivo": f"token activo de {activo}; solicitante {solicitante}",
+            "verificado_en_aws": False,
         }
     return {
         "comando": "concurrencia",
-        "estado": "ESCRITOR_UNICO",
+        "estado": "ESCRITOR_UNICO_SIMULADO",
         "permite": True,
-        "motivo": "un solo escritor autorizado sobre el state",
+        "motivo": "consistencia del escenario simulado; no acredita un lock real de S3",
+        "verificado_en_aws": False,
+        "autoridad_locking": "I-070",
     }
 
 
@@ -369,6 +402,8 @@ def ejecutar(argv: Sequence[str] | None = None) -> tuple[int, dict[str, Any]]:
         "TABLA_NO_COINCIDE",
         "RECUPERACION_RECHAZADA",
         "ESCRITOR_CONCURRENTE",
+        "SOLICITUD_INCOMPLETA",
+        "EVIDENCIA_MALFORMADA",
     )
     return (1 if resultado.get("estado") in bloqueantes else 0), resultado
 
