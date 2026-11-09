@@ -16,8 +16,10 @@ import (
 	healthinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/health"
 )
 
-// servidorRESP levanta un servidor TCP minimo que responde +PONG a PING.
-func servidorRESP(t *testing.T, responder string) string {
+// servidorRESP levanta un servidor TCP minimo que responde segun el comando.
+// go-redis envia HELLO al conectar; responder +PONG a HELLO rompe el handshake,
+// asi que el doble distingue comandos como lo haria Redis.
+func servidorRESP(t *testing.T, respuestaPing string) string {
 	t.Helper()
 	escucha, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -32,9 +34,22 @@ func servidorRESP(t *testing.T, responder string) string {
 			}
 			go func(c net.Conn) {
 				defer func() { _ = c.Close() }()
-				buffer := make([]byte, 512)
-				_, _ = c.Read(buffer)
-				_, _ = c.Write([]byte(responder))
+				buffer := make([]byte, 1024)
+				for {
+					leidos, err := c.Read(buffer)
+					if err != nil || leidos == 0 {
+						return
+					}
+					comando := strings.ToUpper(string(buffer[:leidos]))
+					switch {
+					case strings.Contains(comando, "HELLO"):
+						_, _ = c.Write([]byte("-ERR unknown command 'HELLO'\r\n"))
+					case strings.Contains(comando, "PING"):
+						_, _ = c.Write([]byte(respuestaPing))
+					default:
+						_, _ = c.Write([]byte("+OK\r\n"))
+					}
+				}
 			}(conexion)
 		}
 	}()
