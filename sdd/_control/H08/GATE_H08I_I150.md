@@ -133,3 +133,18 @@ Terraform/Trivy/Gitleaks/Go pasen y SDD/SHA-256 permanezcan íntegros.
 Evidencia: 110 pruebas en `tests/infra/publicacion`. `HTTP_VERIFIED` y `TWO_NODES_VERIFIED` siguen
 `NOT_RUN`; INF-150-07 permanece `DISEÑO_LOCAL_COMPLETO — IMPLEMENTACIÓN_CLOUD_PENDIENTE` con
 `BLOCKED_DEPENDENCY`.
+## 11. Registro de integración — 2026-11-09
+
+- `APRUEBO_MERGE_PR_35_SHA_0285c23bbe0a5906eea07993383f95c594d7f373` concedido por el responsable;
+  HEAD verificado por igualdad exacta y `--match-head-commit`; 7/7 checks `pass` y `MERGEABLE`/`CLEAN`.
+- **PR #35 `MERGED`** (`2026-11-09T07:18:59Z`); merge commit y `main` =
+  **`1e910d26507abc17257db5933c349e7a985bd8da`** (padres `7d1418a` y `0285c23`); `git pull --ff-only`
+  dejó `main` local idéntico a `origin/main`.
+- CI post-merge sobre `main` en `1e910d2`: **SDD documental `success`** (run `42578553848`) y
+  **Go Backend CI `success`** (run `42578553811`, seis jobs en verde, con instalación fijada de PyYAML).
+- Estado: **INTEGRADO_MAIN — NO DESPLEGADO**. `AWS_NOT_RUN`, `HTTP_AWS_NOT_RUN`, `DEPLOY_NOT_RUN`,
+  `TWO_NODES_AWS_NOT_VERIFIED`, `DAST_NOT_RUN`.
+- Bloqueos sin cambios: H-01, RFC-004, RFC-006 (vence 2026-12-02 o Gate AWS), RFC-007, D-100-01/02,
+  D-110-01, `ARTIFACT_DELIVERY`, agente CloudWatch (I-020), readiness 503, OIDC/SCP, branch protection,
+  créditos `NOT_VERIFIED`, `BLOCKED_I130` y moderación externa `BLOCKED_DEPENDENCY`.
+- Este registro es documental: no se modificó Terraform, Go, OpenAPI ni workflows tras el merge.

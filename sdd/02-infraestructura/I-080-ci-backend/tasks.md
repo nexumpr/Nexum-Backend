@@ -101,3 +101,14 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - AWS-0011 bajo aceptacion temporal: no autoriza WAF ni despliegue; el despliegue AWS sigue bloqueado por RFC-004, H-01 y RFC-006 5. Cualquier otro HIGH/CRITICAL bloquea.
 - Vigencia automatizada en el job iac: herramientas/verificar_vigencia_rfc006.py falla si la RFC no esta aprobada, revocada, caducada, con fechas RFC/ignore distintas o si existe Gate de despliegue AWS aprobado. CI no puede usar la excepcion fuera de su autorizacion.
 - Pruebas: 29 de contrato CI y 59 de herramientas (+10 de vigencia); sin cambios en logica de negocio.
+
+### Modernizacion del grafo CI/CD (RFC-008, 2026-11-09)
+
+- Deteccion de cambios fail-closed con perfiles `go`, `api`, `sdd`, `infra` y `completo`.
+- Validaciones paralelas con `needs:` reales y condiciones resistentes a fallos.
+- SAST Semgrep con reglas propias y fixture negativo.
+- Integracion de capas reales con `-race` y arranque del binario sondeado por TCP.
+- Evaluacion determinista de mutation testing: `BLOCKED_TECNICO_MUTACION`, sin metricas.
+- Quality Gate fail-closed y Hardening Report generado siempre.
+- Hallazgos corregidos: H-02 (accion sin SHA en SDD), H-03 (`tests/infra/ci` sin job).
+- Sin AWS, sin despliegue, sin cambios en `cd-backend.yml`.

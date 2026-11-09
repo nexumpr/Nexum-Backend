@@ -1,8 +1,11 @@
 name: Go Backend CI
 
-# CI funcional del Backend Go (A-100 / A-110 / I-080).
+# CI funcional del Backend Go (A-100 / A-110 / I-080 / RFC-008).
 # Sin AWS, sin Docker, sin secretos productivos, sin despliegue.
-# Acciones fijadas por SHA de commit y herramientas Go por versión exacta.
+# Acciones fijadas por SHA de commit y herramientas por version exacta.
+#
+# Grafo (RFC-008): deteccion -> validaciones en paralelo -> quality-gate
+#                  -> hardening-report -> CI Success.
 # Contrato: sdd/_control/H08/MATRIZ_JOBS_CI.md y GATES_PR.md.
 
 on:
@@ -11,8 +14,11 @@ on:
   push:
     branches: [main]
 
+# `actions: read` solo permite descargar los artefactos del propio run para el
+# Quality Gate y el Hardening Report. No hay permisos de escritura ni credenciales.
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: go-ci-${{ github.workflow }}-${{ github.ref }}
@@ -22,8 +28,39 @@ env:
   GOFLAGS: -mod=readonly
 
 jobs:
+  detectar:
+    name: Deteccion de cambios
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      go: ${{ steps.perfil.outputs.go }}
+      api: ${{ steps.perfil.outputs.api }}
+      sdd: ${{ steps.perfil.outputs.sdd }}
+      infra: ${{ steps.perfil.outputs.infra }}
+      completo: ${{ steps.perfil.outputs.completo }}
+    steps:
+      - name: Checkout (historial completo para calcular el diff)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Calcular perfil de cambios (fail-closed)
+        id: perfil
+        env:
+          EVENTO: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 herramientas/detectar_cambios_ci.py \
+            --evento "$EVENTO" --base "$BASE" --head "$HEAD" \
+            --salida "$GITHUB_OUTPUT"
+
   calidad:
     name: Formato, vet, build y pruebas
+    needs: detectar
+    if: ${{ !cancelled() && (needs.detectar.result != 'success' || needs.detectar.outputs.go == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -77,6 +114,10 @@ jobs:
       - name: go test -race (cmd, unitarios y seguridad)
         run: go test -race ./cmd/... ./tests/unit/... ./tests/security/... -count=1 -timeout 480s
 
+      - name: Fuzzing acotado del binding HTTP
+        run: |
+          go test ./tests/unit/transport -run '^$' -fuzz '^FuzzBindJSON$' -fuzztime 20s
+
       - name: Cobertura del dominio (umbral 80%)
         run: |
           go test ./tests/... -coverpkg=all -coverprofile=coverage.out -count=1 -timeout 600s
@@ -90,8 +131,21 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+      - name: Evaluacion de mutation testing (decision determinista)
+        run: python3 herramientas/evaluar_mutacion.py --json mutacion.json
+
+      - name: Publicar evaluacion de mutacion
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mutacion-${{ github.sha }}
+          path: mutacion.json
+          retention-days: 7
+          if-no-files-found: error
+
   seguridad:
     name: Analisis estatico y vulnerabilidades
+    needs: detectar
+    if: ${{ !cancelled() && (needs.detectar.result != 'success' || needs.detectar.outputs.go == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -135,6 +189,8 @@ jobs:
 
   secretos:
     name: Escaneo de secretos
+    needs: detectar
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -158,6 +214,8 @@ jobs:
 
   iac:
     name: Validacion Terraform e IaC
+    needs: detectar
+    if: ${{ !cancelled() && (needs.detectar.result != 'success' || needs.detectar.outputs.infra == 'true' || needs.detectar.outputs.sdd == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -277,6 +335,8 @@ jobs:
 
   contratos:
     name: Contratos OpenAPI y herramientas
+    needs: detectar
+    if: ${{ !cancelled() && (needs.detectar.result != 'success' || needs.detectar.outputs.api == 'true' || needs.detectar.outputs.sdd == 'true' || needs.detectar.outputs.go == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -307,8 +367,13 @@ jobs:
       - name: Pruebas de herramientas y validadores
         run: python3 -m unittest discover -s herramientas/tests
 
+      - name: Contrato del propio CI (grafo y documentos)
+        run: python3 -m unittest discover -s tests/infra/ci
+
   cadena-suministro:
     name: SBOM de dependencias
+    needs: detectar
+    if: ${{ !cancelled() && (needs.detectar.result != 'success' || needs.detectar.outputs.go == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -335,3 +400,279 @@ jobs:
           path: sbom.spdx.json
           retention-days: 7
           if-no-files-found: error
+
+  sast-semgrep:
+    name: SAST Semgrep
+    needs: detectar
+    if: ${{ !cancelled() && (needs.detectar.result != 'success' || needs.detectar.outputs.go == 'true' || needs.detectar.outputs.sdd == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Instalar Semgrep (version fijada)
+        run: python3 -m pip install --disable-pip-version-check "semgrep==1.184.0"
+
+      - name: Semgrep SAST sobre el codigo (hallazgos bloqueantes)
+        run: |
+          semgrep --config herramientas/semgrep/nexum.yml \
+            --metrics=off --disable-version-check \
+            --severity ERROR --error \
+            --json --output semgrep.json \
+            cmd internal pkg tests/unit tests/security tests/integration
+
+      - name: Publicar hallazgos SAST
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: semgrep-${{ github.sha }}
+          path: semgrep.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Semgrep detecta el fixture inseguro (prueba negativa)
+        run: |
+          rc=0
+          semgrep --config herramientas/semgrep/nexum.yml \
+            --metrics=off --disable-version-check \
+            --severity ERROR --error \
+            --json --output "$RUNNER_TEMP/semgrep-fixture.json" \
+            tests/fixtures/semgrep/inseguro || rc=$?
+          python3 herramientas/verificar_fixture_semgrep.py "$RUNNER_TEMP/semgrep-fixture.json" "$rc"
+
+  integracion:
+    name: Integracion HTTP y concurrencia
+    needs: detectar
+    if: ${{ !cancelled() && (needs.detectar.result != 'success' || needs.detectar.outputs.go == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Go (version del go.mod)
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Pruebas de integracion de capas reales (con -race)
+        run: |
+          set -o pipefail
+          go test -race ./tests/integration/... -count=1 -timeout 300s -v | tee integracion.txt
+
+      - name: Binario real arrancado y sondeado por TCP
+        run: |
+          set -euo pipefail
+          go build -trimpath -buildvcs=true -o "$RUNNER_TEMP/nexum-server" ./cmd/server
+          "$RUNNER_TEMP/nexum-server" > "$RUNNER_TEMP/servidor.log" 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null; :' EXIT
+          listo=0
+          for _ in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8080/api/v1/health/live; then
+              listo=1
+              break
+            fi
+            sleep 0.5
+          done
+          if [ "$listo" -ne 1 ]; then
+            echo "::error::El binario no respondio /api/v1/health/live en 30 s"
+            cat "$RUNNER_TEMP/servidor.log"
+            exit 1
+          fi
+          codigo_404="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/v1/ruta-inexistente)"
+          codigo_405="$(curl -s -X POST -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/v1/health/live)"
+          codigo_ready="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/v1/health/ready)"
+          {
+            echo "binario: vivo y escuchando en 127.0.0.1:8080"
+            echo "GET /api/v1/health/live = 200"
+            echo "GET /api/v1/ruta-inexistente = $codigo_404"
+            echo "POST /api/v1/health/live = $codigo_405"
+            echo "GET /api/v1/health/ready = $codigo_ready (503 esperado: sin dependencias registradas)"
+          } | tee -a integracion.txt
+          if [ "$codigo_404" != "404" ]; then
+            echo "::error::Se esperaba 404 y se obtuvo $codigo_404"
+            exit 1
+          fi
+          if [ "$codigo_405" != "405" ]; then
+            echo "::error::Se esperaba 405 y se obtuvo $codigo_405"
+            exit 1
+          fi
+          if [ "$codigo_ready" != "503" ]; then
+            echo "::error::Se esperaba 503 (readiness sin dependencias) y se obtuvo $codigo_ready"
+            exit 1
+          fi
+
+      - name: Publicar evidencia de integracion
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: integracion-${{ github.sha }}
+          path: integracion.txt
+          retention-days: 7
+          if-no-files-found: ignore
+
+  quality-gate:
+    name: PR Quality Gate
+    needs:
+      - detectar
+      - calidad
+      - seguridad
+      - secretos
+      - iac
+      - contratos
+      - cadena-suministro
+      - sast-semgrep
+      - integracion
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Descargar artefactos del run
+        if: ${{ needs.calidad.result == 'success' || needs.seguridad.result == 'success' || needs.iac.result == 'success' || needs['cadena-suministro'].result == 'success' || needs['sast-semgrep'].result == 'success' || needs.integracion.result == 'success' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: artefactos
+
+      - name: Reconstruir contexto del gate
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          PERFIL_GO: ${{ needs.detectar.outputs.go }}
+          PERFIL_API: ${{ needs.detectar.outputs.api }}
+          PERFIL_SDD: ${{ needs.detectar.outputs.sdd }}
+          PERFIL_INFRA: ${{ needs.detectar.outputs.infra }}
+          PERFIL_COMPLETO: ${{ needs.detectar.outputs.completo }}
+        run: |
+          set -euo pipefail
+          mkdir -p artefactos
+          python3 - <<'PY'
+          import json
+          import os
+
+          perfil = {
+              clave: os.environ.get(f"PERFIL_{clave.upper()}", "false") == "true"
+              for clave in ("go", "api", "sdd", "infra", "completo")
+          }
+          with open("perfil.json", "w", encoding="utf-8") as manejador:
+              json.dump(perfil, manejador)
+          with open("needs.json", "w", encoding="utf-8") as manejador:
+              manejador.write(os.environ["NEEDS_JSON"])
+          PY
+
+      - name: Evaluar Quality Gate (falla cerrado)
+        run: |
+          python3 herramientas/quality_gate_ci.py \
+            --needs needs.json --perfil perfil.json \
+            --artefactos artefactos --sha "$GITHUB_SHA" \
+            --json quality-gate.json --resumen "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar resultado del gate
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: quality-gate-${{ github.sha }}
+          path: quality-gate.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+  hardening-report:
+    name: Hardening Report
+    needs:
+      - detectar
+      - calidad
+      - seguridad
+      - secretos
+      - iac
+      - contratos
+      - cadena-suministro
+      - sast-semgrep
+      - integracion
+      - quality-gate
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Descargar artefactos del run
+        if: ${{ needs.calidad.result == 'success' || needs.seguridad.result == 'success' || needs.iac.result == 'success' || needs['cadena-suministro'].result == 'success' || needs['sast-semgrep'].result == 'success' || needs.integracion.result == 'success' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: artefactos
+
+      - name: Generar Hardening Report
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          PERFIL_GO: ${{ needs.detectar.outputs.go }}
+          PERFIL_API: ${{ needs.detectar.outputs.api }}
+          PERFIL_SDD: ${{ needs.detectar.outputs.sdd }}
+          PERFIL_INFRA: ${{ needs.detectar.outputs.infra }}
+          PERFIL_COMPLETO: ${{ needs.detectar.outputs.completo }}
+          PR_NUMERO: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          mkdir -p artefactos
+          python3 - <<'PY'
+          import json
+          import os
+
+          perfil = {
+              clave: os.environ.get(f"PERFIL_{clave.upper()}", "false") == "true"
+              for clave in ("go", "api", "sdd", "infra", "completo")
+          }
+          with open("perfil.json", "w", encoding="utf-8") as manejador:
+              json.dump(perfil, manejador)
+          with open("needs.json", "w", encoding="utf-8") as manejador:
+              manejador.write(os.environ["NEEDS_JSON"])
+          PY
+          python3 herramientas/hardening_report.py \
+            --needs needs.json --perfil perfil.json \
+            --artefactos artefactos --sha "$GITHUB_SHA" \
+            --ref "$GITHUB_REF" --pr "${PR_NUMERO:-}" \
+            --salida reporte --resumen "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar Hardening Report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hardening-report-${{ github.sha }}
+          path: reporte/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  ci-success:
+    name: CI Success
+    needs:
+      - quality-gate
+      - hardening-report
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Consolidar resultado final
+        env:
+          GATE: ${{ needs.quality-gate.result }}
+          REPORTE: ${{ needs.hardening-report.result }}
+        run: |
+          set -euo pipefail
+          echo "quality-gate=$GATE"
+          echo "hardening-report=$REPORTE"
+          if [ "$GATE" != "success" ] || [ "$REPORTE" != "success" ]; then
+            echo "::error::CI SUCCESS no se puede declarar (quality-gate=$GATE, hardening-report=$REPORTE)"
+            exit 1
+          fi
+          echo "CI SUCCESS: todos los controles obligatorios y el reporte estan en orden."

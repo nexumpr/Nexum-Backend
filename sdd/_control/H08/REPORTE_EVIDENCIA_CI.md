@@ -103,3 +103,14 @@ No se declara integración cloud `PASS` a partir de mocks o adaptadores en memor
 - El SBOM no sustituye pruebas de seguridad dinámicas.
 - La cobertura de sentencias no mide comportamiento en producción.
 - Branch protection: **BLOQUEADO_PLAN_GITHUB** (HTTP 403 verificado en repositorio privado).
+
+## Grafo modernizado (RFC-008)
+
+- Implementacion local del grafo de doce jobs con `needs:` reales; `AWS_NOT_RUN`.
+- Evidencia de ejecucion: se registra en este documento **solo** cuando el run existe,
+  con su `run_id` y su SHA. Mientras no exista, el estado es `NOT_RUN`.
+- Artefactos exigidos por el Quality Gate: `binario-<sha>`, `cobertura-<sha>`,
+  `mutacion-<sha>`, `dependencias-<sha>`, `sbom-spdx-<sha>`, `semgrep-<sha>`,
+  `integracion-<sha>`, `quality-gate-<sha>`, `hardening-report-<sha>`.
+- `MUTATION = BLOCKED_TECNICO_MUTACION`: no se publican metricas de mutacion.
+- `DAST = NOT_RUN`: sin entorno autorizado.
