@@ -114,3 +114,22 @@ Terraform/Trivy/Gitleaks/Go pasen y SDD/SHA-256 permanezcan íntegros.
   servicio cloud (opción local, Amazon Comprehend y externo), CDN descartada por existir CloudFront D2 y
   `BLOCKED_DEPENDENCY` para moderación externa. El validador rechaza cualquier operación con contenido
   que no figure en el diseño.
+
+## 10. Corrección final (2026-11-09)
+
+- **A — parser YAML:** se elimina el parser artesanal y se usa **PyYAML 6.0.2** fijado en
+  `herramientas/requirements.txt`, instalado en CI antes de los validadores. El cargador personalizado
+  **rechaza claves duplicadas en cualquier profundidad** (ruta, operación, propiedad de schema) y falla
+  cerrado ante YAML inválido. La paridad compara ahora también `components.schemas` (tipo, `required`,
+  `enum`, `items`, `additionalProperties`, composición y `$ref`) y `securitySchemes`: **88 esquemas**
+  contrastados. Un cambio aislado en el YAML de un tipo o de un `enum` produce `PARIDAD_ROTA`.
+- **B — excepciones de breaking changes:** se elimina la aprobación por coincidencia textual. Ahora se
+  exige un registro `sdd/_control/H08/EXCEPCIONES_COMPATIBILIDAD_API.json` con `alcance =
+  API_COMPATIBILIDAD`, código, ruta, método, RFC, aprobador, `gate_documento` que contenga `APRUEBO` y el
+  RFC, y `vigencia_hasta` no vencida. Las RFC de infraestructura/seguridad/FinOps (RFC-004, RFC-005,
+  RFC-006, RFC-007) se rechazan explícitamente como autorización de API. Como **no existe ningún registro
+  aprobado**, toda excepción se rechaza y el comparador queda fail-closed.
+
+Evidencia: 110 pruebas en `tests/infra/publicacion`. `HTTP_VERIFIED` y `TWO_NODES_VERIFIED` siguen
+`NOT_RUN`; INF-150-07 permanece `DISEÑO_LOCAL_COMPLETO — IMPLEMENTACIÓN_CLOUD_PENDIENTE` con
+`BLOCKED_DEPENDENCY`.

@@ -65,3 +65,7 @@
 - [x] Breaking changes en respuestas y seguridad efectiva con scopes.
 - [x] Excepciones solo con RFC ratificada verificable.
 - [x] Moderacion: tres operaciones documentadas y `BLOCKED_DEPENDENCY` para servicio externo.
+- [x] PyYAML fijado y usado con rechazo de claves duplicadas.
+- [x] Paridad semantica de `components.schemas` YAML/JSON.
+- [x] Excepciones de breaking changes solo con autorizacion humana especifica de API.
+- [x] RFC de infraestructura (incluida RFC-006) rechazadas como excepcion de API.

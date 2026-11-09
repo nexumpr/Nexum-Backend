@@ -115,3 +115,8 @@ Gate `APRUEBO_GATE_I150_LOCAL`. Rama `feat/h08i-i150-publicacion`. Ninguna prueb
 - **Paridad semantica:** parser de bloque del YAML que reconstruye la estructura y compara por operacion (metodo+ruta, operationId, catalogo, seguridad, parametros, requestBody y respuestas); rechaza tabulaciones, duplicados y `$ref` irresolubles.
 - **Breaking changes:** comparador ampliado a respuestas (propiedad, tipo, enum, requerido, esquema) y seguridad efectiva con scopes; `$ref` roto falla cerrado; excepcion solo con RFC ratificada en `sdd/_control/H08`.
 - **INF-150-07:** `MODERACION_CDN_I150.md` en `DISEÑO_LOCAL_COMPLETO — IMPLEMENTACIÓN_CLOUD_PENDIENTE` con las 3 operaciones y `BLOCKED_DEPENDENCY` para moderacion externa; el validador rechaza contenido sin tratamiento.
+
+### Correccion final (2026-11-09)
+
+- **A:** PyYAML 6.0.2 fijado y usado con cargador que rechaza duplicados; paridad semantica de `components.schemas`.
+- **B:** excepciones de breaking changes solo con autorizacion humana especifica de API, vigente y acotada; RFC de otras materias rechazadas.

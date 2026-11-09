@@ -653,9 +653,55 @@ class RespuestasYSeguridad(unittest.TestCase):
         datos = {"excepciones": [{"codigo": "RUTA_ELIMINADA", "ruta": "/x", "metodo": "*", "estado": "APPROVED", "rfc": "RFC-999"}]}
         self.assertEqual(cmp.excepciones_aprobadas(datos), [])
 
-    def test_rfc_ratificada_aprueba_excepcion(self) -> None:
-        datos = {"excepciones": [{"codigo": "RUTA_ELIMINADA", "ruta": "/x", "metodo": "*", "estado": "APPROVED", "rfc": "RFC-006"}]}
-        self.assertEqual(len(cmp.excepciones_aprobadas(datos)), 1)
+    def test_rfc_de_infraestructura_no_autoriza_api(self) -> None:
+        for rfc in ("RFC-004", "RFC-005", "RFC-006", "RFC-007"):
+            with self.subTest(rfc=rfc):
+                datos = {"excepciones": [{"codigo": "RUTA_ELIMINADA", "ruta": "/x", "metodo": "*", "estado": "APPROVED", "rfc": rfc}]}
+                self.assertEqual(cmp.excepciones_aprobadas(datos), [])
+
+    def test_rfc_006_no_autoriza_cambio_de_seguridad(self) -> None:
+        datos = {"excepciones": [{"codigo": "SCOPES_CAMBIADOS", "ruta": "/api/v1/movements", "metodo": "get", "estado": "APPROVED", "rfc": "RFC-006"}]}
+        self.assertEqual(cmp.excepciones_aprobadas(datos), [])
+
+    def test_aprobado_no_basta_sin_autorizacion_humana(self) -> None:
+        datos = {"excepciones": [{"codigo": "RUTA_ELIMINADA", "ruta": "/x", "metodo": "*", "estado": "APPROVED", "rfc": "RFC-API-001"}]}
+        self.assertEqual(cmp.excepciones_aprobadas(datos), [])
+
+    def test_registro_inexistente_no_autoriza_nada(self) -> None:
+        self.assertEqual(cmp._registro(Path(tempfile.mkdtemp()) / "no.json"), [])
+
+    def test_excepcion_de_otra_ruta_no_aplica(self) -> None:
+        registro = [{
+            "alcance": "API_COMPATIBILIDAD", "codigo": "RUTA_ELIMINADA", "ruta": "/otra",
+            "metodo": "*", "rfc": "RFC-API-001", "aprobado_por": "responsable",
+            "gate_documento": "sdd/_control/H08/GATE_H08I_I150.md", "vigencia_hasta": "2027-01-01",
+        }]
+        datos = {"excepciones": [{"codigo": "RUTA_ELIMINADA", "ruta": "/x", "metodo": "*", "estado": "APPROVED", "rfc": "RFC-API-001"}]}
+        self.assertEqual(cmp.excepciones_aprobadas(datos, registro=registro), [])
+
+    def test_alcance_distinto_de_api_no_aplica(self) -> None:
+        registro = [{
+            "alcance": "INFRAESTRUCTURA", "codigo": "RUTA_ELIMINADA", "ruta": "/x",
+            "metodo": "*", "rfc": "RFC-API-001", "aprobado_por": "responsable",
+            "gate_documento": "sdd/_control/H08/GATE_H08I_I150.md", "vigencia_hasta": "2027-01-01",
+        }]
+        datos = {"excepciones": [{"codigo": "RUTA_ELIMINADA", "ruta": "/x", "metodo": "*", "estado": "APPROVED", "rfc": "RFC-API-001"}]}
+        self.assertEqual(cmp.excepciones_aprobadas(datos, registro=registro), [])
+
+    def test_autorizacion_vencida_no_aplica(self) -> None:
+        registro = [{
+            "alcance": "API_COMPATIBILIDAD", "codigo": "RUTA_ELIMINADA", "ruta": "/x",
+            "metodo": "*", "rfc": "RFC-API-001", "aprobado_por": "responsable",
+            "gate_documento": "sdd/_control/H08/GATE_H08I_I150.md", "vigencia_hasta": "2026-01-01",
+        }]
+        datos = {"excepciones": [{"codigo": "RUTA_ELIMINADA", "ruta": "/x", "metodo": "*", "estado": "APPROVED", "rfc": "RFC-API-001"}]}
+        self.assertEqual(cmp.excepciones_aprobadas(datos, hoy="2026-11-09", registro=registro), [])
+
+    def test_breaking_sin_excepcion_hace_fallar_el_cli(self) -> None:
+        actual = json.loads(OPENAPI.read_text(encoding="utf-8"))
+        actual["paths"].pop("/api/v1/auth/login")
+        ruta_actual = _json(actual)
+        self.assertEqual(cmp.main(["--base", str(OPENAPI), "--actual", str(ruta_actual)]), 1)
 
     def test_contrato_base_ausente_falla_cerrado(self) -> None:
         with self.assertRaises(cmp.ErrorComparacion):
@@ -693,6 +739,75 @@ class ModeracionTextoLibre(unittest.TestCase):
 
     def test_moderacion_nunca_operativa(self) -> None:
         self.assertFalse(pub.escanear_contenido()["moderacion_operativa"])
+
+
+class YAMLDuplicadosYSchemas(unittest.TestCase):
+    """PyYAML con rechazo de duplicados y paridad de components.schemas."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.yaml = pub.YAML.read_text(encoding="utf-8")
+
+    def _paridad(self, texto_yaml: str) -> dict:
+        ruta = Path(tempfile.mkdtemp()) / "mutado.yaml"
+        ruta.write_text(texto_yaml, encoding="utf-8")
+        return pub.validar_paridad(ruta_yaml=ruta)
+
+    def test_duplicado_de_ruta_rechazado(self) -> None:
+        texto = self.yaml.replace(
+            "  /api/v1/auth/refresh:",
+            "  /api/v1/auth/login:\n    post:\n      operationId: nexum_e002\n  /api/v1/auth/refresh:",
+            1,
+        )
+        with self.assertRaises(pub.ErrorUso):
+            self._paridad(texto)
+
+    def test_duplicado_de_operacion_rechazado(self) -> None:
+        texto = self.yaml.replace(
+            "    post:\n      tags:\n      - identidad\n      operationId: nexum_e002",
+            "    post:\n      tags:\n      - identidad\n      operationId: nexum_e002\n    post:\n      operationId: nexum_e002",
+            1,
+        )
+        with self.assertRaises(pub.ErrorUso):
+            self._paridad(texto)
+
+    def test_duplicado_de_propiedad_en_schema_rechazado(self) -> None:
+        texto = self.yaml.replace(
+            "      properties:\n        email:",
+            "      properties:\n        email:\n          type: string\n        email:",
+            1,
+        )
+        with self.assertRaises(pub.ErrorUso):
+            self._paridad(texto)
+
+    def test_tipo_de_propiedad_cambiado_en_yaml(self) -> None:
+        texto = self.yaml.replace(
+            "    AuthTokens:\n      type: object",
+            "    AuthTokens:\n      type: array",
+            1,
+        )
+        resultado = self._paridad(texto)
+        self.assertEqual(resultado["estado"], "PARIDAD_ROTA")
+        self.assertTrue(any("schema" in p for p in resultado["problemas"]))
+
+    def test_enum_cambiado_en_yaml(self) -> None:
+        texto = self.yaml.replace("          enum:\n          - accepted\n", "          enum:\n          - accepted\n          - rejected\n", 1)
+        resultado = self._paridad(texto)
+        self.assertEqual(resultado["estado"], "PARIDAD_ROTA")
+        self.assertTrue(any("schema" in p for p in resultado["problemas"]))
+
+    def test_yaml_invalido_rechazado(self) -> None:
+        with self.assertRaises(pub.ErrorUso):
+            self._paridad("openapi: 3.1.0\n  mal: [sin cerrar")
+
+    def test_pyyaml_disponible_y_fijado(self) -> None:
+        import yaml
+
+        self.assertEqual(yaml.__version__, "6.0.2")
+        requisitos = (RAIZ / "herramientas" / "requirements.txt").read_text(encoding="utf-8")
+        self.assertIn("pyyaml==6.0.2", requisitos)
+        workflow = (RAIZ / ".github" / "workflows" / "go-backend.yml").read_text(encoding="utf-8")
+        self.assertIn("herramientas/requirements.txt", workflow)
 
 
 if __name__ == "__main__":  # pragma: no cover

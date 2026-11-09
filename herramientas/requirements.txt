@@ -1,0 +1,2 @@
+# Dependencias de las herramientas de validacion (I-150)
+pyyaml==6.0.2

@@ -288,41 +288,82 @@ def comparar(base: Mapping[str, Any], actual: Mapping[str, Any]) -> list[dict[st
     return roturas
 
 
-RAIZ_CONTROL = Path(__file__).resolve().parents[1] / "sdd" / "_control" / "H08"
+RAIZ = Path(__file__).resolve().parents[1]
+REGISTRO_EXCEPCIONES = RAIZ / "sdd" / "_control" / "H08" / "EXCEPCIONES_COMPATIBILIDAD_API.json"
+
+# Autorizaciones de otras materias no habilitan cambios incompatibles de API.
+RFC_FUERA_DE_ALCANCE_API = {
+    "RFC-004": "secretos de bootstrap",
+    "RFC-005": "TLS/CloudFront de I-030",
+    "RFC-006": "excepcion WAF temporal de I-030",
+    "RFC-007": "notificacion de alarmas CloudWatch",
+}
+
+ALCANCE_REQUERIDO = "API_COMPATIBILIDAD"
 
 
-def _rfc_ratificada(identificador: str) -> bool:
-    """La excepcion exige un documento de control con el RFC y marca de aprobacion."""
-    if not isinstance(identificador, str) or not identificador.strip():
+def _registro(ruta: Path | None = None) -> list[dict[str, Any]]:
+    """Registro de excepciones de API; si no existe, no hay ninguna autorizada."""
+    archivo = Path(ruta) if ruta else REGISTRO_EXCEPCIONES
+    if not archivo.is_file():
+        return []
+    datos = json.loads(archivo.read_text(encoding="utf-8"))
+    lista = datos.get("excepciones") if isinstance(datos, Mapping) else None
+    return lista if isinstance(lista, list) else []
+
+
+def _excepcion_autorizada(excepcion: Mapping[str, Any], hoy: str | None, registro: list[dict[str, Any]]) -> bool:
+    """Autorizacion humana explicita, vigente y acotada al contrato API."""
+    if excepcion.get("estado") != "APPROVED":
         return False
-    patron = re.compile(re.escape(identificador.strip()), re.IGNORECASE)
-    for documento in RAIZ_CONTROL.rglob("*.md"):
-        try:
-            texto = documento.read_text(encoding="utf-8")
-        except OSError:
+    rfc = str(excepcion.get("rfc", ""))
+    if rfc in RFC_FUERA_DE_ALCANCE_API:
+        return False
+    for autorizada in registro:
+        if not isinstance(autorizada, Mapping):
             continue
-        if patron.search(documento.name) or patron.search(texto):
-            if re.search(r"APROBAD[OA]|Ratificad[oa]", texto) and patron.search(texto):
-                return True
+        if autorizada.get("alcance") != ALCANCE_REQUERIDO:
+            continue
+        if autorizada.get("codigo") != excepcion.get("codigo"):
+            continue
+        if autorizada.get("ruta") != excepcion.get("ruta"):
+            continue
+        if str(autorizada.get("metodo", "")).lower() != str(excepcion.get("metodo", "")).lower():
+            continue
+        if autorizada.get("rfc") != rfc:
+            continue
+        if not autorizada.get("aprobado_por"):
+            continue
+        documento = RAIZ / str(autorizada.get("gate_documento", ""))
+        if not documento.is_file():
+            continue
+        contenido = documento.read_text(encoding="utf-8")
+        if "APRUEBO" not in contenido or rfc not in contenido:
+            continue
+        vigencia = str(autorizada.get("vigencia_hasta", ""))
+        referencia = hoy or "2026-11-09"
+        if not vigencia or vigencia < referencia:
+            continue
+        return True
     return False
 
 
-def excepciones_aprobadas(datos: Mapping[str, Any] | None) -> list[dict[str, Any]]:
-    """Solo cuentan excepciones con RFC ratificada en un documento de control."""
+def excepciones_aprobadas(
+    datos: Mapping[str, Any] | None, hoy: str | None = None, registro: list[dict[str, Any]] | None = None
+) -> list[dict[str, Any]]:
+    """Solo cuentan excepciones con autorizacion humana especifica de API."""
     if not datos:
         return []
     lista = datos.get("excepciones") if isinstance(datos, Mapping) else None
     if not isinstance(lista, list):
         raise ErrorComparacion("'excepciones' debe ser una lista.")
+    autorizadas = registro if registro is not None else _registro()
     aprobadas: list[dict[str, Any]] = []
     for excepcion in lista:
         if not isinstance(excepcion, Mapping):
             raise ErrorComparacion("excepcion malformada")
-        if excepcion.get("estado") != "APPROVED":
-            continue
-        if not _rfc_ratificada(str(excepcion.get("rfc", ""))):
-            continue
-        aprobadas.append(excepcion)
+        if _excepcion_autorizada(excepcion, hoy, autorizadas):
+            aprobadas.append(excepcion)
     return aprobadas
 
 

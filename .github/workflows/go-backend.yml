@@ -257,6 +257,9 @@ jobs:
       - name: Evidencia de drills I-140 (Python)
         run: python3 -m unittest herramientas.tests.test_cd_helpers.DecisionRollback -v
 
+      - name: Dependencias de herramientas (fijadas)
+        run: python3 -m pip install --disable-pip-version-check -r herramientas/requirements.txt
+
       - name: Pruebas de contrato Terraform e IaC
         run: python3 -m unittest discover -s tests/infra/terraform
 
@@ -282,6 +285,9 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+
+      - name: Dependencias de herramientas (fijadas)
+        run: python3 -m pip install --disable-pip-version-check -r herramientas/requirements.txt
 
       - name: Validacion OpenAPI H06
         run: python3 sdd/03-endpoints/herramientas/validar_h06.py

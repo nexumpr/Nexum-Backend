@@ -344,130 +344,74 @@ CLAVES_CONTENIDO = ("text", "content", "message", "description", "body", "commen
 FORMATOS_MEDIA = ("binary", "base64", "byte")
 
 
-def _lineas_yaml(texto_yaml: str) -> list[tuple[int, str]]:
-    resultado: list[tuple[int, str]] = []
-    for numero, linea in enumerate(texto_yaml.splitlines(), start=1):
-        limpia = linea.rstrip()
-        if not limpia.strip() or limpia.lstrip().startswith("#"):
-            continue
-        sangria = len(limpia) - len(limpia.lstrip(" \t"))
-        if "\t" in limpia[:sangria]:
-            raise ErrorUso(f"YAML con tabulaciones en la linea {numero}")
-        resultado.append((sangria, limpia.strip()))
-    return resultado
-
-
-def _escalar(valor: str) -> Any:
-    limpio = valor.strip()
-    if limpio.startswith("'") and limpio.endswith("'") and len(limpio) > 1:
-        return limpio[1:-1]
-    if limpio.startswith('"') and limpio.endswith('"') and len(limpio) > 1:
-        return limpio[1:-1]
-    if limpio == "[]":
-        return []
-    if limpio == "{}":
-        return {}
-    if limpio.lower() in ("true", "false"):
-        return limpio.lower() == "true"
-    if limpio.startswith("["):
-        interior = limpio[1:-1] if limpio.endswith("]") else limpio[1:]
-        return [_escalar(parte) for parte in interior.split(",") if parte.strip()]
-    return limpio
-
-
-def _parse_mapa(lineas: list[tuple[int, str]], indice: int, sangria: int) -> tuple[dict[str, Any], int]:
-    resultado: dict[str, Any] = {}
-    while indice < len(lineas):
-        nivel, contenido = lineas[indice]
-        if nivel < sangria:
-            break
-        if nivel > sangria:
-            indice += 1
-            continue
-        if contenido.startswith("- "):
-            break
-        clave, _, resto = contenido.partition(":")
-        clave = clave.strip().strip("'\"")
-        resto = resto.strip()
-        if clave in resultado:
-            raise ErrorUso(f"clave duplicada en YAML: {clave}")
-        indice += 1
-        if resto:
-            resultado[clave] = _escalar(resto)
-            continue
-        if indice < len(lineas) and lineas[indice][0] > sangria:
-            hijo, indice = _parse(lineas, indice, lineas[indice][0])
-            resultado[clave] = hijo
-        elif indice < len(lineas) and lineas[indice][0] == sangria and lineas[indice][1].startswith("- "):
-            hijo, indice = _parse_lista(lineas, indice, sangria)
-            resultado[clave] = hijo
-        else:
-            resultado[clave] = None
-    return resultado, indice
-
-
-def _parse_lista(lineas: list[tuple[int, str]], indice: int, sangria: int) -> tuple[list[Any], int]:
-    resultado: list[Any] = []
-    while indice < len(lineas):
-        nivel, contenido = lineas[indice]
-        if nivel != sangria or not contenido.startswith("- "):
-            break
-        elemento = contenido[2:].strip()
-        indice += 1
-        if not elemento:
-            if indice < len(lineas) and lineas[indice][0] > sangria:
-                valor, indice = _parse(lineas, indice, lineas[indice][0])
-                resultado.append(valor)
-            else:
-                resultado.append(None)
-            continue
-        if ":" in elemento:
-            clave, _, resto = elemento.partition(":")
-            clave = clave.strip().strip("'\"")
-            resto = resto.strip()
-            item: dict[str, Any] = {clave: (_escalar(resto) if resto else None)}
-            if indice < len(lineas) and lineas[indice][0] > sangria:
-                extra, indice = _parse_mapa(lineas, indice, lineas[indice][0])
-                item.update(extra)
-            resultado.append(item)
-        else:
-            resultado.append(_escalar(elemento))
-    return resultado, indice
-
-
-def _parse(lineas: list[tuple[int, str]], indice: int, sangria: int) -> tuple[Any, int]:
-    if indice < len(lineas) and lineas[indice][0] == sangria and lineas[indice][1].startswith("- "):
-        return _parse_lista(lineas, indice, sangria)
-    return _parse_mapa(lineas, indice, sangria)
-
-
-def estructura_yaml(texto_yaml: str) -> dict[str, Any]:
-    """Parsea el YAML (subconjunto de bloque) y devuelve la estructura equivalente."""
-    lineas = _lineas_yaml(texto_yaml)
-    if not lineas:
-        raise ErrorUso("YAML vacio")
-    if lineas[0][0] != 0:
-        raise ErrorUso("YAML malformado: la raiz debe empezar en la columna 0")
-    estructura, consumidas = _parse_mapa(lineas, 0, 0)
-    if consumidas != len(lineas):
+def _cargar_yaml(texto_yaml: str) -> dict[str, Any]:
+    """Carga YAML con PyYAML rechazando claves duplicadas en cualquier nivel."""
+    try:
+        import yaml  # dependencia fijada en herramientas/requirements.txt
+    except ImportError as exc:  # pragma: no cover - CI instala la dependencia
         raise ErrorUso(
-            f"YAML no consumido por completo ({consumidas} de {len(lineas)} lineas): estructura no soportada"
-        )
-    return estructura
+            "PyYAML no esta disponible; instalar herramientas/requirements.txt (falla cerrado)"
+        ) from exc
+
+    class _LoaderSinDuplicados(yaml.SafeLoader):
+        pass
+
+    def _mapa_sin_duplicados(loader: Any, nodo: Any, deep: bool = False) -> Any:
+        claves: set[str] = set()
+        for nodo_clave, _ in nodo.value:
+            clave = loader.construct_object(nodo_clave, deep=deep)
+            if clave in claves:
+                raise ErrorUso(f"clave duplicada en YAML: {clave}")
+            claves.add(clave)
+        return loader.construct_mapping(nodo, deep=deep)
+
+    _LoaderSinDuplicados.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _mapa_sin_duplicados
+    )
+    try:
+        datos = yaml.load(texto_yaml, Loader=_LoaderSinDuplicados)
+    except ErrorUso:
+        raise
+    except yaml.YAMLError as exc:
+        raise ErrorUso(f"YAML invalido: {exc}") from exc
+    if not isinstance(datos, Mapping):
+        raise ErrorUso("YAML invalido: la raiz debe ser un objeto")
+    return dict(datos)
 
 
-def _refs_json(nodo: Any) -> set[str]:
-    encontrados: set[str] = set()
-    if isinstance(nodo, Mapping):
-        for clave, valor in nodo.items():
-            if clave == "$ref" and isinstance(valor, str):
-                encontrados.add(valor)
+CAMPOS_CONTRATO = ("type", "format", "required", "enum", "items", "additionalProperties", "oneOf", "anyOf", "allOf")
+
+
+def _firma(esquema: Any) -> Any:
+    """Firma contractual del esquema: ignora ejemplos y orden de claves."""
+    if not isinstance(esquema, Mapping):
+        return esquema
+    firma: dict[str, Any] = {}
+    for clave in CAMPOS_CONTRATO:
+        if clave in esquema:
+            valor = esquema[clave]
+            if clave == "items" or clave in ("oneOf", "anyOf", "allOf"):
+                firma[clave] = [_firma(v) for v in (valor if isinstance(valor, list) else [valor])]
             else:
-                encontrados |= _refs_json(valor)
-    elif isinstance(nodo, list):
-        for valor in nodo:
-            encontrados |= _refs_json(valor)
-    return encontrados
+                firma[clave] = valor
+    if "$ref" in esquema:
+        firma["$ref"] = esquema["$ref"]
+    if "properties" in esquema and isinstance(esquema["properties"], Mapping):
+        firma["properties"] = {k: _firma(v) for k, v in esquema["properties"].items()}
+    return firma
+
+
+def _componentes(datos: Mapping[str, Any]) -> dict[str, Any]:
+    componentes = datos.get("components") or {}
+    esquemas = {
+        nombre: _firma(esquema)
+        for nombre, esquema in (componentes.get("schemas") or {}).items()
+    }
+    return {
+        "schemas": esquemas,
+        "parameters": componentes.get("parameters") or {},
+        "securitySchemes": componentes.get("securitySchemes") or {},
+    }
 
 
 def _seguridad(valor: Any) -> list[dict[str, list[str]]]:
@@ -489,11 +433,7 @@ def _params(valor: Any) -> list[tuple[str, str, bool]]:
             normal.append((str(parametro["$ref"]), "", False))
             continue
         normal.append(
-            (
-                str(parametro.get("name", "")),
-                str(parametro.get("in", "")),
-                bool(parametro.get("required")),
-            )
+            (str(parametro.get("name", "")), str(parametro.get("in", "")), bool(parametro.get("required")))
         )
     return sorted(normal)
 
@@ -514,8 +454,27 @@ def _ref_cuerpo(valor: Any) -> str:
     return str(esquema.get("$ref") or "")
 
 
+def _refs(nodo: Any) -> set[str]:
+    encontrados: set[str] = set()
+    if isinstance(nodo, Mapping):
+        for clave, valor in nodo.items():
+            if clave == "$ref" and isinstance(valor, str):
+                encontrados.add(valor)
+            else:
+                encontrados |= _refs(valor)
+    elif isinstance(nodo, list):
+        for valor in nodo:
+            encontrados |= _refs(valor)
+    return encontrados
+
+
+def estructura_yaml(texto_yaml: str) -> dict[str, Any]:
+    """Estructura YAML equivalente al JSON, sin claves duplicadas."""
+    return _cargar_yaml(texto_yaml)
+
+
 def validar_paridad(ruta_yaml: Path | None = None) -> dict[str, Any]:
-    """Paridad semantica JSON ↔ YAML ↔ matriz, operacion por operacion."""
+    """Paridad semantica JSON ↔ YAML (operaciones y components) ↔ matriz."""
     if not OPENAPI_JSON.is_file() or not YAML.is_file() or not MATRIZ_CSV.is_file():
         raise ErrorUso("Faltan JSON, YAML o la matriz H06.")
     datos = cargar_json(OPENAPI_JSON)
@@ -553,7 +512,6 @@ def validar_paridad(ruta_yaml: Path | None = None) -> dict[str, Any]:
         op_json = rutas_json[ruta][metodo]
         op_yaml = rutas_yaml[ruta][metodo]
         etiqueta = f"{metodo.upper()} {ruta}"
-
         if op_json.get("operationId") != op_yaml.get("operationId"):
             problemas.append(f"{etiqueta}: operationId difiere")
         if op_json.get("x-nexum-catalog-id") != op_yaml.get("x-nexum-catalog-id"):
@@ -564,14 +522,24 @@ def validar_paridad(ruta_yaml: Path | None = None) -> dict[str, Any]:
             problemas.append(f"{etiqueta}: parametros difieren")
         if _ref_cuerpo(op_json.get("requestBody")) != _ref_cuerpo(op_yaml.get("requestBody")):
             problemas.append(f"{etiqueta}: requestBody difiere")
-        respuestas_json = _respuestas(op_json.get("responses"))
-        respuestas_yaml = _respuestas(op_yaml.get("responses"))
-        if respuestas_json != respuestas_yaml:
+        if _respuestas(op_json.get("responses")) != _respuestas(op_yaml.get("responses")):
             problemas.append(f"{etiqueta}: respuestas difieren")
-
-        for referencia in _refs_json(op_yaml) | _refs_json(op_json):
+        for referencia in _refs(op_yaml) | _refs(op_json):
             if referencia not in refs_validas:
                 problemas.append(f"{etiqueta}: $ref irresoluble {referencia}")
+
+    # components.schemas comparados semanticamente
+    componentes_json = _componentes(datos)
+    componentes_yaml = _componentes(estructura)
+    for nombre in sorted(set(componentes_json["schemas"]) | set(componentes_yaml["schemas"])):
+        if nombre not in componentes_yaml["schemas"]:
+            problemas.append(f"YAML sin el schema {nombre}")
+        elif nombre not in componentes_json["schemas"]:
+            problemas.append(f"YAML con el schema {nombre} inexistente en JSON")
+        elif componentes_json["schemas"][nombre] != componentes_yaml["schemas"][nombre]:
+            problemas.append(f"schema {nombre}: definicion distinta entre JSON y YAML")
+    if componentes_json["securitySchemes"] != componentes_yaml["securitySchemes"]:
+        problemas.append("securitySchemes difieren entre JSON y YAML")
 
     ids_csv = {fila.get("id") for fila in filas}
     catalogo = {
@@ -595,11 +563,12 @@ def validar_paridad(ruta_yaml: Path | None = None) -> dict[str, Any]:
         "rutas_json": len(rutas_json),
         "rutas_yaml": len(rutas_yaml),
         "filas_matriz": len(filas),
+        "schemas_comparados": len(componentes_json["schemas"]),
         "problemas": problemas,
         "estado": "PARIDAD_OK" if not problemas else "PARIDAD_ROTA",
         "advertencia": (
-            "Paridad semantica (metodo, ruta, operationId, seguridad, parametros, requestBody y "
-            "respuestas) contra el YAML real; no acredita handlers ni HTTP."
+            "Paridad semantica con PyYAML (operaciones y components.schemas); "
+            "no acredita handlers ni respuestas HTTP."
         ),
     }
 
