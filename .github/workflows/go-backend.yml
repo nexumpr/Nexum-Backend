@@ -257,7 +257,7 @@ jobs:
         run: python3 -m unittest discover -s tests/infra/operacion
 
       - name: Controles de respaldo y restauracion I-130
-        run: python3 -m unittest discover -s tests/infra/backup
+        run: python3 -m unittest discover -s tests/infra/respaldo
 
   contratos:
     name: Contratos OpenAPI y herramientas

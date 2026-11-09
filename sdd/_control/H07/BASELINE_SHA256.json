@@ -6,7 +6,7 @@
   "files": {
     ".gitattributes": "bb07acb5b4f5612ed7d22a7edf3b57521cd8bd2bc3e0d085409a56f084bd8551",
     ".github/workflows/cd-backend.yml": "e1f67392455e7bdbc124b6343fbaaf11b6cc27a9783910092dbe98048dcf1d78",
-    ".github/workflows/go-backend.yml": "db957dad15e41f0e8b4df62b1518be28f72d0331a3dc8c7c2f33313a7a6cb6f3",
+    ".github/workflows/go-backend.yml": "eec3abb6c82368929fbddc1958d237419776f163aaf41802c518c493975ec37c",
     ".github/workflows/sdd-validacion.yml": "089ad88dfe79c7d46fbc2ba8984aece5271b84b47eee452c4cf15626664543fb",
     ".gitignore": "bc4cd77a6423f9e72ee3521cfa30de8c32e8b6413bcde37a2c617ab91b37b262",
     ".gitleaks-baseline.json": "1cf5524a0eb8f8f9b718eedac0380a18159db8c64e656b6f8a4d7c3f60b916a7",
