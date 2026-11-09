@@ -72,14 +72,54 @@ class ModuloSecretos(unittest.TestCase):
         self.assertIn("noncurrent_days = var.retencion_version_dias", self.main)
         self.assertIn("abort_incomplete_multipart_upload", self.main)
 
-    def test_politica_deniega_sin_tls_y_fuera_del_rol(self) -> None:
-        self.assertIn("DenegarSinTLS", self.main)
-        self.assertIn('variable = "aws:SecureTransport"', self.main)
-        self.assertIn("DenegarFueraDelPrefijo", self.main)
-        self.assertIn('variable = "aws:PrincipalArn"', self.main)
-        # Solo se usa Deny en las dos declaraciones de politica.
-        self.assertEqual(len(re.findall(r'effect += +"Deny"', self.main)), 2)
-        self.assertNotIn('effect = "Allow"', self.main)
+    def _sentencias(self) -> dict[str, str]:
+        """Devuelve el bloque de cada statement de la politica del bucket."""
+        resultado: dict[str, str] = {}
+        for bloque in re.findall(r"statement \{(.*?)\n  \}", self.main, re.DOTALL):
+            sid = re.search(r'sid += +"([A-Za-z]+)"', bloque)
+            if sid:
+                resultado[sid.group(1)] = bloque
+        return resultado
+
+    def test_runtime_solo_lee_y_nunca_escribe(self) -> None:
+        sentencias = self._sentencias()
+        self.assertIn("DenegarEscrituraAlRuntime", sentencias)
+        bloque = sentencias["DenegarEscrituraAlRuntime"]
+        self.assertIn('effect = "Deny"', bloque)
+        for accion in ("s3:PutObject", "s3:PutObjectAcl", "s3:DeleteObject", "s3:DeleteObjectVersion"):
+            self.assertIn(accion, bloque, accion)
+        self.assertIn("identifiers = [var.rol_runtime_arn]", bloque)
+        self.assertNotIn("s3:GetObject", bloque)
+
+    def test_publicador_no_queda_bloqueado_y_solo_publica_en_el_prefijo(self) -> None:
+        sentencias = self._sentencias()
+        self.assertIn("PermitirPublicacionAlPublicador", sentencias)
+        bloque = sentencias["PermitirPublicacionAlPublicador"]
+        self.assertIn('effect = "Allow"', bloque)
+        self.assertIn('actions   = ["s3:PutObject"]', bloque)
+        self.assertIn("identifiers = [var.publicador_arn]", bloque)
+        self.assertIn('"${aws_s3_bucket.secretos.arn}/${var.prefijo}*"', bloque)
+        # Ningun Deny puede alcanzar al publicador: solo el runtime tiene Deny nominado.
+        for sid, contenido in sentencias.items():
+            if 'effect = "Deny"' in contenido and sid != "DenegarSinTLS":
+                self.assertNotIn("publicador_arn", contenido, sid)
+
+    def test_publicador_exige_cifrado_al_escribir(self) -> None:
+        bloque = self._sentencias()["PermitirPublicacionAlPublicador"]
+        self.assertIn('variable = "s3:x-amz-server-side-encryption"', bloque)
+        self.assertIn('values   = ["AES256"]', bloque)
+
+    def test_sin_tls_se_deniega_para_todos(self) -> None:
+        bloque = self._sentencias()["DenegarSinTLS"]
+        self.assertIn('variable = "aws:SecureTransport"', bloque)
+        self.assertIn('identifiers = ["*"]', bloque)
+        self.assertIn('values   = ["false"]', bloque)
+
+    def test_sin_publicador_el_plan_falla_cerrado(self) -> None:
+        self.assertIn('variable "publicador_arn"', self.variables)
+        self.assertIn('default     = ""', self.variables)
+        self.assertIn("publicador_arn debe ser un ARN", self.main)
+        self.assertIn("(role|user)", self.main)
 
     def test_preconditions_validan_prefijo_retencion_y_rol(self) -> None:
         self.assertIn('endswith(var.prefijo, "/")', self.main)
@@ -136,6 +176,10 @@ class CableadoDelEntorno(unittest.TestCase):
 
     def test_iam_recibe_el_prefijo(self) -> None:
         self.assertIn("secretos_object_arns      = [module.secretos.secrets_prefix_arn]", self.main)
+
+    def test_publicador_cableado_y_fallando_cerrado(self) -> None:
+        self.assertIn("publicador_arn = var.secretos_publicador_arn", re.sub(r"[ ]+", " ", self.main))
+        self.assertIn('variable "secretos_publicador_arn"', self.variables)
 
     def test_computo_recibe_la_uri_con_version(self) -> None:
         self.assertIn("secretos_s3_uri", self.main)

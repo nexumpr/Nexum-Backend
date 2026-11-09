@@ -162,6 +162,7 @@ module "secretos" {
   rol_runtime_arn        = module.iam.runtime_role_arn
   prefijo                = "nexum/secrets/"
   retencion_version_dias = 30
+  publicador_arn         = var.secretos_publicador_arn
 }
 
 module "iam" {

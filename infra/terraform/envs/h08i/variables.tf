@@ -193,3 +193,9 @@ variable "secretos_version" {
   type        = string
   default     = ""
 }
+
+variable "secretos_publicador_arn" {
+  description = "ARN de la identidad IAM que publica el bundle de secretos (RFC-004). Vacio = plan falla cerrado."
+  type        = string
+  default     = ""
+}

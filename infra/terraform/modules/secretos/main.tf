@@ -80,6 +80,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "secretos" {
 }
 
 data "aws_iam_policy_document" "secretos" {
+  # 1. Ningun acceso sin TLS, para cualquier principal.
   statement {
     sid    = "DenegarSinTLS"
     effect = "Deny"
@@ -99,22 +100,44 @@ data "aws_iam_policy_document" "secretos" {
     }
   }
 
+  # 2. El runtime de la instancia NUNCA escribe ni borra, aunque una policy de
+  #    identidad lo concediera por error: el Deny explicito del bucket prevalece.
   statement {
-    sid    = "DenegarFueraDelPrefijo"
+    sid    = "DenegarEscrituraAlRuntime"
     effect = "Deny"
 
-    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-    resources = ["${aws_s3_bucket.secretos.arn}/*"]
+    actions = [
+      "s3:PutObject",
+      "s3:PutObjectAcl",
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion",
+    ]
+    resources = ["${aws_s3_bucket.secretos.arn}/${var.prefijo}*"]
 
     principals {
-      type        = "*"
-      identifiers = ["*"]
+      type        = "AWS"
+      identifiers = [var.rol_runtime_arn]
+    }
+  }
+
+  # 3. El publicador autorizado publica SOLO dentro del prefijo y solo con SSE-S3.
+  #    Su permiso efectivo requiere ademas la policy de identidad correspondiente.
+  statement {
+    sid    = "PermitirPublicacionAlPublicador"
+    effect = "Allow"
+
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.secretos.arn}/${var.prefijo}*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [var.publicador_arn]
     }
 
     condition {
-      test     = "StringNotLike"
-      variable = "aws:PrincipalArn"
-      values   = [var.rol_runtime_arn == "" ? "arn:aws:iam::*:role/inexistente" : var.rol_runtime_arn]
+      test     = "StringEquals"
+      variable = "s3:x-amz-server-side-encryption"
+      values   = ["AES256"]
     }
   }
 }
@@ -127,7 +150,7 @@ resource "aws_s3_bucket_policy" "secretos" {
 }
 
 resource "terraform_data" "secretos_preconditions" {
-  input = "${var.prefijo}|${var.retencion_version_dias}|${var.rol_runtime_arn}"
+  input = "${var.prefijo}|${var.retencion_version_dias}|${var.rol_runtime_arn}|${var.publicador_arn}"
 
   lifecycle {
     precondition {
@@ -143,6 +166,11 @@ resource "terraform_data" "secretos_preconditions" {
     precondition {
       condition     = can(regex("^arn:aws:iam::[0-9]{12}:role/.+$", var.rol_runtime_arn))
       error_message = "rol_runtime_arn debe ser un ARN de rol valido: solo ese rol puede leer el prefijo."
+    }
+
+    precondition {
+      condition     = can(regex("^arn:aws:iam::[0-9]{12}:(role|user)/.+$", var.publicador_arn))
+      error_message = "publicador_arn debe ser un ARN de rol o usuario IAM valido: sin publicador no hay forma autorizada de publicar el bundle."
     }
   }
 }

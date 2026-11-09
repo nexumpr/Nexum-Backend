@@ -35,3 +35,9 @@ variable "rol_runtime_arn" {
   description = "ARN del rol de instancia; unico principal autorizado sobre el prefijo."
   type        = string
 }
+
+variable "publicador_arn" {
+  description = "ARN de la identidad IAM autorizada a publicar el bundle (RFC-004). Sin valor valido, el plan falla cerrado."
+  type        = string
+  default     = ""
+}
