@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	healthinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/health"
 	"github.com/nexumpr/Nexum-Backend/internal/system"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 	"github.com/nexumpr/Nexum-Backend/pkg/telemetry"
@@ -31,6 +32,31 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	// diseño readiness devuelve 503 hasta que exista una comprobación real.
 	health := nexumhttp.NewHealthRegistry(2 * time.Second)
 	router.RegisterHealth(health)
+
+	// I-040/I-050: dependencias REALES. Si una no esta configurada no se registra y
+	// readiness responde 503 (no se declara disponibilidad sin evidencia).
+	cfgDeps := healthinfra.DesdeEntorno()
+	if cfgDeps.TablaDynamoDB != "" {
+		clienteDynamo, err := healthinfra.ClienteDynamoDB(ctx, cfgDeps)
+		if err != nil {
+			logger.Error("dynamodb no configurado; readiness devolvera 503", slog.String("error", err.Error()))
+		} else {
+			tabla := cfgDeps.TablaDynamoDB
+			health.RegisterDependency("dynamodb", func(ctx context.Context) error {
+				return healthinfra.ComprobarDynamoDB(ctx, clienteDynamo, tabla)
+			})
+		}
+	}
+	if cfgDeps.RedisAddr != "" {
+		clienteRedis, err := healthinfra.ClienteRedis(cfgDeps)
+		if err != nil {
+			logger.Error("redis no configurado; readiness devolvera 503", slog.String("error", err.Error()))
+		} else {
+			health.RegisterDependency("redis", func(ctx context.Context) error {
+				return healthinfra.ComprobarRedis(ctx, clienteRedis)
+			})
+		}
+	}
 
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
