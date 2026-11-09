@@ -253,6 +253,9 @@ jobs:
       - name: Regresion FinOps de infraestructura
         run: python3 -m unittest discover -s tests/infra/finops
 
+      - name: Contratos del operador de encendido/apagado I-120
+        run: python3 -m unittest discover -s tests/infra/operacion
+
   contratos:
     name: Contratos OpenAPI y herramientas
     runs-on: ubuntu-latest

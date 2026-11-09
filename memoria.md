@@ -525,3 +525,44 @@
 - I-110 ampliacion (2026-11-08): RequestLogger en HTTPServer (campos canonicos, ruta {id}), /metrics loopback con counters/latencia/runtime, 4 metric filters y 8 alarmas (A6 429, A7 Redis, A8 DynamoDB), cableadas desde I-040/I-050. Pipeline de logs LOG_PIPELINE_IMPLEMENTED_LOCAL / AWS_VERIFIED NOT_RUN (I-010 endpoint + I-060 permisos; falta agente I-020). D-110-01 (A-090 headers sin hex/flags/limite). Coste +0.5000 USD/mes no medido; AWS_COST_REAL/CREDITS/SCP NOT_VERIFIED.
 
 - I-110 correccion final (2026-11-08): ALB suffix app/... (sin loadbalancer/) validado por terraform test en CI; Logs Insights pct(); rutas desconocidas -> /unknown y max 500 series con dropped; AWS Budgets email directo sin SNS (emails_presupuesto vacio); ALERT_DELIVERY sigue BLOCKED_RFC007_SNS_KMS. D-110-01 abierto.
+
+### I-110: cierre post-merge (2026-11-09)
+
+- **PR #31 MERGED** (merge `071478a1d23ff2da44bb7b7ee94d9fc98c686fa9`), HEAD autorizado `c8f1049bdbcdc88ea51aa1fd07ada3b5ca8a940b` verificado con `--match-head-commit`. `main` local = `origin/main` por fast-forward.
+- CI del PR 7/7 PASS (runs 42545254647 y 42545254656); CI de `main`: SDD documental run 42546793045 SUCCESS y Go Backend CI run 42546793065 SUCCESS (seis jobs).
+- Estado: **INTEGRADO_MAIN - NO DESPLEGADO**. `AWS_NOT_RUN`; `LOG_PIPELINE_AWS_VERIFIED = NOT_RUN` (agente CloudWatch depende de I-020); `ALERT_DELIVERY = BLOCKED_RFC007_SNS_KMS`; `DAST_NOT_RUN`.
+- Correcciones integradas: dimensiones ALB `app/<nombre>/<id>` y TargetGroup `targetgroup/...` evaluadas por `terraform test`; Logs Insights con `pct()`; rutas no registradas -> `/unknown` y 500 series maximo con `nexum_metrics_series_dropped_total`; AWS Budgets con email directo sin SNS (`emails_presupuesto` vacio).
+- Defectos abiertos sin cambios: `D-100-01`, `D-100-02`, `D-110-01`. RFC-004, H-01 (TLSv1), RFC-006 y `AWS_SCP_NOT_VERIFIED` intactos. readiness 503 por diseno.
+- Registro documental; no se modifico Terraform, Go, OpenAPI ni workflows tras el merge. I-120 sigue `NOT_AUTHORIZED` hasta `APRUEBO_GATE_I120_LOCAL`.
+
+### I-120: encendido/apagado implementado en local (2026-11-09)
+
+- Gate `APRUEBO_GATE_I120_LOCAL` registrado en `sdd/_control/H08/GATE_H08I_I120.md`; rama `feat/h08i-i120-operacion` desde `main` `071478a1` (incluye el cierre documental de I-110). `AWS_NOT_RUN`, `INFRA_NOT_DEPLOYED`.
+- Modulo `infra/terraform/modules/operacion`: solo guardas (`terraform_data`), sin recursos AWS; 5 preconditions (denegados, core suspendible, allowlist desconocida, componentes core faltantes, destroys en false) y validaciones permanentes de `destroy_datos`/`destroy_estado`/`max_denegados`.
+- Inventario unico `infra/terraform/operacion/inventario.json` (16 recursos) leido por `envs/h08i/operacion.tf` con `jsondecode(file(...))` y por el operador. Allowlist auxiliar explicita en el entorno, no derivada del JSON.
+- `herramientas/nexum_operacion.py`: 8 comandos (`estado`, `plan`, `encender`, `suspender-aux`, `reanudar-aux`, `reconciliar`, `rollback`, `destruir-aux`), codigos 0/1/2, aprobaciones exactas por entorno, sin SDK de AWS ni procesos externos; todo plan declara `aws_consultado=false`.
+- Prohibiciones efectivas: `destroy-data`, `destroy-state`, `destroy-all` y alias rechazados con mensaje especifico; el core no se puede suspender ni destruir ni aunque se pida por nombre; core suspendido observado se trata como incidente.
+- Residual: 0.0902 USD/h; 96.9973 residente + 0.4438 presupuestado = 97.4412 USD/45 d; auxiliares 0.0600 USD/h (64.8000/45 d si estuvieran siempre activos, frente a 1.4400 por ventana de 24 h de I-000). `secretsmanager` no computable (`BLOQUEADO_RFC004`); partidas variables excluidas y no declaradas cero.
+- Documentos: `MAQUINA_ESTADOS_RUNTIME.md`, `RUNBOOK_START_STOP.md`, `INVENTARIO_RESIDUAL.md`.
+- Pruebas: 54 operador + 27 contrato Terraform + 7 alineacion FinOps; `fmt`/`init -backend=false`/`validate` PASS; Trivy PASS.
+- Sin recursos AWS, sin `terraform plan/apply/destroy`, sin Cost Explorer. Bloqueos vigentes: I-130 (backups), RFC-004, H-01, RFC-007, `AWS_SCP_NOT_VERIFIED`, readiness 503, D-100-01/02, D-110-01.
+
+### I-120 ampliacion v2 (2026-11-09)
+
+- **INF-120-01:** registro de transicion con 12 campos (estado anterior/nuevo, actor, timestamp UTC, entorno, recurso, motivo, operacion_id, autorizacion, resultado, evidencia, rollback). `OFF` se clasifica como estado auxiliar; si el core observa `OFF` se marca `off_sobre_core` y se trata como incidente.
+- **INF-120-02:** `reanudar-aux` exige creditos Y forecast; sin pronostico el resultado es `BLOQUEADO` (codigo 1). Dos targets sanos solo deciden publicabilidad (`alcance = disponibilidad_global_del_backend`), no autorizan tocar el core.
+- **INF-120-03:** campo `impacto_core` en el inventario (`NINGUNO`/`VENTANA_DECLARADA`/`BLOQUEANTE`); `VENTANA_DECLARADA` (D6) es el unico admitido para los 3 endpoints de mantenimiento y `BLOQUEANTE` deniega. Pruebas negativas con EC2 core, ALB, Redis, DynamoDB, CloudFront, state, auxiliar autorizado, sin etiqueta, desconocido y auxiliar bloqueante.
+- **INF-120-04:** el plan se verifica contra el core (`cambios_sobre_core`, `cambios_fuera_de_allowlist`); `desired < 2` se rechaza en Terraform y en el operador. `TWO_NODES_AWS_NOT_VERIFIED`.
+- **INF-120-05:** `apply`/`aplicar` devuelve `EJECUCION_DESHABILITADA` (codigo 2) y `--force`/`--yes` se rechazan. `cargar_autorizacion` valida frase, entorno, operacion y aprobador y declara `habilitacion_ejecucion = DENEGADA_EN_I120_LOCAL`. Separacion prevista read-only/plan/apply-aux/apply-core sin crear roles (I-060/I-090 intactos).
+- **INF-120-06:** 20 categorias cubiertas, incluidas idempotencia, reintentos, fallos parciales, concurrencia (25 hilos) y manipulacion de planes.
+- **FinOps diario:** `herramientas/verificar_finops_diario.py` con umbrales `<=45` aviso, `<=35` bloqueo, `<=30` revision urgente, `<20` incidente critico y `forecast > credito restante`; sin evidencia devuelve `BLOQUEADO_SIN_DATOS`. Nunca apaga el core ni cambia el plan Free.
+- **gitleaks:** excepcion acotada dentro de `generic-api-key` (ruta `tests/infra/operacion/**` y valor `^BLOQUEADO_[A-Z0-9]+$`) para el falso positivo del commit `3f45f16`; sin allowlist global ni reglas desactivadas. Probado que un secreto real no cumple el patron.
+- Evidencia: 83 pruebas de operacion, 36 de contrato Terraform, 18 de FinOps diario, 11 de configuracion gitleaks; `terraform fmt/init -backend=false/validate` PASS; Trivy PASS.
+
+### I-120 cierre de fail-open (2026-11-09)
+
+- **Allowlist:** `clasificar(inv, None)` y `clasificar(inv, [])` dejan `suspendibles` vacio; la CLI ya no deriva la allowlist del inventario y las operaciones que mutan exigen pertenencia explicita. `validar_allowlist` rechaza core, nombres inexistentes y etiquetas distintas de `auxiliary`. Pruebas: 11 nuevas en `AllowlistExplicita`.
+- **Plan:** `exigir_alcance_plan` rechaza plan ausente, plan vacio con cambios solicitados y plan malformado; solo la repeticion idempotente admite plan vacio. La salida distingue `PLAN_LOCAL_VALIDADO` de `PLAN_AWS_NO_VERIFICADO` y expone `TERRAFORM_REAL_PLAN_NOT_VERIFIED`. Pruebas: 10 nuevas en `PlanObligatorio`.
+- **FinOps:** se exigen banderas `verificado_*`, el plan debe ser `FREE`, se rechazan negativos/NaN/infinitos, se detectan creditos vencidos y `creditos_restante_usd` evita el doble descuento del consumo. Toda salida declara `autoriza_ejecucion_real = false` y `es_prueba_independiente_de_facturacion = false`. Pruebas: 13 nuevas en `ControlesNuevos`.
+- **gitleaks:** excepcion reducida a `tests/infra/operacion/test_nexum_operacion.py` + `^BLOQUEADO_RFC004$` con `condition = "AND"`; se restauro la asercion natural de la prueba y se verifica que otras rutas y otros valores siguen detectandose.
+- Conteos: 104 pruebas de operacion, 238 de FinOps, 147 de herramientas, 36 de contrato Terraform. Sin AWS, sin Terraform remoto, sin merge.

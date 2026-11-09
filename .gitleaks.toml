@@ -29,3 +29,10 @@ condition = "AND"
 paths = ['''^sdd/_control/H07/BASELINE_SHA256\.json$''']
 regexTarget = "line"
 regexes = ['''^\s*"[A-Za-z0-9_./\\-]+":\s*"[a-f0-9]{64}"\s*,?$''']
+
+[[rules.allowlists]]
+description = "Constante de estado BLOQUEADO_RFC004 en un unico archivo de prueba (falso positivo del commit 3f45f16)"
+condition = "AND"
+paths = ['''^tests/infra/operacion/test_nexum_operacion\.py$''']
+regexTarget = "secret"
+regexes = ['''^BLOQUEADO_RFC004$''']

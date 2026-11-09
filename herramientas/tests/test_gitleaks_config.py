@@ -57,17 +57,21 @@ class ConfiguracionGitleaks(unittest.TestCase):
     def test_no_excluye_carpetas_ni_reglas(self) -> None:
         for prohibido in ("disabledRules", "stopwords", "'''sdd/'''", "'''sdd\\'"):
             self.assertNotIn(prohibido, self.sin_comentarios)
-        # La ruta autorizada es exactamente un archivo, no un prefijo.
+        # Cada ruta autorizada es un archivo concreto, nunca un prefijo de carpeta.
         rutas = re.findall(r"paths\s*=\s*\[\s*'''(.*?)'''", self.sin_comentarios)
-        self.assertEqual(len(rutas), 1)
-        self.assertIn("BASELINE_SHA256", rutas[0])
-        self.assertTrue(rutas[0].endswith("$"), "la ruta debe estar anclada al final")
+        self.assertEqual(len(rutas), 2, "solo el manifiesto y la prueba de I-120")
+        self.assertEqual(len([r for r in rutas if "BASELINE_SHA256" in r]), 1)
+        self.assertEqual(len([r for r in rutas if "tests/infra/operacion" in r]), 1)
+        for ruta in rutas:
+            self.assertTrue(ruta.endswith("$"), f"la ruta debe estar anclada: {ruta}")
 
     def test_patron_cubre_todos_los_documentos_secretos_sin_ocultar_credenciales(self) -> None:
         """El manifiesto declara ruta + digest; la excepción sólo cubre ese formato."""
         rutas = re.findall(r"regexes\s*=\s*\[\s*'''(.*?)'''", self.sin_comentarios)
-        self.assertEqual(len(rutas), 1)
-        patron = rutas[0]
+        self.assertEqual(len(rutas), 2, "manifiesto + constante de estado de I-120")
+        candidatos = [r for r in rutas if "[a-f0-9]{64}" in r]
+        self.assertEqual(len(candidatos), 1)
+        patron = candidatos[0]
         self.assertIn("[a-f0-9]{64}", patron)
         self.assertIn("BASELINE_SHA256", self.sin_comentarios)
         # Debe aceptar los documentos existentes y rechazar cualquier otra línea.
@@ -91,3 +95,53 @@ class ConfiguracionGitleaks(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExcepcionI120(unittest.TestCase):
+    """La constante de estado de I-120 no puede abrir un agujero de seguridad."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        import re
+
+        texto = _leer()
+        bloque = texto.split("Constante de estado BLOQUEADO_RFC004")[1].split("[[rules.allowlists]]")[0]
+        cls.bloque = bloque
+        cls.ruta = re.search(r"paths\s*=\s*\[\s*'''(.*?)'''", bloque).group(1)
+        cls.valor = re.search(r"regexes\s*=\s*\[\s*'''(.*?)'''", bloque).group(1)
+
+    def test_excepcion_en_un_unico_archivo(self) -> None:
+        import re
+
+        patron = re.compile(self.ruta)
+        self.assertTrue(patron.match("tests/infra/operacion/test_nexum_operacion.py"))
+        for ruta in (
+            "tests/infra/operacion/test_operacion_avanzada.py",
+            "tests/infra/operacion/test_nexum_operacion_v2.py",
+            "tests/infra/finops/test_finops_diario.py",
+            "herramientas/nexum_operacion.py",
+        ):
+            self.assertIsNone(patron.match(ruta), ruta)
+
+    def test_excepcion_solo_acepta_el_valor_constante(self) -> None:
+        import re
+
+        patron = re.compile(self.valor)
+        self.assertTrue(patron.match("BLOQUEADO_RFC004"))
+        for valor in (
+            "BLOQUEADO_RFC005",
+            "BLOQUEADO_OTRA",
+            "cf73cb1ac2eb61137e33abbaced62405b445cdd4bedf269c0a64f23475a9fb19",
+            "AKIAIOSFODNN7EXAMPLE",
+            "sk-ant-api03-abcdefghijklmnopqrstuvwxyz",
+        ):
+            self.assertIsNone(patron.match(valor), valor)
+
+    def test_excepcion_es_and_y_sobre_el_secreto(self) -> None:
+        self.assertIn('condition = "AND"', self.bloque)
+        self.assertIn('regexTarget = "secret"', self.bloque)
+
+    def test_no_existe_allowlist_global_de_ruta(self) -> None:
+        texto = _leer()
+        self.assertNotIn("[allowlist]", texto)
+        self.assertIn("generic-api-key", texto)
