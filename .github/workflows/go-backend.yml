@@ -256,6 +256,9 @@ jobs:
       - name: Contratos del operador de encendido/apagado I-120
         run: python3 -m unittest discover -s tests/infra/operacion
 
+      - name: Controles de respaldo y restauracion I-130
+        run: python3 -m unittest discover -s tests/infra/backup
+
   contratos:
     name: Contratos OpenAPI y herramientas
     runs-on: ubuntu-latest

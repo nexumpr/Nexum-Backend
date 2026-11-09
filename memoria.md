@@ -566,3 +566,26 @@
 - **FinOps:** se exigen banderas `verificado_*`, el plan debe ser `FREE`, se rechazan negativos/NaN/infinitos, se detectan creditos vencidos y `creditos_restante_usd` evita el doble descuento del consumo. Toda salida declara `autoriza_ejecucion_real = false` y `es_prueba_independiente_de_facturacion = false`. Pruebas: 13 nuevas en `ControlesNuevos`.
 - **gitleaks:** excepcion reducida a `tests/infra/operacion/test_nexum_operacion.py` + `^BLOQUEADO_RFC004$` con `condition = "AND"`; se restauro la asercion natural de la prueba y se verifica que otras rutas y otros valores siguen detectandose.
 - Conteos: 104 pruebas de operacion, 238 de FinOps, 147 de herramientas, 36 de contrato Terraform. Sin AWS, sin Terraform remoto, sin merge.
+
+### I-120: cierre post-merge (2026-11-09)
+
+- **PR #32 MERGED** (merge `31d25127033cd63a4a74040caea4137f52732536`), HEAD autorizado `03b10cdb1a7c982f2077915cb324c9f880865da0` verificado con `--match-head-commit`; `main` local = `origin/main` por fast-forward.
+- CI del PR 7/7 PASS (runs 42555133780 y 42555133786); CI de `main` en `31d2512`: SDD documental run 42555990713 SUCCESS y Go Backend CI run 42555990909 SUCCESS (seis jobs).
+- Estado: **INTEGRADO_MAIN - NO DESPLEGADO**. `AWS_NOT_RUN`; `PLAN_AWS_NO_VERIFICADO`; `TWO_NODES_AWS_NOT_VERIFIED`; `BLOCKED_I130`; `DAST_NOT_RUN`.
+- Integrado: allowlist y plan fail-closed, `apply` deshabilitado con `--force/--yes` rechazados, `impacto_core`, control FinOps diario con banderas de verificacion, excepcion gitleaks limitada a un archivo y un valor.
+- Registro documental en el arbol de trabajo; se publicara en el PR de la siguiente spec autorizada (no se abre PR solo para el estado).
+- Bloqueos intactos: D-100-01, D-100-02, D-110-01, RFC-004, H-01, RFC-006, RFC-007, ARTIFACT_DELIVERY, agente CloudWatch (I-020), ALERT_DELIVERY, readiness 503, OIDC, AWS_SCP_NOT_VERIFIED, branch protection. I-130 sigue `NOT_AUTHORIZED`.
+
+### I-130: respaldo y recuperacion implementados en local (2026-11-09)
+
+- Gate `APRUEBO_GATE_I130_LOCAL` registrado en `sdd/_control/H08/GATE_H08I_I130.md`; rama `feat/h08i-i130-backup` desde `main` `31d2512` (incluye el cierre documental de I-120). `AWS_NOT_RUN`.
+- Modulo `infra/terraform/modules/respaldo`: sin recursos AWS; 6 preconditions (PITR obligatorio, state con versionado+cifrado+proteccion, patron de restauracion que no alcanza la tabla activa, destroys en false, retencion <= 35 d, tabla/ARN presentes) y validaciones permanentes.
+- `.gitignore` excluye `**/backup/`: el directorio del modulo se renombro a `infra/terraform/modules/respaldo` y el inventario a `infra/terraform/respaldo/inventario_backup.json` para no debilitar ese control con excepciones.
+- El proveedor AWS **no expone** `aws_dynamodb_backup`: el backup on-demand es un procedimiento autorizado fuera de IaC y el modulo solo declara guardas. `terraform validate` confirma la ausencia del recurso invalido detectada en la primera version.
+- `herramientas/verificar_backup_restore.py`: 5 comandos (`estado`, `plan-restauracion`, `verificar-restore`, `borrado-cuenta`, `verificar-inventario`), Decimal, sin AWS ni procesos externos. Restauracion solo en `^NEXUM_CORE_RESTORE_[a-z0-9]{4,20}$`, nunca sobre la tabla activa ni sobre un activo del inventario.
+- RTO 4 h / RPO 24 h declarados `OBJETIVO_PROPUESTO_NO_MEDIDO`; `RESTORE_AWS_NO_VERIFICADO`; `BLOCKED_I130` de I-120 **no** se cierra con simulacion.
+- Costes: 0.0009 USD/h residente + 0.0004 USD/h opcional = 0.0013 USD/h; 1.4336 USD/45 d; restore 0.3000 USD por 2 GB. `AWS_COST_REAL = NOT_VERIFIED`.
+- Borrado de cuenta: `BORRADO_DIFERIDO_DOCUMENTADO`; se rechaza afirmar borrado inmediato de copias o de copias inmutables.
+- Documentos: `POLITICA_BACKUPS.md`, `PRUEBAS_RESTORE.md`, `MATRIZ_RETENCION.md`, `MATRIZ_INF_130.md` y Gate.
+- Pruebas: 39 de respaldo/restauracion y 20 de contrato Terraform; `fmt`/`init -backend=false`/`validate` PASS.
+- Discrepancia documentada: spec §8 presupuesta 2 GB y el inventario usa 3 GB; se mantiene 3 GB y se registra para ratificacion humana.

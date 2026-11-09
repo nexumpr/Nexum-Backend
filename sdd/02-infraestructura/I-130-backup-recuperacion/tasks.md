@@ -78,3 +78,16 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+## Implementacion H08-I (2026-11-09) — LOCAL, sin AWS
+
+Gate `APRUEBO_GATE_I130_LOCAL`. Rama `feat/h08i-i130-backup`. Nada se despliega: `AWS_NOT_RUN`.
+
+- **T-130-01 (RTO/RPO):** IMPLEMENTADO_LOCAL. RTO 4 h / RPO 24 h declarados `OBJETIVO_PROPUESTO_NO_MEDIDO`; `MEDIDO` exige restore real.
+- **T-130-02 (Datos):** IMPLEMENTADO_LOCAL. PITR obligatorio y backup on-demand documentado como procedimiento fuera de IaC; retencion <= 35 d.
+- **T-130-03 (State):** IMPLEMENTADO_LOCAL. Versionado, cifrado y `prevent_destroy` exigidos simultaneamente por precondition.
+- **T-130-04 (Restore):** IMPLEMENTADO_LOCAL. Solo tabla nueva aislada con patron obligatorio; invariantes `saved = opening + sum(allocations)`; `RESTORE_AWS_NO_VERIFICADO`.
+- **T-130-05 (Privacidad):** IMPLEMENTADO_LOCAL. `BORRADO_DIFERIDO_DOCUMENTADO`; prohibido afirmar borrado inmediato de copias o de copias inmutables.
+- **T-130-06 (Runbook):** IMPLEMENTADO_LOCAL en `PRUEBAS_RESTORE.md` §2.
+- **T-130-90 (Riesgos):** PITR/backup de pago presupuestado (0.9690 USD/mes declarado, no medido); perdida de datos mitigada por restauracion aislada; restore de aportaciones divididas cubierto por invariante aritmetica. Los tres CONDICIONADOS a verificacion real.
+- **T-130-99 (Ratificacion):** REVIEW pendiente; merge requiere autorizacion humana ligada a PR + HEAD.
