@@ -28,6 +28,7 @@ type Configuracion struct {
 	RedisUsuario  string
 	RedisPassword string
 	RedisTLS      bool
+	Entorno       string
 }
 
 // DesdeEntorno lee la configuracion del proceso. No inventa valores por defecto:
@@ -35,6 +36,7 @@ type Configuracion struct {
 func DesdeEntorno() Configuracion {
 	tlsActivo := strings.EqualFold(os.Getenv("REDIS_TLS"), "true")
 	return Configuracion{
+		Entorno:       strings.TrimSpace(os.Getenv("APP_ENV")),
 		TablaDynamoDB: strings.TrimSpace(os.Getenv("DYNAMODB_TABLE")),
 		Region:        strings.TrimSpace(os.Getenv("AWS_REGION")),
 		RedisAddr:     strings.TrimSpace(os.Getenv("REDIS_ADDR")),
@@ -71,6 +73,15 @@ func ClienteRedis(cfg Configuracion) (*redis.Client, error) {
 	if cfg.RedisAddr == "" {
 		return nil, fmt.Errorf("REDIS_ADDR no configurado")
 	}
+	// En produccion el modulo I-050 exige TLS y RBAC. Sin ambos, falla cerrado.
+	if strings.EqualFold(cfg.Entorno, "PRODUCTION") {
+		if !cfg.RedisTLS {
+			return nil, fmt.Errorf("REDIS_TLS debe ser true en PRODUCTION")
+		}
+		if cfg.RedisUsuario == "" || cfg.RedisPassword == "" {
+			return nil, fmt.Errorf("Redis exige usuario y contrasena RBAC en PRODUCTION")
+		}
+	}
 	opciones := &redis.Options{
 		Addr:         cfg.RedisAddr,
 		Username:     cfg.RedisUsuario,
@@ -92,11 +103,17 @@ func ComprobarDynamoDB(ctx context.Context, cliente *dynamodb.Client, tabla stri
 	if cliente == nil || tabla == "" {
 		return fmt.Errorf("dynamodb no configurado")
 	}
-	_, err := cliente.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+	salida, err := cliente.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 		TableName: aws.String(tabla),
 	})
 	if err != nil {
 		return fmt.Errorf("dynamodb no disponible: %w", err)
+	}
+	if salida == nil || salida.Table == nil {
+		return fmt.Errorf("dynamodb devolvio una tabla vacia")
+	}
+	if string(salida.Table.TableStatus) != "ACTIVE" {
+		return fmt.Errorf("dynamodb no esta ACTIVE (estado %q)", string(salida.Table.TableStatus))
 	}
 	return nil
 }

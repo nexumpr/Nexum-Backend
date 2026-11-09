@@ -203,3 +203,84 @@ func TestSinDireccionNoSeInventanValores(t *testing.T) {
 	}
 	_ = time.Second
 }
+
+func TestRedisProduccionExigeTLS(t *testing.T) {
+	_, err := healthinfra.ClienteRedis(healthinfra.Configuracion{
+		RedisAddr: "cache:6379", Entorno: "PRODUCTION",
+		RedisUsuario: "nexum", RedisPassword: "x", RedisTLS: false,
+	})
+	if err == nil {
+		t.Fatal("PRODUCTION sin TLS debe fallar cerrado")
+	}
+}
+
+func TestRedisProduccionExigeRBAC(t *testing.T) {
+	for _, caso := range []healthinfra.Configuracion{
+		{RedisAddr: "cache:6379", Entorno: "PRODUCTION", RedisTLS: true, RedisPassword: "x"},
+		{RedisAddr: "cache:6379", Entorno: "PRODUCTION", RedisTLS: true, RedisUsuario: "nexum"},
+	} {
+		if _, err := healthinfra.ClienteRedis(caso); err == nil {
+			t.Fatalf("PRODUCTION sin RBAC completo debe fallar: %+v", caso)
+		}
+	}
+}
+
+func TestRedisProduccionCompletaSeConstruye(t *testing.T) {
+	cliente, err := healthinfra.ClienteRedis(healthinfra.Configuracion{
+		RedisAddr: "cache:6379", Entorno: "PRODUCTION",
+		RedisUsuario: "nexum", RedisPassword: "secreto-de-prueba", RedisTLS: true,
+	})
+	if err != nil {
+		t.Fatalf("configuracion completa no debe fallar: %v", err)
+	}
+	t.Cleanup(func() { _ = cliente.Close() })
+	if cliente.Options().TLSConfig == nil || cliente.Options().TLSConfig.InsecureSkipVerify {
+		t.Fatal("TLS debe validar el certificado (sin InsecureSkipVerify)")
+	}
+}
+
+func TestRedisLocalSinTLSPermitido(t *testing.T) {
+	if _, err := healthinfra.ClienteRedis(healthinfra.Configuracion{RedisAddr: "127.0.0.1:6379"}); err != nil {
+		t.Fatalf("en local se permite sin TLS: %v", err)
+	}
+}
+
+func TestDynamoDBRechazaEstadoNoActivo(t *testing.T) {
+	for _, estado := range []string{"CREATING", "UPDATING", "DELETING"} {
+		servidor := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/x-amz-json-1.0")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"Table":{"TableName":"NEXUM_CORE_H08I","TableStatus":"` + estado + `"}}`))
+		}))
+		carga, _ := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithRegion("us-east-2"),
+			awsconfig.WithCredentialsProvider(aws.CredentialsProviderFunc(func(context.Context) (aws.Credentials, error) {
+				return aws.Credentials{AccessKeyID: "prueba", SecretAccessKey: "prueba"}, nil
+			})))
+		cliente := dynamodb.NewFromConfig(carga, func(o *dynamodb.Options) {
+			o.BaseEndpoint = aws.String(servidor.URL)
+		})
+		if err := healthinfra.ComprobarDynamoDB(context.Background(), cliente, "NEXUM_CORE_H08I"); err == nil {
+			t.Fatalf("estado %s debe degradar readiness", estado)
+		}
+		servidor.Close()
+	}
+}
+
+func TestDynamoDBRechazaTablaVacia(t *testing.T) {
+	servidor := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.0")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(servidor.Close)
+	carga, _ := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithRegion("us-east-2"),
+		awsconfig.WithCredentialsProvider(aws.CredentialsProviderFunc(func(context.Context) (aws.Credentials, error) {
+			return aws.Credentials{AccessKeyID: "prueba", SecretAccessKey: "prueba"}, nil
+		})))
+	cliente := dynamodb.NewFromConfig(carga, func(o *dynamodb.Options) {
+		o.BaseEndpoint = aws.String(servidor.URL)
+	})
+	if err := healthinfra.ComprobarDynamoDB(context.Background(), cliente, "NEXUM_CORE_H08I"); err == nil {
+		t.Fatal("respuesta sin tabla debe degradar readiness")
+	}
+}
