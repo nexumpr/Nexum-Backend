@@ -78,7 +78,7 @@ El tramo CloudFront→ALB discurre por VPC Origin dentro de la VPC y **no usa TL
 sets the security policy to TLSv1».
 
 **Consecuencia:** con el diseño D2 (certificado por defecto, sin dominio propio) la distribución **no puede**
-configurar `minimum_protocol_version = TLSv1.2_2021`; la política queda en **TLSv1**, que admite TLS 1.0/1.1
+configurar `minimum_protocol_version = TLSv1.2_2021`; la política queda en **TLSv1**, que admite TLS 1.0/1.1/1.2/1.3 y **no** SSLv3 (SSLv3 solo existe en la politica `SSLv3`; tabla oficial de politicas de CloudFront)
 para clientes antiguos. Cualquier afirmación de «TLS 1.2 obligatorio en el borde» sería falsa.
 
 **Lo que sí se conserva:** certificado de CA pública válido para `*.cloudfront.net`, HTTPS obligatorio para el

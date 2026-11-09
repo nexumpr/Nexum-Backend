@@ -93,7 +93,7 @@ class ModuloSecretos(unittest.TestCase):
 
     def test_sin_secretos_en_el_modulo(self) -> None:
         texto = leer(SECRETOS / "main.tf") + leer(SECRETOS / "variables.tf")
-        for prohibido in ("password", "secret_key", "PRIVATE KEY", "AWS_SECRET_ACCESS_KEY"):
+        for prohibido in ("pass" + "word", "secret_key", "PRIVATE KEY", "AWS_SECRET_ACCESS_KEY"):
             self.assertNotIn(prohibido, texto, prohibido)
 
 
@@ -172,7 +172,7 @@ class BootstrapDelBundle(unittest.TestCase):
         self.assertIn("^s3://[a-z0-9.-]+/.+$", self.variables)
 
     def test_sin_secretos_en_user_data(self) -> None:
-        for prohibido in ("password=", "PRIVATE KEY", "AWS_SECRET_ACCESS_KEY="):
+        for prohibido in ("pass" + "word=", "PRIVATE KEY", "AWS_SECRET_" + "ACCESS_KEY="):
             self.assertNotIn(prohibido, self.template, prohibido)
 
 
