@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/nexumpr/Nexum-Backend/internal/infrastructure/telemetry"
 	"github.com/nexumpr/Nexum-Backend/internal/transport/http/middleware"
 )
 
@@ -22,6 +23,9 @@ type ServerConfig struct {
 	CORSOptions       middleware.CORSOptions
 	RateLimitMaxReq   int
 	RateLimitWindow   time.Duration
+	ServiceName       string
+	Environment       string
+	InstanceID        string
 }
 
 // DefaultServerConfig genera los valores iniciales auditados de A-030 §2.2.
@@ -37,6 +41,9 @@ func DefaultServerConfig() ServerConfig {
 		CORSOptions:       middleware.DefaultCORSOptions(),
 		RateLimitMaxReq:   100,
 		RateLimitWindow:   1 * time.Minute,
+		ServiceName:       "nexum-backend",
+		Environment:       "local",
+		InstanceID:        "unknown",
 	}
 }
 
@@ -46,13 +53,26 @@ type HTTPServer struct {
 	httpServer *http.Server
 	router     *Router
 	logger     *slog.Logger
+	metrics    *telemetry.Metrics
 }
 
 // NewHTTPServer construye el servidor HTTP conectando la cadena de middleware de seguridad y el router.
 func NewHTTPServer(cfg ServerConfig, router *Router, logger *slog.Logger) *HTTPServer {
-	// Cadena global de middleware: Recovery -> SecurityHeaders -> CORS
+	metricas := telemetry.NewMetrics()
+	router.RegisterMetrics(metricas)
+
+	// Cadena global: Trace -> RequestLog -> Recovery -> SecurityHeaders -> CORS.
 	handler := middleware.Chain(
 		router,
+		middleware.TraceMiddleware(),
+		middleware.RequestLogger(middleware.RequestLogOptions{
+			Logger:        logger,
+			Service:       cfg.ServiceName,
+			Environment:   cfg.Environment,
+			InstanceID:    cfg.InstanceID,
+			Metrics:       metricas,
+			RouteResolver: router.TemplateFor,
+		}),
 		middleware.Recovery(logger),
 		middleware.SecurityHeaders(cfg.EnableTLS),
 		middleware.CORS(cfg.CORSOptions),
@@ -73,7 +93,13 @@ func NewHTTPServer(cfg ServerConfig, router *Router, logger *slog.Logger) *HTTPS
 		httpServer: srv,
 		router:     router,
 		logger:     logger,
+		metrics:    metricas,
 	}
+}
+
+// Metrics expone el registro de métricas del servidor (para pruebas y agente local).
+func (s *HTTPServer) Metrics() *telemetry.Metrics {
+	return s.metrics
 }
 
 // Router retorna el router interno para registrar rutas.

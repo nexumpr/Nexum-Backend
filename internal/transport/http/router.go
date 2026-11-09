@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/nexumpr/Nexum-Backend/internal/infrastructure/telemetry"
 	"github.com/nexumpr/Nexum-Backend/pkg/httputil"
 )
 
@@ -16,6 +17,7 @@ type Router struct {
 	probeMux  *http.ServeMux
 	apiPrefix string
 	health    *HealthRegistry
+	metrics   *telemetry.Metrics
 }
 
 // NewRouter crea un enrutador con soporte estricto de métodos, 404 no enumerable y 405 Method Not Allowed.
@@ -58,6 +60,28 @@ func (rt *Router) RegisterHealth(hr *HealthRegistry) {
 	rt.HandleFunc(http.MethodGet, "/health/ready", hr.ReadyHandler())
 }
 
+// RegisterMetrics conecta el registro de métricas y expone /metrics (sólo loopback).
+// TemplateFor devuelve la plantilla registrada para una ruta conocida o /unknown.
+// Las rutas no registradas nunca devuelven segmentos arbitrarios (PII/cardinalidad).
+func (rt *Router) TemplateFor(path string) string {
+	switch path {
+	case "/health", "/ready", "/metrics":
+		return path
+	}
+	rt.mu.RLock()
+	defer rt.mu.RUnlock()
+	if _, existe := rt.routes[path]; existe {
+		return path
+	}
+	return "/unknown"
+}
+
+func (rt *Router) RegisterMetrics(m *telemetry.Metrics) {
+	rt.mu.Lock()
+	rt.metrics = m
+	rt.mu.Unlock()
+}
+
 // healthRegistry devuelve el registro conectado, si existe.
 func (rt *Router) healthRegistry() *HealthRegistry {
 	rt.mu.RLock()
@@ -96,6 +120,17 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 1. Resolver probes heredados del balanceador (/health, /ready).
 	// Con HealthRegistry conectado reflejan el estado real de A-090; sin él se
 	// conserva el comportamiento previo de A-030.
+	if path == "/metrics" {
+		rt.mu.RLock()
+		m := rt.metrics
+		rt.mu.RUnlock()
+		if m == nil {
+			httputil.WriteError(w, http.StatusNotFound, "RESOURCE_NOT_FOUND", "el recurso solicitado no existe")
+			return
+		}
+		m.Handler().ServeHTTP(w, r)
+		return
+	}
 	if path == "/health" || path == "/ready" {
 		if hr := rt.healthRegistry(); hr != nil {
 			if path == "/health" {

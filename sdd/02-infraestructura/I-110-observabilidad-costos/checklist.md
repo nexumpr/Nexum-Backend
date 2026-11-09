@@ -46,3 +46,22 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+- [x] Log group con retencion finita y politica de logs sin PII.
+- [x] 3 metric filters y 5 alarmas con runbooks.
+- [x] Presupuesto 85 % ACTUAL y 100 % FORECASTED; no se presenta como limite de gasto.
+- [x] Dashboard y consultas de dos nodos/p50-p95-p99 documentados.
+- [ ] Agente de CloudWatch en instancias (dependencia I-020) y aplicacion AWS: NOT_RUN.
+- [ ] Metricas DynamoDB/Redis y OTel runtime: pendientes de identificadores/exportador.
+
+- [ ] Notificacion automatica de alarmas: BLOCKED_RFC007_SNS_KMS (CMK SNS no presupuestada); alarmas visibles y con runbook.
+
+- [x] RequestLogger integrado en runtime, ruta saneada y metricas loopback.
+- [x] 4 metric filters y 8 alarmas con runbook A1-A8 (2 condicionales).
+- [ ] Pipeline real de logs: agente CloudWatch (I-020) y AWS_VERIFIED NOT_RUN.
+- [ ] D-110-01 (A-090) headers de trazabilidad sin validacion estricta; Gate de A-090 requerido.
+
+- [x] Dimensiones ALB/TG evaluadas por terraform test, no solo validate.
+- [x] Consultas Logs Insights con pct() y contrato que rechaza percentile().
+- [x] Rutas desconocidas /unknown y cardinalidad acotada a 500 series.
+- [x] AWS Budgets con notificacion email declarativa sin SNS; ALERT_DELIVERY CloudWatch sigue bloqueado.

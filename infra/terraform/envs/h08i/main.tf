@@ -241,3 +241,37 @@ output "redis" {
     estado_despliegue    = module.redis.estado_despliegue
   }
 }
+
+
+# --- I-110: observabilidad, metricas, alarmas y FinOps -----------------------
+
+module "observabilidad" {
+  source = "../../modules/observabilidad"
+
+  proyecto = "nexum"
+  entorno  = var.entorno
+  region   = var.region
+
+  alb_arn          = module.balanceo.alb_arn
+  target_group_arn = module.balanceo.target_group_arn
+
+  retencion_dias      = 7
+  umbral_5xx          = 5
+  umbral_auth_401     = 20
+  presupuesto_usd     = 1
+  habilitar_dashboard = true
+}
+
+output "observabilidad" {
+  description = "Logs, metric filters, alarmas, presupuesto y dashboard (sin AWS aplicado)"
+  value = {
+    log_group         = module.observabilidad.log_group_backend
+    retencion_dias    = module.observabilidad.retencion_dias
+    namespace         = module.observabilidad.namespace_metricas
+    notificacion      = module.observabilidad.notificacion
+    alarmas           = module.observabilidad.alarmas
+    presupuesto       = module.observabilidad.presupuesto
+    dashboard         = module.observabilidad.dashboard
+    estado_despliegue = module.observabilidad.estado_despliegue
+  }
+}

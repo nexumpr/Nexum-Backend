@@ -506,3 +506,22 @@
 - I-100 correccion final (2026-11-08): escaner IaC por bucket (multi-bucket), SG cidr_ipv4/ipv6, IAM wildcard en listas y GIT_CHECK_FAILED; dinamicos como S3_CIFRADO_NO_VERIFICABLE. Rate limiting: D-100-01 (A-030 local + XFF sin proxy) y D-100-02 (A-080 no cableado; Redis real y 2 nodos NOT_RUN); no se declara RATE_LIMIT_DISTRIBUTED_VERIFIED. DAST: evidencia de Gate obligatoria dentro de sdd/_control/H08 y sin --permitir-remoto; BLOCKED_AUTHORIZATION. 18 pruebas de contrato, 12 IaC y 13 DAST/gosec.
 
 - I-100 cierre (2026-11-08): escaner IaC por bloques con llaves; cifrado asociado dentro del bloque SSE y sse_algorithm valido; ingress/egress separados; fixtures secure/exposed e ingress/egress. DAST: evidencia candidata no autoriza; BLOCKED_AUTHORIZATION fuera de modo prueba con NEXUM_TEST_MODE=1. 18 contrato, 15 IaC y 15 DAST/gosec.
+
+
+### I-100: cierre post-merge (2026-11-08)
+
+- PR #30 MERGED (merge 6542e724e0b203d8074f41b5abaad739a9b09feb), HEAD autorizado 8cd75a731d3a9cd7cfabf224ebda07ecb66549d0 verificado con --match-head-commit. CI del PR 7/7; CI de main SUCCESS.
+- Estado INTEGRADO_MAIN - NO DESPLEGADO. D-100-01/D-100-02 (A-030/A-080) abiertos; DAST NOT_RUN; AWS_NOT_RUN.
+
+### I-110: observabilidad y costos implementada en local (2026-11-08)
+
+- Gate APRUEBO_GATE_I110_LOCAL registrado en sdd/_control/H08/GATE_H08I_I110.md; rama feat/h08i-i110-observabilidad; base main 6542e72.
+- Modulo infra/terraform/modules/observabilidad: log group /nexum/<entorno>/backend con retencion 7 y maximo 30; 3 metric filters (5xx, 401, readiness); 5 alarmas (targets<2, 5xx, 401, readiness, logs sin eventos); SNS sin suscripciones por defecto; presupuesto 85/100; dashboard condicional. Cableado en envs/h08i con ARNs de I-030.
+- Go: RequestRecord con campos canonicos, validacion de claves sensibles y sanitizacion; 6 pruebas.
+- Documentos POLITICA_LOGS.md, MATRIZ_METRICAS_ALERTAS.md y DASHBOARD_OBSERVABILIDAD.md. Agente CloudWatch (I-020) y AWS NOT_RUN; +0.2000 USD/mes estimado por 2 alarmas extra, no medido.
+
+- I-110 bloqueo de notificacion (2026-11-08): SNS con alias/aws/sns dispara Trivy AWS-0136 (HIGH). Se retiran SNS, alarm_actions y notificaciones del presupuesto para no crear CMK no presupuestada; ALERT_DELIVERY=BLOCKED_RFC007_SNS_KMS. Alarmas y dashboard permanecen; RFC-007 pendiente.
+
+- I-110 ampliacion (2026-11-08): RequestLogger en HTTPServer (campos canonicos, ruta {id}), /metrics loopback con counters/latencia/runtime, 4 metric filters y 8 alarmas (A6 429, A7 Redis, A8 DynamoDB), cableadas desde I-040/I-050. Pipeline de logs LOG_PIPELINE_IMPLEMENTED_LOCAL / AWS_VERIFIED NOT_RUN (I-010 endpoint + I-060 permisos; falta agente I-020). D-110-01 (A-090 headers sin hex/flags/limite). Coste +0.5000 USD/mes no medido; AWS_COST_REAL/CREDITS/SCP NOT_VERIFIED.
+
+- I-110 correccion final (2026-11-08): ALB suffix app/... (sin loadbalancer/) validado por terraform test en CI; Logs Insights pct(); rutas desconocidas -> /unknown y max 500 series con dropped; AWS Budgets email directo sin SNS (emails_presupuesto vacio); ALERT_DELIVERY sigue BLOCKED_RFC007_SNS_KMS. D-110-01 abierto.
