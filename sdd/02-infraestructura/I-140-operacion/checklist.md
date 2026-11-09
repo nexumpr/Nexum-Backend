@@ -46,3 +46,10 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+- [x] 10 runbooks con los 8 campos obligatorios y estado `DOCUMENTADO_NO_EJECUTADO`.
+- [x] Matriz S1–S4 con coherencia de tiempos y escalamiento.
+- [x] 5 drills planificados con `NOT_RUN`; prohibido `EJECUTADO_AWS` en local.
+- [x] Inventario derivado del código con `existe_en_aws = NOT_VERIFIED`.
+- [x] Política de acceso sin root, sin SSH público y con identidades temporales.
+- [ ] Drills reales y cierre de incidentes: `NOT_RUN` (requieren Gate de despliegue).
+- [ ] Ratificación humana de tiempos de notificación y severidades.

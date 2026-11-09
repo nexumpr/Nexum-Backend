@@ -1,0 +1,8 @@
+{
+  "shell_root": false,
+  "ssh_publico": false,
+  "identidades_temporales": true,
+  "claves_estaticas": false,
+  "cambio_scp": false,
+  "ssm_solo_en_ventana": true
+}

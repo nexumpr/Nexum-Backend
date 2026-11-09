@@ -78,3 +78,16 @@ Estado inicial de todos los trabajos: `TODO`, salvo evidencia local de integrida
 - **Entrada:** `spec.md`, `plan.md`, `tasks.md`, `checklist.md` actualizados.
 - **Salida:** decisión explícita del responsable y vínculo a evidencia en informe I-GO.
 - **Bloqueo:** no crear Terraform/endpoints ni ejecutar AWS.
+
+## Implementacion H08-I (2026-11-09) — LOCAL, sin AWS
+
+Gate `APRUEBO_GATE_I140_LOCAL`. Rama `feat/h08i-i140-operacion`. Nada se ejecuta contra AWS.
+
+- **T-140-01 (Runbooks):** IMPLEMENTADO_LOCAL. 10 procedimientos con responsable, precondiciones, diagnostico, mitigacion, rollback, evidencia, criterio y estado `DOCUMENTADO_NO_EJECUTADO`.
+- **T-140-02 (Prioridades):** IMPLEMENTADO_LOCAL. S1–S4 con tiempos, escalamiento y rollback; coherencia validada y `PENDIENTE_DE_RATIFICACION_HUMANA`.
+- **T-140-03 (Drills):** IMPLEMENTADO_LOCAL. 5 drills planificados en `NOT_RUN`; el validador rechaza `EJECUTADO_AWS`, acciones destructivas y drills con AWS sin datos sinteticos.
+- **T-140-04 (Prueba y aceptacion):** IMPLEMENTADO_LOCAL. Inventario derivado del codigo y contraste con los validadores SDD; AWS `NOT_VERIFIED`.
+- **T-140-05 (Acceso):** IMPLEMENTADO_LOCAL. Politica sin root, sin SSH publico, con identidades temporales y SSM solo en ventana.
+- **T-140-06 (Inventario final):** IMPLEMENTADO_LOCAL. Modulos y recursos declarados; un nombre no prueba existencia.
+- **T-140-90 (Riesgos):** acceso de recuperacion a nodos limitado a SSM en ventana; inconsistencia tras reintentos cubierta por idempotencia de A-070; registros de incidentes dependientes del agente CloudWatch (I-020). Los tres CONDICIONADOS a verificacion real.
+- **T-140-99 (Ratificacion):** REVIEW pendiente; merge requiere autorizacion humana ligada a PR + HEAD.

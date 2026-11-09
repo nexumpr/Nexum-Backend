@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "drills": [
+    {
+      "id": "aislar-instancia-a",
+      "componente": "computo",
+      "degradacion_esperada": "1 target sano",
+      "criterio_exito": "responde 200 y el ASG repone",
+      "rollback": "restaurar capacidad con la LT vigente",
+      "requiere_aws": true,
+      "datos_sinteticos": true,
+      "estado": "NOT_RUN",
+      "accion": "drenar instancia A"
+    },
+    {
+      "id": "reemplazo-target",
+      "componente": "balanceo",
+      "degradacion_esperada": "target fuera del pool",
+      "criterio_exito": "HealthyHostCount vuelve a 2",
+      "rollback": "cancelar refresh",
+      "requiere_aws": true,
+      "datos_sinteticos": true,
+      "estado": "NOT_RUN",
+      "accion": "refresh controlado"
+    },
+    {
+      "id": "fallo-redis",
+      "componente": "cache",
+      "degradacion_esperada": "lecturas sin cache",
+      "criterio_exito": "auth fail-closed sin 5xx",
+      "rollback": "restablecer endpoint anterior",
+      "requiere_aws": true,
+      "datos_sinteticos": true,
+      "estado": "NOT_RUN",
+      "accion": "simular indisponibilidad"
+    },
+    {
+      "id": "cuota-dynamo",
+      "componente": "datos",
+      "degradacion_esperada": "throttling controlado",
+      "criterio_exito": "backoff efectivo sin Scan",
+      "rollback": "detener carga sintetica",
+      "requiere_aws": true,
+      "datos_sinteticos": true,
+      "estado": "NOT_RUN",
+      "accion": "carga sintetica acotada"
+    },
+    {
+      "id": "rotacion-jwt",
+      "componente": "identidad",
+      "degradacion_esperada": "tokens previos invalidados",
+      "criterio_exito": "sesiones revocadas no se reactivan",
+      "rollback": "restaurar claves en ventana",
+      "requiere_aws": true,
+      "datos_sinteticos": true,
+      "estado": "NOT_RUN",
+      "accion": "rotar claves en ventana"
+    }
+  ]
+}

@@ -620,3 +620,22 @@
 - **Concurrencia:** `SOLICITUD_INCOMPLETA` sin identidad; coincidencia de tokens -> `ESCRITOR_UNICO_SIMULADO` con `verificado_en_aws=false`; I-070 sigue siendo la autoridad del locking.
 - Pruebas tautologicas revisadas y sustituidas por aserciones con valores esperados calculados desde el catalogo y el Gate de I-000.
 - Conteos: 129 pruebas de respaldo, 258 de FinOps, 321 de Terraform. Sin AWS, sin Terraform remoto, sin merge.
+
+### I-130: cierre post-merge (2026-11-09)
+
+- **PR #33 MERGED** (merge `da2aee149551b583a13b68276ac4d97058d225da`), HEAD autorizado `2634e5bffea0c0598784a13e43d557e810e85b56` verificado con `--match-head-commit`; `main` local = `origin/main` por fast-forward.
+- CI del PR 7/7 PASS (runs 42562971029 y 42562971023); CI de `main` en `da2aee1`: SDD documental run 42563665183 SUCCESS y Go Backend CI run 42563665206 SUCCESS (seis jobs).
+- Estado: **INTEGRADO_MAIN - NO DESPLEGADO**. `AWS_NOT_RUN`; `RESTORE_AWS_NOT_RUN`; `RTO_RPO_PENDING_HUMAN_APPROVAL`; `BACKUP_AWS_NOT_VERIFIED`; `DAST_NOT_RUN`; `BLOCKED_I130` de I-120 sigue abierto.
+- Integrado: verificacion AWS deshabilitada en local, PITR 1..35 d separado de on-demand, state con 8 precondiciones declaradas, restore aislado con 16 codigos de integridad, privacidad sin reactivacion, runbook de 13 fases y FinOps conciliado contra el presupuesto vigente de I-000 (incremento 0.0000, margen teorico 6.9387 no disponible).
+- Registro documental en el arbol de trabajo; se publicara en el PR de la siguiente spec autorizada (no se abre PR solo para el estado).
+- Bloqueos intactos: RFC-004, H-01, RFC-006, RFC-007, ARTIFACT_DELIVERY, agente CloudWatch (I-020), ALERT_DELIVERY, readiness 503, OIDC, AWS_SCP_NOT_VERIFIED, branch protection, D-100-01, D-100-02, D-110-01. I-140 sigue `NOT_AUTHORIZED`.
+
+### I-140: operacion e incidentes implementados en local (2026-11-09)
+
+- Gate `APRUEBO_GATE_I140_LOCAL` registrado en `sdd/_control/H08/GATE_H08I_I140.md`; rama `feat/h08i-i140-operacion` desde `main` `da2aee1` (incluye el cierre documental de I-130). `AWS_NOT_RUN`.
+- `RUNBOOK_OPERATIVO.md`: 10 procedimientos (deployment, health-fail, dynamo-throttle, redis-unavailable, certificados, rotacion-secretos, auth-inesperado, presupuesto, incidente, eliminacion-iac) con 8 campos y estado `DOCUMENTADO_NO_EJECUTADO`.
+- `MATRIZ_INCIDENTES.md`: S1–S4 con notificacion, escalamiento y rollback; tiempos `PENDIENTE_DE_RATIFICACION_HUMANA` (no se declara SLA).
+- `PLAN_PRUEBAS_OPERACION.md`: 5 drills (aislar instancia A, reemplazo de target, fallo Redis, cuota Dynamo, rotacion JWT), todos `NOT_RUN` y con datos sinteticos.
+- `herramientas/verificar_operacion_i140.py`: `runbooks`, `prioridades`, `drills`, `inventario` (deriva recursos del codigo, `existe_en_aws = NOT_VERIFIED`) y `acceso` (sin root, sin SSH publico, identidades temporales, SSM en ventana).
+- 36 pruebas nuevas en `tests/infra/operacion/test_i140_operacion.py`; la suite de operacion suma 140.
+- Sin AWS, sin terraform remoto, sin drills reales y sin merge.
