@@ -46,3 +46,12 @@
 ### Ejecución futura H08 (NO ejecutada en este lote)
 
 - [ ] Pruebas AWS/CI/HTTP y sus evidencias ejecutadas realmente tras aprobación y release; no cambiar a PASS antes.
+
+- [x] Log group con retencion finita y politica de logs sin PII.
+- [x] 3 metric filters y 5 alarmas con runbooks.
+- [x] Presupuesto 85 % ACTUAL y 100 % FORECASTED; no se presenta como limite de gasto.
+- [x] Dashboard y consultas de dos nodos/p50-p95-p99 documentados.
+- [ ] Agente de CloudWatch en instancias (dependencia I-020) y aplicacion AWS: NOT_RUN.
+- [ ] Metricas DynamoDB/Redis y OTel runtime: pendientes de identificadores/exportador.
+
+- [ ] Notificacion automatica de alarmas: BLOCKED_RFC007_SNS_KMS (CMK SNS no presupuestada); alarmas visibles y con runbook.
