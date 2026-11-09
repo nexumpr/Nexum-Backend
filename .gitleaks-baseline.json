@@ -355,5 +355,26 @@
     "Message": "﻿feat(h08i): bundle de secretos en S3 con lectura de solo lectura y bootstrap fail-closed\n\nImplementa RFC-004 opcion B, aprobada con APRUEBO_RFC004_OPCION_B. AWS_NOT_RUN.\n\n- Modulo `secretos`: bucket privado con Block Public Access completo, BucketOwnerEnforced,\n  versionado, SSE-S3, lifecycle de versiones no actuales (30 d), politica que deniega sin\n  TLS y fuera del rol, force_destroy=false y preconditions de prefijo, retencion y ARN.\n- IAM: `runtime_secretos` concede solo s3:GetObject sobre el prefijo; la variable rechaza\n  el bucket completo y su count es 0 por defecto.\n- Bootstrap: SECRETOS_URI + python3 valida {version, variables{...}}, exige APP_ENV,\n  rechaza claves y valores invalidos y escribe backend.env atomico en 0640 root:nexum;\n  sin bundle o invalido, falla cerrado.\n- Excepcion acotada de Trivy AWS-0132 solo para modules/secretos/main.tf, justificada\n  por la RFC aprobada (SSE-S3 sin CMK).\n\nVerificado: fmt/validate PASS, 352 pruebas de contrato Terraform (31 nuevas), SDD exacto\ny git diff --check = 0. Sin AWS, sin secrets reales, sin plan/apply.",
     "Tags": [],
     "Fingerprint": "d0fde5e0649a13787ceaef087acdddf4a343a7bf:infra/terraform/modules/computo/main.tf:generic-api-key:111"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "Description": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+    "StartLine": 29,
+    "EndLine": 29,
+    "StartColumn": 56,
+    "EndColumn": 90,
+    "Match": "secretos_uri = REDACTED`",
+    "Secret": "REDACTED",
+    "File": "sdd/_control/H08/RFC-009-PUBLICACION_REPOSITORIO.md",
+    "SymlinkFile": "",
+    "Commit": "0c9b8ad0cc544aedb1abd0e355163148420a8404",
+    "Link": "https://github.com/nexumpr/Nexum-Backend/blob/0c9b8ad0cc544aedb1abd0e355163148420a8404/sdd/_control/H08/RFC-009-PUBLICACION_REPOSITORIO.md?plain=1#L29",
+    "Entropy": 3.5368867,
+    "Author": "nexumpr",
+    "Email": "349666511+nexumpr@users.noreply.github.com",
+    "Date": "2026-11-09T18:45:07Z",
+    "Message": "docs(rfc009): autorizar y registrar la publicacion del repositorio\n\nRFC-009 y Gate con la evidencia del barrido de secretos (8 falsos positivos, cero credenciales, sin archivos sensibles en el historial), riesgos aceptados y post-condiciones. AWS_NOT_RUN.",
+    "Tags": [],
+    "Fingerprint": "0c9b8ad0cc544aedb1abd0e355163148420a8404:sdd/_control/H08/RFC-009-PUBLICACION_REPOSITORIO.md:generic-api-key:29"
   }
 ]
