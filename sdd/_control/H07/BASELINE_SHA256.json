@@ -177,7 +177,7 @@
     "infra/terraform/modules/respaldo/main.tf": "8bdffbc8b11fa5ae913b3596e67c4b21df8bcab55c463146789b7b2b809e1c47",
     "infra/terraform/modules/respaldo/outputs.tf": "5f85cb6341627643853a0c2250fdaa8b828122483618f81068d3deee99df90ba",
     "infra/terraform/modules/respaldo/variables.tf": "de00b6fab3c305345c548d3281af9634e157bf33d7ef82bb53d406cdd4a456d3",
-    "infra/terraform/modules/secretos/main.tf": "bc5f127b6dd09e293fa03a8393977d0da34474eecbcc19f57db8be38d9f64c42",
+    "infra/terraform/modules/secretos/main.tf": "8225cd72e0c74924cb30992df7b67044c8514abc531a351746ae1a7edc421175",
     "infra/terraform/modules/secretos/outputs.tf": "aba9c56298bfa58014f397a5cef032f2ba9df25c85f191c099b0e675ab53f74f",
     "infra/terraform/modules/secretos/variables.tf": "80f8a8131dfeb69c4b394918e0410b168876b1dffb363011d9f488d34364c770",
     "infra/terraform/operacion/inventario.json": "a3facdc1b42795d47ab3fe82f0e533188f026af60d703c714e53745e4a02d11a",

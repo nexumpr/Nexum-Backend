@@ -80,7 +80,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "secretos" {
 }
 
 data "aws_iam_policy_document" "secretos" {
-  # 1. Ningun acceso sin TLS, para cualquier principal.
+  # 1. Ningun acceso sin TLS, para cualquier principal y cualquier accion.
   statement {
     sid    = "DenegarSinTLS"
     effect = "Deny"
@@ -100,8 +100,8 @@ data "aws_iam_policy_document" "secretos" {
     }
   }
 
-  # 2. El runtime de la instancia NUNCA escribe ni borra, aunque una policy de
-  #    identidad lo concediera por error: el Deny explicito del bucket prevalece.
+  # 2. El runtime de la instancia NUNCA escribe ni borra, aunque su policy de
+  #    identidad lo concediera por error.
   statement {
     sid    = "DenegarEscrituraAlRuntime"
     effect = "Deny"
@@ -120,8 +120,42 @@ data "aws_iam_policy_document" "secretos" {
     }
   }
 
-  # 3. El publicador autorizado publica SOLO dentro del prefijo y solo con SSE-S3.
-  #    Su permiso efectivo requiere ademas la policy de identidad correspondiente.
+  # 3. Ser publicador NO concede lectura: se deniega explicitamente.
+  statement {
+    sid    = "DenegarLecturaAlPublicador"
+    effect = "Deny"
+
+    actions   = ["s3:GetObject", "s3:GetObjectVersion"]
+    resources = ["${aws_s3_bucket.secretos.arn}/${var.prefijo}*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [var.publicador_arn]
+    }
+  }
+
+  # 4. Publicar exige SSE-S3: sin el encabezado, la publicacion queda denegada
+  #    aunque una policy de identidad la permita.
+  statement {
+    sid    = "DenegarPublicacionSinSSE"
+    effect = "Deny"
+
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.secretos.arn}/${var.prefijo}*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [var.publicador_arn]
+    }
+
+    condition {
+      test     = "StringNotEquals"
+      variable = "s3:x-amz-server-side-encryption"
+      values   = ["AES256"]
+    }
+  }
+
+  # 5. El publicador autorizado publica SOLO dentro del prefijo y con SSE-S3.
   statement {
     sid    = "PermitirPublicacionAlPublicador"
     effect = "Allow"
@@ -138,6 +172,38 @@ data "aws_iam_policy_document" "secretos" {
       test     = "StringEquals"
       variable = "s3:x-amz-server-side-encryption"
       values   = ["AES256"]
+    }
+  }
+
+  # 6. Cualquier otra identidad (incluidas policies de identidad amplias de la
+  #    misma cuenta) queda denegada sobre los objetos protegidos. Se usa
+  #    aws:PrincipalArn en lugar de NotPrincipal. La recuperacion de la politica
+  #    del bucket se hace con la accion de plano de control s3:PutBucketPolicy,
+  #    que esta politica de objetos no concede ni exime: administrar el bucket no
+  #    da lectura de los secretos.
+  statement {
+    sid    = "DenegarAPrincipalsNoAutorizados"
+    effect = "Deny"
+
+    actions = [
+      "s3:GetObject",
+      "s3:GetObjectVersion",
+      "s3:PutObject",
+      "s3:PutObjectAcl",
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion",
+    ]
+    resources = ["${aws_s3_bucket.secretos.arn}/*"]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "StringNotEquals"
+      variable = "aws:PrincipalArn"
+      values   = [var.rol_runtime_arn, var.publicador_arn]
     }
   }
 }
@@ -171,6 +237,12 @@ resource "terraform_data" "secretos_preconditions" {
     precondition {
       condition     = can(regex("^arn:aws:iam::[0-9]{12}:(role|user)/.+$", var.publicador_arn))
       error_message = "publicador_arn debe ser un ARN de rol o usuario IAM valido: sin publicador no hay forma autorizada de publicar el bundle."
+    }
+
+
+    precondition {
+      condition     = var.rol_runtime_arn != var.publicador_arn
+      error_message = "El rol runtime y el publicador deben ser identidades distintas: el runtime no puede publicar."
     }
   }
 }

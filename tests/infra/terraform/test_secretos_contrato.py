@@ -40,6 +40,23 @@ def bloque_parser() -> str:
     return texto[inicio:fin]
 
 
+def _bloques(texto: str, etiqueta: str) -> list[str]:
+    """Devuelve el contenido de cada bloque `etiqueta { ... }` con anidamiento."""
+    resultado: list[str] = []
+    patron = re.compile(rf"\b{etiqueta}\s*\{{")
+    for coincidencia in patron.finditer(texto):
+        profundidad = 1
+        i = coincidencia.end()
+        while i < len(texto) and profundidad:
+            if texto[i] == "{":
+                profundidad += 1
+            elif texto[i] == "}":
+                profundidad -= 1
+            i += 1
+        resultado.append(texto[coincidencia.end() : i - 1])
+    return resultado
+
+
 class ModuloSecretos(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -72,54 +89,219 @@ class ModuloSecretos(unittest.TestCase):
         self.assertIn("noncurrent_days = var.retencion_version_dias", self.main)
         self.assertIn("abort_incomplete_multipart_upload", self.main)
 
-    def _sentencias(self) -> dict[str, str]:
-        """Devuelve el bloque de cada statement de la politica del bucket."""
-        resultado: dict[str, str] = {}
-        for bloque in re.findall(r"statement \{(.*?)\n  \}", self.main, re.DOTALL):
-            sid = re.search(r'sid += +"([A-Za-z]+)"', bloque)
-            if sid:
-                resultado[sid.group(1)] = bloque
-        return resultado
+    def _statements(self) -> list[dict]:
+        """Extrae las sentencias de la politica del bucket con sus campos."""
+        base = (
+            self.main.replace("${aws_s3_bucket.secretos.arn}", "arn:aws:s3:::bucket")
+            .replace("${var.prefijo}", "nexum/secrets/")
+            .replace("var.rol_runtime_arn", f'"{self.RUNTIME}"')
+            .replace("var.publicador_arn", f'"{self.PUBLICADOR}"')
+            .replace("var.admin_arn", f'"{self.ADMIN}"')
+        )
+        salida: list[dict] = []
+        for trozo in _bloques(base, "statement"):
+            efecto = re.search(r'effect += +"(Allow|Deny)"', trozo)
+            acciones = re.findall(r'"(s3:[A-Za-z*]+)"', trozo)
+            recursos = re.findall(r'"(arn:aws:s3:::[^"]+)"', trozo)
+            ids = re.search(r"identifiers = \[(.*?)\]", trozo, re.DOTALL)
+            principal = re.findall(r'"([^"]+)"', ids.group(1)) if ids else []
+            condiciones = []
+            for cond in _bloques(trozo, "condition"):
+                prueba = re.search(r'test += +"(\w+)"', cond)
+                variable = re.search(r'variable += +"([^"]+)"', cond)
+                extraido = re.search(r"values\s*=\s*(.+)", cond)
+                valores = None
+                if extraido:
+                    crudo = extraido.group(1)
+                    ini = crudo.find("[")
+                    fin = crudo.rfind("]")
+                    if ini >= 0 and fin > ini:
+                        valores = re.findall(r'"([^"]*)"', crudo[ini + 1 : fin])
+                if prueba and variable and valores:
+                    condiciones.append(
+                        (
+                            prueba.group(1),
+                            variable.group(1),
+                            list(valores),
+                        )
+                    )
+            if efecto:
+                salida.append(
+                    {
+                        "sid": (re.search(r'sid += +"(\w+)"', trozo) or [None, ""])[1],
+                        "effect": efecto.group(1),
+                        "actions": acciones,
+                        "resources": recursos,
+                        "principals": principal,
+                        "conditions": condiciones,
+                        "texto": trozo,
+                    }
+                )
+        return salida
 
-    def test_runtime_solo_lee_y_nunca_escribe(self) -> None:
-        sentencias = self._sentencias()
-        self.assertIn("DenegarEscrituraAlRuntime", sentencias)
-        bloque = sentencias["DenegarEscrituraAlRuntime"]
-        self.assertIn('effect = "Deny"', bloque)
-        for accion in ("s3:PutObject", "s3:PutObjectAcl", "s3:DeleteObject", "s3:DeleteObjectVersion"):
-            self.assertIn(accion, bloque, accion)
-        self.assertIn("identifiers = [var.rol_runtime_arn]", bloque)
-        self.assertNotIn("s3:GetObject", bloque)
+    def _decidir(
+        self,
+        principal: str,
+        accion: str,
+        recurso: str,
+        *,
+        tls: bool = True,
+        sse: str | None = "AES256",
+        identidad_permite: bool = True,
+    ) -> str:
+        sentencias = self._statements()
 
-    def test_publicador_no_queda_bloqueado_y_solo_publica_en_el_prefijo(self) -> None:
-        sentencias = self._sentencias()
-        self.assertIn("PermitirPublicacionAlPublicador", sentencias)
-        bloque = sentencias["PermitirPublicacionAlPublicador"]
-        self.assertIn('effect = "Allow"', bloque)
-        self.assertIn('actions   = ["s3:PutObject"]', bloque)
-        self.assertIn("identifiers = [var.publicador_arn]", bloque)
-        self.assertIn('"${aws_s3_bucket.secretos.arn}/${var.prefijo}*"', bloque)
-        # Ningun Deny puede alcanzar al publicador: solo el runtime tiene Deny nominado.
-        for sid, contenido in sentencias.items():
-            if 'effect = "Deny"' in contenido and sid != "DenegarSinTLS":
-                self.assertNotIn("publicador_arn", contenido, sid)
+        def coincide_accion(patrones: list[str]) -> bool:
+            return any(
+                p == "*" or p == accion or (p.endswith("*") and accion.startswith(p[:-1]))
+                for p in patrones
+            )
 
-    def test_publicador_exige_cifrado_al_escribir(self) -> None:
-        bloque = self._sentencias()["PermitirPublicacionAlPublicador"]
-        self.assertIn('variable = "s3:x-amz-server-side-encryption"', bloque)
-        self.assertIn('values   = ["AES256"]', bloque)
+        def coincide_recurso(patrones: list[str]) -> bool:
+            for p in patrones:
+                if p.endswith("*"):
+                    if recurso.startswith(p[:-1]):
+                        return True
+                elif p == recurso:
+                    return True
+            return False
 
-    def test_sin_tls_se_deniega_para_todos(self) -> None:
-        bloque = self._sentencias()["DenegarSinTLS"]
-        self.assertIn('variable = "aws:SecureTransport"', bloque)
-        self.assertIn('identifiers = ["*"]', bloque)
-        self.assertIn('values   = ["false"]', bloque)
+        def coincide_principal(ids: list[str]) -> bool:
+            if "*" in ids:
+                return True
+            return principal in ids
 
-    def test_sin_publicador_el_plan_falla_cerrado(self) -> None:
-        self.assertIn('variable "publicador_arn"', self.variables)
-        self.assertIn('default     = ""', self.variables)
+        def condiciones_aplican(condiciones: list[tuple[str, str, list[str]]]) -> bool:
+            for prueba, variable, valores in condiciones:
+                if variable == "aws:SecureTransport" and prueba == "Bool":
+                    if tls is True and "false" in valores:
+                        return False
+                elif variable == "aws:PrincipalArn" and prueba == "StringNotEquals":
+                    if principal in valores:
+                        return False
+                elif variable == "s3:x-amz-server-side-encryption":
+                    if prueba == "StringEquals" and sse not in valores:
+                        return False
+                    if prueba == "StringNotEquals" and sse in valores:
+                        return False
+                else:
+                    raise AssertionError(f"condicion no reconocida: {prueba} {variable}")
+            return True
+
+        for s in sentencias:
+            if s["effect"] != "Deny":
+                continue
+            if not coincide_accion(s["actions"]):
+                continue
+            if not coincide_recurso(s["resources"]):
+                continue
+            if not coincide_principal(s["principals"]):
+                continue
+            if condiciones_aplican(s["conditions"]):
+                return "DENY"
+
+        for s in sentencias:
+            if s["effect"] != "Allow":
+                continue
+            if (
+                coincide_accion(s["actions"])
+                and coincide_recurso(s["resources"])
+                and coincide_principal(s["principals"])
+                and condiciones_aplican(s["conditions"])
+            ):
+                return "ALLOW"
+
+        # Misma cuenta: sin Deny aplicable, decide la policy de identidad.
+        return "ALLOW" if identidad_permite else "DENY"
+
+    RUNTIME = "arn:aws:iam::111122223333:role/nexum-runtime"
+    PUBLICADOR = "arn:aws:iam::111122223333:role/nexum-publicador"
+    AJENO = "arn:aws:iam::111122223333:role/otra-app-amplia"
+    ADMIN = "arn:aws:iam::111122223333:role/nexum-recuperacion"
+    OBJETO = "arn:aws:s3:::bucket/nexum/secrets/v1/secrets.json"
+    FUERA = "arn:aws:s3:::bucket/otros/secrets.json"
+
+    def test_runtime_lee_el_bundle(self) -> None:
+        self.assertEqual(self._decidir(self.RUNTIME, "s3:GetObject", self.OBJETO), "ALLOW")
+
+    def test_runtime_no_escribe(self) -> None:
+        self.assertEqual(self._decidir(self.RUNTIME, "s3:PutObject", self.OBJETO), "DENY")
+
+    def test_runtime_no_borra(self) -> None:
+        self.assertEqual(self._decidir(self.RUNTIME, "s3:DeleteObject", self.OBJETO), "DENY")
+
+    def test_publicador_publica_con_sse(self) -> None:
+        self.assertEqual(self._decidir(self.PUBLICADOR, "s3:PutObject", self.OBJETO), "ALLOW")
+
+    def test_publicador_no_lee(self) -> None:
+        self.assertEqual(self._decidir(self.PUBLICADOR, "s3:GetObject", self.OBJETO), "DENY")
+
+    def test_publicador_fuera_del_prefijo(self) -> None:
+        # Fuera del prefijo no hay Allow del bucket y su identidad esta acotada.
+        self.assertEqual(
+            self._decidir(self.PUBLICADOR, "s3:PutObject", self.FUERA, identidad_permite=False),
+            "DENY",
+        )
+
+    def test_principal_ajeno_lee_denegado(self) -> None:
+        self.assertEqual(self._decidir(self.AJENO, "s3:GetObject", self.OBJETO), "DENY")
+
+    def test_principal_ajeno_escribe_denegado(self) -> None:
+        self.assertEqual(self._decidir(self.AJENO, "s3:PutObject", self.OBJETO), "DENY")
+
+    def test_principal_ajeno_borra_denegado(self) -> None:
+        self.assertEqual(self._decidir(self.AJENO, "s3:DeleteObject", self.OBJETO), "DENY")
+
+    def test_sin_tls_denegado_para_todos(self) -> None:
+        for principal in (self.RUNTIME, self.PUBLICADOR, self.AJENO):
+            self.assertEqual(
+                self._decidir(principal, "s3:GetObject", self.OBJETO, tls=False), "DENY", principal
+            )
+
+    def test_publicador_sin_sse_denegado(self) -> None:
+        self.assertEqual(
+            self._decidir(self.PUBLICADOR, "s3:PutObject", self.OBJETO, sse=None), "DENY"
+        )
+
+    def test_condiciones_usan_principalarn_y_no_notprincipal(self) -> None:
+        self.assertIn('variable = "aws:PrincipalArn"', self.main)
+        self.assertNotIn("not_principals", self.main)
+        self.assertNotIn("NotPrincipal", self.main)
+
+    def test_administracion_no_implica_lectura_de_secretos(self) -> None:
+        # La recuperacion usa s3:PutBucketPolicy (plano de control), que esta
+        # politica de objetos ni concede ni exime: no hay admin_arn exento.
+        self.assertNotIn("admin_arn", self.main)
+        self.assertNotIn("admin_arn", self.variables)
+        self.assertEqual(self._decidir(self.ADMIN, "s3:GetObject", self.OBJETO), "DENY")
+        self.assertEqual(self._decidir(self.ADMIN, "s3:DeleteObject", self.OBJETO), "DENY")
+
+    def test_principal_ajeno_denegado_tambien_fuera_del_prefijo(self) -> None:
+        self.assertEqual(self._decidir(self.AJENO, "s3:GetObject", self.FUERA), "DENY")
+
+    def test_la_politica_no_concede_listbucket(self) -> None:
+        # ListBucket es de plano de control/identidad: este modulo no lo concede
+        # ni lo deniega, y ninguna sentencia debe nombrarlo.
+        self.assertNotIn("ListBucket", self.main)
+
+    def test_condicion_no_reconocida_no_se_asume_verdadera(self) -> None:
+        sentencias = self._statements()
+        variables = {
+            cond[1] for s in sentencias for cond in s["conditions"]
+        }
+        reconocidas = {
+            "aws:SecureTransport",
+            "aws:PrincipalArn",
+            "s3:x-amz-server-side-encryption",
+        }
+        self.assertEqual(variables - reconocidas, set(), variables)
+
+    def test_runtime_y_publicador_no_pueden_coincidir(self) -> None:
+        self.assertIn("var.rol_runtime_arn != var.publicador_arn", self.main)
+
+    def test_publicador_ausente_falla_cerrado(self) -> None:
         self.assertIn("publicador_arn debe ser un ARN", self.main)
-        self.assertIn("(role|user)", self.main)
+        self.assertIn('default     = ""', self.variables)
 
     def test_preconditions_validan_prefijo_retencion_y_rol(self) -> None:
         self.assertIn('endswith(var.prefijo, "/")', self.main)
