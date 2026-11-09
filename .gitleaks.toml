@@ -39,17 +39,3 @@ paths = [
 ]
 regexTarget = "secret"
 regexes = ['''^BLOQUEADO_RFC004$''']
-
-# La baseline cita literalmente `Match`, `Secret` y `Fingerprint` de cada hallazgo
-# aceptado. Al reescribirse cambian sus numeros de linea y los fingerprints antiguos
-# dejan de suprimir sus propias citas (recursividad). La excepcion se declara DENTRO
-# de `generic-api-key`, con condition = "AND", ruta exacta anclada y regexTarget =
-# "line": solo casa una linea que sea **exactamente** uno de esos tres campos JSON.
-# No es una exclusion por ruta: una credencial real en ese archivo con otra forma
-# (por ejemplo una clave llamada api_key) sigue generando hallazgo.
-[[rules.allowlists]]
-description = "Campos citados por la baseline de falsos positivos (Match/Secret/Fingerprint en una sola linea JSON)"
-condition = "AND"
-paths = ['^\.gitleaks-baseline\.json$']
-regexTarget = "line"
-regexes = ['^\s*"(Match|Secret|Fingerprint)":\s*".*",?$']
