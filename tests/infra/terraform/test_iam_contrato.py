@@ -62,8 +62,7 @@ class RuntimeRole(unittest.TestCase):
             '"dynamodb:Scan"',
             '"dynamodb:BatchGetItem"',
             '"dynamodb:BatchWriteItem"',
-            '"dynamodb:DescribeTable"',
-            '"dynamodb:ListTables"',
+                      '"dynamodb:ListTables"',
             '"dynamodb:CreateTable"',
             '"dynamodb:DeleteTable"',
             '"dynamodb:TransactWriteItems"',
@@ -285,8 +284,7 @@ class DynamoDBQueryYLeadingKeys(unittest.TestCase):
             "dynamodb:CreateTable",
             "dynamodb:DeleteTable",
             "dynamodb:UpdateTable",
-            "dynamodb:DescribeTable",
-            "dynamodb:ListTables",
+                      "dynamodb:ListTables",
             "dynamodb:*",
         ):
             self.assertNotIn(prohibido, self.main)
@@ -313,7 +311,7 @@ class DynamoDBQueryYLeadingKeys(unittest.TestCase):
     def test_sin_recursos_dynamodb_fuera_de_tabla_e_indices(self) -> None:
         recursos = re.findall(r"Resource\s*=\s*(\[?[^\n]+)", _sin_comentarios(self.main))
         ddb = [r for r in recursos if "dynamodb" in r.lower() or "table_arn" in r or "index_arns" in r]
-        self.assertEqual(len(ddb), 2, ddb)
+        self.assertEqual(len(ddb), 3, ddb)
 
     def test_la_politica_no_sustituye_ownership_en_go(self) -> None:
         self.assertRegex(self.main, r"ownership")

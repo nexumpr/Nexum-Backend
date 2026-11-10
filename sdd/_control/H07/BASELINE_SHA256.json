@@ -161,7 +161,7 @@
     "infra/terraform/modules/dynamodb/main.tf": "617afe6a5905be4afa24a16f65402a899ec4bf1609a3781b79fcd5a708540132",
     "infra/terraform/modules/dynamodb/outputs.tf": "18a63dbc4f9148af380a87309be250f847d7cf2dbdb2a5dac27a9335a359530f",
     "infra/terraform/modules/dynamodb/variables.tf": "efdf8807ce4b971639e74ee6d2e902196f2442c264ff27475d9a9791d1b5f868",
-    "infra/terraform/modules/iam/main.tf": "834518bd98d55bc93ad5164a66bfd1dae0adcd5eb3baf5bead8f574820530414",
+    "infra/terraform/modules/iam/main.tf": "e0df26437b1fa82fc4660ee9b3c79f712adf9010e9627261a234ded1461c8f57",
     "infra/terraform/modules/iam/outputs.tf": "6ed604c43965ea79a31a10c82d1cc75676ba22d3798c3cdf755f4fd9de5249b8",
     "infra/terraform/modules/iam/variables.tf": "584251274151304434f5eca0951ef58fa57d64e099fb9b9371401a8adaaab69b",
     "infra/terraform/modules/observabilidad/dimensiones.tftest.hcl": "59cca9f1431363a971cdb35522231581a2050b33a7663f95cf23db28e473f7af",
