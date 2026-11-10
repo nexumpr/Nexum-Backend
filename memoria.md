@@ -777,3 +777,16 @@
 - Simulacion IAM **con** `aws:RequestedRegion=us-east-2`: VPC, EC2, ALB, DynamoDB, Redis, S3, KMS, SNS, WAF, ASG, LT, CloudFront VPC Origin e `iam:CreateRole/PassRole` = `allowed`. El `explicitDeny` anterior era un artefacto de simular sin contexto regional.
 - `iam:CreateOpenIDConnectProvider` = `explicitDeny` y `iam:ListOpenIDConnectProviders` = `AccessDenied` por SCP `p-ys0pa0u8`; `billing:GetCredits` = `AccessDenied` por SCP `p-y4aokimx`.
 - RFC-010 propone promocion **asistida** sin OIDC (CI sin credenciales + publicacion con sesion temporal + `instance_refresh`). Requiere `APRUEBO_CD_ASISTIDO_SIN_OIDC`.
+
+### Bootstrap Terraform: plan invalido corregido y Gate de apply preparado (2026-11-10)
+
+- **Base verificada:** `main` `2958136a824a0d25e91ad87c788dac51a96e2991` (PR #46 fusionado).
+- **El `bootstrap.tfplan` entregado NO era aplicable:** SHA-256 `036C05D0AD258E3614AA3274406639EB5777EECA2646232E4499D7E44DE495F5`, `applyable=false`, `complete=false`, `errored=true` y **1 de 8** recursos. Aplicarlo habria fallado o dejado infraestructura parcial.
+- **Causas reales reproducidas:** (1) `AWS_PROFILE=nexum-tf-bootstrap` apunta a un perfil que **no existe** en `~/.aws/config` (solo `nexum` y `nexum-login`); (2) el root `infra/terraform/bootstrap` **no declaraba `provider "aws"`** y Terraform aborta con *requires explicit configuration* (defecto que `terraform validate` no detecta); (3) `sufijo_cuenta` vacio y la precondition del bucket fallo.
+- **Puente de credenciales:** la sesion de `aws login` del perfil `nexum` **no la usa el provider de Terraform** (es cache exclusiva del CLI). Se uso un `credential_process` temporal en `%TEMP%` (fuera del repositorio, sin claves en disco ni en Git) que invoca `aws configure export-credentials --profile nexum --format process`.
+- **Correcciones:** bloque `provider "aws"` con `region = var.region` y `default_tags` sin credenciales; prueba de regresion `test_declara_proveedor_aws_explicito`; verificador `herramientas/verificar_plan_bootstrap.py` con 13 pruebas.
+- **Plan regenerado y verificado:** SHA-256 `57C195ADB49548B8490445D2A8222EB69A7599B19B10BD775B81E7DC1563874C` (7 746 bytes, 2026-11-10T17:00:10Z), `applyable=true`, `complete=true`, `errored=false`, **8 recursos** (7 S3 + 1 `terraform_data`), **8 create**, 0 update, 0 delete, 0 replace, 0 imports. Bucket `nexum-h08i-tfstate-713797602090`.
+- **Gate:** `sdd/_control/H08/GATE_H08I_BOOTSTRAP_APPLY.md` en estado **PREPARADO**. Frase requerida `APRUEBO_APPLY_BOOTSTRAP_SHA256_57C195AD…874C`. `terraform apply` sigue **denegado**; la excepcion literal minima (permissions ask + policies allow para `terraform apply bootstrap.tfplan`) queda descrita y **no** habilitada.
+- **Gobernanza reconciliada:** la regla `terraform show -json bootstrap.tfplan` usada para inspeccionar el plan se **retiro** de `opencode.json`, que vuelve a coincidir con `main`. Tanto esa lectura como el `apply` quedan en RFC-002 como **PROPUESTAS** (`APRUEBO_PERMISO_TERRAFORM_SHOW_PLAN` y el Gate del plan), sin habilitar.
+- **Coste:** S3 state 0.0690 USD/mes ya presupuestado en I-000 (no es coste nuevo); 45 dias ~0.1035 USD; sin KMS, DynamoDB de lock, NAT ni IPv4 publica. Coste real `NOT_VERIFIED`.
+- **Sin AWS:** ningun recurso creado, sin migracion de state, sin plan Free alterado. `AWS_NOT_RUN`.

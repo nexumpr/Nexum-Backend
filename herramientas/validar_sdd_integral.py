@@ -4,7 +4,10 @@ from pathlib import Path
 import argparse,csv,hashlib,json,re,subprocess,sys,runpy
 
 MANIFEST="sdd/_control/H07/BASELINE_SHA256.json"
-SKIP_PARTS={'.git','__pycache__','node_modules','.pytest_cache'}
+SKIP_PARTS={'.git','__pycache__','node_modules','.pytest_cache','.terraform'}
+# Artefactos locales excluidos por .gitignore: no son documentos ni código versionable.
+# El plan se conserva en disco para su Gate, pero nunca se publica.
+SKIP_SUFFIXES=('.tfplan',)
 
 def is_h08_code(rel_posix: str) -> bool:
     return rel_posix.startswith(('cmd/', 'internal/', 'pkg/', 'tests/')) or rel_posix in ('go.mod', 'go.sum')
@@ -12,7 +15,7 @@ def is_h08_code(rel_posix: str) -> bool:
 def sha256(data:bytes)->str:return hashlib.sha256(data).hexdigest()
 
 def paths_of(root:Path):
-    return {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and not (set(p.relative_to(root).parts)&SKIP_PARTS) and not is_h08_code(p.relative_to(root).as_posix())}
+    return {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and not (set(p.relative_to(root).parts)&SKIP_PARTS) and not p.name.endswith(SKIP_SUFFIXES) and not is_h08_code(p.relative_to(root).as_posix())}
 
 def validate(root:Path,check_git=False):
     root=root.resolve(); errors=[]

@@ -31,6 +31,25 @@ terraform {
   # humano y nunca se commitea. El state del runtime vivirá en el bucket creado aquí.
 }
 
+# El proveedor debe declararse explícitamente: sin bloque `provider`, Terraform
+# rechaza el plan con "requires explicit configuration" aunque existan
+# AWS_REGION/AWS_PROFILE. Las credenciales NO se escriben aquí (perfil/entorno).
+provider "aws" {
+  region = var.region
+
+  default_tags {
+    tags = merge(
+      {
+        Proyecto = "Nexum-Backend"
+        Spec     = "I-070-terraform"
+        Entorno  = var.entorno
+        Gestion  = "terraform"
+      },
+      var.etiquetas
+    )
+  }
+}
+
 locals {
   nombre_bucket = coalesce(var.bucket_state_nombre, "${var.proyecto}-${var.entorno}-tfstate-${var.sufijo_cuenta}")
 }
