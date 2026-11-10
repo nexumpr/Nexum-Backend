@@ -189,7 +189,29 @@ Las preconditions decodifican `data.aws_iam_policy_document.trust_operador.json`
 añadido en el bloque equivocado no pasa inadvertido. `terraform validate` no las evalúa: su
 verificación efectiva ocurre en el plan/apply real, que sigue `NOT_RUN`.
 
-### 11.4 Consecuencia sobre el plan
+### 11.4 Invariantes bloqueantes (corrección de cierre)
+
+Un bloque `check` de Terraform **sólo emite una advertencia**: no detiene el `apply`. Las cinco
+invariantes de `envs/h08i/checks.tf` (nombres de los tres roles y de los dos buckets) eran por
+tanto consultivas; si un nombre divergiera, las políticas S3 apuntarían a un recurso inexistente y
+el fallo aparecería tarde (o en runtime).
+
+Corrección mínima, sin ciclos:
+
+- se declaran `local.nombre_*` como única fuente de verdad y los `local.arn_*` se derivan de ellas
+  (el ARN es función determinista de cuenta y nombre);
+- `terraform_data.invariantes_identidades` añade **6 preconditions bloqueantes** que comparan
+  `module.identidades.nombres.*` y `module.*.bucket_name` con esos locales;
+- se comparan valores **conocidos en el plan** (`name` y `bucket` los fija la configuración) para
+  fallar antes de mutar, sin diferir la comprobación a un «conocido tras apply»;
+- el recurso es hoja: ningún módulo lo recibe, por lo que no hay ciclo (`terraform validate` lo
+  verifica);
+- el `check` se conserva como advertencia temprana sobre los ARN reales.
+
+Efecto en el plan: +1 recurso local (`terraform_data`), es decir 73 `create` en lugar de 72; no
+crea infraestructura ni tiene coste.
+
+### 11.5 Consecuencia sobre el plan
 
 El plan de §7 queda **STALE**. Debe regenerarse desde `main` tras el merge, con el mismo
 `tfvars` custodiado (contraseña Redis existente, sin generar otra) y `desplegar_aplicacion=false`,

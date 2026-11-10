@@ -169,6 +169,50 @@ def problemas_trust(cuerpo: str) -> list[str]:
     return problemas
 
 
+# --- Detector de invariantes bloqueantes (un `check` NO detiene el apply) ---
+
+NOMBRES_ESPERADOS = (
+    "module.identidades.nombres.artefactos_publicador",
+    "module.identidades.nombres.secretos_publicador",
+    "module.identidades.nombres.secretos_gestor_iac",
+    "module.artefactos.bucket_name",
+    "module.secretos.bucket_name",
+)
+
+
+def problemas_invariantes(texto: str) -> list[str]:
+    """Problemas del bloqueo de invariantes de `checks.tf`; ``[]`` = apto.
+
+    Un bloque `check` sólo emite una advertencia: **no** impide el `apply`. Las
+    invariantes que dejarían políticas S3 apuntando a otro recurso deben ser
+    `precondition` de un recurso y usar valores conocidos durante el plan, para
+    fallar antes de mutar nada.
+    """
+    limpio = _sin_comentarios(texto)
+    if 'resource "terraform_data"' not in limpio:
+        return ["sólo hay `check` (advertencia): ninguna invariante bloquea el apply"]
+    try:
+        cuerpo = bloque(limpio, 'resource "terraform_data" "invariantes_identidades"')
+    except AssertionError as ex:
+        return [f"no se encontró el recurso de invariantes: {ex}"]
+    guardas = bloques(cuerpo, "precondition")
+    if not guardas:
+        return ["el recurso de invariantes no declara preconditions"]
+    problemas: list[str] = []
+    unidas = "\n".join(guardas)
+    for esperado in NOMBRES_ESPERADOS:
+        if esperado not in unidas:
+            problemas.append(f"falta la invariante sobre {esperado}")
+    if re.search(
+        r"module\.identidades\.(artefactos_publicador_arn|secretos_publicador_arn|secretos_gestor_iac_arn)",
+        unidas,
+    ):
+        problemas.append("precondition sobre un ARN desconocido en el plan: se diferiría al apply")
+    if unidas.count("error_message") < len(guardas):
+        problemas.append("alguna precondition no declara error_message")
+    return problemas
+
+
 class Estructura(unittest.TestCase):
     def test_hay_ficheros_esperados(self) -> None:
         for nombre in ("main.tf", "variables.tf", "outputs.tf"):
@@ -513,6 +557,82 @@ class PoliticasDeLosRoles(unittest.TestCase):
         self.assertTrue((MODULOS / "artefactos").is_dir())
         self.assertTrue((MODULOS / "secretos").is_dir())
         self.assertNotIn('resource "aws_s3_bucket"', self.main)
+
+
+class InvariantesBloqueantes(unittest.TestCase):
+    """`check` sólo advierte; las invariantes críticas deben abortar el apply."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checks = _leer(ENV / "checks.tf")
+        cls.main = _leer(ENV / "main.tf")
+
+    def test_el_archivo_real_bloquea(self) -> None:
+        self.assertEqual(problemas_invariantes(self.checks), [])
+
+    def test_cinco_preconditions_y_cinco_asserts(self) -> None:
+        recurso = bloque(self.checks, 'resource "terraform_data" "invariantes_identidades"')
+        self.assertGreaterEqual(len(bloques(recurso, "precondition")), 5)
+        consultivo = bloque(self.checks, 'check "identidades_publicacion_coherentes"')
+        self.assertEqual(len(bloques(consultivo, "assert")), 5)
+
+    def test_preconditions_usan_valores_conocidos_en_el_plan(self) -> None:
+        recurso = bloque(self.checks, 'resource "terraform_data" "invariantes_identidades"')
+        self.assertNotRegex(recurso, r"\.arn\b")
+        self.assertIn("module.identidades.nombres.", recurso)
+        self.assertIn("module.artefactos.bucket_name", recurso)
+        self.assertIn("module.secretos.bucket_name", recurso)
+
+    def test_una_sola_fuente_de_verdad_para_el_arn(self) -> None:
+        for local in (
+            "nombre_artefactos_publicador",
+            "nombre_secretos_publicador",
+            "nombre_secretos_gestor_iac",
+        ):
+            self.assertRegex(self.main, rf"{local}\s*=\s*lower\(", local)
+            self.assertIn(f"role/${{local.{local}}}", self.main, local)
+
+    def test_el_recurso_de_invariantes_no_alimenta_ningun_modulo(self) -> None:
+        # Si un módulo lo recibiera habría ciclo; el recurso debe ser hoja.
+        self.assertNotIn("terraform_data.invariantes_identidades", self.main)
+
+    def test_rechaza_solo_check(self) -> None:
+        solo_check = 'check "x" {\n  assert {\n    condition = true\n    error_message = "x"\n  }\n}\n'
+        self.assertIn("ninguna invariante bloquea", " ".join(problemas_invariantes(solo_check)))
+
+    def test_rechaza_recurso_sin_preconditions(self) -> None:
+        roto = 'resource "terraform_data" "invariantes_identidades" {\n  input = "x"\n}\n'
+        self.assertIn("no declara preconditions", " ".join(problemas_invariantes(roto)))
+
+    def test_rechaza_invariante_faltante(self) -> None:
+        roto = (
+            'resource "terraform_data" "invariantes_identidades" {\n'
+            '  input = "x"\n'
+            "  lifecycle {\n"
+            "    precondition {\n"
+            "      condition     = module.identidades.nombres.artefactos_publicador == local.nombre_artefactos_publicador\n"
+            '      error_message = "x"\n'
+            "    }\n"
+            "  }\n"
+            "}\n"
+        )
+        problemas = " ".join(problemas_invariantes(roto))
+        self.assertIn("module.artefactos.bucket_name", problemas)
+        self.assertIn("module.secretos.bucket_name", problemas)
+
+    def test_rechaza_precondition_sobre_arn(self) -> None:
+        roto = (
+            'resource "terraform_data" "invariantes_identidades" {\n'
+            '  input = "x"\n'
+            "  lifecycle {\n"
+            "    precondition {\n"
+            "      condition     = module.identidades.artefactos_publicador_arn == local.arn_artefactos_publicador\n"
+            '      error_message = "x"\n'
+            "    }\n"
+            "  }\n"
+            "}\n"
+        )
+        self.assertIn("ARN desconocido", " ".join(problemas_invariantes(roto)))
 
 
 if __name__ == "__main__":

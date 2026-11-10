@@ -44,13 +44,21 @@ locals {
   bucket_artefactos_nombre = lower("nexum-${var.entorno}-artefactos-${local.cuenta_id}")
   bucket_secretos_nombre   = lower("nexum-${var.entorno}-secretos-${local.cuenta_id}")
 
+  # Nombres de rol esperados. Se declaran aparte porque `checks.tf` los compara
+  # con `module.identidades.nombres` en una **precondition bloqueante** (los
+  # `check` sólo advierten y no detienen el apply).
+  nombre_artefactos_publicador = lower("nexum-${var.entorno}-artefactos-publicador")
+  nombre_secretos_publicador   = lower("nexum-${var.entorno}-secretos-publicador")
+  nombre_secretos_gestor_iac   = lower("nexum-${var.entorno}-secretos-gestor-iac")
+
   # ARN derivados del ID de cuenta y del nombre de rol que crea el módulo
   # `identidades_publicacion`. No son valores inventados: son la forma canónica
-  # del ARN de un rol de IAM en esta cuenta. La raíz verifica con `check` que
-  # coinciden con los ARN reales una vez aplicados.
-  arn_artefactos_publicador = "arn:aws:iam::${local.cuenta_id}:role/nexum-${var.entorno}-artefactos-publicador"
-  arn_secretos_publicador   = "arn:aws:iam::${local.cuenta_id}:role/nexum-${var.entorno}-secretos-publicador"
-  arn_secretos_gestor_iac   = "arn:aws:iam::${local.cuenta_id}:role/nexum-${var.entorno}-secretos-gestor-iac"
+  # del ARN de un rol de IAM en esta cuenta. Al ser función determinista de
+  # (cuenta, nombre), la precondition sobre el nombre garantiza el ARN; el `check`
+  # sobre el ARN real añade la comprobación en el apply.
+  arn_artefactos_publicador = "arn:aws:iam::${local.cuenta_id}:role/${local.nombre_artefactos_publicador}"
+  arn_secretos_publicador   = "arn:aws:iam::${local.cuenta_id}:role/${local.nombre_secretos_publicador}"
+  arn_secretos_gestor_iac   = "arn:aws:iam::${local.cuenta_id}:role/${local.nombre_secretos_gestor_iac}"
 }
 
 module "red" {
