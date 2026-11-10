@@ -446,7 +446,107 @@
     },
     {
       "action": "shell",
-      "resource": "aws servicequotas get-service-quota*",
+      "resource": "aws service-quotas get-service-quota*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws service-quotas list-service-quotas*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-instances*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-vpcs*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-subnets*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-vpc-endpoints*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-security-groups*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling describe-auto-scaling-groups*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws elbv2 describe-load-balancers*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws elbv2 describe-target-groups*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws elasticache describe-cache-clusters*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws elasticache describe-replication-groups*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws dynamodb list-tables*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws dynamodb describe-table*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws s3api list-buckets*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws cloudfront list-distributions*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam list-open-id-connect-providers*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam get-open-id-connect-provider*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam get-role *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws organizations describe-organization*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws billing get-credits*",
       "effect": "ask"
     },
     {
