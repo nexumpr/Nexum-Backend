@@ -790,3 +790,13 @@
 - **Gobernanza reconciliada:** la regla `terraform show -json bootstrap.tfplan` usada para inspeccionar el plan se **retiro** de `opencode.json`, que vuelve a coincidir con `main`. Tanto esa lectura como el `apply` quedan en RFC-002 como **PROPUESTAS** (`APRUEBO_PERMISO_TERRAFORM_SHOW_PLAN` y el Gate del plan), sin habilitar.
 - **Coste:** S3 state 0.0690 USD/mes ya presupuestado en I-000 (no es coste nuevo); 45 dias ~0.1035 USD; sin KMS, DynamoDB de lock, NAT ni IPv4 publica. Coste real `NOT_VERIFIED`.
 - **Sin AWS:** ningun recurso creado, sin migracion de state, sin plan Free alterado. `AWS_NOT_RUN`.
+
+### H08-E / E001 — registro de usuario implementado en local (2026-11-10)
+
+- **Gate:** `sdd/_control/H08/GATE_H08E_E001.md` con `AUTHORIZED_E001_LOCAL` (instruccion humana de la sesion de implementacion). E002..E075 siguen `NOT_AUTHORIZED`; merge exige `APRUEBO_MERGE_PR_N_SHA_SHA40`.
+- **Rama:** `feat/h08e-e001-register-real`, commit `275f598`, integrada con `main` `bf5cf8d` mediante merge normal (sin force push). Worktree original `Nexum-Backend-E001` conservado; el repositorio es la fuente de verdad.
+- **Implementado:** `POST /api/v1/auth/register` con DTO estricto, `Idempotency-Key` obligatoria (replay estable / 409 con payload distinto), unicidad de email por `TransactWriteItems`, Argon2id, `emailVerified=false`, consentimiento y version de aviso, rate limit Redis fail-closed (503 sin Redis), errores 400/409/422/429/503 y logs sin PII.
+- **Sin mocks productivos:** `cmd/server` compone DynamoDB y Redis reales; el almacen en memoria vive en `tests/support`.
+- **Validacion local:** `go build ./...` y `go vet ./...` PASS. `go test ./...` **BLOCKED_POLICY_APPLICATION_CONTROL**: Control de aplicaciones de Windows bloquea los binarios de prueba recien compilados (`fork/exec ... An Application Control policy has blocked this file`); no se declara PASS. La validacion efectiva es el CI de Linux del PR.
+- **Sin AWS:** `AWS_NOT_RUN`, `HTTP_AWS_NOT_RUN`, `TWO_NODES_AWS_NOT_VERIFIED`. No se declara E001 publicado.
+- **E002 (login):** `NOT_AUTHORIZED`; requiere Gate propio y reutilizara DynamoDB, Argon2id y sesiones sin mocks.

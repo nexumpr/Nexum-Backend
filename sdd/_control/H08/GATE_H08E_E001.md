@@ -56,17 +56,26 @@ separada ligada a PR y SHA de 40 caracteres.
 
 ## 5. Entregables y criterio de cierre local
 
-| Comprobación | Estado esperado |
+| Comprobación | Estado real (2026-11-10) |
 |---|---|
-| `go build ./...` | PASS |
-| `go vet ./...` | PASS |
-| `go test ./... -count=1` | PASS |
-| `go test -race` en unitarios/seguridad/integración | PASS |
-| Pruebas de concurrencia e idempotencia | PASS local |
-| Pruebas de contrato E001/OpenAPI | PASS local |
-| `gofmt`, `staticcheck`, `gosec`, `govulncheck` | PASS en CI/local cuando aplique |
-| PR abierto con CI | Pendiente de esta ejecución |
-| Merge | **BLOQUEADO** hasta `APRUEBO_MERGE_PR_N_SHA_SHA40` |
+| `go build ./...` | **PASS** (worktree y checkout integrado) |
+| `go vet ./...` | **PASS** |
+| `go test ./... -count=1` | **BLOCKED_POLICY_APPLICATION_CONTROL** en local: los binarios de prueba recién compilados son bloqueados por Control de aplicaciones de Windows (`fork/exec ... An Application Control policy has blocked this file`). No se declara PASS. La validación efectiva es el CI de Linux del PR. |
+| `go test -race` | No ejecutado en local por el mismo bloqueo; CI lo ejecuta. |
+| Pruebas de concurrencia e idempotencia | Implementadas; ejecución pendiente de CI. |
+| Pruebas de contrato E001/OpenAPI | Implementadas; ejecución pendiente de CI. |
+| `gofmt`, `staticcheck`, `gosec`, `govulncheck` | Pendientes de CI. |
+| PR abierto con CI | Pendiente de esta ejecución. |
+| Merge | **BLOQUEADO** hasta `APRUEBO_MERGE_PR_N_SHA_SHA40`. |
 
 **No se declara** `IMPLEMENTED` hasta que el PR exista y CI esté verde; **no se declara**
-`AWS_VERIFIED` en ningún caso desde este worktree.
+`AWS_VERIFIED` en ningún caso desde este worktree. El bloqueo local se registra con su mensaje
+exacto y **no** se sustituye por una afirmación de PASS.
+
+## 6. Estado del worktree y trazabilidad
+
+- Worktree: `C:\Proyectos\Nexum\Nexum-Backend-E001`, rama `feat/h08e-e001-register-real`.
+- Base original `2958136`; integrado `main` `bf5cf8d` mediante merge normal (sin force push).
+- Commit de implementación: `275f598`.
+- El código vive en el repositorio; el worktree no es la fuente de verdad.
+
