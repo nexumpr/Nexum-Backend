@@ -81,10 +81,21 @@ class TerraformGateTests(unittest.TestCase):
             )
 
     def test_no_hay_allow_para_plan_apply_destroy(self) -> None:
+        # Excepcion unica autorizada (RFC-002, plan del bootstrap): cualquier otro
+        # allow sobre plan/apply/destroy/import/state sigue siendo un fallo.
+        permitido = "shell:terraform plan -input=false -out=bootstrap.tfplan"
         for recurso, efecto in self.politicas:
-            if efecto != "allow":
+            if efecto != "allow" or recurso == permitido:
                 continue
             self.assertNotRegex(recurso, r"terraform (plan|apply|destroy|import|state)")
+
+    def test_la_excepcion_de_plan_es_exactamente_la_autorizada(self) -> None:
+        allows = [
+            recurso
+            for recurso, efecto in self.politicas
+            if efecto == "allow" and "terraform plan" in recurso
+        ]
+        self.assertEqual(allows, ["shell:terraform plan -input=false -out=bootstrap.tfplan"])
 
     def test_aws_mutante_sigue_denegado(self) -> None:
         for recurso, efecto in self.permisos:
