@@ -13,7 +13,7 @@ class PrimerDespliegue(unittest.TestCase):
         self.assertIn('default     = false', VAR)
         for nombre in ("computo", "balanceo", "observabilidad"):
             bloque = TF.split(f'module "{nombre}" {{',1)[1].split('\n}',1)[0]
-            self.assertIn('count  = var.desplegar_aplicacion ? 1 : 0',bloque)
+            self.assertIn('count = var.desplegar_aplicacion ? 1 : 0',bloque)
     def test_dos_ec2_no_se_relajan(self):
         self.assertIn('condition     = var.asg_capacidad == 2', COMPUTO)
         self.assertIn('min_size            = var.asg_capacidad', COMPUTO)
