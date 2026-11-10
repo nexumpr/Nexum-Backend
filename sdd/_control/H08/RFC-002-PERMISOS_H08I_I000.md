@@ -90,3 +90,52 @@ acceso a secretos.
 
 Autoriza **planificar el bootstrap**. No autoriza aplicar, migrar el state ni tocar el
 entorno de aplicación. El `apply` sigue necesitando su Gate propio.
+
+## Solicitud — Lectura del plan del bootstrap (2026-11-10, NO HABILITADA)
+
+| Campo | Valor |
+|---|---|
+| Estado | **PROPUESTA — pendiente de frase humana; reglas NO aplicadas** |
+| Base | `main` `2958136a824a0d25e91ad87c788dac51a96e2991` |
+| Alcance | inspeccionar un `.tfplan` local ya generado; **no** ejecuta Terraform contra AWS |
+| Frase requerida | `APRUEBO_PERMISO_TERRAFORM_SHOW_PLAN` |
+
+### Motivo
+
+El plan entregado el 2026-11-10 era inválido (`applyable=false`, `errored=true`, 1 de 8
+recursos) y su contenido solo podía determinarse leyendo el artefacto. La verificación se
+realizó y quedó documentada en `GATE_H08I_BOOTSTRAP_APPLY.md`, pero **la regla de permiso no
+se deja activa**: se retiró de `opencode.json` para no conservar una autorización que no fue
+concedida por el responsable.
+
+### Reglas exactas a habilitar solo tras la frase
+
+- `permissions`: `terraform show -json bootstrap.tfplan` → **ask**.
+- `policies`: `shell:terraform show -json bootstrap.tfplan` → **allow**.
+
+`terraform show` sobre un fichero de plan es **solo lectura local**: no contacta AWS, no
+modifica el state y no aplica cambios.
+
+### Límite
+
+No autoriza `terraform apply`, `destroy`, `import`, `state`, `init` con backend real ni
+`plan -target/-destroy`. El `apply` del bootstrap exige su propio Gate y una excepción
+posterior, también literal.
+
+## Solicitud — Apply del plan exacto del bootstrap (2026-11-10, NO HABILITADA)
+
+| Campo | Valor |
+|---|---|
+| Estado | **PROPUESTA — pendiente del Gate del plan y de frase humana** |
+| Frase del Gate | `APRUEBO_APPLY_BOOTSTRAP_SHA256_57C195ADB49548B8490445D2A8222EB69A7599B19B10BD775B81E7DC1563874C` |
+| Artefacto | `infra/terraform/bootstrap/bootstrap.tfplan` |
+
+### Reglas exactas a habilitar solo después del Gate
+
+- `permissions`: `{"action": "shell", "resource": "terraform apply bootstrap.tfplan", "effect": "ask"}`
+- `policies`: `{"action": "tool.use", "resource": "shell:terraform apply bootstrap.tfplan", "effect": "allow"}`
+
+Sin ambas capas la orden se rechaza. No se habilita `apply -auto-approve`, ni `-target`, ni
+`destroy`, ni `init -migrate-state`.
+
+
