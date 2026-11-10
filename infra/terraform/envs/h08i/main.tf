@@ -62,7 +62,11 @@ output "interface_endpoint_permanente" {
   value = module.red.interface_endpoint_permanente
 }
 
+# Etapa inicial: no instanciar EC2 hasta publicar artefactos y verificar SHA.
+# El módulo I-020 conserva capacidad fija de DOS instancias cuando se habilita.
 module "computo" {
+  count = var.desplegar_aplicacion ? 1 : 0
+
   source = "../../modules/computo"
 
   proyecto      = "nexum"
@@ -83,24 +87,26 @@ module "computo" {
 }
 
 output "asg_name" {
-  value = module.computo.asg_name
+  value = var.desplegar_aplicacion ? module.computo[0].asg_name : null
 }
 
 output "capacidad_computo" {
-  value = module.computo.capacidad
+  value = var.desplegar_aplicacion ? module.computo[0].capacidad : null
 }
 
 output "cpu_credits" {
-  value = module.computo.cpu_credits
+  value = var.desplegar_aplicacion ? module.computo[0].cpu_credits : null
 }
 
 output "health_endpoints" {
-  value = module.computo.health_endpoints
+  value = var.desplegar_aplicacion ? module.computo[0].health_endpoints : null
 }
 
 # --- I-030: balanceo interno + publicación HTTPS por CloudFront (D2) -------
 
 module "balanceo" {
+  count = var.desplegar_aplicacion ? 1 : 0
+
   source = "../../modules/balanceo"
 
   proyecto = "nexum"
@@ -111,7 +117,7 @@ module "balanceo" {
   subnet_ids    = module.red.subredes_privadas
   sg_alb_id     = module.red.security_groups["alb"]
   sg_backend_id = module.red.security_groups["backend"]
-  asg_name      = module.computo.asg_name
+  asg_name      = module.computo[0].asg_name
 
   puerto_backend         = var.puerto_backend
   health_check_path      = var.health_check_path
@@ -120,19 +126,19 @@ module "balanceo" {
 
 output "balanceo" {
   description = "ALB interno, target group, VPC origin y dominio CloudFront"
-  value = {
-    alb_arn           = module.balanceo.alb_arn
-    alb_es_interno    = module.balanceo.alb_es_interno
-    target_group_arn  = module.balanceo.target_group_arn
-    listener          = module.balanceo.listener_http_privado
-    health_check      = module.balanceo.health_check
-    vpc_origin_id     = module.balanceo.vpc_origin_id
-    cloudfront_domain = module.balanceo.cloudfront_domain_name
-    cloudfront_id     = module.balanceo.cloudfront_distribution_id
-    certificado       = module.balanceo.cloudfront_certificado
-    sin_cache         = module.balanceo.sin_cache
-    estado_despliegue = module.balanceo.estado_despliegue
-  }
+  value = var.desplegar_aplicacion ? {
+    alb_arn           = module.balanceo[0].alb_arn
+    alb_es_interno    = module.balanceo[0].alb_es_interno
+    target_group_arn  = module.balanceo[0].target_group_arn
+    listener          = module.balanceo[0].listener_http_privado
+    health_check      = module.balanceo[0].health_check
+    vpc_origin_id     = module.balanceo[0].vpc_origin_id
+    cloudfront_domain = module.balanceo[0].cloudfront_domain_name
+    cloudfront_id     = module.balanceo[0].cloudfront_distribution_id
+    certificado       = module.balanceo[0].cloudfront_certificado
+    sin_cache         = module.balanceo[0].sin_cache
+    estado_despliegue = module.balanceo[0].estado_despliegue
+  } : null
 }
 
 # --- I-040: DynamoDB (tabla única A-060) -----------------------------------
@@ -282,14 +288,16 @@ output "redis" {
 # --- I-110: observabilidad, metricas, alarmas y FinOps -----------------------
 
 module "observabilidad" {
+  count = var.desplegar_aplicacion ? 1 : 0
+
   source = "../../modules/observabilidad"
 
   proyecto = "nexum"
   entorno  = var.entorno
   region   = var.region
 
-  alb_arn          = module.balanceo.alb_arn
-  target_group_arn = module.balanceo.target_group_arn
+  alb_arn          = module.balanceo[0].alb_arn
+  target_group_arn = module.balanceo[0].target_group_arn
 
   retencion_dias      = 7
   umbral_5xx          = 5
@@ -300,14 +308,14 @@ module "observabilidad" {
 
 output "observabilidad" {
   description = "Logs, metric filters, alarmas, presupuesto y dashboard (sin AWS aplicado)"
-  value = {
-    log_group         = module.observabilidad.log_group_backend
-    retencion_dias    = module.observabilidad.retencion_dias
-    namespace         = module.observabilidad.namespace_metricas
-    notificacion      = module.observabilidad.notificacion
-    alarmas           = module.observabilidad.alarmas
-    presupuesto       = module.observabilidad.presupuesto
-    dashboard         = module.observabilidad.dashboard
-    estado_despliegue = module.observabilidad.estado_despliegue
-  }
+  value = var.desplegar_aplicacion ? {
+    log_group         = module.observabilidad[0].log_group_backend
+    retencion_dias    = module.observabilidad[0].retencion_dias
+    namespace         = module.observabilidad[0].namespace_metricas
+    notificacion      = module.observabilidad[0].notificacion
+    alarmas           = module.observabilidad[0].alarmas
+    presupuesto       = module.observabilidad[0].presupuesto
+    dashboard         = module.observabilidad[0].dashboard
+    estado_despliegue = module.observabilidad[0].estado_despliegue
+  } : null
 }

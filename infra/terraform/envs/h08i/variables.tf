@@ -1,3 +1,12 @@
+# Permite preparar red, IAM, buckets, DynamoDB y Redis sin lanzar instancias
+# que aún carecen de binario, unidad systemd y bundle de configuración.
+# En producción se activa solo después de publicar y verificar los artefactos.
+variable "desplegar_aplicacion" {
+  description = "true: 2 EC2 + ALB + CloudFront + observabilidad; false: solo infraestructura base"
+  type        = bool
+  default     = false
+}
+
 variable "entorno" {
   description = "Entorno lógico"
   type        = string
