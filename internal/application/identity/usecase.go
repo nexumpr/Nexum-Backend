@@ -117,20 +117,21 @@ func (s *IdentityService) Authenticate(ctx context.Context, userID, rawPassword 
 	}
 
 	// 1. Validar contraseña con puerto hasher
-	storedHash, _ := item["PasswordHash"].(string)
+	storedHash := attrString(item, "passwordHash", "PasswordHash")
 	valid, err := s.hasher.VerifyPassword(rawPassword, storedHash)
 	if err != nil || !valid {
 		return nil, ports.ErrInvalidPassword
 	}
 
 	// 2. Reconstituir entidad para validar reglas de negocio (usuario no eliminado, etc.)
-	status := domain.UserStatus(item["Status"].(string))
-	createdTime, _ := time.Parse(time.RFC3339, item["CreatedAt"].(string))
-	updatedTime, _ := time.Parse(time.RFC3339, item["UpdatedAt"].(string))
+	// Se aceptan las claves canónicas en minúscula de E001 y las históricas en mayúscula.
+	status := domain.UserStatus(attrString(item, "status", "Status"))
+	createdTime := attrTime(item, "createdAt", "CreatedAt")
+	updatedTime := attrTime(item, "updatedAt", "UpdatedAt")
 
 	user, err := domain.ReconstituteUser(
-		item["ID"].(string),
-		item["Email"].(string),
+		attrString(item, "userId", "ID"),
+		attrString(item, "email", "Email"),
 		storedHash,
 		status,
 		createdTime,

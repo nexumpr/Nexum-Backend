@@ -140,7 +140,7 @@ class MatrizFisicaCoherente(unittest.TestCase):
         self.assertIn("GSI2PK=DUE#<yyyy-mm-dd>#<shard>", self.matriz)
         # El adaptador Go ya emite exactamente esos prefijos (A-060).
         keys = _leer(RAIZ / "internal" / "domain" / "dynamo" / "keys.go")
-        self.assertIn("TypePrefix      = \"#TYPE#\"", keys)
+        self.assertRegex(keys, r'TypePrefix\s*=\s*"#TYPE#"')
         self.assertIn("gsi1pk = fmt.Sprintf(\"%s%s%s%s\", PrefixUser, userID, TypePrefix", keys)
 
     def test_ttl_de_la_matriz_es_el_del_modulo(self) -> None:

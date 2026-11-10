@@ -316,7 +316,7 @@ class DynamoDBQueryYLeadingKeys(unittest.TestCase):
     def test_la_politica_no_sustituye_ownership_en_go(self) -> None:
         self.assertRegex(self.main, r"ownership")
         claves = _leer(RAIZ / "internal" / "domain" / "dynamo" / "keys.go")
-        self.assertIn('PrefixUser      = "USER#"', claves)
+        self.assertRegex(claves, r'PrefixUser\s*=\s*"USER#"')
 
     def test_gsi2_deshabilitado_no_amplia_la_politica(self) -> None:
         self.assertIn('default     = false', _leer(ENV / "variables.tf").split('variable "dynamodb_habilitar_gsi2"')[1].split("}")[0])
