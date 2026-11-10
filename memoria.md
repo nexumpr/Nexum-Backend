@@ -770,3 +770,10 @@
 - Motivo: el CI de `main` no completa los 12 jobs (causa `NO_VERIFIED`, compatible con cupo agotado) y la proteccion de ramas estaba `BLOQUEADO_PLAN_GITHUB`.
 - Evidencia de seguridad: Gitleaks sin baseline sobre 114 commits -> 8 falsos positivos y **cero credenciales reales**; nunca existio `.env`, `.pem`, `.key`, `tfstate`, `tfvars` ni `credentials` en el historial.
 - Riesgos aceptados: arquitectura AWS visible, emails de autor y 12 ramas publicas, PR de forks ejecutando codigo sin secretos disponibles.
+
+### Preflight AWS real y RFC-010 (2026-11-10)
+
+- CLI operativa en OpenCode tras PR #43. Cuota EC2 **16 vCPU**; `t4g.micro` en `us-east-2a/2b/2c`; sin instancias previas.
+- Simulacion IAM **con** `aws:RequestedRegion=us-east-2`: VPC, EC2, ALB, DynamoDB, Redis, S3, KMS, SNS, WAF, ASG, LT, CloudFront VPC Origin e `iam:CreateRole/PassRole` = `allowed`. El `explicitDeny` anterior era un artefacto de simular sin contexto regional.
+- `iam:CreateOpenIDConnectProvider` = `explicitDeny` y `iam:ListOpenIDConnectProviders` = `AccessDenied` por SCP `p-ys0pa0u8`; `billing:GetCredits` = `AccessDenied` por SCP `p-y4aokimx`.
+- RFC-010 propone promocion **asistida** sin OIDC (CI sin credenciales + publicacion con sesion temporal + `instance_refresh`). Requiere `APRUEBO_CD_ASISTIDO_SIN_OIDC`.
