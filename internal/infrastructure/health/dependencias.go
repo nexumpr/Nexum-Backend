@@ -76,10 +76,10 @@ func ClienteRedis(cfg Configuracion) (*redis.Client, error) {
 	// En produccion el modulo I-050 exige TLS y RBAC. Sin ambos, falla cerrado.
 	if strings.EqualFold(cfg.Entorno, "PRODUCTION") {
 		if !cfg.RedisTLS {
-			return nil, fmt.Errorf("REDIS_TLS debe ser true en PRODUCTION")
+			return nil, fmt.Errorf("redis requiere REDIS_TLS=true en PRODUCTION")
 		}
 		if cfg.RedisUsuario == "" || cfg.RedisPassword == "" {
-			return nil, fmt.Errorf("Redis exige usuario y contrasena RBAC en PRODUCTION")
+			return nil, fmt.Errorf("redis requiere usuario y contrasena RBAC en PRODUCTION")
 		}
 	}
 	opciones := &redis.Options{
