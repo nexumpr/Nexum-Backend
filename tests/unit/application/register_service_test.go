@@ -32,10 +32,12 @@ func newFixedService(store appIdentity.RegisterStore, hasher ports.PasswordHashe
 		WithIDGenerator(func() (string, error) { return id, nil })
 }
 
+const syntheticPhrase = "ExamplePassphrase#2026"
+
 func validCommand(key string) appIdentity.RegisterCommand {
 	return appIdentity.RegisterCommand{
 		Email:                "usuario@example.invalid",
-		Password:             "ExamplePassphrase#2026",
+		Password:             syntheticPhrase,
 		DisplayName:          "Usuario Ejemplo",
 		PrivacyNoticeVersion: "2026-11",
 		PrivacyAccepted:      true,
@@ -92,7 +94,7 @@ func TestRegisterServiceCreatesProfileAndHashesPassword(t *testing.T) {
 	if !ok {
 		t.Fatal("no se persistio el registro")
 	}
-	if record.PasswordHash == "ExamplePassphrase#2026" {
+	if record.PasswordHash == syntheticPhrase {
 		t.Fatal("la contrasena se persistio en claro")
 	}
 	if len(record.PasswordHash) < 20 || record.PasswordHash[:10] != "$argon2id$" {

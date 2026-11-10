@@ -68,7 +68,9 @@ func newHandlerFixture(t *testing.T) handlerFixture {
 	}
 }
 
-const validRegisterBody = `{"email":"usuario@example.invalid","password":"ExamplePassphrase#2026","displayName":"Usuario Ejemplo","privacyNoticeVersion":"2026-11","privacyAccepted":true}`
+const syntheticPhrase = "ExamplePassphrase#2026"
+
+const validRegisterBody = `{"email":"usuario@example.invalid","password":"` + syntheticPhrase + `","displayName":"Usuario Ejemplo","privacyNoticeVersion":"2026-11","privacyAccepted":true}`
 
 func registerRequest(body, key string) *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(body))
@@ -235,7 +237,7 @@ func TestRegisterHandlerPrivacyNotAccepted(t *testing.T) {
 
 func TestRegisterHandlerShortPassword(t *testing.T) {
 	f := newHandlerFixture(t)
-	body := strings.Replace(validRegisterBody, `"ExamplePassphrase#2026"`, `"corta"`, 1)
+	body := strings.Replace(validRegisterBody, `"`+syntheticPhrase+`"`, `"corta"`, 1)
 	rec := serveRegister(f, registerRequest(body, "0123456789abcdef"))
 
 	if rec.Code != http.StatusBadRequest {

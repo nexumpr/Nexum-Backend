@@ -78,7 +78,9 @@ func postRegister(client *http.Client, url, key, body string) httpResult {
 	return httpResult{status: resp.StatusCode, body: string(data)}
 }
 
-const integrationRegisterBody = `{"email":"dos-nodos@example.invalid","password":"ExamplePassphrase#2026","displayName":"Dos Nodos","privacyNoticeVersion":"2026-11","privacyAccepted":true}`
+const syntheticPhrase = "ExamplePassphrase#2026"
+
+const integrationRegisterBody = `{"email":"dos-nodos@example.invalid","password":"` + syntheticPhrase + `","displayName":"Dos Nodos","privacyNoticeVersion":"2026-11","privacyAccepted":true}`
 
 func TestRegisterHTTPTwoInstancesSameKeyReplay(t *testing.T) {
 	store := memorystore.NewRegistrationStore()

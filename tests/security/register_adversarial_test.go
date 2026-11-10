@@ -30,7 +30,9 @@ func (securityLimiter) Allow(context.Context, string, string) (bool, time.Durati
 	return true, 0, nil
 }
 
-const secureRegisterBody = `{"email":"seguridad@example.invalid","password":"ExamplePassphrase#2026","displayName":"Seguridad","privacyNoticeVersion":"2026-11","privacyAccepted":true}`
+const syntheticPhrase = "ExamplePassphrase#2026"
+
+const secureRegisterBody = `{"email":"seguridad@example.invalid","password":"` + syntheticPhrase + `","displayName":"Seguridad","privacyNoticeVersion":"2026-11","privacyAccepted":true}`
 
 func newSecurityHandler(t *testing.T, store appIdentity.RegisterStore, logger *slog.Logger) *internalhttp.RegisterHandler {
 	t.Helper()
@@ -66,7 +68,7 @@ func TestRegisterRejectsInjectionInEmail(t *testing.T) {
 func TestRegisterDoesNotEchoPassword(t *testing.T) {
 	store := memorystore.NewRegistrationStore()
 	handler := newSecurityHandler(t, store, slog.New(slog.NewJSONHandler(io.Discard, nil)))
-	body := strings.Replace(secureRegisterBody, "ExamplePassphrase#2026", "corta", 1)
+	body := strings.Replace(secureRegisterBody, syntheticPhrase, "corta", 1)
 
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, securityRequest(body, "0123456789abcdef"))
@@ -130,7 +132,7 @@ func TestRegisterLogsDoNotContainSecrets(t *testing.T) {
 	if strings.Contains(logText, "seguridad@example.invalid") {
 		t.Fatalf("el log contiene el correo: %s", logText)
 	}
-	if strings.Contains(logText, "ExamplePassphrase#2026") {
+	if strings.Contains(logText, syntheticPhrase) {
 		t.Fatalf("el log contiene la contrasena: %s", logText)
 	}
 	if strings.Contains(logText, "hashed:") {
