@@ -11,7 +11,11 @@ import (
 	"syscall"
 	"time"
 
+	dynamoAdapter "github.com/nexumpr/Nexum-Backend/internal/adapters/dynamo"
+	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
+	cacheinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/cache"
 	healthinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/health"
+	"github.com/nexumpr/Nexum-Backend/internal/infrastructure/security"
 	"github.com/nexumpr/Nexum-Backend/internal/system"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 	"github.com/nexumpr/Nexum-Backend/pkg/telemetry"
@@ -60,6 +64,24 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 		})
 		defer func() { _ = clienteRedis.Close() }()
 	}
+
+	// H08-E / E001: registro real. La persistencia y el rate limit son dependencias
+	// obligatorias; si faltan, el endpoint responde 503 (fail-closed). El almacen en
+	// memoria solo existe en pruebas y nunca se compone aquí.
+	var registrationStore *dynamoAdapter.RegistrationStore
+	if clienteDynamo != nil && cfgDeps.TablaDynamoDB != "" {
+		registrationStore = dynamoAdapter.NewRegistrationStore(clienteDynamo, cfgDeps.TablaDynamoDB)
+	} else {
+		registrationStore = dynamoAdapter.NewRegistrationStore(nil, "")
+	}
+	registerService := appIdentity.NewRegisterService(registrationStore, security.NewArgon2Hasher(nil))
+
+	var authRateLimiter nexumhttp.RegisterRateLimiter
+	if clienteRedis != nil {
+		authRateLimiter = cacheinfra.NewAuthRateLimiter(clienteRedis, 5, 15*time.Minute)
+	}
+	registerHandler := nexumhttp.NewRegisterHandler(registerService, authRateLimiter, logger)
+	router.HandleFunc(http.MethodPost, "/auth/register", registerHandler.ServeHTTP)
 
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 

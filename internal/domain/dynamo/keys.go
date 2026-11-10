@@ -10,16 +10,17 @@ import (
 
 // Constantes de prefijos canónicos de Single-Table Design (A-060 §2.2, §2.3).
 const (
-	PrefixUser      = "USER#"
-	PrefixEmail     = "EMAIL#"
-	PrefixProfile   = "PROFILE"
-	PrefixMovement  = "MOVEMENT#"
-	PrefixGoal      = "GOAL#"
-	PrefixRecurring = "RECURRING#"
-	PrefixBudget    = "BUDGET#"
-	PrefixSession   = "SESSION#"
-	PrefixOwner     = "OWNER"
-	TypePrefix      = "#TYPE#"
+	PrefixUser        = "USER#"
+	PrefixEmail       = "EMAIL#"
+	PrefixProfile     = "PROFILE"
+	PrefixMovement    = "MOVEMENT#"
+	PrefixGoal        = "GOAL#"
+	PrefixRecurring   = "RECURRING#"
+	PrefixBudget      = "BUDGET#"
+	PrefixSession     = "SESSION#"
+	PrefixIdempotency = "IDEM#"
+	PrefixOwner       = "OWNER"
+	TypePrefix        = "#TYPE#"
 )
 
 // UserKeys genera PK y SK para el perfil del usuario.
@@ -69,4 +70,13 @@ func BudgetKeys(userID, period, category string) (pk, sk string) {
 // SessionKeys genera PK y SK para una sesión persistida por hash de token.
 func SessionKeys(tokenHash string) (pk, sk string) {
 	return PrefixSession + tokenHash, "METADATA"
+}
+
+// IdempotencyKeys genera PK y SK para un registro de idempotencia. La clave incluye
+// la operación y la Idempotency-Key original, pero solo se persiste su SHA-256 para
+// no almacenar el valor crudo del cliente (A-040 §2.5, A-070 §2.7).
+func IdempotencyKeys(operation, idempotencyKey string) (pk, sk string) {
+	normalized := strings.TrimSpace(operation) + ":" + strings.TrimSpace(idempotencyKey)
+	hash := sha256.Sum256([]byte(normalized))
+	return PrefixIdempotency + hex.EncodeToString(hash[:]), "RECORD"
 }

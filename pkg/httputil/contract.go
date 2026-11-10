@@ -12,9 +12,10 @@ import (
 )
 
 // ErrorDetail representa un detalle específico dentro del envelope de error (A-040 §2.4).
+// Los nombres `field` y `reason` coinciden con `ApiErrorDetail` del OpenAPI 3.1.
 type ErrorDetail struct {
-	Field string `json:"field,omitempty"`
-	Issue string `json:"issue"`
+	Field  string `json:"field"`
+	Reason string `json:"reason"`
 }
 
 // ErrorPayload representa la carga útil estructurada de error.
