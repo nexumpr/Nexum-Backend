@@ -609,6 +609,7 @@
       "resource": "terraform plan*",
       "effect": "deny"
     },
+    {"action": "shell", "resource": "terraform plan -input=false -out=bootstrap.tfplan", "effect": "ask"},
     {
       "action": "shell",
       "resource": "terraform init -backend=false",
@@ -886,6 +887,7 @@
       "resource": "shell:terraform plan*",
       "effect": "deny"
     },
+    {"action": "tool.use", "resource": "shell:terraform plan -input=false -out=bootstrap.tfplan", "effect": "allow"},
     {
       "action": "tool.use",
       "resource": "shell:docker *",

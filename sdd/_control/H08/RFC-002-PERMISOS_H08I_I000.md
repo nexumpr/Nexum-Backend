@@ -60,3 +60,33 @@ cambios, igual que las denegaciones de edición de specs, `.env`, tfstate, tfvar
 Una autorización de lectura **no** concede escritura: toda operación mutante sigue
 denegada y requiere su Gate propio (bootstrap, plan, apply). El Gate FinOps sigue siendo
 independiente de estos permisos de herramienta.
+
+## Enmienda — Plan local del bootstrap (2026-11-10)
+
+| Campo | Valor |
+|---|---|
+| Autorización | `APRUEBO_GATE_OPENCODE_TERRAFORM_PLAN_LOCAL` |
+| Base | `main` `6e03c8e4b1f05bef1b76b7f8dcdd521ae3042ece` |
+| Alcance | una única excepción de plan para el bootstrap |
+
+### Defecto corregido
+
+El bloqueo era doble: `deny` en `permissions` (`terraform plan*`) y `deny` en `policies`
+(`shell:terraform plan*`). OpenCode v2.2.5 evalúa ambas capas, de modo que levantar solo una
+no habría permitido planificar. Además, `policies` solo admite `allow`/`deny`: un `ask` en
+esa capa sería inerte.
+
+### Reglas añadidas
+
+- `permissions`: `terraform plan -input=false -out=bootstrap.tfplan` → **ask**.
+- `policies`: `shell:terraform plan -input=false -out=bootstrap.tfplan` → **allow**.
+
+El recurso es el **comando literal completo**, no `terraform plan*`. Quedan denegados
+`plan -destroy`, `plan -target`, `apply`, `destroy`, `import`, `state`, `init -backend=true`,
+`init -migrate-state` e `init -reconfigure`, además de todo el AWS mutante, Git destructivo y
+acceso a secretos.
+
+### Límite
+
+Autoriza **planificar el bootstrap**. No autoriza aplicar, migrar el state ni tocar el
+entorno de aplicación. El `apply` sigue necesitando su Gate propio.
