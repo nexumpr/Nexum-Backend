@@ -122,8 +122,8 @@ class DashboardYCableado(unittest.TestCase):
     def test_cableado_en_entorno(self) -> None:
         self.assertIn('module "observabilidad"', self.env)
         self.assertIn('source = "../../modules/observabilidad"', self.env)
-        self.assertIn("alb_arn          = module.balanceo.alb_arn", self.env)
-        self.assertIn("target_group_arn = module.balanceo.target_group_arn", self.env)
+        self.assertIn("alb_arn          = module.balanceo[0].alb_arn", self.env)
+        self.assertIn("target_group_arn = module.balanceo[0].target_group_arn", self.env)
         self.assertIn('output "observabilidad"', self.env)
 
     def test_estado_no_aplicado(self) -> None:

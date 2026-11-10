@@ -209,7 +209,7 @@ class IntegracionI030(unittest.TestCase):
 
     def test_env_compone_modulo_computo(self) -> None:
         self.assertIn('module "computo"', self.env)
-        self.assertIn("module.computo.asg_name", self.env)
+        self.assertIn("module.computo[0].asg_name", self.env)
 
 
 if __name__ == "__main__":

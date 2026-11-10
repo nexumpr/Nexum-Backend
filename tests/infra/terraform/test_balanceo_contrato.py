@@ -338,7 +338,7 @@ class ComposicionDelEntorno(unittest.TestCase):
         self.assertIn('module "balanceo"', self.env)
         self.assertIn('source = "../../modules/balanceo"', self.env)
         self.assertIn("subnet_ids    = module.red.subredes_privadas", self.env)
-        self.assertIn("asg_name      = module.computo.asg_name", self.env)
+        self.assertIn("asg_name      = module.computo[0].asg_name", self.env)
         self.assertIn("vpc_id   = module.red.vpc_id", self.env)
 
     def test_provider_soporta_vpc_origin(self) -> None:
