@@ -17,7 +17,7 @@
 | H08-I / I-040 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #24 MERGED (merge `51e01f6eae37d548b3b790a967859ff314ed6bc7`); tabla única `NEXUM_CORE_<ENV>`, GSI1, TTL `expiresAt`, SSE, PITR y matriz de accesos validados; GSI2 opt-in; AWS NOT_RUN |
 | H08-I / I-050 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #25 MERGED (merge `8c314015dcd065f9188bde239be26ddf76cfc1c1`); ElastiCache Redis OSS `cache.t4g.micro` 1 nodo, TLS + RBAC con `default` deshabilitado, ACL `@transaction`, subnet group privado, sin backups; AWS NOT_RUN; secreto RBAC bloqueado por RFC-004/state |
 | H08-I / I-060 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #26 MERGED (merge `c8e37a78efaa1c9ddc0e412b2b96d465eec4911b`); rol/instance profile runtime con DynamoDB exacto (Query en tabla e índices, LeadingKeys + Null:false); roles OIDC trust-only condicionales; `AWS_SCP_NOT_VERIFIED`; secretos `BLOCKED_RFC004` |
-| H08-I / I-070 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #27 MERGED (merge `21eb9cb540e4d4a39a0851a2c3f730fd78a0846f`); raíz `bootstrap` con state S3 versionado/SSE-S3/privado y locking nativo `use_lockfile` (sin tabla DynamoDB); backend remoto y `apply` NO ejecutados; AWS NOT_RUN |
+| H08-I / I-070 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #27 MERGED (merge `21eb9cb540e4d4a39a0851a2c3f730fd78a0846f`); raíz `bootstrap` con state S3 versionado/SSE-S3/privado y locking nativo `use_lockfile` (sin tabla DynamoDB); backend remoto y `apply` NO ejecutados; AWS NOT_RUN. **2026-11-10:** Gate de aplicación `GATE_H08I_BOOTSTRAP_APPLY.md` **PREPARADO** sobre plan válido SHA-256 `57C195AD…874C` (8 recursos, 0 destrucciones, 0 imports), pendiente de frase humana; el plan previo `036C05D0…95F5` era inválido (`errored`, 1 de 8) y se corrigió la ausencia de `provider "aws"` |
 | H08-I / I-080 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #28 MERGED (merge `4262972e5d423a01ba8be89642fa423e6a764003`); CI de seis jobs con Trivy real, cobertura 92.0 %, OpenAPI, SBOM y `validar`; RFC-006 aprobada (WAF temporal hasta 2026-12-02); branch protection `BLOQUEADO_PLAN_GITHUB`; AWS NOT_RUN; **RFC-008** moderniza el grafo a 12 jobs (deteccion, Semgrep, integracion, Quality Gate, Hardening Report, CI Success); `cd-backend.yml` intacto; `MUTATION = BLOCKED_TECNICO_MUTACION`; `AWS_NOT_RUN`; **PR #36 MERGED** (merge `a441a0cada5c22fc3bdf9c094c7d11bc8aa2540c`) — grafo RFC-008 de 12 jobs integrado, 13/13 checks; defecto D-01 de deteccion en commits de merge corregido; `AWS_NOT_RUN`; **PR #37 MERGED** (merge `2ebc9f2398ad344fa826ed0cf88fe07b4710fedc`) — D-01 verificado de extremo a extremo: run post-merge `42650883409` con **12/12 jobs** en `success` y cero omisiones; `AWS_NOT_RUN` |
 | H08-I / I-090 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #29 MERGED (merge `a67ea4b929e3ca5a9fe246f68f852931e516eb5d`); CD manual con entorno, autorización por SHA, artefacto verificado, S3 inmutable, refresh con estado terminal y rollback seguro; `ARTIFACT_DELIVERY` bloqueado por I-060/I-020; 0 ejecuciones CD; AWS NOT_RUN |
 | H08-I / I-100 | **INTEGRADO_MAIN — NO DESPLEGADO** | PR #30 MERGED (merge `6542e724e0b203d8074f41b5abaad739a9b09feb`); threat model, escáner IaC por bloques, pruebas adversariales y DAST bloqueado sin Gate; `D-100-01`/`D-100-02` (A-030/A-080) abiertos; AWS NOT_RUN |
@@ -43,3 +43,16 @@ VPC Origin → ALB interno HTTP:80 → 2 instancias Go. **No** autoriza Terrafor
 
 **Integración (2026-11-07):** el diseño D2 se implementó y fusionó en `main` con el PR **#22** (merge
 `cc19a77b14d73f4a146baa899a2febe677c267fa`). Sigue **sin** desplegarse: `AWS_NOT_RUN`.
+
+## Preparación del apply del bootstrap (10-nov-2026)
+
+- `main` verificado en `2958136a824a0d25e91ad87c788dac51a96e2991`. El `bootstrap.tfplan` entregado
+  (SHA-256 `036C05D0…95F5`) era **inválido**: `applyable=false`, `errored=true`, 1 de 8 recursos, por
+  perfil AWS inexistente, ausencia de `provider "aws"` y `sufijo_cuenta` vacío.
+- Corregido el root `bootstrap` (bloque `provider`), añadida prueba de regresión y verificador
+  `herramientas/verificar_plan_bootstrap.py`. Plan regenerado y verificado: **8 recursos, 0
+  destrucciones, 0 imports**, SHA-256 `57C195ADB49548B8490445D2A8222EB69A7599B19B10BD775B81E7DC1563874C`.
+- Gate `sdd/_control/H08/GATE_H08I_BOOTSTRAP_APPLY.md` **PREPARADO**, pendiente de la frase humana
+  `APRUEBO_APPLY_BOOTSTRAP_SHA256_57C195AD…874C`. `terraform apply` sigue **denegado** en
+  `opencode.json`; la excepción mínima está descrita en el Gate y en RFC-002.
+- Sin recursos AWS creados (`AWS_NOT_RUN`), sin migración de state y sin cambios de plan Free.

@@ -260,6 +260,16 @@ class CondicionesDeSeguridad(unittest.TestCase):
     def test_region_fija(self) -> None:
         self.assertIn('var.region == "us-east-2"', self.main)
 
+    def test_declara_proveedor_aws_explicito(self) -> None:
+        # Sin bloque `provider`, Terraform rechaza el plan con
+        # "requires explicit configuration" aunque existan AWS_REGION/AWS_PROFILE.
+        self.assertRegex(self.main, r'(?m)^provider\s+"aws"\s*\{')
+        self.assertIn("region = var.region", self.main)
+        # El proveedor no puede llevar credenciales embebidas.
+        bloque = self.main.split('provider "aws"', 1)[1].split("}", 1)[0]
+        for prohibido in ("access_key", "secret_key", "token"):
+            self.assertNotIn(prohibido, bloque)
+
     def test_no_crea_recursos_de_otras_specs(self) -> None:
         tipos = {t for t, _ in recursos(self.main)}
         for prohibido in (
