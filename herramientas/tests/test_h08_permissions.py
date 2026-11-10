@@ -33,9 +33,11 @@ class PermisosH08I(unittest.TestCase):
   self.assertEqual(self.eff('shell','go test ./...'),'allow')
   self.assertEqual(self.eff('shell','git status -sb'),'allow')
  def test_cloud_deny_readonly_ask(self):
-  for cmd in ['aws ec2 run-instances --x','aws ec2 create-vpc --x','aws budgets create-budget --x','terraform apply -auto-approve','terraform init -backend=true','terraform plan','terraform destroy','git push origin main','git reset --hard HEAD','docker build .']:
+  for cmd in ['aws ec2 run-instances --x','aws ec2 create-vpc --x','aws budgets create-budget --x','terraform apply -auto-approve','terraform destroy','terraform import aws_s3_bucket.x y','terraform state list','git push origin main','git reset --hard HEAD','docker build .']:
    self.assertEqual(self.eff('shell',cmd),'deny',cmd)
-  for cmd in ['aws sts get-caller-identity --profile nexum','aws freetier get-account-plan-state --region us-east-2','aws pricing get-products --service-code AmazonEC2','terraform fmt -check']:
+  # RFC-011: `plan` e `init -backend=true` pasaron de DENY a ASK con aprobacion humana
+  # por ejecucion; `show` se añadio tambien en ASK. Ninguno autoriza mutacion.
+  for cmd in ['aws sts get-caller-identity --profile nexum','aws freetier get-account-plan-state --region us-east-2','aws pricing get-products --service-code AmazonEC2','terraform fmt -check','terraform plan -input=false -var-file x.tfvars -out y.tfplan','terraform init -backend=true','terraform show -json fase-base.tfplan']:
    self.assertEqual(self.eff('shell',cmd),'ask',cmd)
  def test_specialists_and_skills(self):
   for sub in ['finops-guardian','aws-terraform-engineer','qa-evidence-verifier']:
@@ -66,36 +68,54 @@ class TerraformGateTests(unittest.TestCase):
     def test_init_local_sin_backend_permitido(self) -> None:
         self.assertIn(("shell:terraform init -backend=false*", "allow"), self.politicas)
 
-    def test_init_con_backend_remoto_denegado(self) -> None:
-        self.assertIn(("shell:terraform init -backend=true*", "deny"), self.politicas)
+    def test_init_con_backend_remoto_es_ask(self) -> None:
+        # RFC-011: leer el state remoto para planificar exige aprobacion humana por
+        # ejecucion; ya no es DENY, pero nunca queda sin control (`ask`).
+        self.assertIn(("terraform init -backend=true*", "ask"), self.permisos)
+        self.assertIn(("shell:terraform init -backend=true*", "allow"), self.politicas)
 
     def test_init_migracion_y_reconfigure_denegados(self) -> None:
         self.assertIn(("shell:terraform init -migrate-state*", "deny"), self.politicas)
         self.assertIn(("shell:terraform init -reconfigure*", "deny"), self.politicas)
 
     def test_operaciones_mutantes_denegadas(self) -> None:
-        for verbo in ("plan", "apply", "destroy", "import", "state"):
+        for verbo in ("apply", "destroy", "import", "state"):
             self.assertTrue(
                 any(r == f"shell:terraform {verbo}*" and e == "deny" for r, e in self.politicas),
                 verbo,
             )
 
-    def test_no_hay_allow_para_plan_apply_destroy(self) -> None:
-        # Excepcion unica autorizada (RFC-002, plan del bootstrap): cualquier otro
-        # allow sobre plan/apply/destroy/import/state sigue siendo un fallo.
-        permitido = "shell:terraform plan -input=false -out=bootstrap.tfplan"
-        for recurso, efecto in self.politicas:
-            if efecto != "allow" or recurso == permitido:
-                continue
-            self.assertNotRegex(recurso, r"terraform (plan|apply|destroy|import|state)")
+    def test_plan_y_show_son_ask(self) -> None:
+        self.assertIn(("terraform plan*", "ask"), self.permisos)
+        self.assertIn(("terraform show*", "ask"), self.permisos)
+        self.assertIn(("shell:terraform plan*", "allow"), self.politicas)
+        self.assertIn(("shell:terraform show*", "allow"), self.politicas)
 
-    def test_la_excepcion_de_plan_es_exactamente_la_autorizada(self) -> None:
-        allows = [
+    def test_no_hay_allow_de_politica_para_apply_destroy_import_state(self) -> None:
+        # `plan` y `show` son de solo lectura y RFC-011 los autoriza; apply, destroy,
+        # import y state siguen sin ninguna entrada `allow`.
+        for recurso, efecto in self.politicas:
+            if efecto != "allow":
+                continue
+            self.assertNotRegex(recurso, r"terraform (apply|destroy|import|state)")
+
+    def test_permisos_de_apply_destroy_import_state_son_deny(self) -> None:
+        for verbo in ("apply", "destroy", "import", "state"):
+            self.assertIn((f"terraform {verbo}*", "deny"), self.permisos, verbo)
+
+    def test_los_allow_de_plan_son_exactamente_los_autorizados(self) -> None:
+        allows = sorted(
             recurso
             for recurso, efecto in self.politicas
             if efecto == "allow" and "terraform plan" in recurso
-        ]
-        self.assertEqual(allows, ["shell:terraform plan -input=false -out=bootstrap.tfplan"])
+        )
+        self.assertEqual(
+            allows,
+            [
+                "shell:terraform plan -input=false -out=bootstrap.tfplan",
+                "shell:terraform plan*",
+            ],
+        )
 
     def test_aws_mutante_sigue_denegado(self) -> None:
         for recurso, efecto in self.permisos:
