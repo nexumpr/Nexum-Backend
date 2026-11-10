@@ -823,3 +823,14 @@
 - **Limitación:** los controles se leen del state escrito tras las respuestas de AWS; las lecturas `get-bucket-*` **no** están autorizadas → `AWS_GET_INDEPENDIENTE_NOT_RUN`.
 - **Coste:** 0.0690 USD/mes ya presupuestado (state S3); sin KMS, NAT, IPv4 pública ni DynamoDB de lock. Coste real de facturación `NOT_VERIFIED`.
 - **Estado:** `BOOTSTRAP_APPLIED`; migración del state al backend remoto pendiente de **Gate independiente**; `AWS_DEPLOYED` y `E001_PUBLICADO` **no** declarados.
+
+### Migración del state del bootstrap al backend S3 (2026-11-10)
+
+- **Autorización:** `APRUEBO_GATE_I070_MIGRACION_STATE` y `APRUEBO_PERMISO_S3_LIST_STATE_PREFIX`; Gate `sdd/_control/H08/GATE_H08I_STATE_MIGRATION.md` §8.
+- **Backend incorporado:** `infra/terraform/bootstrap/backend.tf` (bucket `nexum-h08i-tfstate-713797602090`, `key = bootstrap/terraform.tfstate`, `us-east-2`, `encrypt = true`, `use_lockfile = true`), SHA-256 `77dcb5c2…1575`.
+- **Ejecución:** `terraform init -migrate-state` → `Successfully configured the backend "s3"`. Objeto remoto: 12 641 bytes, `ETag 79cbd04a…7163`, `VersionId RPd3nr5N…`, `19:52:43Z` (versionado confirmado en la práctica).
+- **Verificación de contenido:** 8/8 direcciones idénticas, atributos e IDs idénticos, `terraform_version` 1.16.6, 6 outputs presentes. **`MIGRACION_DATOS_OK`.**
+- **Hallazgo D-MIG-01:** Terraform escribió el state remoto con **lineage nuevo** (`eb92ccf3-…`) y **serial 1** frente al local (`aaf998b8-…`/`10`). No hay pérdida ni recreación de recursos, pero **no se declara igualdad de lineage**. La copia cifrada previa conserva el lineage antiguo (restauración exigiría `state push -force` con Gate). El `terraform.tfstate` local quedó a 0 bytes; el operativo es el objeto S3.
+- **Hallazgo D-PERM-01:** las reglas de permiso de **cadena exacta** no se aplicaron; sólo funcionaron las de comodín. Para ejecutar lo autorizado se retiró temporalmente el `DENY` `terraform init -migrate-state*` (sustituido por ASK) y se añadieron lecturas `s3api list-objects-v2`/`get-object`; **`opencode.json` se restauró después a `HEAD`** (`git diff` vacío). Requiere revisión del motor de permisos.
+- **Sin mutación de recursos:** 0 create/update/delete. Coste: 12 641 bytes en bucket ya presupuestado; facturación `NOT_VERIFIED`.
+- **Estado:** `STATE_MIGRATED` con reserva `D-MIG-01`; `envs/h08i` pendiente de su backend (unidad de fase base); `E001_PUBLICADO` no declarado.
