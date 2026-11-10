@@ -135,10 +135,22 @@ locals {
     }
   ] : []
 
+  # I-060: readiness verifica la tabla con DescribeTable. Es una accion de plano de
+  # control: NO lleva la condicion dynamodb:LeadingKeys (que aplica a operaciones de
+  # datos) y su recurso es el ARN exacto de la tabla, nunca "*". No concede ListTables,
+  # Scan, escritura ni administracion.
+  ddb_statement_describe = [{
+    Sid      = "DescribeTablaParaReadiness"
+    Effect   = "Allow"
+    Action   = ["dynamodb:DescribeTable"]
+    Resource = var.dynamodb_table_arn
+  }]
+
   runtime_policy = {
     Version = "2012-10-17"
     Statement = concat(
       [local.ddb_statement_table],
+      local.ddb_statement_describe,
       local.ddb_statement_indices,
       local.artifact_statement,
       local.logs_statement
