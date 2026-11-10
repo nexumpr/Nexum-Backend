@@ -438,8 +438,18 @@ class CableadoDelEntorno(unittest.TestCase):
         self.assertIn("secretos_object_arns      = [module.secretos.secrets_prefix_arn]", self.main)
 
     def test_publicador_cableado_y_fallando_cerrado(self) -> None:
-        self.assertIn("publicador_arn = var.secretos_publicador_arn", re.sub(r"[ ]+", " ", self.main))
-        self.assertIn('variable "secretos_publicador_arn"', self.variables)
+        compacto = re.sub(r"[ ]+", " ", self.main)
+        # RFC-011: el publicador y el gestor IaC los crea el módulo
+        # `identidades_publicacion`; la raíz los referencia por ARN determinista y
+        # ya no existe una variable vacía que pueda quedar sin cablear.
+        self.assertIn("publicador_arn = local.arn_secretos_publicador", compacto)
+        self.assertIn("gestor_iac_arn = local.arn_secretos_gestor_iac", compacto)
+        self.assertNotIn('variable "secretos_publicador_arn"', self.variables)
+        self.assertNotIn('variable "secretos_gestor_iac_arn"', self.variables)
+
+        # El principal operador es obligatorio: sin él el plan falla cerrado.
+        self.assertIn('variable "principal_operador_arn"', self.variables)
+        self.assertIn('default     = ""', self.variables)
 
     def test_computo_recibe_la_uri_con_version(self) -> None:
         self.assertIn("secretos_s3_uri", self.main)

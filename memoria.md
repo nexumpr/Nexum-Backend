@@ -834,3 +834,29 @@
 - **Hallazgo D-PERM-01:** las reglas de permiso de **cadena exacta** no se aplicaron; sólo funcionaron las de comodín. Para ejecutar lo autorizado se retiró temporalmente el `DENY` `terraform init -migrate-state*` (sustituido por ASK) y se añadieron lecturas `s3api list-objects-v2`/`get-object`; **`opencode.json` se restauró después a `HEAD`** (`git diff` vacío). Requiere revisión del motor de permisos.
 - **Sin mutación de recursos:** 0 create/update/delete. Coste: 12 641 bytes en bucket ya presupuestado; facturación `NOT_VERIFIED`.
 - **Estado:** `STATE_MIGRATED` con reserva `D-MIG-01`; `envs/h08i` pendiente de su backend (unidad de fase base); `E001_PUBLICADO` no declarado.
+
+### RFC-011 identidades de publicación y plan de fase base (2026-11-10)
+
+- **Autorización:** `APRUEBO_RFC011_IDENTIDADES_PUBLICACION` y `APRUEBO_GATE_FASE_BASE_PLAN`; RFC `sdd/_control/H08/RFC-011-IDENTIDADES_PUBLICACION.md`.
+- **Módulo nuevo** `infra/terraform/modules/identidades_publicacion`: tres roles (`artefactos-publicador`, `secretos-publicador`, `secretos-gestor-iac`) con trust a un solo principal operador (`aws:PrincipalArn`), sin OIDC, sin usuarios ni claves, políticas acotadas a prefijo y `Deny` de borrado/administración.
+- **Sin ciclo:** el módulo recibe **nombres** de bucket; la raíz deriva los ARN canónicos y un bloque `check` los compara con `aws_iam_role.*.arn` al aplicar. Las tres variables `*_arn` de `envs/h08i` se eliminaron (quedaban vacías de forma permanente).
+- **D-BASE-02 corregido:** `iam.artifact_object_arns` recibía `…/releases/*`, que viola la validación de I-060 (objeto exacto, sin comodín). Ahora sólo se pasan objetos exactos; en fase base queda vacío y el runtime **no** puede leer artefactos todavía.
+- **D-BOOT-01, causa raíz:** el envoltorio de shell rompe los argumentos con `=` (`-out=…`, `-var=…`). La forma separada (`-var-file "…" -out "…"`) funciona y permite emitir el plan; no se usaron envoltorios.
+- **Permisos (RFC-002):** `plan*` e `init -backend=true*` pasan de DENY a **ASK** (+allow de política) y se añaden `terraform show*` y `aws s3api list-objects-v2*` en ASK. `apply*`, `destroy*`, `import*`, `state*` y `init -migrate-state*` siguen DENY.
+- **Plan de fase base:** 74 entradas → **72 create**, 2 read, **0 destroy, 0 replace, 0 import**; SHA-256 `5628072141D368F84B767A391A5A416A2562B37B54757EB7ED0D10AFD03CAF1E` (87 447 bytes). Ausencias verificadas: 0 EC2, 0 NAT, 0 EIP, 0 ALB, 0 CloudFront, 0 ASG, 0 launch template.
+- **Coste incremental:** 0.0260–0.0360 USD/h (Redis 0.0160 + endpoint `logs` 0.0100–0.0200) → 0.1560–0.2160 USD por 6 h y 28.0800–38.8800 USD/45 días, dentro del presupuesto de I-000. Real observado `NOT_VERIFIED`.
+- **Secreto Redis (RFC-004):** valor aleatorio de 32 caracteres generado en memoria y guardado en `tfvars` **fuera del repositorio** con ACL restringida; el plan binario también vive ahí porque contiene el valor. No se imprime ni se versiona.
+- **Pruebas:** 409 pruebas de contrato Terraform OK tras actualizar 5 aserciones al diseño RFC-011 (se conservan los controles de fallo cerrado).
+- **Estado:** `BASE_PLAN_READY — NO APLICADO`; `E001_PUBLICADO` sigue sin declarar; ningún recurso AWS creado en esta unidad.
+
+### RFC-011 — endurecimiento de la trust policy (2026-11-10)
+
+- **Defecto reportado:** un enunciado `DenegarPrincipalNoAutorizado` con `resources = ["*"]` en `data.aws_iam_policy_document.trust_operador`. Una trust policy con `Resource` es rechazada por AWS (`MalformedPolicyDocument`).
+- **Estado real verificado:** el enunciado **no existe** en el árbol de trabajo. Evidencia sobre la política ya renderizada en el plan custodiado (`module.identidades.data.aws_iam_policy_document.trust_operador`): un único `Allow` de `sts:AssumeRole`, `Principal.AWS` = `arn:aws:iam::713797602090:role/AccountFullAccessRole`, condición sobre `aws:PrincipalArn`, **sin** `Resource` ni comodín.
+- **Principal correcto:** `principal_operador_arn` usa el ARN IAM del rol (`arn:aws:iam::...:role/AccountFullAccessRole`), no el ARN STS de la sesión. AWS documenta que `aws:PrincipalArn` devuelve el ARN del rol para sesiones de rol, por eso la condición no rompe el login.
+- **Correcciones:** `StringEquals` → `ArnEquals` (operador de ARN recomendado por AWS); `default = ""` retirado de `principal_operador_arn` en módulo y entorno (fail-closed real); validación y precondition explícitas contra `arn:aws:sts::`; precondition de confianza circular; cuatro preconditions que decodifican el JSON renderizado y rechazan `Resource`, `NotResource`, `NotPrincipal`, un `Deny`, un principal distinto del operador o una condición distinta.
+- **Pruebas:** `tests/infra/terraform/test_identidades_publicacion_contrato.py` con 54 pruebas, incluido un detector propio y **fixtures negativas** que demuestran que rechaza `resources = ["*"]`, `NotResource`, principal comodín, segundo principal, condición ausente, `Deny` y `:root`. Suite Terraform: **463 pruebas OK**.
+- **Invariantes bloqueantes:** `check` no detiene el `apply`, así que los nombres de los tres roles y de los dos buckets pasan a ser `precondition` de `terraform_data.invariantes_identidades` (6 guardas, valores conocidos en el plan, recurso hoja sin ciclo). El `check` sobre los ARN reales se conserva como advertencia. Efecto: +1 recurso local en el plan (73 `create`), coste 0.
+- **Plan:** el SHA-256 `5628072141D368F84B767A391A5A416A2562B37B54757EB7ED0D10AFD03CAF1E` queda **STALE** (generado antes del endurecimiento) y no debe aplicarse; requiere regeneración desde `main` tras el merge y Gate nuevo.
+- **Validador SDD:** `dist/` y `*.tfstate*`/`*.tflock` se excluyen del manifiesto como artefactos locales no versionables; la seguridad sigue dependiendo de `git` (`GIT_UNDECLARED` para tfstate rastreado y `verificar_iac_devsecops.py`).
+- **Sin AWS:** `AWS_NOT_RUN`; ningún `terraform plan/apply/destroy` en esta unidad.

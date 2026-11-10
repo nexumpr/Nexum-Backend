@@ -34,6 +34,21 @@ class IntegridadSDD(unittest.TestCase):
         b=b'integridad test'
         self.assertNotEqual(vi.sha256(b),self.m['constitution.md'])
 
+    def test_artefactos_locales_no_son_entregables(self):
+        # Build nativo y state operativo: fuera del manifiesto por diseño.
+        for ruta in ('dist/nexum-backend-linux-arm64','dist/nexum-backend-linux-arm64.manifest.json',
+                     'infra/terraform/bootstrap/terraform.tfstate','infra/terraform/bootstrap/terraform.tfstate.backup',
+                     'envs/h08i/terraform.tfstate.tflock'):
+            with self.subTest(ruta=ruta):
+                self.assertTrue(vi.is_local_artifact(ruta))
+        # El plan binario se excluye por SKIP_SUFFIXES, no por esta guarda.
+        self.assertTrue('x/fase-base.tfplan'.endswith(vi.SKIP_SUFFIXES))
+        # Un documento o un .tf real sigue siendo exigible.
+        for ruta in ('memoria.md','infra/terraform/envs/h08i/main.tf','sdd/_control/H08/RFC-011-IDENTIDADES_PUBLICACION.md',
+                     'herramientas/validar_sdd_integral.py','tests/infra/terraform/test_red_contrato.py'):
+            with self.subTest(ruta=ruta):
+                self.assertFalse(vi.is_local_artifact(ruta))
+
     def test_no_referencias_a_gobierno_h07_en_archivos_activos(self):
         for relative in self.m:
             if relative.endswith(('.md','.py','.yaml','.yml','.json','.csv')):

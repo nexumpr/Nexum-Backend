@@ -203,20 +203,22 @@ variable "secretos_version" {
   default     = ""
 }
 
-variable "secretos_publicador_arn" {
-  description = "ARN de la identidad IAM que publica el bundle de secretos (RFC-004). Vacio = plan falla cerrado."
+variable "principal_operador_arn" {
+  description = <<-EOT
+    ARN del principal humano/operador autorizado a asumir las tres identidades de
+    publicación creadas por RFC-011 (artefactos, secretos y gestor IaC).
+    Sin valor por defecto: si falta, el plan falla cerrado. No se admiten la
+    cuenta raíz, el ARN STS de una sesión ni comodines.
+  EOT
   type        = string
-  default     = ""
-}
 
-variable "secretos_gestor_iac_arn" {
-  description = "ARN del rol IAM que ejecuta Terraform sobre el bucket de secretos (RFC-004). Vacio = plan fail-closed."
-  type        = string
-  default     = ""
-}
+  validation {
+    condition     = can(regex("^arn:aws:iam::[0-9]{12}:(role|user)/[A-Za-z0-9+=,.@_/-]{1,64}$", var.principal_operador_arn))
+    error_message = "principal_operador_arn debe ser un ARN IAM concreto de rol o usuario (fail-closed)."
+  }
 
-variable "artefactos_publicador_arn" {
-  description = "ARN del rol de CI que publica binarios y SBOM en el bucket de artefactos. Vacio = plan fail-closed."
-  type        = string
-  default     = ""
+  validation {
+    condition     = !startswith(var.principal_operador_arn, "arn:aws:sts::")
+    error_message = "principal_operador_arn no puede ser un ARN STS de sesión; use el ARN IAM del rol real."
+  }
 }

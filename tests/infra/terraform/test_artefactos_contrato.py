@@ -103,15 +103,22 @@ class BucketDeArtefactos(unittest.TestCase):
 
 
     def test_prefijo_unico_entre_modulo_cd_y_verificador(self) -> None:
-        # El prefijo debe ser identico en bucket, IAM, LT, verificador y bootstrap.
+        # El prefijo debe ser identico en bucket, CD, LT, verificador y bootstrap.
         variables = _leer(MODULO / "variables.tf")
         self.assertIn('default     = "releases/"', variables)
         self.assertIn('prefijo = "releases/"', re.sub(r"[ \t]+", " ", _leer(ENVS / "main.tf")))
-        self.assertIn("/releases/*", _leer(ENVS / "main.tf"))
         verificador = _leer(RAIZ / "herramientas" / "verificar_lt_release.py")
         self.assertIn('releases/{release_id}/nexum-backend-linux-arm64', verificador)
         cd = _leer(RAIZ / ".github" / "workflows" / "cd-backend.yml")
         self.assertIn('CLAVE="releases/$IN_RELEASE_ID/nexum-backend-linux-arm64"', cd)
+
+        # RFC-011: el runtime YA NO recibe un comodin sobre todo el prefijo. Los
+        # objetos exactos (binario + unidad) llegan por `iam_artifact_object_arns`
+        # cuando exista el release; conceder `releases/*` al rol de instancia
+        # permitiria leer cualquier artefacto de cualquier version.
+        compacto = re.sub(r"[ \t]+", " ", _leer(ENVS / "main.tf"))
+        self.assertNotIn("/releases/*", compacto)
+        self.assertIn("artifact_object_arns = var.iam_artifact_object_arns", compacto)
 
     def test_cd_exige_sse_al_publicar(self) -> None:
         cd = _leer(RAIZ / ".github" / "workflows" / "cd-backend.yml")
@@ -169,14 +176,27 @@ class CableadoYNombreDeterminista(unittest.TestCase):
             self.modulo,
         )
 
-    def test_runtime_recibe_el_prefijo_de_releases(self) -> None:
+    def test_runtime_sin_comodin_hasta_publicar(self) -> None:
+        # RFC-011: el rol runtime no obtiene `releases/*`; recibe solo objetos
+        # exactos aportados por `iam_artifact_object_arns` (vacio en fase base).
         compacto = re.sub(r"[ \t]+", " ", self.envs)
         self.assertIn("artifact_object_arns", compacto)
-        self.assertIn("arn:aws:s3:::${local.artefactos_bucket}/releases/*", compacto)
+        self.assertIn("artifact_object_arns = var.iam_artifact_object_arns", compacto)
+        self.assertNotIn("/releases/*", compacto)
 
-    def test_publicador_por_variable_fail_closed(self) -> None:
-        self.assertIn('variable "artefactos_publicador_arn"', self.variables)
-        self.assertIn("default     = \"\"", self.variables)
+    def test_publicador_cableado_rfc011_fail_closed(self) -> None:
+        compacto = re.sub(r"[ \t]+", " ", self.envs)
+        variables = re.sub(r"[ \t]+", " ", _leer(ENVS / "variables.tf"))
+
+        # El publicador ya no es una variable vacia: lo crea RFC-011 y la raiz lo
+        # referencia por su ARN determinista.
+        self.assertIn("publicador_arn = local.arn_artefactos_publicador", compacto)
+        self.assertIn("gestor_iac_arn = local.arn_secretos_gestor_iac", compacto)
+        self.assertNotIn('variable "artefactos_publicador_arn"', variables)
+
+        # El principal operador sigue siendo obligatorio y falla cerrado.
+        self.assertIn('variable "principal_operador_arn"', variables)
+        self.assertIn('default = ""', variables)
 
     def test_sin_secretos_en_el_modulo(self) -> None:
         texto = _leer(MODULO / "main.tf") + _leer(MODULO / "variables.tf")

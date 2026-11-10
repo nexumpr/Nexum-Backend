@@ -33,6 +33,34 @@ provider "aws" {
   }
 }
 
+# RFC-011 — Nombres deterministas de los buckets y de las identidades de
+# publicación. Se derivan de la cuenta para poder referenciar los ARN sin
+# crear un ciclo entre los roles y los módulos que crean los buckets.
+data "aws_caller_identity" "actual" {}
+
+locals {
+  cuenta_id = data.aws_caller_identity.actual.account_id
+
+  bucket_artefactos_nombre = lower("nexum-${var.entorno}-artefactos-${local.cuenta_id}")
+  bucket_secretos_nombre   = lower("nexum-${var.entorno}-secretos-${local.cuenta_id}")
+
+  # Nombres de rol esperados. Se declaran aparte porque `checks.tf` los compara
+  # con `module.identidades.nombres` en una **precondition bloqueante** (los
+  # `check` sólo advierten y no detienen el apply).
+  nombre_artefactos_publicador = lower("nexum-${var.entorno}-artefactos-publicador")
+  nombre_secretos_publicador   = lower("nexum-${var.entorno}-secretos-publicador")
+  nombre_secretos_gestor_iac   = lower("nexum-${var.entorno}-secretos-gestor-iac")
+
+  # ARN derivados del ID de cuenta y del nombre de rol que crea el módulo
+  # `identidades_publicacion`. No son valores inventados: son la forma canónica
+  # del ARN de un rol de IAM en esta cuenta. Al ser función determinista de
+  # (cuenta, nombre), la precondition sobre el nombre garantiza el ARN; el `check`
+  # sobre el ARN real añade la comprobación en el apply.
+  arn_artefactos_publicador = "arn:aws:iam::${local.cuenta_id}:role/${local.nombre_artefactos_publicador}"
+  arn_secretos_publicador   = "arn:aws:iam::${local.cuenta_id}:role/${local.nombre_secretos_publicador}"
+  arn_secretos_gestor_iac   = "arn:aws:iam::${local.cuenta_id}:role/${local.nombre_secretos_gestor_iac}"
+}
+
 module "red" {
   source = "../../modules/red"
 
@@ -169,6 +197,21 @@ locals {
   artefactos_bucket = lower("nexum-${var.entorno}-artefactos-${data.aws_caller_identity.para_artefactos.account_id}")
 }
 
+module "identidades" {
+  source = "../../modules/identidades_publicacion"
+
+  proyecto                 = "nexum"
+  entorno                  = var.entorno
+  etiquetas                = var.etiquetas
+  cuenta_id                = local.cuenta_id
+  principal_operador_arn   = var.principal_operador_arn
+  bucket_artefactos_nombre = local.bucket_artefactos_nombre
+  bucket_secretos_nombre   = local.bucket_secretos_nombre
+  prefijo_artefactos       = "releases/"
+  prefijo_secretos         = "nexum/secrets/"
+  rol_runtime_arn          = module.iam.runtime_role_arn
+}
+
 module "artefactos" {
   source = "../../modules/artefactos"
 
@@ -177,8 +220,13 @@ module "artefactos" {
   etiquetas       = var.etiquetas
   prefijo         = "releases/"
   rol_runtime_arn = module.iam.runtime_role_arn
-  publicador_arn  = var.artefactos_publicador_arn
-  gestor_iac_arn  = var.secretos_gestor_iac_arn
+
+  # RFC-011: los ARN se derivan de la cuenta y del nombre determinista del rol.
+  # Se pasan como cadena conocida (no como valor "unknown") porque las
+  # preconditions de I-060 validan el formato en tiempo de plan; la raíz
+  # comprueba después con `check` que coinciden con `aws_iam_role.*.arn`.
+  publicador_arn = local.arn_artefactos_publicador
+  gestor_iac_arn = local.arn_secretos_gestor_iac
 }
 
 module "secretos" {
@@ -190,7 +238,8 @@ module "secretos" {
   rol_runtime_arn        = module.iam.runtime_role_arn
   prefijo                = "nexum/secrets/"
   retencion_version_dias = 30
-  publicador_arn         = var.secretos_publicador_arn
+  publicador_arn         = local.arn_secretos_publicador
+  gestor_iac_arn         = local.arn_secretos_gestor_iac
 }
 
 module "iam" {
@@ -208,7 +257,11 @@ module "iam" {
 
   # Los objetos exactos esperan I-080; los log groups/sink los define I-110.
   # Listas vacías significan que NO se concede acceso S3/CloudWatch.
-  artifact_object_arns      = concat(var.iam_artifact_object_arns, ["arn:aws:s3:::${local.artefactos_bucket}/releases/*"])
+  # Objetos exactos (binario y unidad systemd) sólo se conocen tras publicar el
+  # release (I-020/I-080). Un ARN con comodín NO es aceptable aquí: la validación
+  # del módulo exige objeto exacto y sin '*'. En la fase base (sin cómputo) la
+  # lista queda vacía y el rol runtime no obtiene acceso a artefactos todavía.
+  artifact_object_arns      = var.iam_artifact_object_arns
   secretos_object_arns      = [module.secretos.secrets_prefix_arn]
   cloudwatch_log_group_arns = var.iam_cloudwatch_log_group_arns
 

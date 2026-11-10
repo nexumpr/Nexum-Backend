@@ -521,6 +521,11 @@
     },
     {
       "action": "shell",
+      "resource": "aws s3api list-objects-v2*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
       "resource": "aws cloudfront list-distributions*",
       "effect": "ask"
     },
@@ -607,9 +612,10 @@
     {
       "action": "shell",
       "resource": "terraform plan*",
-      "effect": "deny"
+      "effect": "ask"
     },
     {"action": "shell", "resource": "terraform plan -input=false -out=bootstrap.tfplan", "effect": "ask"},
+    {"action": "shell", "resource": "terraform show*", "effect": "ask"},
     {
       "action": "shell",
       "resource": "terraform init -backend=false",
@@ -623,7 +629,7 @@
     {
       "action": "shell",
       "resource": "terraform init -backend=true*",
-      "effect": "deny"
+      "effect": "ask"
     },
     {
       "action": "shell",
@@ -865,7 +871,7 @@
     {
       "action": "tool.use",
       "resource": "shell:terraform init -backend=true*",
-      "effect": "deny"
+      "effect": "allow"
     },
     {
       "action": "tool.use",
@@ -885,9 +891,10 @@
     {
       "action": "tool.use",
       "resource": "shell:terraform plan*",
-      "effect": "deny"
+      "effect": "allow"
     },
     {"action": "tool.use", "resource": "shell:terraform plan -input=false -out=bootstrap.tfplan", "effect": "allow"},
+    {"action": "tool.use", "resource": "shell:terraform show*", "effect": "allow"},
     {
       "action": "tool.use",
       "resource": "shell:docker *",

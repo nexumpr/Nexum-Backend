@@ -8,6 +8,19 @@ SKIP_PARTS={'.git','__pycache__','node_modules','.pytest_cache','.terraform'}
 # Artefactos locales excluidos por .gitignore: no son documentos ni código versionable.
 # El plan se conserva en disco para su Gate, pero nunca se publica.
 SKIP_SUFFIXES=('.tfplan',)
+# Artefactos de ejecución local que NO son entregables: build nativo (`dist/`) y
+# state operativo de Terraform. Se excluyen del manifiesto porque cambian en cada
+# ejecución local; la seguridad no depende de esta exclusión sino de `git`: un
+# tfstate o un binario *rastreado* sigue siendo un error (`GIT_UNDECLARED` en
+# --check-git) y `herramientas/verificar_iac_devsecops.py` bloquea tfstate/secretos.
+LOCAL_ARTIFACT_PARTS={'dist'}
+LOCAL_ARTIFACT_SUFFIXES=('.tfstate','.tfstate.backup','.tfstate.lock.info','.tflock')
+
+
+def is_local_artifact(rel_posix: str) -> bool:
+    partes=set(rel_posix.split('/'))
+    return bool(partes&LOCAL_ARTIFACT_PARTS) or rel_posix.endswith(LOCAL_ARTIFACT_SUFFIXES)
+
 
 def is_h08_code(rel_posix: str) -> bool:
     return rel_posix.startswith(('cmd/', 'internal/', 'pkg/', 'tests/')) or rel_posix in ('go.mod', 'go.sum')
@@ -15,7 +28,7 @@ def is_h08_code(rel_posix: str) -> bool:
 def sha256(data:bytes)->str:return hashlib.sha256(data).hexdigest()
 
 def paths_of(root:Path):
-    return {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and not (set(p.relative_to(root).parts)&SKIP_PARTS) and not p.name.endswith(SKIP_SUFFIXES) and not is_h08_code(p.relative_to(root).as_posix())}
+    return {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and not (set(p.relative_to(root).parts)&SKIP_PARTS) and not p.name.endswith(SKIP_SUFFIXES) and not is_local_artifact(p.relative_to(root).as_posix()) and not is_h08_code(p.relative_to(root).as_posix())}
 
 def validate(root:Path,check_git=False):
     root=root.resolve(); errors=[]
