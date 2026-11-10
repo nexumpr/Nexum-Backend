@@ -39,3 +39,15 @@ paths = [
 ]
 regexTarget = "secret"
 regexes = ['''^BLOQUEADO_RFC004$''']
+
+[[rules.allowlists]]
+description = "Contrasena sintetica de pruebas E001 (valor literal, no credencial real; rutas y valor exactos)"
+condition = "AND"
+paths = [
+  '''^tests/integration/register_http_test\.go$''',
+  '''^tests/security/register_adversarial_test\.go$''',
+  '''^tests/unit/transport/register_handler_test\.go$''',
+  '''^tests/unit/application/register_service_test\.go$''',
+]
+regexTarget = "secret"
+regexes = ['''^ExamplePassphrase#2026$''']

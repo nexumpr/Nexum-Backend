@@ -69,7 +69,7 @@ class ConfiguracionGitleaks(unittest.TestCase):
     def test_patron_cubre_todos_los_documentos_secretos_sin_ocultar_credenciales(self) -> None:
         """El manifiesto declara ruta + digest; la excepción sólo cubre ese formato."""
         rutas = re.findall(r"regexes\s*=\s*\[\s*'''(.*?)'''", self.sin_comentarios)
-        self.assertEqual(len(rutas), 2, "manifiesto + constante de estado de I-120")
+        self.assertEqual(len(rutas), 3, "manifiesto + constante de estado de I-120 + passphrase sintetica E001")
         candidatos = [r for r in rutas if "[a-f0-9]{64}" in r]
         self.assertEqual(len(candidatos), 1)
         patron = candidatos[0]
@@ -88,6 +88,21 @@ class ConfiguracionGitleaks(unittest.TestCase):
             '  "sdd/_control/H08/ROTACION_SECRETOS_I060.md": "AKIAIOSFODNN7EXAMPLE"',
             patron.replace("\\\\", "\\"),
         )
+
+    def test_excepcion_passphrase_sintetica_e001_es_acotada(self) -> None:
+        bloque = self.sin_comentarios.split("Contrasena sintetica de pruebas E001", 1)[1].split("[[rules.allowlists]]")[0]
+        self.assertIn('condition = "AND"', bloque)
+        self.assertIn("ExamplePassphrase#2026", bloque)
+        for ruta in (
+            "register_http_test",
+            "register_adversarial_test",
+            "register_handler_test",
+            "register_service_test",
+        ):
+            self.assertIn(ruta, bloque)
+        self.assertNotIn("tests/**", bloque)
+        self.assertNotIn("tests/integration/**", bloque)
+        self.assertNotIn("tests/unit/**", bloque)
 
     def test_sin_credenciales_reales_en_la_configuracion(self) -> None:
         self.assertNotRegex(self.texto, r"AKIA[0-9A-Z]{16}")
