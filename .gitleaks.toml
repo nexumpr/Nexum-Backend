@@ -41,7 +41,7 @@ regexTarget = "secret"
 regexes = ['''^BLOQUEADO_RFC004$''']
 
 [[rules.allowlists]]
-description = "Contrasena sintetica de pruebas E001 (valor literal, no credencial real; rutas y valor exactos)"
+description = "Contrasena sintetica de pruebas E001 (valor literal, no credencial real; rutas exactas y contexto de campo password)"
 condition = "AND"
 paths = [
   '''^tests/integration/register_http_test\.go$''',
@@ -49,5 +49,26 @@ paths = [
   '''^tests/unit/transport/register_handler_test\.go$''',
   '''^tests/unit/application/register_service_test\.go$''',
 ]
-regexTarget = "secret"
-regexes = ['''^ExamplePassphrase#2026$''']
+regexTarget = "line"
+# Se exige adyacencia campo/valor en lugar de un hueco libre (`[^\r\n]*`): un hueco libre
+# permitiria ocultar una credencial real situada en la misma linea tras la palabra password.
+regexes = ['''(?i)"?\bpassword\b"?\s*[:=]\s*"?ExamplePassphrase#2026''']
+
+# Hallazgo real reproducido con gitleaks v8.30.1 sobre el historial (`detect --source .`):
+# 3 hallazgos `generic-api-key` en el commit 275f598, en
+# `tests/integration/register_http_test.go:88` y `tests/unit/transport/register_handler_test.go:140,275`.
+# NO eran la passphrase sintetica: el secreto capturado es la clave de idempotencia de prueba
+# `0123456789abcdef` (16 hex correlativos) asignada a una variable llamada `key`, que la regla
+# interpreta como clave/valor. No es una credencial: no autentica ni da acceso a servicio alguno.
+# La excepcion es minima: ruta exacta (dos archivos) **y** linea exacta de asignacion con ese
+# literal. Otra asignacion `key = "..."`, otro valor u otro archivo siguen generando hallazgo;
+# el historial publicado no se reescribe.
+[[rules.allowlists]]
+description = "Clave de idempotencia sintetica de pruebas E001 (literal fijo de 16 hex, no credencial; rutas y asignaciones exactas)"
+condition = "AND"
+paths = [
+  '''^tests/integration/register_http_test\.go$''',
+  '''^tests/unit/transport/register_handler_test\.go$''',
+]
+regexTarget = "line"
+regexes = ['''^\s*(?:const\s+)?key\s*:?=\s*"0123456789abcdef"\s*$''']

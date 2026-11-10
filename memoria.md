@@ -800,3 +800,12 @@
 - **Validacion local:** `go build ./...` y `go vet ./...` PASS. `go test ./...` **BLOCKED_POLICY_APPLICATION_CONTROL**: Control de aplicaciones de Windows bloquea los binarios de prueba recien compilados (`fork/exec ... An Application Control policy has blocked this file`); no se declara PASS. La validacion efectiva es el CI de Linux del PR.
 - **Sin AWS:** `AWS_NOT_RUN`, `HTTP_AWS_NOT_RUN`, `TWO_NODES_AWS_NOT_VERIFIED`. No se declara E001 publicado.
 - **E002 (login):** `NOT_AUTHORIZED`; requiere Gate propio y reutilizara DynamoDB, Argon2id y sesiones sin mocks.
+
+### E001 — corrección del escaneo de secretos en CI (2026-11-10)
+
+- **Síntoma:** PR #48 con el resto de jobs en verde salvo `Escaneo de secretos` (gitleaks v8.30.1): `leaks found: 3`; `PR Quality Gate` y `CI Success` en rojo por arrastre.
+- **Hipótesis descartada con evidencia:** no eran la contraseña sintética `ExamplePassphrase#2026`. Reproducido en local con el binario 8.30.1 sobre el historial real (144 commits): los 3 hallazgos son `generic-api-key` en el commit `275f598`, `tests/integration/register_http_test.go:88` y `tests/unit/transport/register_handler_test.go:140,275`; el secreto capturado es la clave de idempotencia de prueba `0123456789abcdef` asignada a una variable `key`.
+- **Corrección:** excepción mínima dentro de la regla `generic-api-key` (`condition = "AND"`, dos rutas exactas, `regexTarget = "line"`, patrón de asignación exacta con el literal). Es un literal sintético que no autentica ni accede a ningún servicio; el historial publicado no se reescribe. La excepción de la passphrase pasa de `regexTarget = "secret"` a `"line"` con adyacencia campo/valor (sin `[^\r\n]*`, que ocultaría una credencial en la misma línea).
+- **Pruebas negativas con fixtures sintéticos fuera del repositorio (gitleaks 8.30.1):** otro valor en la misma ruta, el mismo literal en otra ruta o en un tercer archivo, otra contraseña, un access key AWS sintético, un token de alta entropía, una asignación partida y un literal más largo → **todos se detectan**; las dos líneas históricas quedan limpias y el escaneo completo devuelve `no leaks found`.
+- **Contratos:** 19 pruebas en `herramientas/tests/test_gitleaks_config.py` (5 nuevas para la clave de idempotencia, 1 nueva para la passphrase). Manifiesto `BASELINE_SHA256.json` recalculado.
+- **Estado:** CI del PR #48 **no declarado verde** hasta que el run posterior a este cambio termine en SUCCESS; `AWS_NOT_RUN`.
