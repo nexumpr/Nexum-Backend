@@ -1,87 +1,109 @@
-# E002 — Iniciar sesión y emitir tokens
+# E002 — Iniciar sesión y emitir tokens (V6.0.2)
 
-| Propiedad | Contrato H06 |
+| Propiedad | Contrato |
 |---|---|
 | Método y ruta | `POST /api/v1/auth/login` |
-| Origen H04 | Clase `M` (M maqueta; S soporte; E esperado; O opcional) |
-| Alcance | **REQUIRED_DESIGN**; documentado, no implementado |
-| Seguridad | `public` (público/credencial específica del cuerpo) |
-| Respuesta éxito | **HTTP 200**; `AuthTokens` |
-| Request | `LoginRequest` |
-| Idempotency-Key | No exigido por este contrato |
-| Control de versión | CAS/versión interna cuando corresponda |
-| Persistencia | AWS DynamoDB/Redis, sin Scan; ver `DYNAMODB_ACCESOS_H06.md` |
-| Releases | H08+, una función/endpoint nuevo por release con aprobación |
+| `operationId` | `nexum_e002` |
+| Origen H04 | Clase `M` |
+| Versión de contrato | **V6.0.2** (RFC-013, aprobada) |
+| Seguridad | `public`; sin `Authorization` previo ni `Idempotency-Key` |
+| Respuesta éxito | **HTTP 200**; `LoginResponse` (esquema propio) |
+| Persistencia | DynamoDB `NEXUM_CORE_<ENTORNO>`; sin `Scan`; Redis para cuotas |
+| Cifrado | JWT RS256 900 s + refresh opaco de 32 bytes CSPRNG |
 
-## 1. Caso de uso y criterio funcional
+## 1. Problema y alcance
 
-Verificar contraseña en tiempo constante; refresh opaco hasheado y sesión persistida; respuesta no revela existencia de correo.
+El contrato H06 sólo admitía `email` y `password` y devolvía `AuthTokens` de cinco campos.
+El prototipo V6.0.2 exige, desde el primer release, los metadatos opcionales del
+dispositivo, la identidad real del usuario y el estado real de onboarding, además de una
+sesión persistida y compartida por los dos nodos.
 
-**Precondiciones:** ruta pública validada o JWT de usuario activo; el servidor siempre deriva `userId` desde su identidad autenticada. Toda referencia `{...}` debe verificarse contra recursos propiedad del usuario, salvo recursos públicos. Los estados del usuario borrado o revocado impiden nuevas escrituras. **Postcondiciones:** resultado reproducible por HTTP sin duplicidad ni efectos ocultos fuera de transacción.
+Fuera de alcance: E003 (refresh), E004 (logout), E005/E006 y el resto del catálogo.
 
-## 2. Entrada HTTP, parámetros y reglas
+## 2. Entrada — `LoginRequest`
 
-**Payload `LoginRequest`:**
+| Campo | Obligatorio | Regla |
+|---|:---:|---|
+| `email` | Sí | Email válido, máximo 254; normalizado **exactamente** como E001 (`domain.ValidateEmail`). |
+| `password` | Sí | No vacía, máximo 128; **sin** trim, minúsculas ni normalización Unicode. Verificación Argon2id. No se exige la política de alta a cuentas antiguas. |
+| `deviceId` | No | Máximo 128 caracteres; identificador de instalación, no sensible. Nunca autoriza acceso. |
+| `deviceName` | No | Máximo 80 caracteres; etiqueta legible del dispositivo. |
+| `platform` | No | Enum cerrado `android` (minúsculas). |
 
-| Campo | Tipo / ejemplo | Requerido |
-|---|---|:---:|
-| `email` | `"ejemplo@example.invalid"` | Sí |
-| `password` | `"ExamplePassphrase#2026"` | Sí |
+JSON estricto (`additionalProperties:false`), cuerpo máximo **256 KiB**. Se rechazan con
+400 `userId`, `name`, `income`, `recurringExpenses`, `privacy`, `confirmPassword`,
+`signupConfirm`, `accountStatus` y cualquier propiedad no declarada. La ausencia de
+metadatos opcionales nunca provoca rechazo.
 
-**Parámetros:** ninguno explícito. JSON UTF-8, `application/json`, propiedades desconocidas rechazadas. El dominio valida además rangos y transiciones, aunque el tipo JSON sea válido. Moneda inicial MXN; importes serializados decimal string y operados internamente como `int64` centavos.
+## 3. Salida — `LoginResponse` (200)
 
-## 3. Salida, seguridad y errores
+`accessToken`, `refreshToken`, `tokenType` (`Bearer`), `expiresIn` (**900**), `sessionId`,
+`session.id` (**igual a `sessionId`**), `user.id`, `user.name` (desde `PROFILE.displayName`),
+`user.email`, `user.emailVerified`, `onboarding.configured`.
 
-**Respuesta `AuthTokens`:**
+Los datos de `user` y `onboarding` proceden de DynamoDB, nunca de valores fijos. Un usuario
+histórico sin ítem `ONBOARDING` devuelve `configured=false` (RFC-013) y nunca `true`
+inventado. No se devuelven contraseñas, hashes, refresh en claro persistido, datos
+financieros ni identificadores de infraestructura. `Cache-Control: private, no-store`.
 
-| Campo | Tipo / ejemplo | Requerido |
-|---|---|:---:|
-| `accessToken` | `"REDACTED_ACCESS_TOKEN"` | Sí |
-| `refreshToken` | `"REDACTED_REFRESH_TOKEN"` | Sí |
-| `tokenType` | `"Bearer"` | Sí |
-| `expiresIn` | `900` | Sí |
-| `sessionId` | `"018f90ef-08e5-7a68-b09f-2b67a47c92f0"` | Sí |
+## 4. Errores
 
-**Códigos especificados:** `200`, `400`, `409`, `422`, `429`, `500`, `503`. Error común: `{"error":{"code":"...","message":"...","traceId":"...","details":[]}}`. No revelar recursos ajenos, hashes, JWT, correo inexistente, configuración AWS ni datos financieros en logs. Fijar límites de velocidad según grupo de riesgo en `POLITICAS_TRANSVERSALES_H06.md`.
+| Código | `code` | Cuándo |
+|---|---|---|
+| 400 | `INVALID_REQUEST` | JSON malformado, email inválido, campos faltantes o desconocidos, tipos o longitudes incorrectas, plataforma no admitida, cuerpo > 256 KiB |
+| 401 | `UNAUTHORIZED` | Mensaje genérico e indistinguible para correo inexistente, contraseña incorrecta y cuenta deshabilitada/eliminada/revocada |
+| 429 | `RATE_LIMITED` | Cuota superada, con `Retry-After` |
+| 500 | `INTERNAL_ERROR` | Fallo inesperado saneado |
+| 503 | `DEPENDENCY_UNAVAILABLE` | DynamoDB/Redis no disponible o falta de material criptográfico |
 
-**Request JSON de ejemplo (sintético, sin credenciales reales):**
+Nunca se usa 404 para "correo inexistente" ni se entra en modo invitado ante un email
+desconocido.
 
-```json
-{
-  "email": "ejemplo@example.invalid",
-  "password": "ExamplePassphrase#2026"
-}
-```
+## 5. Identidad y estados
 
-**Response JSON de ejemplo (sintético):**
+Reserva `EMAIL#<sha256(email normalizado)>`/`OWNER` → `USER#<id>`/`PROFILE` con
+`ConsistentRead`, comprobando coherencia reserva↔perfil. Sólo `status = ACTIVE` puede
+autenticarse. Argon2id con el hasher de E001 (parámetros sin cambios). Ante correo
+inexistente se ejecuta una verificación señuelo con Argon2id real y contraseña aleatoria,
+sin prometer igualdad temporal matemática. Sin `Scan` ni búsqueda global.
 
-```json
-{
-  "accessToken": "REDACTED_ACCESS_TOKEN",
-  "refreshToken": "REDACTED_REFRESH_TOKEN",
-  "tokenType": "Bearer",
-  "expiresIn": 900,
-  "sessionId": "018f90ef-08e5-7a68-b09f-2b67a47c92f0"
-}
-```
+## 6. JWT RS256 y keyring
 
-## 4. Acceso físico e invariantes
+Cabecera JOSE: `alg=RS256`, `typ=JWT`, `kid` conocido. Claims: `iss=https://api.nexum.finance`,
+`aud=nexum-client`, `sub`, `sid`, `jti` (128 bits CSPRNG), `iat`, `nbf`, `exp` con
+`exp-iat ≤ 900 s`. Validación: firma RSA ≥2048 bits, rechazo de `alg` distinto, `kid`
+desconocido, `iss`/`aud` incorrectos, `sub`/`sid`/`jti` ausentes, `nbf`/`iat` futuros fuera
+de tolerancia, expirado, coherencia temporal y vida excesiva. Leeway máximo 30 s. La clave
+firmante es única y compartida por los dos nodos, cargada desde el bundle RFC-004
+(`JWT_PRIVATE_KEY_PEM_B64`, `JWT_KEY_ID`) y decodificada sólo en memoria; sin clave, 503.
 
-Email-reserva / USER#id PROFILE y SESSION#id / SESSIONHASH#digest; token hash con TTL y expiración funcional.
+## 7. Sesiones y persistencia
 
-Invariante: Verificar contraseña en tiempo constante; refresh opaco hasheado y sesión persistida; respuesta no revela existencia de correo. Ninguna operación puede hacer `Scan` global ni consultar PK de un usuario diferente. ETag/versionado, cancelación de transacciones, caché y TTL deben seguir H04/H05. El contrato OpenAPI es `openapi/nexum-api-v1.yaml` y su espejo JSON; ambos son la autoridad de transporte de H06.
+Una sola `TransactWriteItems` condicional con `USER#<id>`/`SESSION#<id>` y
+`REFRESH#<sha256(refresh)>`/`SESSION`. Sólo se persiste el digest del refresh. Atributos:
+`userId`, `sessionId`, `familyId`, `status` (`ACTIVE`/`REVOKED`), `refreshHash`, `accessJti`,
+`createdAt`, `lastUsedAt`, **`expiresAt` Number (epoch seconds, TTL físico de la tabla)**,
+`expiresAtISO` (legibilidad) y metadatos opcionales del dispositivo. La expiración lógica se
+comprueba con `now.Unix() >= expiresAt`: un ítem caducado no autentica aunque el TTL no lo
+haya purgado. Si la transacción falla, no se devuelve 200 ni se emiten tokens.
 
-## 5. Pruebas de aceptación obligatorias (para H08)
+## 8. Redis y cuotas
 
-- **T01:** Solicitud válida produce el código y esquema exactos indicados en OpenAPI; ejemplos sintéticos deben validarse con JSON Schema.
-- **T02:** JSON malformado, campos desconocidos, tipo incorrecto y longitud excedida -> 400/422 sin secretos en logs.
-- **T03:** Petición sobre recurso de otro usuario no filtra existencia (404), si aplica; verificar propiedad con dos sujetos.
-- **T04:** Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
-- **T05:** Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
+Dos cuotas simultáneas e independientes de E001 (**5/min/IP** y **10/min/email
+normalizado**), evaluadas en un único script Lua atómico con TTL por clave e identificadores
+seudonimizados. Redis no disponible ⇒ 503. Cuota excedida ⇒ 429 con `Retry-After`. La IP
+efectiva debe proceder de la cadena de proxies confiable (CloudFront → ALB), nunca de un
+`X-Forwarded-For` arbitrario del cliente.
 
-## 6. Trazabilidad, evidencia y estado
+## 9. Compatibilidad
 
-- Inventario origen: `../01-arquitectura-general/TRAZABILIDAD_75_RUTAS.md` (mismo E-ID); matriz H06 `MATRIZ_OPERACIONES_H06.csv`.
-- Dependencias: H04 A-030/A-040/A-050/A-060/A-070/A-080; H05 I-040/I-050/I-150; seguridad GOV-06/07/11/15/16.
-- **Contrato diseñado:** documentado en H06. **Pruebas HTTP/Dynamo/Redis y despliegue:** NOT_RUN; solo H08+, no afirmar `PASS`.
-- **Responsabilidad:** Backend independiente del equipo móvil. La API cumple contrato sin solicitar aprobación de Android.
+E001 V6.0.2 no se modifica: registro, contrato, idempotencia y persistencia intactos.
+`AuthTokens` se conserva para E003. Los usuarios existentes no se migran ni se reescriben.
+
+## 10. Aceptación observable
+
+`201` de E001 con una cuenta sintética; `200` de E002 con esa cuenta (JSON mínimo y
+completo) devolviendo los ocho bloques del contrato, `session.id = sessionId`,
+`expiresIn=900`, `tokenType=Bearer`; `401` genérico con contraseña errónea y con correo
+inexistente; sesión real consultable en DynamoDB con `expiresAt` numérico; `429` al superar
+cualquiera de las dos cuotas. **AWS real: NOT_RUN** hasta el despliegue autorizado.

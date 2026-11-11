@@ -1,24 +1,52 @@
-# Tareas planificadas — E002
+# Tareas — E002 V6.0.2
 
-> Todas las tareas de implementación están **TODO** hasta H08. Este archivo es especificación, no evidencia de código.
+> Sólo se marca lo ejecutado y comprobable. `AWS` permanece `NOT_RUN` hasta el despliegue
+> autorizado; ninguna casilla local implica prueba en la nube.
 
-- [ ] `E002-T01` Revisar OpenAPI `operationId=nexum_e002` vs `POST /api/v1/auth/login` y contrato de dominio.
-- [ ] `E002-T02` Implementar request/response DTO estrictos `LoginRequest` / `AuthTokens`; rechazo de campos desconocidos.
-- [ ] `E002-T03` Implementar autorización por sujeto JWT y propiedad; públicas solo según allowlist aprobada.
-- [ ] `E002-T04` Implementar caso de uso y invariantes: Verificar contraseña en tiempo constante; refresh opaco hasheado y sesión persistida; respuesta no revela existencia de correo.
-- [ ] `E002-T05` Implementar adaptador DynamoDB y patrón: Email-reserva / USER#id PROFILE y SESSION#id / SESSIONHASH#digest; token hash con TTL y expiración funcional.
-- [ ] `E002-T06` Integrar Redis y consistencia multiinstancia sin confiar en caché para privilegios.
-- [ ] `E002-T07` Implementar códigos y errores definidos, ETag e idempotencia según operación.
-- [ ] `E002-T08` Crear unit tests de reglas y validaciones; fixture sin PII/credenciales reales.
-- [ ] `E002-T09` Crear integración Dynamo y prueba HTTP desde cliente externo conforme OpenAPI.
-- [ ] `E002-T10` Ejecutar negativas de auth/ownership/concurrencia y carga paginada cuando aplique.
-- [ ] `E002-T11` CI + seguridad + revisión de contratos + rollback y trazas saneadas.
-- [ ] `E002-T12` Solicitar autorización humana de release; desplegar desde IaC/CI, probar en dos nodos y registrar evidencia real.
+- [x] `E002-T01` RFC-013 aprobada (`APRUEBO_RFC_013_E002_V602`) y Gate local
+      (`APRUEBO_GATE_H08E_E002_LOCAL`); contrato V6.0.2 fijado en spec/plan.
+- [x] `E002-T02` `LoginRequest` estricto con `deviceId`, `deviceName` y `platform`
+      opcionales; cuerpo máximo 256 KiB y rechazo de propiedades desconocidas
+      (`login_handler.go`, `binding.go`).
+- [x] `E002-T03` `LoginResponse` propio con los cinco campos heredados más `session.id`,
+      `user` y `onboarding`; `AuthTokens` intacto para E003.
+- [x] `E002-T04` `LoginService` con validación canónica, identidad real, estados y 401
+      indistinguible; hash señuelo derivado del hasher productivo.
+- [x] `E002-T05` Adaptador DynamoDB `SessionStore` con lecturas consistentes y
+      `TransactWriteItems` de dos ítems condicionales; `expiresAt` Number como TTL físico.
+- [x] `E002-T06` Emisión JWT RS256 de 900 s con `jti` persistido y carga de clave desde el
+      bundle RFC-004; fallo cerrado sin material criptográfico.
+- [x] `E002-T07` Validación estricta del JWT: `typ`, `kid`, `iss`, `aud`, `sub`, `sid`,
+      `jti`, `iat`, `nbf`, `exp`, vida máxima y leeway de 30 s.
+- [x] `E002-T08` Cuota dual atómica en Redis (5/min/IP y 10/min/email canónico) con script
+      Lua, clases separadas de E001 y `Retry-After`.
+- [x] `E002-T09` Composición real en `cmd/server` junto a `/auth/register`, `/health/live` y
+      `/health/ready`, sin `MemorySessionStore` en producción.
+- [x] `E002-T10` OpenAPI YAML/JSON sincronizados: `LoginResponse`, `LoginSession`,
+      `LoginUser`, `LoginOnboarding`, `401`, ejemplos sintéticos y paridad verificada.
+- [x] `E002-T11` Excepción de compatibilidad acotada (`ESQUEMA_RESPUESTA_CAMBIADO` del 200 de
+      E002) cubierta por RFC-013 y por el registro de excepciones.
+- [x] `E002-T12` Validadores verdes: `validar_h06.py`, paridad YAML/JSON, comparador de
+      contratos, `validar_sdd_integral.py` y manifiesto SHA256.
+- [x] `E002-T13` CI del PR #56 con los 13 checks en `SUCCESS`.
+- [ ] `E002-T14` Pruebas dedicadas del adaptador DynamoDB, del limitador dual y del handler
+      HTTP con dobles: **pendiente**.
+- [ ] `E002-T15` Política de IP efectiva verificada sobre la topología CloudFront→ALB y, si
+      procede, endurecimiento de la cabecera: **pendiente**.
+- [ ] `E002-T16` Seudonimización de la cuota por email mediante HMAC-SHA256 con secreto del
+      bundle (hoy SHA-256): **pendiente**, requiere Gate de bundle.
+- [ ] `E002-T17` Merge autorizado con `APRUEBO_MERGE_PR_56_SHA_<SHA40>`: **pendiente**.
+- [ ] `E002-T18` Release ARM64 canónico, publicación S3 y bundle de claves bajo sus Gates:
+      **pendiente**.
+- [ ] `E002-T19` Despliegue gradual por ASG y verificación HTTPS real de E001 y E002:
+      **pendiente** (`AWS_NOT_RUN`).
 
 ## Casos concretos
 
-- [ ] `E002-CT01` Solicitud válida produce el código y esquema exactos indicados en OpenAPI; ejemplos sintéticos deben validarse con JSON Schema.
-- [ ] `E002-CT02` JSON malformado, campos desconocidos, tipo incorrecto y longitud excedida -> 400/422 sin secretos en logs.
-- [ ] `E002-CT03` Petición sobre recurso de otro usuario no filtra existencia (404), si aplica; verificar propiedad con dos sujetos.
-- [ ] `E002-CT04` Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
-- [ ] `E002-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
+- [x] `E002-CT01` Contrato 200 con `session.id = sessionId` y `expiresIn = 900` verificado en
+      pruebas de aplicación.
+- [x] `E002-CT02` 401 genérico en contraseña incorrecta, cuenta eliminada y correo
+      inexistente; sin sesión creada.
+- [x] `E002-CT03` 400 de validación (email, contraseña vacía, `platform` no admitida).
+- [x] `E002-CT04` Fallo de persistencia ⇒ sin 200 y sin tokens.
+- [ ] `E002-CT05` Dos nodos reales con la misma clave y sesión compartida: **NOT_RUN** (AWS).
