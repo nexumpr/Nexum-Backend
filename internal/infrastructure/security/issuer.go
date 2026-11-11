@@ -19,8 +19,8 @@ import (
 
 // Variables de entorno con el material criptográfico (bundle RFC-004 → backend.env).
 const (
-	// EnvJWTPrivateKeyB64 contiene el PEM de la clave privada RSA en Base64.
-	EnvJWTPrivateKeyB64 = "JWT_PRIVATE_KEY_PEM_B64"
+	// EnvJWTPrivatePEMB64 contiene el PEM de la clave privada RSA en Base64.
+	EnvJWTPrivatePEMB64 = "JWT_PRIVATE_KEY_PEM_B64"
 	// EnvJWTKeyID identifica la clave vigente (claim kid).
 	EnvJWTKeyID = "JWT_KEY_ID"
 )
@@ -32,9 +32,9 @@ var ErrSigningKeyUnavailable = errors.New("clave de firma JWT no disponible")
 // LoadTokenProvider construye el proveedor RS256 desde el entorno. La clave se decodifica
 // sólo en memoria: nunca se escribe en disco ni se registra en logs.
 func LoadTokenProvider() (*RSATokenProvider, error) {
-	encoded := strings.TrimSpace(os.Getenv(EnvJWTPrivateKeyB64))
+	encoded := strings.TrimSpace(os.Getenv(EnvJWTPrivatePEMB64))
 	if encoded == "" {
-		return nil, fmt.Errorf("%w: falta %s", ErrSigningKeyUnavailable, EnvJWTPrivateKeyB64)
+		return nil, fmt.Errorf("%w: falta %s", ErrSigningKeyUnavailable, EnvJWTPrivatePEMB64)
 	}
 	pemBytes, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {

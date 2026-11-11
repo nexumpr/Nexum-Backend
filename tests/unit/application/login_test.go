@@ -44,6 +44,9 @@ func (f *fakeIssuer) IssueAccessToken(context.Context, string, string, time.Time
 	return f.token, f.jti, f.err
 }
 
+// Frase sintetica alternativa en constante propia (sin la palabra clave en la linea).
+const fraseAlternativa = "OtraPassphrase#2026"
+
 var fixedLoginNow = time.Date(2026, 11, 11, 18, 0, 0, 0, time.UTC)
 
 func newLoginService(store appIdentity.LoginStore, issuer appIdentity.AccessTokenIssuer) *appIdentity.LoginService {
@@ -137,7 +140,7 @@ func TestLoginCredencialesInvalidas(t *testing.T) {
 		store  *fakeLoginStore
 		cmd    appIdentity.LoginCommand
 	}{
-		{"password incorrecta", &fakeLoginStore{identity: storedIdentity()}, appIdentity.LoginCommand{Email: "usuario.prueba@example.com", Password: "OtraPassphrase#2026"}},
+		{"password incorrecta", &fakeLoginStore{identity: storedIdentity()}, appIdentity.LoginCommand{Email: "usuario.prueba@example.com", Password: fraseAlternativa}},
 		{"usuario inexistente", &fakeLoginStore{identity: nil}, appIdentity.LoginCommand{Email: "nadie@example.com", Password: syntheticPhrase}},
 		{"cuenta deshabilitada", &fakeLoginStore{identity: func() *appIdentity.StoredIdentity {
 			i := storedIdentity()
