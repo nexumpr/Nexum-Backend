@@ -13,9 +13,10 @@ import (
 )
 
 type idempotencyRecord struct {
-	payloadHash string
-	response    appIdentity.StoredResponse
-	expiresAt   time.Time
+	payloadHash      string
+	response         appIdentity.StoredResponse
+	passwordVerifier string
+	expiresAt        time.Time
 }
 
 // RegistrationStore es un doble concurrente de appIdentity.RegisterStore.
@@ -24,6 +25,9 @@ type RegistrationStore struct {
 	idempotency map[string]idempotencyRecord
 	emails      map[string]string
 	records     map[string]appIdentity.RegistrationRecord
+	// expenses acumula los compromisos persistidos por usuario para poder comprobar
+	// que un replay no los duplica (no existe en DynamoDB: alli son items RECURRING#).
+	expenses    map[string]int
 	unavailable bool
 	now         func() time.Time
 }
@@ -34,6 +38,7 @@ func NewRegistrationStore() *RegistrationStore {
 		idempotency: make(map[string]idempotencyRecord),
 		emails:      make(map[string]string),
 		records:     make(map[string]appIdentity.RegistrationRecord),
+		expenses:    make(map[string]int),
 	}
 }
 
@@ -81,6 +86,7 @@ func (s *RegistrationStore) CreateOrReplay(
 		copied := existing.response
 		copied.Body = append([]byte(nil), existing.response.Body...)
 		copied.Replayed = true
+		copied.PasswordVerifier = existing.passwordVerifier
 		return &copied, nil
 	}
 
@@ -94,10 +100,12 @@ func (s *RegistrationStore) CreateOrReplay(
 
 	s.emails[emailKey] = record.UserID
 	s.records[record.UserID] = record
+	s.expenses[record.UserID] = len(record.RecurringExpenses)
 	s.idempotency[key] = idempotencyRecord{
-		payloadHash: payloadHash,
-		response:    response,
-		expiresAt:   now.Add(ttl),
+		payloadHash:      payloadHash,
+		response:         response,
+		passwordVerifier: response.PasswordVerifier,
+		expiresAt:        now.Add(ttl),
 	}
 
 	return nil, nil
@@ -109,6 +117,13 @@ func (s *RegistrationStore) Registration(userID string) (appIdentity.Registratio
 	defer s.mu.Unlock()
 	record, ok := s.records[userID]
 	return record, ok
+}
+
+// ExpensesCount devuelve cuantos compromisos fijos tiene persistidos el usuario.
+func (s *RegistrationStore) ExpensesCount(userID string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.expenses[userID]
 }
 
 // EmailReserved indica si el email ya tiene reserva (solo para aserciones).

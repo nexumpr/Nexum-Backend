@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -80,7 +81,15 @@ func postRegister(client *http.Client, url, key, body string) httpResult {
 
 const syntheticPhrase = "ExamplePassphrase#2026"
 
-const integrationRegisterBody = `{"email":"dos-nodos@example.invalid","password":"` + syntheticPhrase + `","displayName":"Dos Nodos","privacyNoticeVersion":"2026-11","privacyAccepted":true}`
+// Cuerpo V6.0.2 completo: identidad, ingreso, dos compromisos fijos, consentimiento y
+// contexto de cliente.
+const integrationRegisterBody = `{"name":"Dos Nodos","email":"dos-nodos@example.invalid","password":"` + syntheticPhrase + `",` +
+	`"income":{"amount":"12000.00","frequency":"monthly"},` +
+	`"recurringExpenses":[` +
+	`{"concept":"Internet","amount":"699.00","frequency":"monthly","category":"Servicios","type":"fixed"},` +
+	`{"concept":"Transporte","amount":"300.00","frequency":"weekly","category":"Transporte","type":"fixed"}],` +
+	`"privacy":{"accepted":true,"noticeVersion":"2026-11"},` +
+	`"client":{"locale":"es-MX","timeZone":"America/Mexico_City"}}`
 
 func TestRegisterHTTPTwoInstancesSameKeyReplay(t *testing.T) {
 	store := memorystore.NewRegistrationStore()
@@ -115,6 +124,57 @@ func TestRegisterHTTPTwoInstancesSameKeyReplay(t *testing.T) {
 	}
 	if store.RecordsCount() != 1 {
 		t.Fatalf("se esperaba un unico usuario, obtenidos %d", store.RecordsCount())
+	}
+}
+
+func TestRegisterHTTPRespuesta201Completa(t *testing.T) {
+	store := memorystore.NewRegistrationStore()
+	server := newRegisterHTTPServer(t, store, allowAllLimiter{})
+
+	result := postRegister(server.Client(), server.URL, "respuesta-completa-0001", integrationRegisterBody)
+	if result.err != nil {
+		t.Fatalf("peticion HTTP fallo: %v", result.err)
+	}
+	if result.status != http.StatusCreated {
+		t.Fatalf("status esperado 201, obtenido %d: %s", result.status, result.body)
+	}
+	if strings.Contains(result.body, syntheticPhrase) || strings.Contains(result.body, "password") {
+		t.Fatalf("la respuesta no debe exponer credenciales: %s", result.body)
+	}
+
+	var response appIdentity.RegisterResponse
+	if err := json.Unmarshal([]byte(result.body), &response); err != nil {
+		t.Fatalf("respuesta no es JSON valido: %v", err)
+	}
+	if response.User.ID == "" || response.User.Name != "Dos Nodos" {
+		t.Fatalf("bloque user inesperado: %+v", response.User)
+	}
+	if response.Income.Amount != "12000.00" || response.Income.Frequency != "monthly" ||
+		response.Income.MonthlyEquivalent != "12000.00" {
+		t.Fatalf("bloque income inesperado: %+v", response.Income)
+	}
+	if len(response.RecurringPayments) != 2 {
+		t.Fatalf("se esperaban 2 compromisos, hay %d", len(response.RecurringPayments))
+	}
+	for i, esperado := range []string{"Internet", "Transporte"} {
+		if response.RecurringPayments[i].Concept != esperado {
+			t.Fatalf("compromiso %d: esperado %q, obtenido %q", i, esperado, response.RecurringPayments[i].Concept)
+		}
+		if response.RecurringPayments[i].ID == "" {
+			t.Fatalf("el compromiso %d no tiene identificador", i)
+		}
+		if response.RecurringPayments[i].Type != "fixed" {
+			t.Fatalf("tipo inesperado en el compromiso %d: %q", i, response.RecurringPayments[i].Type)
+		}
+	}
+	if response.Consent.NoticeVersion != "2026-11" || !response.Consent.AcceptedByServer {
+		t.Fatalf("bloque consent inesperado: %+v", response.Consent)
+	}
+	if response.Onboarding.Microphone != "pending" || response.Onboarding.Configured {
+		t.Fatalf("bloque onboarding inesperado: %+v", response.Onboarding)
+	}
+	if store.ExpensesCount(response.User.ID) != 2 {
+		t.Fatalf("compromisos persistidos: esperados 2, hay %d", store.ExpensesCount(response.User.ID))
 	}
 }
 
@@ -173,6 +233,9 @@ func TestRegisterHTTPRateLimited(t *testing.T) {
 	if !strings.Contains(result.body, "RATE_LIMITED") {
 		t.Fatalf("codigo de error inesperado: %s", result.body)
 	}
+	if store.RecordsCount() != 0 {
+		t.Fatal("una peticion limitada no debe persistir nada")
+	}
 }
 
 func TestRegisterHTTPUnavailable(t *testing.T) {
@@ -189,5 +252,8 @@ func TestRegisterHTTPUnavailable(t *testing.T) {
 	}
 	if !strings.Contains(result.body, "DEPENDENCY_UNAVAILABLE") {
 		t.Fatalf("codigo de error inesperado: %s", result.body)
+	}
+	if store.RecordsCount() != 0 {
+		t.Fatal("un fallo de persistencia no debe confirmar escritura parcial")
 	}
 }

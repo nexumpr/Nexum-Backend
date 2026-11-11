@@ -66,10 +66,12 @@
         ],
         "operationId": "nexum_e001",
         "summary": "Registrar usuario y consentimiento inicial",
-        "description": "E001 · Email normalizado único con reserva transaccional; contraseña Argon2id; estado email no verificado; política vigente aceptada. Estado H06: REQUIRED_DESIGN. No implementado; pruebas HTTP reales H08.",
+        "description": "E001 · Registro atomico V6.0.2: identidad, ingreso habitual, compromisos fijos iniciales, consentimiento sellado por el servidor y estado inicial de onboarding en una sola transaccion DynamoDB. Sustituye de forma intencional al contrato anterior de E001 (RFC-012).",
         "x-nexum-catalog-id": "E001",
         "x-nexum-source-class": "M",
         "x-nexum-implementation-scope": "REQUIRED_DESIGN",
+        "x-nexum-contract-version": "V6.0.2",
+        "x-nexum-responsible-rfc": "RFC-012",
         "x-nexum-data-access": "DynamoDB user scoped; no Scan; ver DYNAMODB_ACCESOS_H06.md",
         "security": [],
         "parameters": [
@@ -88,19 +90,53 @@
         ],
         "responses": {
           "201": {
-            "description": "Creado.",
+            "description": "Creado. Registro atomico de identidad, ingreso habitual, compromisos fijos, consentimiento y estado inicial de onboarding.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserProfile"
+                  "$ref": "#/components/schemas/RegisterResponse"
                 },
                 "example": {
-                  "id": "018f90ef-08e5-7a68-b09f-2b67a47c92f0",
-                  "email": "ejemplo@example.invalid",
-                  "displayName": "Usuario Ejemplo",
-                  "emailVerified": false,
-                  "createdAt": "2026-11-05T17:00:00Z",
-                  "version": 1
+                  "user": {
+                    "id": "018f90ef-08e5-7a68-b09f-2b67a47c92f0",
+                    "name": "Leonardo Prueba",
+                    "email": "registro.v602@example.com",
+                    "emailVerified": false,
+                    "createdAt": "2026-11-10T12:00:00Z"
+                  },
+                  "income": {
+                    "amount": "12000.00",
+                    "frequency": "monthly",
+                    "monthlyEquivalent": "12000.00"
+                  },
+                  "recurringPayments": [
+                    {
+                      "id": "018f90ef-08e5-4a68-b09f-000000000101",
+                      "concept": "Internet",
+                      "amount": "699.00",
+                      "frequency": "monthly",
+                      "category": "Servicios",
+                      "type": "fixed"
+                    },
+                    {
+                      "id": "018f90ef-08e5-4a68-b09f-000000000102",
+                      "concept": "Transporte",
+                      "amount": "300.00",
+                      "frequency": "weekly",
+                      "category": "Transporte",
+                      "type": "fixed"
+                    }
+                  ],
+                  "consent": {
+                    "noticeVersion": "2026-11",
+                    "acceptedAt": "2026-11-10T12:00:00Z",
+                    "acceptedByServer": true
+                  },
+                  "onboarding": {
+                    "microphone": "pending",
+                    "notifications": "pending",
+                    "configured": false
+                  }
                 }
               }
             },
@@ -230,11 +266,37 @@
                 "$ref": "#/components/schemas/RegisterRequest"
               },
               "example": {
-                "email": "ejemplo@example.invalid",
+                "name": "Leonardo Prueba",
+                "email": "registro.v602@example.com",
                 "password": "ExamplePassphrase#2026",
-                "displayName": "Usuario Ejemplo",
-                "privacyNoticeVersion": "2026-11",
-                "privacyAccepted": true
+                "income": {
+                  "amount": "12000.00",
+                  "frequency": "monthly"
+                },
+                "recurringExpenses": [
+                  {
+                    "concept": "Internet",
+                    "amount": "699.00",
+                    "frequency": "monthly",
+                    "category": "Servicios",
+                    "type": "fixed"
+                  },
+                  {
+                    "concept": "Transporte",
+                    "amount": "300.00",
+                    "frequency": "weekly",
+                    "category": "Transporte",
+                    "type": "fixed"
+                  }
+                ],
+                "privacy": {
+                  "accepted": true,
+                  "noticeVersion": "2026-11"
+                },
+                "client": {
+                  "locale": "es-MX",
+                  "timeZone": "America/Mexico_City"
+                }
               }
             }
           }
@@ -14943,6 +15005,13 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "name": {
+            "type": "string",
+            "example": "Leonardo Prueba",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Nombre del titular (signupName del prototipo). Sustituye a displayName en el contrato publico de E001; el almacenamiento conserva displayName."
+          },
           "email": {
             "type": "string",
             "example": "ejemplo@example.invalid",
@@ -14955,34 +15024,348 @@
             "minLength": 12,
             "maxLength": 128
           },
-          "displayName": {
+          "income": {
+            "$ref": "#/components/schemas/RegisterIncomeInput"
+          },
+          "recurringExpenses": {
+            "type": "array",
+            "maxItems": 94,
+            "description": "Compromisos fijos iniciales. Puede ser [] (sin gastos fijos). El limite de 94 deriva de las 100 acciones de TransactWriteItems menos las 6 acciones fijas del alta; nunca se trunca la lista.",
+            "items": {
+              "$ref": "#/components/schemas/RegisterRecurringExpenseInput"
+            }
+          },
+          "privacy": {
+            "$ref": "#/components/schemas/RegisterPrivacyInput"
+          },
+          "client": {
+            "$ref": "#/components/schemas/RegisterClientInput"
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "password",
+          "income",
+          "recurringExpenses",
+          "privacy"
+        ],
+        "description": "Contrato formal Nexum RegisterRequest (E001 V6.0.2). Sustituye al contrato anterior de forma intencional; ver RFC-012."
+      },
+      "RegisterIncomeInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
             "type": "string",
-            "example": "Usuario Ejemplo",
+            "pattern": "^[0-9]+\\.[0-9]{2}$",
+            "example": "12000.00",
+            "description": "Importe MXN como cadena decimal exacta de dos decimales. Estrictamente mayor que cero. Prohibido enviar numeros JSON."
+          },
+          "frequency": {
+            "type": "string",
+            "example": "monthly",
+            "enum": [
+              "weekly",
+              "fortnightly",
+              "monthly",
+              "bimonthly",
+              "quarterly",
+              "semiannual",
+              "annual"
+            ]
+          }
+        },
+        "required": [
+          "amount",
+          "frequency"
+        ],
+        "description": "Ingreso habitual declarado en el registro (R01)."
+      },
+      "RegisterRecurringExpenseInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "concept": {
+            "type": "string",
+            "example": "Internet",
             "minLength": 1,
             "maxLength": 100
           },
-          "privacyNoticeVersion": {
+          "amount": {
             "type": "string",
-            "example": "2026-11",
-            "minLength": 1,
-            "maxLength": 50
+            "pattern": "^[0-9]+\\.[0-9]{2}$",
+            "example": "699.00",
+            "description": "Importe MXN como cadena decimal exacta de dos decimales, mayor que cero."
           },
-          "privacyAccepted": {
+          "frequency": {
+            "type": "string",
+            "example": "monthly",
+            "enum": [
+              "weekly",
+              "fortnightly",
+              "monthly",
+              "bimonthly",
+              "quarterly",
+              "semiannual",
+              "annual"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "example": "Servicios",
+            "enum": [
+              "Vivienda",
+              "Servicios",
+              "Transporte",
+              "Comida",
+              "Otros"
+            ],
+            "description": "Categoria derivada por el prototipo (guessFixedCategory). El servidor valida el catalogo cerrado y persiste el valor; no existen identificadores numericos de categoria."
+          },
+          "type": {
+            "type": "string",
+            "example": "fixed",
+            "enum": [
+              "fixed"
+            ]
+          }
+        },
+        "required": [
+          "concept",
+          "amount",
+          "frequency",
+          "category",
+          "type"
+        ],
+        "description": "Compromiso fijo programado del alta inicial (R02). No es un gasto ejecutado y no genera movimientos."
+      },
+      "RegisterPrivacyInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
             "type": "boolean",
             "example": true,
             "enum": [
               true
             ]
+          },
+          "noticeVersion": {
+            "type": "string",
+            "example": "2026-11",
+            "minLength": 1,
+            "maxLength": 50
           }
         },
         "required": [
-          "email",
-          "password",
-          "displayName",
-          "privacyNoticeVersion",
-          "privacyAccepted"
+          "accepted",
+          "noticeVersion"
         ],
-        "description": "Contrato formal Nexum RegisterRequest"
+        "description": "Consentimiento afirmativo y version exacta del aviso mostrado. La fecha la fija siempre el servidor."
+      },
+      "RegisterClientInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "locale": {
+            "type": "string",
+            "example": "es-MX",
+            "maxLength": 35,
+            "description": "Idioma BCP-47 simplificado (es-MX, en-US)."
+          },
+          "timeZone": {
+            "type": "string",
+            "example": "America/Mexico_City",
+            "maxLength": 64,
+            "description": "Zona IANA validada contra la base de zonas horarias. Se usa para calculos futuros de meses y visualizacion; no fija fechas de vencimiento."
+          }
+        },
+        "description": "Contexto no financiero del cliente. Ambos campos son opcionales."
+      },
+      "RegisterResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/RegisterUser"
+          },
+          "income": {
+            "$ref": "#/components/schemas/RegisterIncome"
+          },
+          "recurringPayments": {
+            "type": "array",
+            "description": "Todas las filas realmente persistidas. Lista vacia si no se declararon compromisos.",
+            "items": {
+              "$ref": "#/components/schemas/RegisterRecurringPayment"
+            }
+          },
+          "consent": {
+            "$ref": "#/components/schemas/RegisterConsent"
+          },
+          "onboarding": {
+            "$ref": "#/components/schemas/RegisterOnboarding"
+          }
+        },
+        "required": [
+          "user",
+          "income",
+          "recurringPayments",
+          "consent",
+          "onboarding"
+        ],
+        "description": "Respuesta 201 de E001 V6.0.2. No contiene contrasena ni hash, ni crea sesion."
+      },
+      "RegisterUser": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "018f90ef-08e5-7a68-b09f-2b67a47c92f0",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Leonardo Prueba"
+          },
+          "email": {
+            "type": "string",
+            "example": "registro.v602@example.com",
+            "format": "email"
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "example": false
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-11-10T12:00:00Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "emailVerified",
+          "createdAt"
+        ],
+        "description": "Identidad creada por E001."
+      },
+      "RegisterIncome": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "type": "string",
+            "example": "12000.00"
+          },
+          "frequency": {
+            "type": "string",
+            "example": "monthly"
+          },
+          "monthlyEquivalent": {
+            "type": "string",
+            "example": "12000.00",
+            "description": "Equivalente mensual derivado en Go con aritmetica exacta (A-070)."
+          }
+        },
+        "required": [
+          "amount",
+          "frequency",
+          "monthlyEquivalent"
+        ],
+        "description": "Ingreso habitual persistido y su equivalente mensual."
+      },
+      "RegisterRecurringPayment": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "018f90ef-08e5-4a68-b09f-000000000101",
+            "format": "uuid"
+          },
+          "concept": {
+            "type": "string",
+            "example": "Internet"
+          },
+          "amount": {
+            "type": "string",
+            "example": "699.00"
+          },
+          "frequency": {
+            "type": "string",
+            "example": "monthly"
+          },
+          "category": {
+            "type": "string",
+            "example": "Servicios"
+          },
+          "type": {
+            "type": "string",
+            "example": "fixed"
+          }
+        },
+        "required": [
+          "id",
+          "concept",
+          "amount",
+          "frequency",
+          "category",
+          "type"
+        ],
+        "description": "Compromiso fijo persistido, con identificador generado por el servidor."
+      },
+      "RegisterConsent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "noticeVersion": {
+            "type": "string",
+            "example": "2026-11"
+          },
+          "acceptedAt": {
+            "type": "string",
+            "example": "2026-11-10T12:00:00Z",
+            "format": "date-time"
+          },
+          "acceptedByServer": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "noticeVersion",
+          "acceptedAt",
+          "acceptedByServer"
+        ],
+        "description": "Consentimiento sellado por el servidor."
+      },
+      "RegisterOnboarding": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "microphone": {
+            "type": "string",
+            "example": "pending"
+          },
+          "notifications": {
+            "type": "string",
+            "example": "pending"
+          },
+          "configured": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "microphone",
+          "notifications",
+          "configured"
+        ],
+        "description": "Estado inicial de permisos del dispositivo, siempre pendiente al registrarse."
       },
       "LoginRequest": {
         "type": "object",

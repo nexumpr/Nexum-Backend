@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "descripcion": "Registro de excepciones de compatibilidad de API (I-150, INF-150-05). Una entrada solo cubre la ruptura exacta que identifica: codigo, ruta, metodo y RFC. Cualquier otra ruptura, en E001 o en los otros 74 contratos, sigue haciendo fallar el comparador.",
+  "politica": "La excepcion exige RFC registrada, aprobador humano, documento de Gate que contenga la aprobacion y vigencia no vencida. El comparador herramientas/comparar_contrato_api.py la lee con --excepciones.",
+  "actualizado": "2026-11-11",
+  "excepciones": [
+    {
+      "estado": "APPROVED",
+      "alcance": "API_COMPATIBILIDAD",
+      "codigo": "CAMPO_REQUERIDO_NUEVO",
+      "ruta": "/api/v1/auth/register",
+      "metodo": "post",
+      "rfc": "RFC-012",
+      "aprobado_por": "Responsable de Nexum-Backend",
+      "gate_documento": "sdd/_control/H08/RFC-012-ALINEACION_E001_V602.md",
+      "vigencia_hasta": "2026-12-31",
+      "justificacion": "El contrato V6.0.2 del prototipo exige name, income, privacy y recurringExpenses como campos obligatorios del alta. No es compatible hacia atras por diseno y sustituye de forma intencional al contrato anterior de E001.",
+      "detalles": [
+        "name",
+        "income",
+        "privacy",
+        "recurringExpenses"
+      ]
+    },
+    {
+      "estado": "APPROVED",
+      "alcance": "API_COMPATIBILIDAD",
+      "codigo": "ESQUEMA_RESPUESTA_CAMBIADO",
+      "ruta": "/api/v1/auth/register",
+      "metodo": "post",
+      "rfc": "RFC-012",
+      "aprobado_por": "Responsable de Nexum-Backend",
+      "gate_documento": "sdd/_control/H08/RFC-012-ALINEACION_E001_V602.md",
+      "vigencia_hasta": "2026-12-31",
+      "justificacion": "La respuesta 201 pasa de UserProfile a RegisterResponse porque el alta devuelve identidad, ingreso, compromisos, consentimiento y onboarding. UserProfile se conserva intacto para E012 (GET /api/v1/users/me).",
+      "detalles": [
+        "201: #/components/schemas/UserProfile -> #/components/schemas/RegisterResponse"
+      ]
+    }
+  ]
+}

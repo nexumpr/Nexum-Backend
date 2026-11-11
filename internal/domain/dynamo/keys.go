@@ -16,6 +16,9 @@ const (
 	PrefixMovement    = "MOVEMENT#"
 	PrefixGoal        = "GOAL#"
 	PrefixRecurring   = "RECURRING#"
+	PrefixIncome      = "INCOME"
+	PrefixConsent     = "CONSENT#"
+	PrefixOnboarding  = "ONBOARDING"
 	PrefixBudget      = "BUDGET#"
 	PrefixSession     = "SESSION#"
 	PrefixIdempotency = "IDEM#"
@@ -60,6 +63,23 @@ func GoalKeys(userID, goalID string) (pk, sk string) {
 // RecurringKeys genera PK y SK para un pago recurrente programado.
 func RecurringKeys(userID, recurringID string) (pk, sk string) {
 	return PrefixUser + userID, PrefixRecurring + recurringID
+}
+
+// IncomeKeys genera PK y SK para el ingreso habitual declarado en el registro inicial
+// (E001 V6.0.2). Vive en la partición del propietario: no crea particiones nuevas.
+func IncomeKeys(userID string) (pk, sk string) {
+	return PrefixUser + userID, PrefixIncome
+}
+
+// ConsentKeys genera PK y SK para el consentimiento de privacidad aceptado. La SK
+// incluye la versión para conservar el histórico de versiones aceptadas.
+func ConsentKeys(userID, noticeVersion string) (pk, sk string) {
+	return PrefixUser + userID, PrefixConsent + noticeVersion
+}
+
+// OnboardingKeys genera PK y SK para el estado inicial de permisos del dispositivo.
+func OnboardingKeys(userID string) (pk, sk string) {
+	return PrefixUser + userID, PrefixOnboarding
 }
 
 // BudgetKeys genera PK y SK para un presupuesto por periodo y categoría.

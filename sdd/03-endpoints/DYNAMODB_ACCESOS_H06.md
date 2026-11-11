@@ -8,8 +8,8 @@ Tabla propuesta `nexum-core-<entorno>`, clave compuesta `PK` String / `SK` Strin
 
 | Elementos (SK) | Acceso contractual | Fuente, patrón |
 |---|---|---|
-| `PROFILE`, `INCOME`, `PREFERENCES`, `ONBOARDING`, `NOTIFICATION_PREF` | GetItem + CAS `attribute_not_exists`/`version` | E012-013, E018-019, E024-025, E057-058, E068-069 |
-| `CONSENT#<timestamp>#<id>` | Query PK + `begins_with(SK, ...)`, AppendOnly | E016-017 |
+| `PROFILE`, `INCOME`, `PREFERENCES`, `ONBOARDING`, `NOTIFICATION_PREF` | GetItem + CAS `attribute_not_exists`/`version` | E001, E012-013, E018-019, E024-025, E057-058, E068-069 |
+| `CONSENT#<noticeVersion>` (E001) y `CONSENT#<timestamp>#<id>` | Query PK + `begins_with(SK, ...)`, AppendOnly; `TransactWriteItems` en el alta | E001, E016-017 |
 | `SESSION#<id>` y `SECURITY#<epoch>` | GetItem + CAS, revocación; token de refresh **solo hash** | E002-009, E014 |
 | `MOVEMENT#<UTC ISO8601>#<id>` | Query PK `begins_with(SK, MOVEMENT#)`; orden SK por fecha | E027-031, E037 |
 | `MOVEMENT_ID#<id>` (locator propio) | GetItem PK usuario + SK locator → GetItem SK ordenada | E029/030/031; guardar/revertir locator atómicamente con movimiento |
@@ -40,6 +40,45 @@ Tabla propuesta `nexum-core-<entorno>`, clave compuesta `PK` String / `SK` Strin
 - Aportación dividida E044: idempotencia, CONTRIBUTION, movimientos propios, locators y versiones de metas (hasta 12 asignaciones distintas). **La suma de asignaciones = monto total en centavos**. Si la cantidad de acciones excede 100 o el tamaño transaccional >4 MB, responder error previo sin escrituras; no dividir silenciosamente la atomicidad.
 - Reversión E047: CAS de estado `active→reversed`, movimientos de compensación, locators, y decrementar metas una sola vez; no borrar historial. Ingreso base no genera ingreso real; saldos y presupuestos solo gastos efectivos.
 - `If-Match` / ETag: versión consistente por recurso; omisión HTTP 428, valor stale 412; PATCH sin cuerpo o campos desconocidos 400. Dynamo `ConditionalCheckFailed` traduce conflicto correctamente.
+
+## E001 V6.0.2 — alta atómica de registro (RFC-012)
+
+El contrato V6.0.2 convierte el registro en una única operación lógica sobre la tabla
+existente `NEXUM_CORE_<ENTORNO>`. **No se crean tablas, índices ni particiones nuevas**:
+todas las claves usadas ya están cubiertas por la política IAM vigente
+(`USER#*`, `EMAIL#*`, `IDEM#*`).
+
+| Orden | Item | PK | SK | Condición |
+|---:|---|---|---|---|
+| 1 | Reserva de correo | `EMAIL#<sha256(email normalizado)>` | `OWNER` | `attribute_not_exists(PK)` |
+| 2 | Perfil | `USER#<id>` | `PROFILE` | `attribute_not_exists(PK)` |
+| 3 | Ingreso habitual | `USER#<id>` | `INCOME` | `attribute_not_exists(PK)` |
+| 4 | Consentimiento | `USER#<id>` | `CONSENT#<noticeVersion>` | `attribute_not_exists(PK)` |
+| 5 | Onboarding | `USER#<id>` | `ONBOARDING` | `attribute_not_exists(PK)` |
+| 6..N | Compromisos fijos | `USER#<id>` | `RECURRING#<uuid>` | `attribute_not_exists(PK)` |
+| Última | Idempotencia | `IDEM#<sha256(operation:key)>` | `RECORD` | `attribute_not_exists(PK) OR expiresAt < :now` |
+
+Reglas vinculantes:
+
+- Las seis acciones fijas más una por compromiso deben caber en una sola
+  `TransactWriteItems`: **máximo 94 compromisos** (100 acciones − 6 fijas). Un exceso se
+  rechaza completo con `422`; la lista **nunca** se trunca.
+- El ingreso se persiste en **centavos enteros** (`amountCents`, `monthlyEquivalentCents`)
+  más `currency = MXN` y `frequency`. No se almacena coma flotante.
+- El consentimiento guarda la versión declarada por el cliente y `acceptedAt` fijado por
+  el servidor (`acceptedByServer = true`). La SK por versión es compatible con el patrón
+  `Query PK + begins_with(SK, 'CONSENT#')` previsto para E016–E017.
+- Los compromisos fijos son **programados**: el alta no escribe ningún `MOVEMENT`. No se
+  descuentan dos veces en resúmenes futuros.
+- `PROFILE` conserva `displayName`, `privacyNoticeVersion` y `privacyAcceptedAt` para que
+  los perfiles antiguos y los nuevos tengan la misma forma; el registro versionado y
+  autoritativo del consentimiento es `CONSENT#<noticeVersion>`.
+- `IDEM#` guarda además `passwordVerifier` (hash Argon2id del solicitante original) para
+  probar en el replay que la contraseña es la misma sin guardar la contraseña ni un
+  digest simple.
+- El replay de la misma `Idempotency-Key` con el mismo payload devuelve la respuesta
+  almacenada sin duplicar usuario, ingreso ni compromisos; un payload o una contraseña
+  distintos devuelven `409`.
 
 ## Seguridad / operación / respaldo
 

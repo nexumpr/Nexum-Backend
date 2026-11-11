@@ -1,21 +1,55 @@
-# Checklist de calidad — E001
+# Checklist de calidad — E001 V6.0.2
 
-**Diseño H06:** review. **Implementación y evidencia:** NOT_RUN. **Respuesta prevista:** 201.
+**Contrato:** V6.0.2 alineado con el prototipo Nexum (RFC-012). **Implementación local:**
+verificada con `go build`, `go vet` y `go test`. **HTTP/DynamoDB/Redis reales:** `NOT_RUN`.
+**Respuesta prevista:** 201 (`RegisterResponse`).
 
-- [ ] Firma del Gate H06 por el responsable; no confundir instalación con aprobación.
-- [ ] Método/path conservan el ID del inventario H04.
-- [ ] Payload válido/negativo, ejemplo y JSON Schema `RegisterRequest` revisados.
-- [ ] Respuesta `UserProfile` y errores de OpenAPI revisados.
-- [ ] Semántica de propiedad y JWT o excepción pública justificada.
-- [ ] Idempotencia obligatoria y concurrencia resueltas.
-- [ ] DynamoDB tiene Get/Query/Transact, localizadores e índices, **nunca Scan**.
-- [ ] Redis invalidación/TTL/servicio real previsto; fallo seguro.
-- [ ] Montos decimales/cents y timestamps UTC/zonas IANA correctos donde aplican.
-- [ ] Pruebas de error 400/401/403/404/409/412/422/429/500/503 pertinentes al caso.
-- [ ] PII y secretos ausentes en logs, capturas y fixture.
-- [ ] Tests unitarios reales, contrato OpenAPI, integración Dynamo y HTTP: NOT_RUN ahora.
-- [ ] API en dos instancias, TLS público, CI/CD e IaC: NOT_RUN ahora.
-- [ ] Gate individual de release H08 y rollback aprobados antes de `terraform apply`.
-- [ ] Dependencias del cliente Mobile nunca constituyen Gate del Backend.
+## Contrato
 
-**Criterio de cierre:** ninguna casilla operativa se marca por generar este documento; la documentación contractual se valida con el auditor del ZIP y queda REVIEW hasta aprobación.
+- [x] Método y path conservan el identificador y la ruta del inventario H04.
+- [x] `RegisterRequest` documenta los nueve campos de entrada y sus reglas exactas.
+- [x] `RegisterResponse` documenta los cinco bloques de salida y no expone contraseña ni hash.
+- [x] OpenAPI YAML y JSON sincronizados (`paridad` = `PARIDAD_OK`).
+- [x] `UserProfile` intacto para E012; el cambio de esquema de E001 está aislado.
+- [x] Ruptura intencional registrada en RFC-012 y en el registro de excepciones de API.
+- [x] Los otros 74 contratos no cambian de comportamiento.
+
+## Permisos y seguridad
+
+- [x] Endpoint público sin `Authorization`; HTTPS obligatorio en el borde (CloudFront).
+- [x] `Idempotency-Key` obligatoria con validación de longitud y caracteres.
+- [x] Contraseña Argon2id de 12–128 caracteres; nunca en claro ni en logs.
+- [x] Replay con contraseña distinta devuelve `409` sin almacenar la contraseña.
+- [x] PII y secretos ausentes en logs, capturas y fixtures.
+- [x] Rate limit de Redis antes de la persistencia; `503` si Redis no responde.
+
+## Dinero y datos
+
+- [x] Importes como cadena decimal de dos decimales en el transporte y `int64` centavos en
+      dominio y persistencia; ningún `float`.
+- [x] Equivalente mensual calculado con el motor exacto de A-070 y probado en las siete
+      frecuencias.
+- [x] Marcas de tiempo UTC; zona horaria del cliente validada contra IANA.
+- [x] `CONSENT#<noticeVersion>` con versión declarada y `acceptedAt` del servidor.
+- [x] Compromisos fijos sin `MOVEMENT`: no se contabilizan como gasto ejecutado.
+
+## Persistencia
+
+- [x] Una única `TransactWriteItems`; ninguna escritura parcial ante fallo de una fila.
+- [x] Máximo 94 compromisos (100 acciones − 6 fijas); el exceso se rechaza completo.
+- [x] Sin `Scan`; todas las claves usan `GetItem`/`Put` por partición conocida.
+- [x] Particiones usadas (`USER#`, `EMAIL#`, `IDEM#`) cubiertas por la política IAM vigente.
+- [x] Perfiles antiguos legibles: `PROFILE` conserva `displayName` y los campos heredados.
+
+## Pruebas y entrega
+
+- [x] Pruebas unitarias reales de dominio, aplicación, adaptador y transporte.
+- [x] Pruebas negativas: 400/409/422/429/503 pertinentes al caso.
+- [x] Contrato OpenAPI y matriz H06 verificados con el validador del repositorio.
+- [ ] API en dos instancias, TLS público y despliegue: `NOT_RUN` hasta el Gate de release.
+- [ ] Gate individual de release y rollback aprobados antes de publicar en AWS.
+- [x] Dependencias del cliente Mobile no constituyen Gate del Backend.
+
+**Criterio de cierre:** ninguna casilla de despliegue se marca por existir este documento.
+La verificación HTTP real y la comprobación en DynamoDB quedan pendientes del Gate de
+publicación y se registrarán con evidencia del comando y su salida.
