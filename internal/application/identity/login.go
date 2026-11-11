@@ -131,12 +131,16 @@ type LoginService struct {
 	refresh func() (string, error)
 	newID   func() (string, error)
 	now     func() time.Time
+	// decoyHash se deriva en construcción con el hasher productivo y una contraseña
+	// aleatoria: garantiza formato Argon2id válido y coste comparable, sin guardar un
+	// literal dudoso ni ninguna contraseña real.
+	decoyHash string
 }
 
 // NewLoginService construye el servicio. Si falta una dependencia crítica, Login falla
 // cerrado con ErrLoginUnavailable (nunca emite tokens ficticios).
 func NewLoginService(store LoginStore, hasher ports.PasswordHasher, issuer AccessTokenIssuer) *LoginService {
-	return &LoginService{
+	servicio := &LoginService{
 		store:   store,
 		hasher:  hasher,
 		issuer:  issuer,
@@ -144,6 +148,15 @@ func NewLoginService(store LoginStore, hasher ports.PasswordHasher, issuer Acces
 		newID:   domain.NewID,
 		now:     func() time.Time { return time.Now().UTC() },
 	}
+	if hasher != nil {
+		semilla := make([]byte, 32)
+		if _, err := rand.Read(semilla); err == nil {
+			if hash, errHash := hasher.HashPassword(base64.RawURLEncoding.EncodeToString(semilla)); errHash == nil {
+				servicio.decoyHash = hash
+			}
+		}
+	}
+	return servicio
 }
 
 // WithClock permite inyectar un reloj determinista en pruebas.
@@ -228,8 +241,11 @@ func (s *LoginService) Login(ctx context.Context, in LoginCommand) (*LoginRespon
 		return nil, ErrLoginUnavailable
 	}
 	if identity == nil {
-		// Trabajo señuelo: reduce la diferencia temporal observable sin prometer igualdad.
-		_, _ = s.hasher.VerifyPassword(cmd.Password, decoyHash)
+		// Trabajo señuelo con Argon2id real: reduce la diferencia temporal observable
+		// sin prometer igualdad temporal matemática.
+		if s.decoyHash != "" {
+			_, _ = s.hasher.VerifyPassword(cmd.Password, s.decoyHash)
+		}
 		return nil, ErrInvalidCredentials
 	}
 
@@ -303,10 +319,6 @@ func (s *LoginService) Login(ctx context.Context, in LoginCommand) (*LoginRespon
 // SessionDigest expone el digest usado como localizador de refresh (sólo para pruebas
 // y para el adaptador; el token en claro nunca se persiste).
 func SessionDigest(token string) string { return HashToken(token) }
-
-// decoyHash es un hash Argon2id sintético de un valor aleatorio fijo: permite ejecutar
-// una verificación con coste comparable cuando el correo no existe.
-const decoyHash = "$argon2id$v=19$m=65536,t=3,p=2$c2FsdHNhbHRzYWx0c2E$3rXVJ0oQ0m6dQ0oQ0m6dQ0oQ0m6dQ0oQ0m6dQ0oQ0m0"
 
 // newOpaqueToken genera 32 bytes CSPRNG en base64url (256 bits de entropía).
 func newOpaqueToken() (string, error) {

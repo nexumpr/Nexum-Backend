@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
+	domain "github.com/nexumpr/Nexum-Backend/internal/domain/identity"
 	"github.com/nexumpr/Nexum-Backend/pkg/httputil"
 )
 
@@ -100,7 +100,16 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeRegisterError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "servicio no disponible", nil)
 		return
 	}
-	allowed, retryAfter, err := h.limiter.AllowLogin(r.Context(), command.ClientIP, strings.TrimSpace(command.Email))
+	// La cuota por email usa exactamente la identidad normalizada canónica (misma regla
+	// que E001 y que la búsqueda en DynamoDB), evitando divergencias por mayúsculas o espacios.
+	emailNormalizado, errEmail := domain.ValidateEmail(command.Email)
+	if errEmail != nil {
+		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+			{Field: "email", Reason: "invalid_email"},
+		})
+		return
+	}
+	allowed, retryAfter, err := h.limiter.AllowLogin(r.Context(), command.ClientIP, emailNormalizado)
 	if err != nil {
 		h.logger.ErrorContext(r.Context(), "login rechazado: fallo del rate limiter",
 			slog.String("error_class", "rate_limiter_unavailable"),

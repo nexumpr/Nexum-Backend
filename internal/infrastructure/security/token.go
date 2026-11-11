@@ -23,6 +23,12 @@ const (
 	DefaultAudience = "nexum-client"
 	// DefaultKeyID identificador de la clave pública para rotación de claves (kid).
 	DefaultKeyID = "nexum-rsa-key-v1"
+
+	// LeewaySegundos es la tolerancia máxima de reloj aceptada al validar claims (RFC-013).
+	LeewaySegundos = 30
+
+	// MaxAccessTokenSegundos es la vida máxima admitida de un access token.
+	MaxAccessTokenSegundos = 900
 )
 
 // JWTHeader representa la cabecera estándar de un JWT RS256.
@@ -39,6 +45,7 @@ type JWTPayload struct {
 	Audience  string   `json:"aud"`
 	SessionID string   `json:"sid"`
 	IssuedAt  int64    `json:"iat"`
+	NotBefore int64    `json:"nbf"`
 	ExpiresAt int64    `json:"exp"`
 	Roles     []string `json:"roles,omitempty"`
 	JWTID     string   `json:"jti"`
@@ -109,6 +116,7 @@ func (p *RSATokenProvider) GenerateAccessToken(ctx context.Context, claims ports
 		Audience:  p.audience,
 		SessionID: claims.SessionID,
 		IssuedAt:  iat.Unix(),
+		NotBefore: iat.Unix(),
 		ExpiresAt: exp.Unix(),
 		Roles:     claims.Roles,
 		JWTID:     jti,
@@ -167,6 +175,13 @@ func (p *RSATokenProvider) ValidateAccessToken(ctx context.Context, tokenString 
 	if header.Algorithm != "RS256" {
 		return nil, fmt.Errorf("%w: algoritmo '%s' no permitido (solo RS256)", ports.ErrInvalidToken, header.Algorithm)
 	}
+	// RFC-013: typ obligatorio y kid conocido por el keyring del proveedor.
+	if !strings.EqualFold(header.Type, "JWT") {
+		return nil, fmt.Errorf("%w: typ distinto de JWT", ports.ErrInvalidToken)
+	}
+	if header.KeyID == "" || header.KeyID != p.keyID {
+		return nil, fmt.Errorf("%w: kid desconocido", ports.ErrInvalidToken)
+	}
 
 	payloadJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
@@ -192,8 +207,39 @@ func (p *RSATokenProvider) ValidateAccessToken(ctx context.Context, tokenString 
 		return nil, ports.ErrInvalidToken
 	}
 
+	// RFC-013: validación de emisor, audiencia y claims obligatorios.
+	if payload.Issuer != p.issuer {
+		return nil, fmt.Errorf("%w: issuer no reconocido", ports.ErrInvalidToken)
+	}
+	if payload.Audience != p.audience {
+		return nil, fmt.Errorf("%w: audience no reconocida", ports.ErrInvalidToken)
+	}
+	if strings.TrimSpace(payload.Subject) == "" || strings.TrimSpace(payload.SessionID) == "" {
+		return nil, fmt.Errorf("%w: sub o sid ausentes", ports.ErrInvalidToken)
+	}
+	if strings.TrimSpace(payload.JWTID) == "" {
+		return nil, fmt.Errorf("%w: jti ausente", ports.ErrInvalidToken)
+	}
+	if payload.IssuedAt <= 0 || payload.NotBefore <= 0 || payload.ExpiresAt <= 0 {
+		return nil, fmt.Errorf("%w: claims temporales enumerables", ports.ErrInvalidToken)
+	}
+	if payload.ExpiresAt <= payload.IssuedAt {
+		return nil, fmt.Errorf("%w: exp no posterior a iat", ports.ErrInvalidToken)
+	}
+	if payload.ExpiresAt-payload.IssuedAt > MaxAccessTokenSegundos+LeewaySegundos {
+		return nil, fmt.Errorf("%w: vida del token fuera de política", ports.ErrInvalidToken)
+	}
+
 	now := time.Now().UTC().Unix()
-	if now >= payload.ExpiresAt {
+	// nbf: el token no puede ser válido en el futuro más allá del leeway.
+	if payload.NotBefore > now+LeewaySegundos {
+		return nil, fmt.Errorf("%w: nbf en el futuro", ports.ErrInvalidToken)
+	}
+	// iat no puede estar en el futuro más allá del leeway.
+	if payload.IssuedAt > now+LeewaySegundos {
+		return nil, fmt.Errorf("%w: iat en el futuro", ports.ErrInvalidToken)
+	}
+	if now >= payload.ExpiresAt+LeewaySegundos {
 		return nil, ports.ErrTokenExpired
 	}
 
