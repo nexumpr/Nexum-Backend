@@ -121,20 +121,21 @@ func (s *SessionStore) CreateSession(ctx context.Context, record appIdentity.Ses
 	expiresAt := record.ExpiresAt.UTC().Format(time.RFC3339)
 
 	sessionItem := map[string]types.AttributeValue{
-		"PK":             stringAttr(sessionPK),
-		"SK":             stringAttr(sessionSK),
-		"entityType":     stringAttr("USER_SESSION"),
-		"userId":         stringAttr(record.UserID),
-		"sessionId":      stringAttr(record.SessionID),
-		"familyId":       stringAttr(record.FamilyID),
-		"refreshHash":    stringAttr(record.RefreshHash),
-		"accessJti":      stringAttr(record.AccessJTI),
-		"status":         stringAttr(record.Status),
-		"createdAt":      stringAttr(createdAt),
-		"lastUsedAt":     stringAttr(createdAt),
-		"expiresAt":      stringAttr(expiresAt),
-		"expiresAtEpoch": numberAttr(record.ExpiresAt.UTC().Unix()),
-		"version":        numberAttr(1),
+		"PK":          stringAttr(sessionPK),
+		"SK":          stringAttr(sessionSK),
+		"entityType":  stringAttr("USER_SESSION"),
+		"userId":      stringAttr(record.UserID),
+		"sessionId":   stringAttr(record.SessionID),
+		"familyId":    stringAttr(record.FamilyID),
+		"refreshHash": stringAttr(record.RefreshHash),
+		"accessJti":   stringAttr(record.AccessJTI),
+		"status":      stringAttr(record.Status),
+		"createdAt":   stringAttr(createdAt),
+		"lastUsedAt":  stringAttr(createdAt),
+		// `expiresAt` es el atributo TTL fisico de la tabla (Number, epoch seconds).
+		"expiresAt":    numberAttr(record.ExpiresAt.UTC().Unix()),
+		"expiresAtISO": stringAttr(expiresAt),
+		"version":      numberAttr(1),
 	}
 	if record.DeviceID != "" {
 		sessionItem["deviceId"] = stringAttr(record.DeviceID)
@@ -147,16 +148,17 @@ func (s *SessionStore) CreateSession(ctx context.Context, record appIdentity.Ses
 	}
 
 	refreshItem := map[string]types.AttributeValue{
-		"PK":             stringAttr(refreshPK),
-		"SK":             stringAttr(refreshSK),
-		"entityType":     stringAttr("REFRESH_LOOKUP"),
-		"userId":         stringAttr(record.UserID),
-		"sessionId":      stringAttr(record.SessionID),
-		"familyId":       stringAttr(record.FamilyID),
-		"status":         stringAttr(record.Status),
-		"createdAt":      stringAttr(createdAt),
-		"expiresAt":      stringAttr(expiresAt),
-		"expiresAtEpoch": numberAttr(record.ExpiresAt.UTC().Unix()),
+		"PK":         stringAttr(refreshPK),
+		"SK":         stringAttr(refreshSK),
+		"entityType": stringAttr("REFRESH_LOOKUP"),
+		"userId":     stringAttr(record.UserID),
+		"sessionId":  stringAttr(record.SessionID),
+		"familyId":   stringAttr(record.FamilyID),
+		"status":     stringAttr(record.Status),
+		"createdAt":  stringAttr(createdAt),
+		// `expiresAt` es el atributo TTL fisico de la tabla (Number, epoch seconds).
+		"expiresAt":    numberAttr(record.ExpiresAt.UTC().Unix()),
+		"expiresAtISO": stringAttr(expiresAt),
 	}
 
 	input := &dynamodb.TransactWriteItemsInput{

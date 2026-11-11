@@ -53,8 +53,15 @@ Ambas se escriben en **una sola `TransactWriteItems`** con
 que E003/E004 fijen su reemplazo definitivo (documentado, sin borrar código en este PR).
 
 El ítem de sesión contiene: `userId`, `sessionId`, `familyId`, `status` (`ACTIVE`/`REVOKED`),
-`refreshHash`, `accessJti`, `createdAt`, `lastUsedAt`, `expiresAt` (UTC y `expiresAtEpoch`
-numérico para TTL), y metadatos opcionales `deviceId`/`deviceName`/`platform`.
+`refreshHash`, `accessJti`, `createdAt`, `lastUsedAt`, `expiresAt` y metadatos opcionales
+`deviceId`/`deviceName`/`platform`.
+
+**Modelo TTL corregido (enmienda 2026-11-11):** `infra/terraform/modules/dynamodb` fija el
+atributo TTL físico en **`expiresAt`** con tipo **Number** (segundos Unix) y su validación
+rechaza cualquier otro nombre. Por tanto `expiresAt` se persiste como **número epoch** y,
+opcionalmente, `expiresAtISO` (string RFC3339, sólo legibilidad). La comprobación lógica es
+`now.Unix() >= expiresAt`, independiente de que DynamoDB no haya purgado el ítem: un ítem
+caducado **no** se considera activo. La tabla no se modifica para adaptarla al código.
 **Nunca** el refresh en claro. La expiración lógica se comprueba aunque el TTL no haya
 purgado el ítem.
 
@@ -63,8 +70,9 @@ purgado el ítem.
 - Algoritmo único `RS256`; se rechaza `alg=none` y cualquier otro.
 - `iss = https://api.nexum.finance` y `aud = nexum-client` (valores ya fijados en
   `token.go`; **no** se sustituyen por el host de CloudFront).
-- Claims: `sub` (userId), `sid` (sessionId), `jti` (128 bits CSPRNG), `iat`, `exp`, `nbf`,
-  `typ`, `kid` explícito. Sin datos financieros, email ni contraseñas.
+- **JOSE header:** `alg=RS256`, `typ=JWT` y `kid`.
+- **Claims del payload:** `iss`, `aud`, `sub` (userId), `sid` (sessionId), `jti` (128 bits
+  CSPRNG), `iat`, `nbf` y `exp`. Sin datos financieros, email ni contraseñas.
 - Vida del access token: **900 s**. Leeway de validación: **≤30 s**.
 - Validación obligatoria de `iss`, `aud`, `exp`, `nbf`, `iat`, `kid` conocido, `sub`/`sid`/`jti`
   presentes y firma. Se rechaza `kid` desconocido.
@@ -149,7 +157,7 @@ se tocan E001, E005–E075, ni la infraestructura (VPC/ALB/CloudFront/DynamoDB/R
 | Cambio de `expiresIn` 600→900 rompe tests previos | actualizar pruebas y `session_service` explícitamente |
 | Deriva con `AuthTokens` | `LoginResponse` es un esquema nuevo y separado |
 | Enumeración de cuentas | 401 genérico idéntico + señuelo Argon2id |
-| Coste | 0.0000 USD: sin recursos nuevos |
+| Coste | Sin recursos nuevos previstos; el consumo operacional de DynamoDB/Redis/CloudFront sigue existiendo y **no se garantiza coste cero** |
 
 ## 8. Pruebas y criterios de cierre
 
