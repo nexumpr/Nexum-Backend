@@ -166,7 +166,7 @@
     "infra/terraform/modules/dynamodb/main.tf": "617afe6a5905be4afa24a16f65402a899ec4bf1609a3781b79fcd5a708540132",
     "infra/terraform/modules/dynamodb/outputs.tf": "18a63dbc4f9148af380a87309be250f847d7cf2dbdb2a5dac27a9335a359530f",
     "infra/terraform/modules/dynamodb/variables.tf": "efdf8807ce4b971639e74ee6d2e902196f2442c264ff27475d9a9791d1b5f868",
-    "infra/terraform/modules/iam/main.tf": "3c24a2e7c638e7dd4fdb9152a78b352de7f0b6b31ab0326d75579ced43fdb286",
+    "infra/terraform/modules/iam/main.tf": "7ee7f8446c2927dbcd2bd9fb82e9d9bf5acfb0cf24d438aa448808fbedb4d81f",
     "infra/terraform/modules/iam/outputs.tf": "6ed604c43965ea79a31a10c82d1cc75676ba22d3798c3cdf755f4fd9de5249b8",
     "infra/terraform/modules/iam/variables.tf": "584251274151304434f5eca0951ef58fa57d64e099fb9b9371401a8adaaab69b",
     "infra/terraform/modules/identidades_publicacion/main.tf": "b84d188ef196960b33114c68a8f8327ed07d9438c3a24d0cc1753fa667e7f3b4",

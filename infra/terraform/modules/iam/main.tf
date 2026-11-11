@@ -45,6 +45,10 @@ locals {
     [
       "USER#*",
       "EMAIL#*",
+      # E001 registra en una transacción USER#, EMAIL# e IDEM# (idempotencia).
+      # TransactWriteItems evalúa LeadingKeys por elemento, así que sin este
+      # prefijo la tercera escritura se deniega y el registro devuelve 503.
+      "IDEM#*",
       "SESSION#*",
       "REFRESH#*",
       "ONE_USE#*",
