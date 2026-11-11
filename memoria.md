@@ -860,3 +860,17 @@
 - **Plan:** el SHA-256 `5628072141D368F84B767A391A5A416A2562B37B54757EB7ED0D10AFD03CAF1E` queda **STALE** (generado antes del endurecimiento) y no debe aplicarse; requiere regeneración desde `main` tras el merge y Gate nuevo.
 - **Validador SDD:** `dist/` y `*.tfstate*`/`*.tflock` se excluyen del manifiesto como artefactos locales no versionables; la seguridad sigue dependiendo de `git` (`GIT_UNDECLARED` para tfstate rastreado y `verificar_iac_devsecops.py`).
 - **Sin AWS:** `AWS_NOT_RUN`; ningún `terraform plan/apply/destroy` en esta unidad.
+
+### Fase base — primer apply autorizado e incidente (2026-11-10)
+
+- **Autorización:** `APRUEBO_APPLY_FASE_BASE_SHA256_C2A5C66900F33354DE690FDDBCB4BBCAB335284940B9D6DE1A89426E56EF6BD9`; plan verificado (hash recalculado, `desplegar_aplicacion=false`, 73 create, 0 change/destroy/replace/import).
+- **Custodia:** la carpeta `C:\Nexum-Custodia` **no estaba restringida** (heredaba `Authenticated Users: Modify` y `BUILTIN\Usuarios: ReadAndExecute`) pese a que RFC-011 §9 afirmaba lo contrario. Corregida con `/inheritance:r` y sólo `leoba`, `SYSTEM` y `Administradores`; verificado en los archivos del plan.
+- **Puente de credenciales:** el proveedor y el backend no usan la sesión de `aws login`; se usó `credential_process` en `%TEMP%\nexum-tf\config` (sin secretos en disco ni en Git).
+- **Resultado del apply: PARCIAL.** 37 recursos creados; **10 errores**: 3 roles IAM con `MalformedPolicyDocument: Invalid principal in policy` y 7 conflictos `already exists`.
+- **Causa 1 (config, real):** el ARN del operador es `arn:aws:iam::713797602090:role/managed/AccountFullAccessRole` (**path `/managed/`**); el `tfvars` tenía el ARN sin path. El ARN de sesión STS (`assumed-role/<rol>/<sesión>`) oculta el path, por lo que la comprobación anterior no lo detectó. Corregido el valor en custodia; exige plan nuevo y token nuevo.
+- **Causa 2 (interrupción):** la primera invocación del apply quedó cortada por el envoltorio y dejó un lock huérfano (`1d932b97…`) y 7 recursos creados **sin escribir state**: 2 buckets, tabla `NEXUM_CORE_H08I`, rol `nexum-h08i-backend-runtime`, parameter group `nexum-h08i-redis7-cache-ttl` y usuarios `nexum-app` / `nexum-default-off`. Lock liberado con `terraform force-unlock` (excepción temporal, retirada).
+- **Causa 3 (código, real):** `module.iam` usaba `count = length(aws_iam_role.terraform_apply)`, no determinable en `terraform import` («Invalid count argument»), lo que impedía adoptar los 7 huérfanos. Corregido con la misma expresión de variables que el rol.
+- **Causa 4 (hueco de detección):** no se verificaba que el principal existiera. Añadido `data "aws_iam_role" "operador"` y precondition que compara el ARN real (habría fallado en el **plan**).
+- **Excepciones temporales de permisos** (`apply`, `force-unlock`, `import`): añadidas, usadas y **retiradas**; `opencode.json` idéntico a `HEAD` (`git diff` vacío).
+- **Coste en curso:** sólo el interface endpoint `logs` (2 AZ) ≈ 0.0200 USD/h; sin replication group Redis, sin cargos DynamoDB/S3 medibles. `AWS_COST_REAL = NOT_VERIFIED`.
+- **Estado:** `FASE_BASE_PARCIAL — 37 CREADOS + 7 HUÉRFANOS — NO COMPLETADA`; `E001_PUBLICADO` no declarado.

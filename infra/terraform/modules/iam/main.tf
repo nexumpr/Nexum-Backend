@@ -350,8 +350,14 @@ resource "aws_iam_role" "terraform_apply" {
 # El único permiso IAM implementado para apply en I-060: permitir pasar el rol
 # runtime exacto al servicio EC2. No concede Create/Update/Delete a ningún recurso;
 # el resto de la matriz IaC depende de I-070/I-080/I-090.
+#
+# `count` se calcula con la MISMA expresión que el recurso del que depende y no con
+# `length(aws_iam_role.terraform_apply)`: la longitud de la lista de instancias de
+# otro recurso no es conocida durante `terraform import` ni en operaciones
+# parciales, lo que bloqueaba la adopción de recursos existentes con
+# «Invalid count argument». Con variables es determinista en plan.
 resource "aws_iam_role_policy" "terraform_apply_pass_runtime" {
-  count = length(aws_iam_role.terraform_apply)
+  count = local.oidc_enabled && var.enable_apply_oidc_role && var.apply_environment_protected ? 1 : 0
 
   name = "${local.nombre}-apply-pass-runtime-to-ec2"
   role = aws_iam_role.terraform_apply[0].id
