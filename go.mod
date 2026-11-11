@@ -1,6 +1,8 @@
 module github.com/nexumpr/Nexum-Backend
 
-go 1.27.3
+go 1.27.4
+
+toolchain go1.27.4
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.47.8
