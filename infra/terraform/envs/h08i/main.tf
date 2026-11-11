@@ -226,7 +226,13 @@ module "artefactos" {
   # preconditions de I-060 validan el formato en tiempo de plan; la raíz
   # comprueba después con `check` que coinciden con `aws_iam_role.*.arn`.
   publicador_arn = local.arn_artefactos_publicador
-  gestor_iac_arn = local.arn_secretos_gestor_iac
+
+  # La política del bucket deniega `s3:ListBucket` a todos salvo esta identidad
+  # (para que `HeadBucket` del refresh no quede denegado y Terraform no crea que
+  # el bucket ha desaparecido). La identidad que ejecuta Terraform en esta cuenta
+  # es el operador, no un rol OIDC: por eso la exención es el operador real.
+  # El rol `secretos-gestor-iac` sigue existiendo para asumirlo en publicaciones.
+  gestor_iac_arn = var.principal_operador_arn
 }
 
 module "secretos" {
@@ -239,7 +245,11 @@ module "secretos" {
   prefijo                = "nexum/secrets/"
   retencion_version_dias = 30
   publicador_arn         = local.arn_secretos_publicador
-  gestor_iac_arn         = local.arn_secretos_gestor_iac
+
+  # Misma razón que en el bucket de artefactos: la exención de `ListBucket` debe
+  # ser la identidad que ejecuta Terraform (el operador), o el refresh deniega
+  # `HeadBucket` y el plan intenta recrear el bucket.
+  gestor_iac_arn = var.principal_operador_arn
 }
 
 module "iam" {

@@ -443,7 +443,9 @@ class CableadoDelEntorno(unittest.TestCase):
         # `identidades_publicacion`; la raíz los referencia por ARN determinista y
         # ya no existe una variable vacía que pueda quedar sin cablear.
         self.assertIn("publicador_arn = local.arn_secretos_publicador", compacto)
-        self.assertIn("gestor_iac_arn = local.arn_secretos_gestor_iac", compacto)
+        # La exención de ListBucket es el operador: es quien ejecuta Terraform.
+        self.assertIn("gestor_iac_arn = var.principal_operador_arn", compacto)
+        self.assertNotIn("gestor_iac_arn = local.arn_secretos_gestor_iac", compacto)
         self.assertNotIn('variable "secretos_publicador_arn"', self.variables)
         self.assertNotIn('variable "secretos_gestor_iac_arn"', self.variables)
 
