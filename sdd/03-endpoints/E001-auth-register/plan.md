@@ -1,25 +1,58 @@
-# Plan H06 — E001: Registrar usuario y consentimiento inicial
+# Plan H06 → V6.0.2 — E001: registro con ingreso habitual y compromisos fijos
 
-**Estado:** diseño listo para revisión humana; implementación futura H08+ con Gate H07 aprobado. **Ruta:** `POST /api/v1/auth/register`.
+**Estado:** contrato V6.0.2 alineado con el prototipo Nexum (RFC-012) e implementado en
+local; despliegue `NOT_RUN`. **Ruta:** `POST /api/v1/auth/register`.
 
-## Arquitectura y secuencia de implementación futura
+## Arquitectura y secuencia
 
-1. Definir caso de uso Go en capa `application` y entidades/errores en `domain`; transportar DTO `RegisterRequest` → `UserProfile` sin exponer SDK AWS a controladores.
-2. HTTP Router/middleware valida JWT, cuerpo, límites y parámetros: auth `public`, idempotencia sí, If-Match no obligatorio.
-3. Adaptador DynamoDB: Email-reserva / USER#id PROFILE y SESSION#id / SESSIONHASH#digest; token hash con TTL y expiración funcional. Integrar condiciones, `Query`/`GetItem`, cero `Scan`, transacciones cuando aplique.
-4. Redis: política por usuario, TTL/invalidation, revocación multiinstancia y fallo seguro. Un cache hit no puede saltarse autorización.
-5. Responder HTTP 201 con esquema OpenAPI, errores uniformes y cabeceras; `Location` en 201 si corresponde.
-6. Publicar un único endpoint nuevo por release con PR, CI SAST/DAST permitido, contratos y pruebas unitarias/de integración/HTTP de dos nodos, rollback y aprobación humana.
+1. **Dominio** (`internal/domain/identity`): `InitialIncome`, `RecurringExpense`, `Consent`,
+   `Onboarding` y `ClientContext` como objetos validados; `Registration` compone el
+   agregado y fija el onboarding inicial. El equivalente mensual se delega en el motor
+   exacto de A-070 (`financial.CalculateMonthlyEquivalent`), nunca en coma flotante.
+2. **Aplicación** (`internal/application/identity`): `RegisterCommand` completo,
+   `ValidateRegisterCommand` por campo, `payloadHash` canónico y `RegisterResponse` como
+   contrato de salida. `RegisterService` hashea la contraseña con Argon2id, genera los UUID
+   del servidor y comprueba en el replay la igualdad de contraseña contra el verificador
+   Argon2id almacenado.
+3. **Transporte** (`internal/transport/http`): DTO estricto con `httputil.DecimalMoney`
+   (string, dos decimales, prohibido número JSON) y bloques obligatorios que producen `400`
+   con el campo exacto. `BindJSON` mantiene `DisallowUnknownFields` y el límite de 1 MB;
+   el rate limit de Redis se aplica **antes** de tocar la persistencia.
+4. **Persistencia** (`internal/adapters/dynamo`): una única `TransactWriteItems` con seis
+   acciones fijas más una por compromiso, condiciones `attribute_not_exists(PK)` y la
+   idempotencia al final con `attribute_not_exists(PK) OR expiresAt < :now`. Los motivos de
+   cancelación se traducen por tipo de acción, no por índice fijo.
+5. **Respuesta:** `201` con `RegisterResponse`, `Location: /api/v1/users/me` y
+   `X-Idempotent-Replay` cuando corresponde. Sin tokens: E001 no crea sesión.
 
 ## Decisiones específicas
 
-- Email normalizado único con reserva transaccional; contraseña Argon2id; estado email no verificado; política vigente aceptada.
-- Modelo de request: `RegisterRequest`. Modelo de response: `UserProfile`.
-- Patrón de persistencia: Email-reserva / USER#id PROFILE y SESSION#id / SESSIONHASH#digest; token hash con TTL y expiración funcional.
-- Obligación: `REQUIRED_DESIGN`. Requerido por el catálogo o soporte vigente; no rebajarlo a demo.
+- **Nombre del contrato:** `name` sustituye a `displayName` en el transporte; el atributo
+  persistido sigue siendo `displayName` para no romper los perfiles existentes que lee E012.
+- **Esquema de respuesta propio:** `RegisterResponse` es nuevo; `UserProfile` se conserva
+  intacto porque lo usa E012 (`GET /api/v1/users/me`).
+- **Límite de la transacción:** 100 acciones de DynamoDB menos 6 fijas = **94 compromisos**.
+  El exceso se rechaza completo; no se trunca la lista.
+- **Idempotencia:** el `payloadHash` cubre identidad, ingreso, compromisos en orden,
+  consentimiento y cliente. La contraseña se prueba con Argon2id en el replay, de modo que
+  una misma clave con otra contraseña devuelve `409` sin almacenar la contraseña ni un
+  digest simple.
+- **Categoría:** catálogo cerrado del prototipo; el servidor valida y persiste el valor, no
+  recalcula por palabras clave ni inventa identificadores numéricos.
+- **Zona horaria:** validada con la base IANA embebida en el binario, para que el resultado
+  no dependa del host.
+- **Sin sesión ficticia:** el bloque `session` del prototipo es condicional y queda fuera
+  del alcance hasta E002/E003.
 
 ## Dependencias y riesgos
 
-- No crear recursos ni ejecutar despliegues en H06. AWS Free/45 días/cero pesos y ciclo IaC cerrado son condiciones de H08, no tareas manuales de Mobile.
-- Errores de concurrencia 409/412, reglas de negocio 422, disponibilidad 503 y seguridad de recursos ajenos.
-- Prueba real HTTP/HTTPS y DynamoDB/Redis: **NOT_RUN**; solo el contrato/documento es verificable ahora.
+- Cambio incompatible **intencional** del contrato de E001: los campos requeridos cambian y
+  el `201` pasa de `UserProfile` a `RegisterResponse`. Se registra en RFC-012 y en el
+  registro de excepciones de compatibilidad de API; el comparador de contratos sigue
+  bloqueando cualquier otra ruptura no autorizada.
+- Errores de concurrencia `409`, reglas de negocio `422`, disponibilidad `503` y seguridad
+  de recursos ajenos.
+- Dependencias de despliegue: artefacto S3 versionado, CD asistido y Gate humano; AWS no se
+  ha modificado en esta unidad.
+- Prueba real HTTP/HTTPS y DynamoDB/Redis: **NOT_RUN**; solo el contrato y la
+  implementación local son verificables ahora.

@@ -33,9 +33,11 @@ type fakeRegisterLimiter struct {
 	err        error
 	class      string
 	identifier string
+	calls      int
 }
 
 func (f *fakeRegisterLimiter) Allow(_ context.Context, class, identifier string) (bool, time.Duration, error) {
+	f.calls++
 	f.class = class
 	f.identifier = identifier
 	if f.err != nil {
@@ -70,7 +72,19 @@ func newHandlerFixture(t *testing.T) handlerFixture {
 
 const syntheticPhrase = "ExamplePassphrase#2026"
 
-const validRegisterBody = `{"email":"usuario@example.invalid","password":"` + syntheticPhrase + `","displayName":"Usuario Ejemplo","privacyNoticeVersion":"2026-11","privacyAccepted":true}`
+// Cuerpo valido del contrato V6.0.2 completo: identidad, ingreso, un gasto fijo,
+// privacidad y contexto de cliente.
+const validRegisterBody = `{"name":"Usuario Ejemplo","email":"usuario@example.invalid","password":"` + syntheticPhrase + `",` +
+	`"income":{"amount":"12000.00","frequency":"monthly"},` +
+	`"recurringExpenses":[{"concept":"Internet","amount":"699.00","frequency":"monthly","category":"Servicios","type":"fixed"}],` +
+	`"privacy":{"accepted":true,"noticeVersion":"2026-11"},` +
+	`"client":{"locale":"es-MX","timeZone":"America/Mexico_City"}}`
+
+// Cuerpo sin gastos recurrentes: la lista vacia es valida.
+const emptyExpensesRegisterBody = `{"name":"Sin Gastos","email":"sin.gastos@example.invalid","password":"` + syntheticPhrase + `",` +
+	`"income":{"amount":"9500.50","frequency":"fortnightly"},` +
+	`"recurringExpenses":[],` +
+	`"privacy":{"accepted":true,"noticeVersion":"2026-11"}}`
 
 func registerRequest(body, key string) *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(body))
@@ -88,13 +102,13 @@ func serveRegister(f handlerFixture, req *http.Request) *httptest.ResponseRecord
 	return rec
 }
 
-func decodeProfile(t *testing.T, rec *httptest.ResponseRecorder) appIdentity.UserProfile {
+func decodeRegisterResponse(t *testing.T, rec *httptest.ResponseRecorder) appIdentity.RegisterResponse {
 	t.Helper()
-	var profile appIdentity.UserProfile
-	if err := json.Unmarshal(rec.Body.Bytes(), &profile); err != nil {
+	var response appIdentity.RegisterResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("respuesta no es JSON valido: %v (%s)", err, rec.Body.String())
 	}
-	return profile
+	return response
 }
 
 func decodeError(t *testing.T, rec *httptest.ResponseRecorder) httputil.ErrorEnvelope {
@@ -116,24 +130,53 @@ func TestRegisterHandlerCreated(t *testing.T) {
 	if got := rec.Header().Get("Location"); got != "/api/v1/users/me" {
 		t.Fatalf("Location inesperado: %q", got)
 	}
+	if got := rec.Header().Get("Content-Type"); !strings.HasPrefix(got, "application/json") {
+		t.Fatalf("Content-Type inesperado: %q", got)
+	}
 	if got := rec.Header().Get("X-Idempotent-Replay"); got != "" {
 		t.Fatalf("la primera respuesta no debe marcarse como replay: %q", got)
 	}
-	profile := decodeProfile(t, rec)
-	if profile.Email != "usuario@example.invalid" || profile.DisplayName != "Usuario Ejemplo" {
-		t.Fatalf("perfil inesperado: %+v", profile)
+
+	response := decodeRegisterResponse(t, rec)
+	if response.User.Email != "usuario@example.invalid" || response.User.Name != "Usuario Ejemplo" {
+		t.Fatalf("usuario inesperado: %+v", response.User)
 	}
-	if profile.EmailVerified {
+	if response.User.EmailVerified {
 		t.Fatal("emailVerified debe ser false")
 	}
-	if profile.Version != 1 {
-		t.Fatalf("version esperada 1, obtenida %d", profile.Version)
+	if response.User.CreatedAt != "2026-11-10T12:00:00Z" {
+		t.Fatalf("createdAt inesperado: %q", response.User.CreatedAt)
 	}
-	if profile.CreatedAt != "2026-11-10T12:00:00Z" {
-		t.Fatalf("createdAt inesperado: %q", profile.CreatedAt)
+	if response.Income.Amount != "12000.00" || response.Income.MonthlyEquivalent != "12000.00" {
+		t.Fatalf("ingreso inesperado: %+v", response.Income)
 	}
-	if f.limiter.class != "auth_register" {
-		t.Fatalf("clase de rate limit inesperada: %q", f.limiter.class)
+	if len(response.RecurringPayments) != 1 {
+		t.Fatalf("compromisos esperados 1, hay %d", len(response.RecurringPayments))
+	}
+	if response.Consent.NoticeVersion != "2026-11" || !response.Consent.AcceptedByServer {
+		t.Fatalf("consentimiento inesperado: %+v", response.Consent)
+	}
+	if response.Onboarding.Configured || response.Onboarding.Microphone != "pending" {
+		t.Fatalf("onboarding inesperado: %+v", response.Onboarding)
+	}
+	if f.limiter.class != "auth_register" || f.limiter.calls != 1 {
+		t.Fatalf("rate limit inesperado: clase %q, llamadas %d", f.limiter.class, f.limiter.calls)
+	}
+}
+
+func TestRegisterHandlerSinGastosDevuelveListaVacia(t *testing.T) {
+	f := newHandlerFixture(t)
+	rec := serveRegister(f, registerRequest(emptyExpensesRegisterBody, "0123456789abcdef"))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status esperado 201, obtenido %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"recurringPayments":[]`) {
+		t.Fatalf("recurringPayments debe serializarse como []: %s", rec.Body.String())
+	}
+	response := decodeRegisterResponse(t, rec)
+	if response.Income.Frequency != "fortnightly" || response.Income.MonthlyEquivalent != "19001.00" {
+		t.Fatalf("equivalente mensual inesperado: %+v", response.Income)
 	}
 }
 
@@ -151,6 +194,19 @@ func TestRegisterHandlerReplay(t *testing.T) {
 	}
 	if first.Body.String() != second.Body.String() {
 		t.Fatalf("replay no estable:\n%s\n%s", first.Body.String(), second.Body.String())
+	}
+}
+
+func TestRegisterHandlerMismaClaveOtraContrasena(t *testing.T) {
+	f := newHandlerFixture(t)
+	key := "0123456789abcdef"
+	if rec := serveRegister(f, registerRequest(validRegisterBody, key)); rec.Code != http.StatusCreated {
+		t.Fatalf("primer registro: %d", rec.Code)
+	}
+	other := strings.Replace(validRegisterBody, syntheticPhrase, "OtraPassphrase#2026", 1)
+	rec := serveRegister(f, registerRequest(other, key))
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status esperado 409, obtenido %d: %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -187,7 +243,7 @@ func TestRegisterHandlerRejectsInvalidContentType(t *testing.T) {
 
 func TestRegisterHandlerMalformedJSON(t *testing.T) {
 	f := newHandlerFixture(t)
-	rec := serveRegister(f, registerRequest(`{"email":`, "0123456789abcdef"))
+	rec := serveRegister(f, registerRequest(`{"name":`, "0123456789abcdef"))
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status esperado 400, obtenido %d", rec.Code)
@@ -208,9 +264,10 @@ func TestRegisterHandlerRejectsUnknownField(t *testing.T) {
 	}
 }
 
-func TestRegisterHandlerRejectsWrongType(t *testing.T) {
+// `signupConfirm` lo compara Android en local y nunca debe enviarse al servidor.
+func TestRegisterHandlerRejectsSignupConfirm(t *testing.T) {
 	f := newHandlerFixture(t)
-	body := strings.Replace(validRegisterBody, `"privacyAccepted":true`, `"privacyAccepted":"true"`, 1)
+	body := strings.TrimSuffix(validRegisterBody, "}") + `,"signupConfirm":"` + syntheticPhrase + `"}`
 	rec := serveRegister(f, registerRequest(body, "0123456789abcdef"))
 
 	if rec.Code != http.StatusBadRequest {
@@ -218,9 +275,47 @@ func TestRegisterHandlerRejectsWrongType(t *testing.T) {
 	}
 }
 
+// Los campos heredados de H06 ya no forman parte del contrato publico.
+func TestRegisterHandlerRejectsLegacyFields(t *testing.T) {
+	f := newHandlerFixture(t)
+	for _, sufijo := range []string{
+		`,"displayName":"Otro"`,
+		`,"privacyAccepted":true`,
+		`,"privacyNoticeVersion":"2026-11"`,
+		`,"signupIncomeMonthly":12000`,
+		`,"signupFixedMonthly":699`,
+		`,"userId":"018f90ef-08e5-4a68-b09f-000000000001"`,
+		`,"birthDate":"1990-01-01"`,
+		`,"phone":"5555555555"`,
+	} {
+		body := strings.TrimSuffix(validRegisterBody, "}") + sufijo + "}"
+		rec := serveRegister(f, registerRequest(body, "0123456789abcdef"))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("campo heredado %q debía rechazarse, status %d", sufijo, rec.Code)
+		}
+	}
+}
+
+func TestRegisterHandlerRejectsWrongType(t *testing.T) {
+	f := newHandlerFixture(t)
+	casos := []string{
+		strings.Replace(validRegisterBody, `"accepted":true`, `"accepted":"true"`, 1),
+		// Importe numerico: el contrato exige string decimal exacto.
+		strings.Replace(validRegisterBody, `"amount":"12000.00"`, `"amount":12000.00`, 1),
+		// Un decimal con un solo digito tampoco es valido.
+		strings.Replace(validRegisterBody, `"amount":"699.00"`, `"amount":"699.0"`, 1),
+	}
+	for _, body := range casos {
+		rec := serveRegister(f, registerRequest(body, "0123456789abcdef"))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("payload %q debía rechazarse, status %d: %s", body, rec.Code, rec.Body.String())
+		}
+	}
+}
+
 func TestRegisterHandlerPrivacyNotAccepted(t *testing.T) {
 	f := newHandlerFixture(t)
-	body := strings.Replace(validRegisterBody, `"privacyAccepted":true`, `"privacyAccepted":false`, 1)
+	body := strings.Replace(validRegisterBody, `"accepted":true`, `"accepted":false`, 1)
 	rec := serveRegister(f, registerRequest(body, "0123456789abcdef"))
 
 	if rec.Code != http.StatusUnprocessableEntity {
@@ -230,8 +325,32 @@ func TestRegisterHandlerPrivacyNotAccepted(t *testing.T) {
 	if env.Error.Code != "BUSINESS_RULE_VIOLATION" {
 		t.Fatalf("codigo inesperado: %q", env.Error.Code)
 	}
-	if len(env.Error.Details) != 1 || env.Error.Details[0].Field != "privacyAccepted" {
+	if len(env.Error.Details) != 1 || env.Error.Details[0].Field != "privacy.accepted" {
 		t.Fatalf("detalle inesperado: %+v", env.Error.Details)
+	}
+}
+
+func TestRegisterHandlerBloquesObligatoriosAusentes(t *testing.T) {
+	f := newHandlerFixture(t)
+	casos := []struct {
+		body  string
+		field string
+	}{
+		{`{"name":"X","email":"a@b.invalid","password":"` + syntheticPhrase + `","recurringExpenses":[],"privacy":{"accepted":true,"noticeVersion":"2026-11"}}`, "income"},
+		{`{"name":"X","email":"a@b.invalid","password":"` + syntheticPhrase + `","income":{"amount":"1.00","frequency":"monthly"},"privacy":{"accepted":true,"noticeVersion":"2026-11"}}`, "recurringExpenses"},
+		{`{"name":"X","email":"a@b.invalid","password":"` + syntheticPhrase + `","income":{"amount":"1.00","frequency":"monthly"},"recurringExpenses":[]}`, "privacy"},
+		{`{"name":"X","email":"a@b.invalid","password":"` + syntheticPhrase + `","income":{"frequency":"monthly"},"recurringExpenses":[],"privacy":{"accepted":true,"noticeVersion":"2026-11"}}`, "income.amount"},
+		{`{"name":"X","email":"a@b.invalid","password":"` + syntheticPhrase + `","income":{"amount":"1.00"},"recurringExpenses":[],"privacy":{"accepted":true,"noticeVersion":"2026-11"}}`, "income.frequency"},
+	}
+	for _, caso := range casos {
+		rec := serveRegister(f, registerRequest(caso.body, "0123456789abcdef"))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("campo %s ausente debía dar 400, status %d: %s", caso.field, rec.Code, rec.Body.String())
+		}
+		env := decodeError(t, rec)
+		if len(env.Error.Details) != 1 || env.Error.Details[0].Field != caso.field {
+			t.Fatalf("campo esperado %q, detalle %+v", caso.field, env.Error.Details)
+		}
 	}
 }
 
@@ -249,6 +368,56 @@ func TestRegisterHandlerShortPassword(t *testing.T) {
 	}
 	if strings.Contains(rec.Body.String(), "corta") {
 		t.Fatal("la respuesta no debe repetir la contrasena")
+	}
+}
+
+func TestRegisterHandlerGastoIncompleto(t *testing.T) {
+	f := newHandlerFixture(t)
+	body := strings.Replace(validRegisterBody,
+		`{"concept":"Internet","amount":"699.00","frequency":"monthly","category":"Servicios","type":"fixed"}`,
+		`{"concept":"Internet","amount":"699.00","frequency":"monthly","category":"Servicios"}`, 1)
+	rec := serveRegister(f, registerRequest(body, "0123456789abcdef"))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status esperado 400, obtenido %d: %s", rec.Code, rec.Body.String())
+	}
+	env := decodeError(t, rec)
+	if len(env.Error.Details) != 1 || env.Error.Details[0].Field != "recurringExpenses[0].type" {
+		t.Fatalf("detalle inesperado: %+v", env.Error.Details)
+	}
+}
+
+func TestRegisterHandlerCategoriaYTipoInvalidos(t *testing.T) {
+	f := newHandlerFixture(t)
+	categoria := strings.Replace(validRegisterBody, `"category":"Servicios"`, `"category":"Mascotas"`, 1)
+	rec := serveRegister(f, registerRequest(categoria, "0123456789abcdef"))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("categoria invalida: status %d", rec.Code)
+	}
+	if env := decodeError(t, rec); env.Error.Details[0].Field != "recurringExpenses[0].category" {
+		t.Fatalf("detalle inesperado: %+v", env.Error.Details)
+	}
+
+	tipo := strings.Replace(validRegisterBody, `"type":"fixed"`, `"type":"variable"`, 1)
+	rec = serveRegister(f, registerRequest(tipo, "0123456789abcdef"))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("tipo invalido: status %d", rec.Code)
+	}
+	if env := decodeError(t, rec); env.Error.Details[0].Field != "recurringExpenses[0].type" {
+		t.Fatalf("detalle inesperado: %+v", env.Error.Details)
+	}
+}
+
+func TestRegisterHandlerImporteCero(t *testing.T) {
+	f := newHandlerFixture(t)
+	body := strings.Replace(validRegisterBody, `"amount":"12000.00"`, `"amount":"0.00"`, 1)
+	rec := serveRegister(f, registerRequest(body, "0123456789abcdef"))
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status esperado 422, obtenido %d: %s", rec.Code, rec.Body.String())
+	}
+	if env := decodeError(t, rec); env.Error.Details[0].Field != "income.amount" {
+		t.Fatalf("detalle inesperado: %+v", env.Error.Details)
 	}
 }
 
@@ -316,6 +485,10 @@ func TestRegisterHandlerRateLimited(t *testing.T) {
 	if env.Error.Code != "RATE_LIMITED" {
 		t.Fatalf("codigo inesperado: %q", env.Error.Code)
 	}
+	// El rate limit se aplica antes de tocar la persistencia.
+	if f.store.RecordsCount() != 0 {
+		t.Fatal("una peticion limitada no debe persistir nada")
+	}
 }
 
 func TestRegisterHandlerRateLimiterError(t *testing.T) {
@@ -343,7 +516,7 @@ func TestRegisterHandlerNilLimiterFailsClosed(t *testing.T) {
 
 func TestRegisterHandlerTraceIDInError(t *testing.T) {
 	f := newHandlerFixture(t)
-	req := registerRequest(`{"email":`, "0123456789abcdef")
+	req := registerRequest(`{"name":`, "0123456789abcdef")
 	req.Header.Set("x-request-id", "trace-explicito-001")
 	rec := serveRegister(f, req)
 
@@ -365,7 +538,7 @@ func TestRegisterHandlerOversizedBody(t *testing.T) {
 
 func TestRegisterErrorDetailContract(t *testing.T) {
 	f := newHandlerFixture(t)
-	rec := serveRegister(f, registerRequest(`{"email":`, "0123456789abcdef"))
+	rec := serveRegister(f, registerRequest(`{"name":`, "0123456789abcdef"))
 
 	var raw map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {

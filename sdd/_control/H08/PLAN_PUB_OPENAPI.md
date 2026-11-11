@@ -19,7 +19,7 @@
 |---|---|
 | Ruta | `sdd/03-endpoints/openapi/nexum-api-v1.json` |
 | Versión | OpenAPI `3.1.0` |
-| SHA-256 esperado | `0a1e41b73230c0566ec6c6e8af871731937de6ccc5637ad39dbc552d65542308` |
+| SHA-256 esperado | `c151efa56b0b44e1206daf1ec16a940ec8cd01bc84f29dabfa908dbcffd14a51` |
 | Verificación | `verificar_publicacion_i150.py publicacion` recalcula el checksum |
 
 Publicar junto a `PLAN_EVIDENCIA_HTTP.md` y la matriz de compatibilidad; el checksum del artefacto

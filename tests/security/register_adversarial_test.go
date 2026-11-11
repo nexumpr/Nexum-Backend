@@ -32,7 +32,10 @@ func (securityLimiter) Allow(context.Context, string, string) (bool, time.Durati
 
 const syntheticPhrase = "ExamplePassphrase#2026"
 
-const secureRegisterBody = `{"email":"seguridad@example.invalid","password":"` + syntheticPhrase + `","displayName":"Seguridad","privacyNoticeVersion":"2026-11","privacyAccepted":true}`
+const secureRegisterBody = `{"name":"Seguridad","email":"seguridad@example.invalid","password":"` + syntheticPhrase + `",` +
+	`"income":{"amount":"8000.00","frequency":"monthly"},` +
+	`"recurringExpenses":[{"concept":"Renta","amount":"2500.00","frequency":"monthly","category":"Vivienda","type":"fixed"}],` +
+	`"privacy":{"accepted":true,"noticeVersion":"2026-11"}}`
 
 func newSecurityHandler(t *testing.T, store appIdentity.RegisterStore, logger *slog.Logger) *internalhttp.RegisterHandler {
 	t.Helper()
@@ -53,7 +56,6 @@ func TestRegisterRejectsInjectionInEmail(t *testing.T) {
 	store := memorystore.NewRegistrationStore()
 	handler := newSecurityHandler(t, store, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 	body := strings.Replace(secureRegisterBody, "seguridad@example.invalid", "a@b.invalid' OR '1'='1", 1)
-
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, securityRequest(body, "0123456789abcdef"))
 
@@ -140,6 +142,43 @@ func TestRegisterLogsDoNotContainSecrets(t *testing.T) {
 	}
 	if !strings.Contains(logText, "trace_id") {
 		t.Fatalf("el log no incluye correlacion: %s", logText)
+	}
+}
+
+func TestRegisterRejectsExcesoDeGastosSinEscribirNada(t *testing.T) {
+	store := memorystore.NewRegistrationStore()
+	handler := newSecurityHandler(t, store, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+	gastos := make([]map[string]any, 0, 95)
+	for i := 0; i < 95; i++ {
+		gastos = append(gastos, map[string]any{
+			"concept":   "Compromiso",
+			"amount":    "10.00",
+			"frequency": "monthly",
+			"category":  "Otros",
+			"type":      "fixed",
+		})
+	}
+	cuerpo, err := json.Marshal(map[string]any{
+		"name":              "Exceso",
+		"email":             "exceso@example.invalid",
+		"password":          syntheticPhrase,
+		"income":            map[string]any{"amount": "100.00", "frequency": "monthly"},
+		"recurringExpenses": gastos,
+		"privacy":           map[string]any{"accepted": true, "noticeVersion": "2026-11"},
+	})
+	if err != nil {
+		t.Fatalf("no se pudo construir el cuerpo: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, securityRequest(string(cuerpo), "0123456789abcdef"))
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status esperado 422, obtenido %d: %s", rec.Code, rec.Body.String())
+	}
+	if store.RecordsCount() != 0 {
+		t.Fatal("una lista excesiva no debe persistir ningun usuario")
 	}
 }
 

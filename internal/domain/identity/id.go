@@ -5,12 +5,13 @@ import (
 	"fmt"
 )
 
-// NewUserID genera un UUID version 4 con entropía criptográfica. El identificador
+// NewID genera un UUID version 4 con entropía criptográfica. Se usa para el usuario y
+// para cada entidad creada en el mismo registro (compromisos fijos). El identificador
 // satisface `format: uuid` del contrato OpenAPI sin depender de librerías externas.
-func NewUserID() (string, error) {
+func NewID() (string, error) {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		return "", fmt.Errorf("no se pudo generar el identificador de usuario: %w", err)
+		return "", fmt.Errorf("no se pudo generar el identificador: %w", err)
 	}
 
 	// RFC 4122: version 4 y variante 10xx.
@@ -25,4 +26,9 @@ func NewUserID() (string, error) {
 		b[8:10],
 		b[10:16],
 	), nil
+}
+
+// NewUserID conserva el nombre historico del generador de identificadores de usuario.
+func NewUserID() (string, error) {
+	return NewID()
 }

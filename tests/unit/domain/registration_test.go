@@ -9,19 +9,57 @@ import (
 	"github.com/nexumpr/Nexum-Backend/internal/domain/identity"
 )
 
+const validHash = "$argon2id$v=19$m=65536,t=3,p=2$c2FsdA$aGFzaA"
+
+func mustIncome(t *testing.T) identity.InitialIncome {
+	t.Helper()
+	income, err := identity.NewInitialIncome(1200000, "monthly")
+	if err != nil {
+		t.Fatalf("ingreso valido rechazado: %v", err)
+	}
+	return income
+}
+
+func mustConsent(t *testing.T, at time.Time) identity.Consent {
+	t.Helper()
+	consent, err := identity.NewConsent("2026-11", at)
+	if err != nil {
+		t.Fatalf("consentimiento valido rechazado: %v", err)
+	}
+	return consent
+}
+
+func mustExpense(t *testing.T, id string) identity.RecurringExpense {
+	t.Helper()
+	expense, err := identity.NewRecurringExpense("Internet", 69900, "monthly", identity.CategoryServices, identity.FixedExpenseType)
+	if err != nil {
+		t.Fatalf("gasto valido rechazado: %v", err)
+	}
+	withID, err := expense.WithID(id)
+	if err != nil {
+		t.Fatalf("identificador de gasto rechazado: %v", err)
+	}
+	return withID
+}
+
+func validParams(t *testing.T, acceptedAt time.Time) identity.RegistrationParams {
+	t.Helper()
+	return identity.RegistrationParams{
+		UserID:            "018f90ef-08e5-7a68-b09f-2b67a47c92f0",
+		Email:             "  Usuario@Example.INVALID ",
+		Name:              "  Usuario Ejemplo  ",
+		PasswordHash:      validHash,
+		Income:            mustIncome(t),
+		RecurringExpenses: []identity.RecurringExpense{mustExpense(t, "rec-1")},
+		Consent:           mustConsent(t, acceptedAt),
+	}
+}
+
 func TestNewRegistrationValid(t *testing.T) {
 	now := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
 	acceptedAt := now.Add(-time.Minute)
 
-	reg, err := identity.NewRegistration(
-		"018f90ef-08e5-7a68-b09f-2b67a47c92f0",
-		"  Usuario@Example.INVALID ",
-		"  Usuario Ejemplo  ",
-		"$argon2id$v=19$m=65536,t=3,p=2$c2FsdA$aGFzaA",
-		" 2026-11 ",
-		acceptedAt,
-		now,
-	)
+	reg, err := identity.NewRegistration(validParams(t, acceptedAt), now)
 	if err != nil {
 		t.Fatalf("registro valido rechazado: %v", err)
 	}
@@ -29,8 +67,8 @@ func TestNewRegistrationValid(t *testing.T) {
 	if reg.Email() != "usuario@example.invalid" {
 		t.Fatalf("email no normalizado: %q", reg.Email())
 	}
-	if reg.DisplayName() != "Usuario Ejemplo" {
-		t.Fatalf("displayName no normalizado: %q", reg.DisplayName())
+	if reg.Name() != "Usuario Ejemplo" || reg.DisplayName() != "Usuario Ejemplo" {
+		t.Fatalf("name/displayName no normalizado: %q / %q", reg.Name(), reg.DisplayName())
 	}
 	if reg.PrivacyNoticeVersion() != "2026-11" {
 		t.Fatalf("version de privacidad no normalizada: %q", reg.PrivacyNoticeVersion())
@@ -47,37 +85,40 @@ func TestNewRegistrationValid(t *testing.T) {
 	if !reg.PrivacyAcceptedAt().Equal(acceptedAt) {
 		t.Fatalf("privacyAcceptedAt esperado %v, obtenido %v", acceptedAt, reg.PrivacyAcceptedAt())
 	}
+	if reg.Income().AmountCents() != 1200000 || reg.Income().Frequency() != identity.FrequencyMonthly {
+		t.Fatalf("ingreso inesperado: %+v", reg.Income())
+	}
+	if len(reg.RecurringExpenses()) != 1 {
+		t.Fatalf("compromisos esperados 1, obtenidos %d", len(reg.RecurringExpenses()))
+	}
+	if reg.Onboarding().Microphone() != "pending" || reg.Onboarding().Notifications() != "pending" || reg.Onboarding().Configured() {
+		t.Fatalf("onboarding inicial inesperado: %+v", reg.Onboarding())
+	}
 }
 
 func TestNewRegistrationRejectsInvalidValues(t *testing.T) {
 	now := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
-	validHash := "$argon2id$v=19$m=65536,t=3,p=2$c2FsdA$aGFzaA"
 
 	cases := []struct {
-		name        string
-		userID      string
-		email       string
-		displayName string
-		hash        string
-		privacy     string
-		acceptedAt  time.Time
-		want        error
+		name   string
+		mutate func(*identity.RegistrationParams)
+		want   error
 	}{
-		{"id vacio", " ", "a@b.invalid", "Nombre", validHash, "2026-11", now, identity.ErrEmptyUserID},
-		{"email invalido", "id-1", "sin-arroba", "Nombre", validHash, "2026-11", now, identity.ErrInvalidEmail},
-		{"display vacio", "id-1", "a@b.invalid", "   ", validHash, "2026-11", now, identity.ErrInvalidDisplayName},
-		{"display largo", "id-1", "a@b.invalid", strings.Repeat("a", 101), validHash, "2026-11", now, identity.ErrInvalidDisplayName},
-		{"display control", "id-1", "a@b.invalid", "Nombre\x00Invalido", validHash, "2026-11", now, identity.ErrInvalidDisplayName},
-		{"hash vacio", "id-1", "a@b.invalid", "Nombre", "  ", "2026-11", now, identity.ErrInvalidPasswordHash},
-		{"privacy vacia", "id-1", "a@b.invalid", "Nombre", validHash, "  ", now, identity.ErrInvalidPrivacyNotice},
-		{"privacy larga", "id-1", "a@b.invalid", "Nombre", validHash, strings.Repeat("v", 51), now, identity.ErrInvalidPrivacyNotice},
-		{"privacy control", "id-1", "a@b.invalid", "Nombre", validHash, "2026\x00-11", now, identity.ErrInvalidPrivacyNotice},
-		{"aceptacion cero", "id-1", "a@b.invalid", "Nombre", validHash, "2026-11", time.Time{}, identity.ErrInvalidPrivacyAcceptance},
+		{"id vacio", func(p *identity.RegistrationParams) { p.UserID = " " }, identity.ErrEmptyUserID},
+		{"email invalido", func(p *identity.RegistrationParams) { p.Email = "sin-arroba" }, identity.ErrInvalidEmail},
+		{"name vacio", func(p *identity.RegistrationParams) { p.Name = "   " }, identity.ErrInvalidDisplayName},
+		{"name largo", func(p *identity.RegistrationParams) { p.Name = strings.Repeat("a", 101) }, identity.ErrInvalidDisplayName},
+		{"name control", func(p *identity.RegistrationParams) { p.Name = "Nombre\x00Invalido" }, identity.ErrInvalidDisplayName},
+		{"hash vacio", func(p *identity.RegistrationParams) { p.PasswordHash = "  " }, identity.ErrInvalidPasswordHash},
+		{"ingreso ausente", func(p *identity.RegistrationParams) { p.Income = identity.InitialIncome{} }, identity.ErrInvalidAmount},
+		{"consent vacio", func(p *identity.RegistrationParams) { p.Consent = identity.Consent{} }, identity.ErrInvalidPrivacyAcceptance},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := identity.NewRegistration(tc.userID, tc.email, tc.displayName, tc.hash, tc.privacy, tc.acceptedAt, now)
+			params := validParams(t, now)
+			tc.mutate(&params)
+			_, err := identity.NewRegistration(params, now)
 			if !errors.Is(err, tc.want) {
 				t.Fatalf("se esperaba %v, se obtuvo %v", tc.want, err)
 			}
@@ -87,19 +128,49 @@ func TestNewRegistrationRejectsInvalidValues(t *testing.T) {
 
 func TestNewRegistrationUsesCurrentTimeWhenZero(t *testing.T) {
 	before := time.Now().UTC()
-	reg, err := identity.NewRegistration(
-		"id-1",
-		"a@b.invalid",
-		"Nombre",
-		"$argon2id$v=19$m=65536,t=3,p=2$c2FsdA$aGFzaA",
-		"2026-11",
-		time.Now().UTC(),
-		time.Time{},
-	)
+	params := validParams(t, time.Now().UTC())
+	reg, err := identity.NewRegistration(params, time.Time{})
 	if err != nil {
 		t.Fatalf("registro valido rechazado: %v", err)
 	}
 	if reg.CreatedAt().Before(before.Add(-time.Second)) || reg.CreatedAt().After(time.Now().UTC().Add(time.Second)) {
 		t.Fatalf("createdAt no usa la hora actual: %v", reg.CreatedAt())
+	}
+}
+
+func TestNewRegistrationCopiesExpenses(t *testing.T) {
+	now := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
+	params := validParams(t, now)
+	reg, err := identity.NewRegistration(params, now)
+	if err != nil {
+		t.Fatalf("registro valido rechazado: %v", err)
+	}
+	params.RecurringExpenses[0] = identity.RecurringExpense{}
+	if len(reg.RecurringExpenses()) != 1 || reg.RecurringExpenses()[0].ID() != "rec-1" {
+		t.Fatal("el agregado debe copiar la lista de compromisos")
+	}
+}
+
+func TestNewRegistrationRejectsExpenseWithoutID(t *testing.T) {
+	now := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
+	params := validParams(t, now)
+	params.RecurringExpenses = []identity.RecurringExpense{mustExpense(t, "rec-1")}
+	params.RecurringExpenses[0] = identity.RecurringExpense{}
+	_, err := identity.NewRegistration(params, now)
+	if !errors.Is(err, identity.ErrInvalidExpenseType) {
+		t.Fatalf("se esperaba ErrInvalidExpenseType, se obtuvo %v", err)
+	}
+}
+
+func TestNewRegistrationRejectsTooManyExpenses(t *testing.T) {
+	now := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
+	params := validParams(t, now)
+	params.RecurringExpenses = make([]identity.RecurringExpense, identity.MaxRecurringExpenses+1)
+	for i := range params.RecurringExpenses {
+		params.RecurringExpenses[i] = mustExpense(t, "rec-"+strings.Repeat("x", 1)+string(rune('a'+i%26))+"-"+string(rune('a'+i/26)))
+	}
+	_, err := identity.NewRegistration(params, now)
+	if !errors.Is(err, identity.ErrTooManyRecurringExpenses) {
+		t.Fatalf("se esperaba ErrTooManyRecurringExpenses, se obtuvo %v", err)
 	}
 }

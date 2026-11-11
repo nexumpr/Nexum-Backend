@@ -360,9 +360,13 @@ jobs:
             exit 2
           fi
           git show origin/main:sdd/03-endpoints/openapi/nexum-api-v1.json > "$RUNNER_TEMP/contrato-base.json"
+          # El registro de excepciones de API (I-150) solo admite rupturas cubiertas por
+          # una autorizacion humana acotada: RFC aprobada, codigo, ruta, metodo y vigencia.
+          # Cualquier otra ruptura, en E001 o en los otros 74 contratos, sigue fallando.
           python3 herramientas/comparar_contrato_api.py \
             --base "$RUNNER_TEMP/contrato-base.json" \
-            --actual sdd/03-endpoints/openapi/nexum-api-v1.json
+            --actual sdd/03-endpoints/openapi/nexum-api-v1.json \
+            --excepciones sdd/_control/H08/EXCEPCIONES_COMPATIBILIDAD_API.json
 
       - name: Pruebas de herramientas y validadores
         run: python3 -m unittest discover -s herramientas/tests
