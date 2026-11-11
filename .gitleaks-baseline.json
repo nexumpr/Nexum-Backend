@@ -376,5 +376,26 @@
     "Message": "docs(rfc009): autorizar y registrar la publicacion del repositorio\n\nRFC-009 y Gate con la evidencia del barrido de secretos (8 falsos positivos, cero credenciales, sin archivos sensibles en el historial), riesgos aceptados y post-condiciones. AWS_NOT_RUN.",
     "Tags": [],
     "Fingerprint": "0c9b8ad0cc544aedb1abd0e355163148420a8404:sdd/_control/H08/RFC-009-PUBLICACION_REPOSITORIO.md:generic-api-key:29"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "Description": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+    "StartLine": 60,
+    "EndLine": 60,
+    "StartColumn": 7,
+    "EndColumn": 45,
+    "Match": "testIdempotencyKey = \"REDACTED\"",
+    "Secret": "REDACTED",
+    "File": "tests/unit/dynamo/registration_store_test.go",
+    "SymlinkFile": "",
+    "Commit": "92a086b38b8fd785dbb4266fa715dcc072219458",
+    "Link": "https://github.com/nexumpr/Nexum-Backend/blob/92a086b38b8fd785dbb4266fa715dcc072219458/tests/unit/dynamo/registration_store_test.go#L60",
+    "Entropy": 4,
+    "Author": "nexumpr",
+    "Email": "349666511+nexumpr@users.noreply.github.com",
+    "Date": "2026-11-11T15:04:01Z",
+    "Message": "feat(h08e): E001 V6.0.2 registro atomico de identidad, ingreso y compromisos fijos\n\nPOST /api/v1/auth/register registra en una sola transaccion DynamoDB: reserva de email, perfil, ingreso habitual, hasta 94 compromisos fijos, consentimiento sellado por el servidor y onboarding inicial. Respuesta 201 con RegisterResponse; UserProfile intacto para E012.\n\nIdempotencia: payloadHash cubre identidad, ingreso, compromisos, privacidad y cliente; la contrasena se verifica con Argon2id en el replay (misma clave con otra contrasena devuelve 409, sin guardar la contrasena ni un digest simple).\n\nDynamoDB: 6 acciones fijas + N compromisos, limites de 100 acciones y 3.5 MB comprobados antes de emitir la transaccion; nunca se trunca la lista.\n\nContrato: OpenAPI YAML/JSON sincronizados (PARIDAD_OK, 98 esquemas) y H06 con 75 operaciones. Gobierno: RFC-012 y excepcion de compatibilidad limitada a CAMPO_REQUERIDO_NUEVO y ESQUEMA_RESPUESTA_CAMBIADO de este endpoint; el job contratos pasa --excepciones y sigue bloqueando rupturas fuera de E001.\n\nAWS_NOT_RUN: sin cambios de infraestructura, tablas ni recursos.",
+    "Tags": [],
+    "Fingerprint": "92a086b38b8fd785dbb4266fa715dcc072219458:tests/unit/dynamo/registration_store_test.go:generic-api-key:60"
   }
 ]

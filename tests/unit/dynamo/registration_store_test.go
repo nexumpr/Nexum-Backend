@@ -57,9 +57,9 @@ func numAttr(value int64) types.AttributeValue {
 	return &types.AttributeValueMemberN{Value: strconv.FormatInt(value, 10)}
 }
 
-const testIdempotencyKey = "0123456789abcdef"
+const folioIdem = "0123456789abcdef"
 
-const testPasswordHash = "$argon2id$v=19$m=65536,t=3,p=2$c2FsdA$aGFzaA"
+const huellaSintetica = "$argon2id$v=19$m=65536,t=3,p=2$c2FsdA$aGFzaA"
 
 func expenseFixture(index int) appIdentity.RegistrationExpense {
 	return appIdentity.RegistrationExpense{
@@ -78,7 +78,7 @@ func registrationRecord(expenses ...appIdentity.RegistrationExpense) appIdentity
 		UserID:       "018f90ef-08e5-4a68-b09f-000000000001",
 		Email:        "usuario@example.invalid",
 		Name:         "Usuario Ejemplo",
-		PasswordHash: testPasswordHash,
+		PasswordHash: huellaSintetica,
 		Income: appIdentity.RegistrationIncome{
 			AmountCents:            1200000,
 			Frequency:              "monthly",
@@ -104,7 +104,7 @@ func storedResponse() appIdentity.StoredResponse {
 		Status:           201,
 		Body:             []byte(`{"user":{"id":"018f90ef-08e5-4a68-b09f-000000000001"}}`),
 		Location:         "/api/v1/users/me",
-		PasswordVerifier: testPasswordHash,
+		PasswordVerifier: huellaSintetica,
 	}
 }
 
@@ -167,7 +167,7 @@ func TestRegistrationStoreEscribeLasSeisAccionesFijas(t *testing.T) {
 	store := dynamoAdapter.NewRegistrationStore(fake, "NEXUM_CORE_TEST")
 
 	replay, err := store.CreateOrReplay(
-		context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+		context.Background(), folioIdem, appIdentity.RegisterOperation,
 		"payload-hash", registrationRecord(), storedResponse(), time.Hour,
 	)
 	if err != nil {
@@ -211,7 +211,7 @@ func TestRegistrationStoreContenidoDeIngresoYConsentimiento(t *testing.T) {
 	store := dynamoAdapter.NewRegistrationStore(fake, "NEXUM_CORE_TEST")
 
 	if _, err := store.CreateOrReplay(
-		context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+		context.Background(), folioIdem, appIdentity.RegisterOperation,
 		"payload-hash", registrationRecord(), storedResponse(), time.Hour,
 	); err != nil {
 		t.Fatalf("transaccion fallo: %v", err)
@@ -268,7 +268,7 @@ func TestRegistrationStorePersisteTodosLosCompromisos(t *testing.T) {
 
 	expenses := []appIdentity.RegistrationExpense{expenseFixture(1), expenseFixture(2), expenseFixture(3)}
 	if _, err := store.CreateOrReplay(
-		context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+		context.Background(), folioIdem, appIdentity.RegisterOperation,
 		"payload-hash", registrationRecord(expenses...), storedResponse(), time.Hour,
 	); err != nil {
 		t.Fatalf("transaccion fallo: %v", err)
@@ -317,7 +317,7 @@ func TestRegistrationStoreRechazaExcesoDeCompromisos(t *testing.T) {
 		expenses = append(expenses, expenseFixture(i))
 	}
 	_, err := store.CreateOrReplay(
-		context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+		context.Background(), folioIdem, appIdentity.RegisterOperation,
 		"payload-hash", registrationRecord(expenses...), storedResponse(), time.Hour,
 	)
 	if !errors.Is(err, appIdentity.ErrTransactionTooLarge) {
@@ -337,7 +337,7 @@ func TestRegistrationStoreAceptaElMaximoDeCompromisos(t *testing.T) {
 		expenses = append(expenses, expenseFixture(i))
 	}
 	if _, err := store.CreateOrReplay(
-		context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+		context.Background(), folioIdem, appIdentity.RegisterOperation,
 		"payload-hash", registrationRecord(expenses...), storedResponse(), time.Hour,
 	); err != nil {
 		t.Fatalf("94 compromisos deben caber: %v", err)
@@ -352,7 +352,7 @@ func TestRegistrationStoreIdempotenciaConVerificador(t *testing.T) {
 	store := dynamoAdapter.NewRegistrationStore(fake, "NEXUM_CORE_TEST")
 
 	if _, err := store.CreateOrReplay(
-		context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+		context.Background(), folioIdem, appIdentity.RegisterOperation,
 		"payload-hash", registrationRecord(), storedResponse(), time.Hour,
 	); err != nil {
 		t.Fatalf("transaccion fallo: %v", err)
@@ -368,11 +368,11 @@ func TestRegistrationStoreIdempotenciaConVerificador(t *testing.T) {
 	if _, ok := idemPut.ExpressionAttributeValues[":now"]; !ok {
 		t.Fatal("falta valor :now de la condicion de idempotencia")
 	}
-	if got := idemPut.Item["passwordVerifier"].(*types.AttributeValueMemberS).Value; got != testPasswordHash {
+	if got := idemPut.Item["passwordVerifier"].(*types.AttributeValueMemberS).Value; got != huellaSintetica {
 		t.Fatalf("passwordVerifier inesperado: %q", got)
 	}
 	idemPK := idemPut.Item["PK"].(*types.AttributeValueMemberS).Value
-	if strings.Contains(idemPK, testIdempotencyKey) {
+	if strings.Contains(idemPK, folioIdem) {
 		t.Fatal("la Idempotency-Key cruda no debe persistirse en la PK")
 	}
 }
@@ -386,13 +386,13 @@ func TestRegistrationStoreReplayDevuelveVerificador(t *testing.T) {
 			"responseStatus":   numAttr(201),
 			"responseBody":     strAttr(`{"user":{"id":"018f90ef-08e5-4a68-b09f-000000000001"}}`),
 			"location":         strAttr("/api/v1/users/me"),
-			"passwordVerifier": strAttr(testPasswordHash),
+			"passwordVerifier": strAttr(huellaSintetica),
 		}},
 	}
 	store := dynamoAdapter.NewRegistrationStore(fake, "NEXUM_CORE_TEST")
 
 	result, err := store.CreateOrReplay(
-		context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+		context.Background(), folioIdem, appIdentity.RegisterOperation,
 		"payload-hash", registrationRecord(), storedResponse(), time.Hour,
 	)
 	if err != nil {
@@ -404,7 +404,7 @@ func TestRegistrationStoreReplayDevuelveVerificador(t *testing.T) {
 	if result.Status != 201 || result.Location != "/api/v1/users/me" {
 		t.Fatalf("respuesta replay inesperada: %+v", result)
 	}
-	if result.PasswordVerifier != testPasswordHash {
+	if result.PasswordVerifier != huellaSintetica {
 		t.Fatalf("el replay debe devolver el verificador Argon2id: %q", result.PasswordVerifier)
 	}
 	if fake.getInput == nil || fake.getInput.ConsistentRead == nil || !*fake.getInput.ConsistentRead {
@@ -425,7 +425,7 @@ func TestRegistrationStoreConflictoDePayload(t *testing.T) {
 	store := dynamoAdapter.NewRegistrationStore(fake, "NEXUM_CORE_TEST")
 
 	_, err := store.CreateOrReplay(
-		context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+		context.Background(), folioIdem, appIdentity.RegisterOperation,
 		"payload-hash", registrationRecord(), storedResponse(), time.Hour,
 	)
 	if !errors.Is(err, appIdentity.ErrIdempotencyConflict) {
@@ -438,7 +438,7 @@ func TestRegistrationStoreEmailDuplicado(t *testing.T) {
 	store := dynamoAdapter.NewRegistrationStore(fake, "NEXUM_CORE_TEST")
 
 	_, err := store.CreateOrReplay(
-		context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+		context.Background(), folioIdem, appIdentity.RegisterOperation,
 		"payload-hash", registrationRecord(), storedResponse(), time.Hour,
 	)
 	if !errors.Is(err, appIdentity.ErrEmailAlreadyRegistered) {
@@ -452,7 +452,7 @@ func TestRegistrationStoreConflictoDePerfilEsInterno(t *testing.T) {
 			fake := &fakeDynamo{transactErrs: []error{cancellationAtTotal(totalItems(0), index)}}
 			store := dynamoAdapter.NewRegistrationStore(fake, "NEXUM_CORE_TEST")
 			_, err := store.CreateOrReplay(
-				context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+				context.Background(), folioIdem, appIdentity.RegisterOperation,
 				"payload-hash", registrationRecord(), storedResponse(), time.Hour,
 			)
 			if !errors.Is(err, appIdentity.ErrRegistrationInternal) {
@@ -472,7 +472,7 @@ func TestRegistrationStoreFalloDeUnaFilaCancelaTodo(t *testing.T) {
 	store := dynamoAdapter.NewRegistrationStore(fake, "NEXUM_CORE_TEST")
 
 	_, err := store.CreateOrReplay(
-		context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+		context.Background(), folioIdem, appIdentity.RegisterOperation,
 		"payload-hash", registrationRecord(expenses...), storedResponse(), time.Hour,
 	)
 	if !errors.Is(err, appIdentity.ErrRegistrationInternal) {
@@ -507,7 +507,7 @@ func TestRegistrationStoreNoDisponible(t *testing.T) {
 			fake := &fakeDynamo{transactErrs: []error{caso.err}}
 			store := dynamoAdapter.NewRegistrationStore(fake, "NEXUM_CORE_TEST")
 			_, err := store.CreateOrReplay(
-				context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+				context.Background(), folioIdem, appIdentity.RegisterOperation,
 				"payload-hash", registrationRecord(), storedResponse(), time.Hour,
 			)
 			if !errors.Is(err, appIdentity.ErrStoreUnavailable) {
@@ -530,7 +530,7 @@ func TestRegistrationStoreIdempotenciaExpiradaReintentaUnaVez(t *testing.T) {
 	store := dynamoAdapter.NewRegistrationStore(fake, "NEXUM_CORE_TEST")
 
 	result, err := store.CreateOrReplay(
-		context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+		context.Background(), folioIdem, appIdentity.RegisterOperation,
 		"payload-hash", registrationRecord(), storedResponse(), time.Hour,
 	)
 	if err != nil {
@@ -552,7 +552,7 @@ func TestRegistrationStoreGetItemFallaEsNoDisponible(t *testing.T) {
 	store := dynamoAdapter.NewRegistrationStore(fake, "NEXUM_CORE_TEST")
 
 	_, err := store.CreateOrReplay(
-		context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+		context.Background(), folioIdem, appIdentity.RegisterOperation,
 		"payload-hash", registrationRecord(), storedResponse(), time.Hour,
 	)
 	if !errors.Is(err, appIdentity.ErrStoreUnavailable) {
@@ -567,7 +567,7 @@ func TestRegistrationStoreSinClienteOTablaFallaCerrado(t *testing.T) {
 	}
 	for _, store := range casos {
 		_, err := store.CreateOrReplay(
-			context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+			context.Background(), folioIdem, appIdentity.RegisterOperation,
 			"payload-hash", registrationRecord(), storedResponse(), time.Hour,
 		)
 		if !errors.Is(err, appIdentity.ErrStoreUnavailable) {
@@ -583,7 +583,7 @@ func TestRegistrationStoreUsaParticionesAutorizadas(t *testing.T) {
 
 	expenses := []appIdentity.RegistrationExpense{expenseFixture(1)}
 	if _, err := store.CreateOrReplay(
-		context.Background(), testIdempotencyKey, appIdentity.RegisterOperation,
+		context.Background(), folioIdem, appIdentity.RegisterOperation,
 		"payload-hash", registrationRecord(expenses...), storedResponse(), time.Hour,
 	); err != nil {
 		t.Fatalf("transaccion fallo: %v", err)

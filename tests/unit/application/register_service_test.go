@@ -49,11 +49,6 @@ const syntheticPhrase = "ExamplePassphrase#2026"
 // junto a la palabra `password`, de modo que no se confunde con una credencial.
 const otraFraseSintetica = "OtraPassphrase#2026"
 
-func incomeOf(t *testing.T, amount int64, frequency string) appIdentity.IncomeCommand {
-	t.Helper()
-	return appIdentity.IncomeCommand{AmountCents: amount, Frequency: frequency}
-}
-
 func expenseOf(concept string, amount int64, frequency, category string) appIdentity.RecurringExpenseCommand {
 	return appIdentity.RecurringExpenseCommand{
 		Concept:     concept,
