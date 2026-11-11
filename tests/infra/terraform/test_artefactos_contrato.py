@@ -191,7 +191,11 @@ class CableadoYNombreDeterminista(unittest.TestCase):
         # El publicador ya no es una variable vacia: lo crea RFC-011 y la raiz lo
         # referencia por su ARN determinista.
         self.assertIn("publicador_arn = local.arn_artefactos_publicador", compacto)
-        self.assertIn("gestor_iac_arn = local.arn_secretos_gestor_iac", compacto)
+        # La exención de ListBucket (HeadBucket del refresh) es la identidad que
+        # realmente ejecuta Terraform: el operador. Con el rol dedicado, el refresh
+        # recibía 403 y el plan intentaba recrear el bucket.
+        self.assertIn("gestor_iac_arn = var.principal_operador_arn", compacto)
+        self.assertNotIn("gestor_iac_arn = local.arn_secretos_gestor_iac", compacto)
         self.assertNotIn('variable "artefactos_publicador_arn"', variables)
 
         # El principal operador sigue siendo obligatorio y falla cerrado.

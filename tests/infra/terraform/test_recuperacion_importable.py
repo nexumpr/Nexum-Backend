@@ -147,6 +147,37 @@ class PrincipalExistente(unittest.TestCase):
         self.assertNotIn("default", cuerpo)
 
 
+class ExencionListBucket(unittest.TestCase):
+    """`DenegarListBucket` debe eximir a la identidad que ejecuta Terraform.
+
+    Con la exención puesta en el rol `secretos-gestor-iac`, el `HeadBucket` del
+    refresh recibía 403, el proveedor interpretaba que el bucket no existía y el
+    plan proponía **recrearlo** (12 reemplazos observados en el plan v3).
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.env = _leer(TF / "envs" / "h08i" / "main.tf")
+
+    def test_ambos_buckets_eximen_al_operador(self) -> None:
+        compacto = re.sub(r"[ \t]+", " ", self.env)
+        self.assertEqual(compacto.count("gestor_iac_arn = var.principal_operador_arn"), 2)
+        self.assertNotIn("gestor_iac_arn = local.arn_secretos_gestor_iac", compacto)
+
+    def test_los_modulos_documentan_la_exencion(self) -> None:
+        for modulo in ("artefactos", "secretos"):
+            variables = _leer(MODULOS / modulo / "variables.tf")
+            self.assertIn('variable "gestor_iac_arn"', variables, modulo)
+            self.assertIn("HeadBucket", variables, modulo)
+
+    def test_los_modulos_deniegan_listbucket_con_esa_exencion(self) -> None:
+        for modulo in ("artefactos", "secretos"):
+            main = _leer(MODULOS / modulo / "main.tf")
+            self.assertIn('sid    = "DenegarListBucket"', main, modulo)
+            self.assertIn('test     = "ArnNotEquals"', main, modulo)
+            self.assertIn("values   = [var.gestor_iac_arn]", main, modulo)
+
+
 class SinRecursosHuerfanosPorDiseno(unittest.TestCase):
     """El plan de fase base no debe depender de nombres que ya existan."""
 
