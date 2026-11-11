@@ -223,14 +223,11 @@ func (p *RSATokenProvider) ValidateAccessToken(ctx context.Context, tokenString 
 	if payload.IssuedAt <= 0 || payload.NotBefore <= 0 || payload.ExpiresAt <= 0 {
 		return nil, fmt.Errorf("%w: claims temporales enumerables", ports.ErrInvalidToken)
 	}
-	if payload.ExpiresAt <= payload.IssuedAt {
-		return nil, fmt.Errorf("%w: exp no posterior a iat", ports.ErrInvalidToken)
-	}
-	if payload.ExpiresAt-payload.IssuedAt > MaxAccessTokenSegundos+LeewaySegundos {
-		return nil, fmt.Errorf("%w: vida del token fuera de política", ports.ErrInvalidToken)
-	}
-
 	now := time.Now().UTC().Unix()
+	// Expirado: se evalúa primero para conservar el error de contrato ErrTokenExpired.
+	if now >= payload.ExpiresAt+LeewaySegundos {
+		return nil, ports.ErrTokenExpired
+	}
 	// nbf: el token no puede ser válido en el futuro más allá del leeway.
 	if payload.NotBefore > now+LeewaySegundos {
 		return nil, fmt.Errorf("%w: nbf en el futuro", ports.ErrInvalidToken)
@@ -239,8 +236,12 @@ func (p *RSATokenProvider) ValidateAccessToken(ctx context.Context, tokenString 
 	if payload.IssuedAt > now+LeewaySegundos {
 		return nil, fmt.Errorf("%w: iat en el futuro", ports.ErrInvalidToken)
 	}
-	if now >= payload.ExpiresAt+LeewaySegundos {
-		return nil, ports.ErrTokenExpired
+	// Coherencia y política de vida útil.
+	if payload.ExpiresAt <= payload.IssuedAt {
+		return nil, fmt.Errorf("%w: exp no posterior a iat", ports.ErrInvalidToken)
+	}
+	if payload.ExpiresAt-payload.IssuedAt > MaxAccessTokenSegundos+LeewaySegundos {
+		return nil, fmt.Errorf("%w: vida del token fuera de política", ports.ErrInvalidToken)
 	}
 
 	return &ports.TokenClaims{
