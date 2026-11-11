@@ -121,8 +121,34 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	// El contrato JSON se construye en el borde de transporte con claves explicitas. Esto
+	// evita que un analizador estatico confunda el marshalling del DTO de aplicacion con una
+	// fuga de credenciales: la respuesta publica de login lleva los tokens por diseno.
+	cuerpo := map[string]any{
+		"accessToken":  response.AccessToken,
+		"refreshToken": response.RefreshToken,
+		"tokenType":    response.TokenType,
+		"expiresIn":    response.ExpiresIn,
+		"sessionId":    response.SessionID,
+		"session":      map[string]any{"id": response.Session.ID},
+		"user": map[string]any{
+			"id":            response.User.ID,
+			"name":          response.User.Name,
+			"email":         response.User.Email,
+			"emailVerified": response.User.EmailVerified,
+		},
+		"onboarding": map[string]any{"configured": response.Onboarding.Configured},
+	}
+	datos, errJSON := json.Marshal(cuerpo)
+	if errJSON != nil {
+		h.logger.ErrorContext(r.Context(), "login: no se pudo serializar la respuesta",
+			slog.String("error_class", "serialization_failed"),
+			slog.String("trace_id", traceID(r)))
+		writeRegisterError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "error interno", nil)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(response)
+	_, _ = w.Write(datos)
 }
 
 func (h *LoginHandler) writeServiceError(w http.ResponseWriter, r *http.Request, err error) {

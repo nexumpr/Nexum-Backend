@@ -397,5 +397,26 @@
     "Message": "feat(h08e): E001 V6.0.2 registro atomico de identidad, ingreso y compromisos fijos\n\nPOST /api/v1/auth/register registra en una sola transaccion DynamoDB: reserva de email, perfil, ingreso habitual, hasta 94 compromisos fijos, consentimiento sellado por el servidor y onboarding inicial. Respuesta 201 con RegisterResponse; UserProfile intacto para E012.\n\nIdempotencia: payloadHash cubre identidad, ingreso, compromisos, privacidad y cliente; la contrasena se verifica con Argon2id en el replay (misma clave con otra contrasena devuelve 409, sin guardar la contrasena ni un digest simple).\n\nDynamoDB: 6 acciones fijas + N compromisos, limites de 100 acciones y 3.5 MB comprobados antes de emitir la transaccion; nunca se trunca la lista.\n\nContrato: OpenAPI YAML/JSON sincronizados (PARIDAD_OK, 98 esquemas) y H06 con 75 operaciones. Gobierno: RFC-012 y excepcion de compatibilidad limitada a CAMPO_REQUERIDO_NUEVO y ESQUEMA_RESPUESTA_CAMBIADO de este endpoint; el job contratos pasa --excepciones y sigue bloqueando rupturas fuera de E001.\n\nAWS_NOT_RUN: sin cambios de infraestructura, tablas ni recursos.",
     "Tags": [],
     "Fingerprint": "92a086b38b8fd785dbb4266fa715dcc072219458:tests/unit/dynamo/registration_store_test.go:generic-api-key:60"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "Description": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+    "StartLine": 23,
+    "EndLine": 23,
+    "StartColumn": 3,
+    "EndColumn": 49,
+    "Match": "EnvJWTPrivateKeyB64 = \"REDACTED\"",
+    "Secret": "REDACTED",
+    "File": "internal/infrastructure/security/issuer.go",
+    "SymlinkFile": "",
+    "Commit": "49c9695d4a3b5117fcece2f43adec9efde865ed8",
+    "Link": "https://github.com/nexumpr/Nexum-Backend/blob/49c9695d4a3b5117fcece2f43adec9efde865ed8/internal/infrastructure/security/issuer.go#L23",
+    "Entropy": 3.7950885,
+    "Author": "nexumpr",
+    "Email": "349666511+nexumpr@users.noreply.github.com",
+    "Date": "2026-11-11T19:27:18Z",
+    "Message": "feat(h08e): E002 login V6.0.2 con sesion DynamoDB y JWT RS256\n\nImplementa POST /api/v1/auth/login con el contrato completo V6.0.2 (RFC-013): Request con deviceId/deviceName/platform opcionales y LoginResponse con session.id, user y onboarding.configured, conservando los cinco campos legacy de AuthTokens sin modificarlo.\n\nAnade LoginService, adaptador DynamoDB de sesiones (USER#id/SESSION#id + REFRESH#digest/SESSION en una TransactWriteItems condicional), emisor RS256 de 900 s con keyring desde el bundle, limitador dual Redis (5/min/IP y 10/min/email seudonimizado) y handler con 400/401/429/503 y Cache-Control no-store.\n\nE001 V6.0.2 no se modifica. Pendiente en este PR: OpenAPI/SDD de E002 y manifiesto de integridad.",
+    "Tags": [],
+    "Fingerprint": "49c9695d4a3b5117fcece2f43adec9efde865ed8:internal/infrastructure/security/issuer.go:generic-api-key:23"
   }
 ]
