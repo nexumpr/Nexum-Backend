@@ -92,6 +92,18 @@ func SessionKeys(tokenHash string) (pk, sk string) {
 	return PrefixSession + tokenHash, "METADATA"
 }
 
+// UserSessionKeys genera PK y SK de la sesión autoritativa de E002: vive en la partición
+// del propietario (SDD H06) y la política IAM vigente ya autoriza USER#* y SESSION#*.
+func UserSessionKeys(userID, sessionID string) (pk, sk string) {
+	return PrefixUser + userID, PrefixSession + sessionID
+}
+
+// RefreshKeys genera PK y SK del localizador de refresh: sólo el digest SHA-256 del token
+// opaco. Permite resolver la sesión sin guardar el token en claro (A-050 §2.3).
+func RefreshKeys(tokenDigest string) (pk, sk string) {
+	return "REFRESH#" + tokenDigest, "SESSION"
+}
+
 // IdempotencyKeys genera PK y SK para un registro de idempotencia. La clave incluye
 // la operación y la Idempotency-Key original, pero solo se persiste su SHA-256 para
 // no almacenar el valor crudo del cliente (A-040 §2.5, A-070 §2.7).

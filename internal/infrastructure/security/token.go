@@ -88,11 +88,14 @@ func (p *RSATokenProvider) GenerateAccessToken(ctx context.Context, claims ports
 	}
 
 	// Generar JTI aleatorio de 16 bytes
-	jtiBytes := make([]byte, 16)
-	if _, err := rand.Read(jtiBytes); err != nil {
-		return "", fmt.Errorf("error al generar jti: %w", err)
+	jti := claims.JTI
+	if jti == "" {
+		jtiBytes := make([]byte, 16)
+		if _, err := rand.Read(jtiBytes); err != nil {
+			return "", fmt.Errorf("error al generar jti: %w", err)
+		}
+		jti = base64.RawURLEncoding.EncodeToString(jtiBytes)
 	}
-	jti := base64.RawURLEncoding.EncodeToString(jtiBytes)
 
 	header := JWTHeader{
 		Algorithm: "RS256",
