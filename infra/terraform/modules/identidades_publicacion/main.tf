@@ -268,6 +268,23 @@ resource "aws_iam_role_policy" "secretos_gestor_iac" {
 }
 
 # ---------------------------------------------------------------------------
+# El principal operador debe EXISTIR en IAM.
+#
+# Un ARN con el path equivocado (por ejemplo sin `/managed/`) tiene exactamente
+# el mismo aspecto que uno correcto, pero AWS lo rechaza al crear el rol con
+# `MalformedPolicyDocument: Invalid principal in policy`, es decir, ya en el
+# apply. El ARN de una sesión STS (`assumed-role/<rol>/<sesión>`) tampoco muestra
+# el path, así que no sirve como comprobación. Se resuelve el rol real y se
+# compara el ARN completo.
+# ---------------------------------------------------------------------------
+data "aws_iam_role" "operador" {
+  count = can(regex(":role/", var.principal_operador_arn)) ? 1 : 0
+
+  # `arn:aws:iam::<cuenta>:role/<path>/<nombre>` → el nombre es el último segmento.
+  name = reverse(split("/", split(":role/", var.principal_operador_arn)[1]))[0]
+}
+
+# ---------------------------------------------------------------------------
 # Guardas fail-closed de la propia unidad.
 # ---------------------------------------------------------------------------
 resource "terraform_data" "identidades_preconditions" {
@@ -308,6 +325,14 @@ resource "terraform_data" "identidades_preconditions" {
     precondition {
       condition     = startswith(var.principal_operador_arn, "arn:aws:iam::")
       error_message = "principal_operador_arn debe ser un ARN IAM (arn:aws:iam::<cuenta>:role|user/<nombre>)."
+    }
+
+    # El ARN debe resolver a un rol IAM existente. Si el principal es un usuario
+    # (count = 0 en el data source) la comparación se resuelve con el propio valor
+    # y no añade requisitos nuevos.
+    precondition {
+      condition     = try(data.aws_iam_role.operador[0].arn, var.principal_operador_arn) == var.principal_operador_arn
+      error_message = "principal_operador_arn no corresponde a un rol IAM existente: revisar el path del ARN (por ejemplo /managed/)."
     }
 
     precondition {

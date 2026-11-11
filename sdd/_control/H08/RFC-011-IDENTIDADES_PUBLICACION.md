@@ -216,3 +216,19 @@ crea infraestructura ni tiene coste.
 El plan de §7 queda **STALE**. Debe regenerarse desde `main` tras el merge, con el mismo
 `tfvars` custodiado (contraseña Redis existente, sin generar otra) y `desplegar_aplicacion=false`,
 y requiere un Gate nuevo `APRUEBO_APPLY_FASE_BASE_SHA256_<SHA256>`.
+
+## 12. Incidente del primer apply de fase base (2026-11-10) — correcciones
+
+El apply autorizado con `APRUEBO_APPLY_FASE_BASE_SHA256_C2A5C669…6BD9` se ejecutó y quedó
+**parcial**: 37 recursos creados y 10 errores. Correcciones derivadas:
+
+| Defecto | Evidencia | Corrección |
+|---|---|---|
+| **D-BASE-05** — `principal_operador_arn` sin el path del rol | `iam:CreateRole` × 3 → `MalformedPolicyDocument: Invalid principal in policy: "AWS":"arn:aws:iam::713797602090:role/AccountFullAccessRole"`; el rol real es `arn:aws:iam::713797602090:role/managed/AccountFullAccessRole` | Valor corregido en el `tfvars` custodiado **y** `data "aws_iam_role" "operador"` + precondition que compara el ARN real: un path incorrecto falla en el **plan**. El ARN de sesión STS no revela el path, así que no servía como comprobación. |
+| **D-BASE-06** — `count` no determinable | `terraform import` abortaba con «Invalid count argument» en `module.iam` (`count = length(aws_iam_role.terraform_apply)`), impidiendo adoptar los 7 recursos ya creados | `count` usa la misma expresión de variables que el rol: determinista en plan y compatible con import y operaciones parciales. |
+| **D-BASE-07** — invocación interrumpida | La primera ejecución del apply quedó cortada y dejó un lock huérfano y 7 recursos **sin state** (2 buckets, tabla `NEXUM_CORE_H08I`, rol runtime, parameter group y 2 usuarios) | Lock liberado con `terraform force-unlock`; los 7 huérfanos se adoptarán con `terraform import` (excepción temporal de permisos, ya retirada). |
+| **D-BASE-08** — custodia no restringida | `C:\Nexum-Custodia` heredaba `Authenticated Users: Modify` pese a lo afirmado en §9 | `/inheritance:r` + `leobo`/`SYSTEM`/`Administradores`; el plan y su JSON viven ahí. |
+
+Ninguna de estas correcciones crea, modifica ni destruye recursos por sí misma: cambian configuración,
+añaden una verificación en plan y permiten adoptar lo ya creado. El nuevo plan debe declarar
+explícitamente **7 imports**, 0 destrucciones y 0 reemplazos, y requiere token nuevo.
