@@ -246,10 +246,14 @@ module "secretos" {
   retencion_version_dias = 30
   publicador_arn         = local.arn_secretos_publicador
 
-  # Misma razón que en el bucket de artefactos: la exención de `ListBucket` debe
-  # ser la identidad que ejecuta Terraform (el operador), o el refresh deniega
-  # `HeadBucket` y el plan intenta recrear el bucket.
-  gestor_iac_arn = var.principal_operador_arn
+  # Dos identidades con propósitos distintos:
+  #  - `gestor_iac_arn` (ListBucket/HeadBucket) sigue siendo el operador que ejecuta
+  #    Terraform, o el refresh deniega `HeadBucket` y el plan intenta recrear el bucket.
+  #  - `gestor_objetos_arn` es el rol dedicado `secretos-gestor-iac`, el único que debe
+  #    leer y actualizar el bundle. Antes se pasaba el operador en su lugar y el rol
+  #    dedicado quedaba denegado por la política de recurso (403 real).
+  gestor_iac_arn     = var.principal_operador_arn
+  gestor_objetos_arn = module.identidades.secretos_gestor_iac_arn
 }
 
 module "iam" {

@@ -97,7 +97,8 @@ class ModuloSecretos(unittest.TestCase):
             .replace("var.rol_runtime_arn", f'"{self.RUNTIME}"')
             .replace("var.publicador_arn", f'"{self.PUBLICADOR}"')
             .replace("var.admin_arn", f'"{self.ADMIN}"')
-            .replace("var.gestor_iac_arn", f'"{self.IAC}"')
+            .replace("var.gestor_objetos_arn", f'"{self.OBJETOS}"')
+            .replace("var.gestor_iac_arn", f'"{self.OPERADOR}"')
         )
         salida: list[dict] = []
         for trozo in _bloques(base, "statement"):
@@ -219,7 +220,8 @@ class ModuloSecretos(unittest.TestCase):
     PUBLICADOR = "arn:aws:iam::111122223333:role/nexum-publicador"
     AJENO = "arn:aws:iam::111122223333:role/otra-app-amplia"
     ADMIN = "arn:aws:iam::111122223333:role/nexum-recuperacion"
-    IAC = "arn:aws:iam::111122223333:role/nexum-iac-gestor"
+    OPERADOR = "arn:aws:iam::111122223333:role/nexum-operador-terraform"
+    OBJETOS = "arn:aws:iam::111122223333:role/nexum-gestor-objetos"
     OBJETO = "arn:aws:s3:::bucket/nexum/secrets/v1/secrets.json"
     FUERA = "arn:aws:s3:::bucket/otros/secrets.json"
 
@@ -308,20 +310,20 @@ class ModuloSecretos(unittest.TestCase):
         # La excepcion es ausencia de Deny, no un Allow del bucket.
         bucket = "arn:aws:s3:::bucket"
         self.assertEqual(
-            self._decidir(self.IAC, "s3:ListBucket", bucket, identidad_permite=True), "ALLOW"
+            self._decidir(self.OPERADOR, "s3:ListBucket", bucket, identidad_permite=True), "ALLOW"
         )
 
     def test_gestor_iac_sin_iam_no_obtiene_allow(self) -> None:
         bucket = "arn:aws:s3:::bucket"
         self.assertEqual(
-            self._decidir(self.IAC, "s3:ListBucket", bucket, identidad_permite=False), "DENY"
+            self._decidir(self.OPERADOR, "s3:ListBucket", bucket, identidad_permite=False), "DENY"
         )
 
     def test_gestor_iac_no_lista_versiones_ni_multipart(self) -> None:
         bucket = "arn:aws:s3:::bucket"
         for accion in ("s3:ListBucketVersions", "s3:ListBucketMultipartUploads"):
             self.assertEqual(
-                self._decidir(self.IAC, accion, bucket, identidad_permite=True), "DENY", accion
+                self._decidir(self.OPERADOR, accion, bucket, identidad_permite=True), "DENY", accion
             )
 
     def test_gestor_iac_puede_leer_y_actualizar_sin_borrar(self) -> None:
@@ -333,18 +335,18 @@ class ModuloSecretos(unittest.TestCase):
         """
         for accion in ("s3:GetObject", "s3:GetObjectVersion", "s3:PutObject"):
             self.assertEqual(
-                self._decidir(self.IAC, accion, self.OBJETO, identidad_permite=True),
+                self._decidir(self.OBJETOS, accion, self.OBJETO, identidad_permite=True),
                 "ALLOW",
                 accion,
             )
         for accion in ("s3:DeleteObject", "s3:DeleteObjectVersion"):
             self.assertEqual(
-                self._decidir(self.IAC, accion, self.OBJETO, identidad_permite=True), "DENY", accion
+                self._decidir(self.OBJETOS, accion, self.OBJETO, identidad_permite=True), "DENY", accion
             )
 
     def test_gestor_iac_sin_identidad_no_obtiene_acceso(self) -> None:
         self.assertEqual(
-            self._decidir(self.IAC, "s3:GetObject", self.OBJETO, identidad_permite=False), "DENY"
+            self._decidir(self.OBJETOS, "s3:GetObject", self.OBJETO, identidad_permite=False), "DENY"
         )
 
     def test_list_bucket_denegado_al_resto(self) -> None:
@@ -620,7 +622,7 @@ class ExcepcionGestorEnBucketPolicy(unittest.TestCase):
 
     def test_gestor_esta_exceptuado_del_deny_de_objetos(self) -> None:
         bloque = self._statement("DenegarAPrincipalsNoAutorizados")
-        self.assertIn("var.gestor_iac_arn", bloque)
+        self.assertIn("var.gestor_objetos_arn", bloque)
         self.assertIn("var.rol_runtime_arn", bloque)
         self.assertIn("var.publicador_arn", bloque)
         self.assertIn("StringNotEquals", bloque)
@@ -637,7 +639,7 @@ class ExcepcionGestorEnBucketPolicy(unittest.TestCase):
         bloque = self._statement("DenegarBorradoAlGestor")
         self.assertIn("s3:DeleteObject", bloque)
         self.assertIn("s3:DeleteObjectVersion", bloque)
-        self.assertIn("var.gestor_iac_arn", bloque)
+        self.assertIn("var.gestor_objetos_arn", bloque)
 
     def test_no_hay_allow_publico_de_objetos(self) -> None:
         # La politica del bucket no debe conceder Allow a Principal "*".
