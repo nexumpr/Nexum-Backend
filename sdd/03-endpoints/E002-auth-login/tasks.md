@@ -43,11 +43,17 @@
 - [x] `E002-T16` Seudonimización de las cuotas con **HMAC-SHA256** y clave propia
       (`LOGIN_RATE_LIMIT_HMAC_KEY_B64`, ≥32 bytes, fail-closed sin ella). El
       provisionamiento del secreto en el bundle RFC-004 es **AWS_GATE_PENDING**.
-- [ ] `E002-T17` Merge autorizado con `APRUEBO_MERGE_PR_56_SHA_<SHA40>`: **pendiente**.
-- [ ] `E002-T18` Release ARM64 canónico, publicación S3 y bundle de claves bajo sus Gates:
-      **pendiente**.
-- [ ] `E002-T19` Despliegue gradual por ASG y verificación HTTPS real de E001 y E002:
-      **pendiente** (`AWS_NOT_RUN`).
+- [x] `E002-T17` Merge autorizado: PR **#56 MERGED** (`4e4060a` → main `7d1ebf3`), más los
+      PR #57 (memoria), #58 (bucket policy) y #59 (wiring del gestor de secretos).
+- [x] `E002-T18` Release ARM64 canónico publicado en
+      `s3://nexum-h08i-artefactos-713797602090/releases/v0.9.0+7d1ebf3d5357/` (19 041 073 B,
+      SHA-256 `7ff35efe…4d79`, `If-None-Match: *`, SSE AES256, checksum verificado) y bundle
+      RFC-004 ampliado con RSA/HMAC (`If-Match`, versión `vD2diulCaPMUWEFR8N6RlCx3KRow5ehM`).
+- [x] `E002-T19` Despliegue gradual verificado: LT v3, `instance refresh` `74a340eb…`
+      **Successful**, dos instancias en LT v3 `Healthy`, dos targets `healthy`, ASG
+      restaurado a 2/2/2 y pruebas HTTPS reales de E001 (201 + idempotencia) y E002
+      (200 mínimo y completo, 401 genérico). `E002_AWS_VERIFIED=VERIFIED`;
+      `E002_USER_ACCEPTED=VERIFIED` para el alcance de la prueba personal en Postman.
 
 ## Casos concretos
 
@@ -57,4 +63,6 @@
       inexistente; sin sesión creada.
 - [x] `E002-CT03` 400 de validación (email, contraseña vacía, `platform` no admitida).
 - [x] `E002-CT04` Fallo de persistencia ⇒ sin 200 y sin tokens.
-- [ ] `E002-CT05` Dos nodos reales con la misma clave y sesión compartida: **NOT_RUN** (AWS).
+- [x] `E002-CT05` Dos nodos reales con la misma clave y sesión compartida: verificado en
+      AWS tras el rollout (ambas instancias en LT v3, dos targets sanos y sesión
+      persistida consultada por `GetItem`).
