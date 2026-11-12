@@ -64,3 +64,37 @@
 **Criterio de cierre:** el PR puede considerarse *listo para revisión* con los pendientes
 declarados arriba; el endpoint **no** está publicado y no se anunciará a Android hasta la
 verificación real en AWS.
+
+## Cierre en producción (2026-11-12)
+
+- [x] Release `v0.9.0+7d1ebf3d5357` publicado en S3 (binario 19 041 073 B, SHA-256
+      `7ff35efe…4d79`, `If-None-Match: *`, SSE AES256, checksum verificado).
+- [x] Bundle RFC-004 con `JWT_PRIVATE_KEY_PEM_B64`, `JWT_KEY_ID` y
+      `LOGIN_RATE_LIMIT_HMAC_KEY_B64` (versión `vD2diulCaPMUWEFR8N6RlCx3KRow5ehM`,
+      escritura con `If-Match`).
+- [x] Launch Template `nexum-h08i-lt-20261111034054695000000001` **v3** con URI y digests
+      del release E002; `SECRETOS_URI` intacto; IAM runtime con 6 ARNs exactos.
+- [x] `instance refresh` `74a340eb-ee47-4d08-9b9f-8d4ff94ae4f5` **Successful**; dos
+      instancias `InService`/`Healthy` en LT v3; ASG restaurado a 2/2/2; dos targets
+      `healthy`; sin refresh pendiente.
+- [x] `GET /health/live` 200 y `/health/ready` 200 en la API pública.
+- [x] E001 `POST /auth/register` 201 con persistencia DynamoDB y replay idempotente.
+- [x] E002 `POST /auth/login` 200 (mínimo y completo) con `session.id = sessionId`,
+      `expiresIn = 900` y sesión real en DynamoDB.
+- [x] JWT: **estructura y claims** comprobados en producción (decodificación del payload:
+      `iss`, `aud`, `sub`, `sid`, `exp-iat = 900`, `jti` y `nbf` presentes, `sub`/`sid`
+      coincidentes con usuario y sesión reales).
+- [ ] **Verificación criptográfica de la firma RS256 en producción**: no ejecutada con una
+      clave pública independiente del servidor. La firma se cubre con pruebas unitarias de Go
+      en CI (`tests/unit/security`), que no equivalen a validación externa del token emitido
+      en AWS.
+- [~] **Sesión compartida entre nodos**: comprobado que ambas instancias están `Healthy` en
+      LT v3, comparten el mismo bundle de claves y persisten la sesión en DynamoDB; **pendiente**
+      la prueba cruzada emitiendo en un nodo y validando contra el otro.
+- [x] `401 UNAUTHORIZED` genérico con contraseña incorrecta y con correo inexistente.
+- [x] Prueba personal del propietario en Postman: 200 con credenciales correctas y 401 con
+      incorrectas. `E002_USER_ACCEPTED=VERIFIED` para ese alcance.
+- [x] `memoria.md` actualizada con la cronología y las evidencias del despliegue.
+- [ ] Deuda diferida (no bloqueante): drift Redis, verificación empírica de la cadena de
+      proxies, suite del adaptador DynamoDB con dobles del SDK, endurecimiento del manejo
+      local de credenciales temporales.

@@ -5,7 +5,7 @@
 | Documento | `sdd/_control/H08/RFC-010-PROMOCION_SIN_OIDC.md` |
 | Fecha | 2026-11-10 |
 | Base | `main` `e579a2d2701b8b17c6781bc29a4d24151960ead6` |
-| Estado | **PROPUESTO — requiere aprobación humana** |
+| Estado | **APROBADO — 2026-11-11** (`APRUEBO_RFC_010_CD_ASISTIDO_SIN_OIDC`) |
 | Bloqueo que resuelve | `iam:CreateOpenIDConnectProvider` = `explicitDeny`; `iam:ListOpenIDConnectProviders` = `AccessDenied` por SCP `p-ys0pa0u8` |
 
 ## 1. Hecho demostrado
@@ -55,3 +55,13 @@ circuito no cambia.
 
 `APRUEBO_CD_ASISTIDO_SIN_OIDC` — autoriza documentar y operar la promoción asistida. No
 autoriza AWS mutante, ni `apply`, ni despliegue por sí sola.
+
+**Registro de aprobación (2026-11-11):** el responsable emitió
+`APRUEBO_RFC_010_CD_ASISTIDO_SIN_OIDC`, que este documento acepta como equivalente al
+token anterior por identidad de alcance y autoridad (R-001: prevalece la instrucción
+expresa más reciente). Vigencia del mecanismo: hasta que la SCP permita OIDC o el
+responsable lo revoque.
+
+Cada operación mutante de la promoción (publicación S3, actualización del Launch Template
+y `instance_refresh`) conserva su **propio Gate**, con recursos, artefacto y SHA exactos;
+esta aprobación no los sustituye.
