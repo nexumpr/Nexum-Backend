@@ -47,3 +47,13 @@ variable "gestor_iac_arn" {
   type        = string
   default     = ""
 }
+
+variable "gestor_objetos_arn" {
+  description = "ARN del rol gestor autorizado a leer y actualizar los objetos del bundle. Es distinto de gestor_iac_arn, que cubre ListBucket/HeadBucket del operador que ejecuta Terraform."
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws:iam::[0-9]{12}:role/.+$", var.gestor_objetos_arn))
+    error_message = "gestor_objetos_arn debe ser el ARN de un rol IAM (arn:aws:iam::<cuenta>:role/<nombre>)."
+  }
+}

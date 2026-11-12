@@ -272,7 +272,7 @@ data "aws_iam_policy_document" "secretos" {
     condition {
       test     = "StringNotEquals"
       variable = "aws:PrincipalArn"
-      values   = [var.rol_runtime_arn, var.publicador_arn, var.gestor_iac_arn]
+      values   = [var.rol_runtime_arn, var.publicador_arn, var.gestor_objetos_arn]
     }
   }
 
@@ -293,7 +293,7 @@ data "aws_iam_policy_document" "secretos" {
 
     principals {
       type        = "AWS"
-      identifiers = [var.gestor_iac_arn]
+      identifiers = [var.gestor_objetos_arn]
     }
   }
 }
