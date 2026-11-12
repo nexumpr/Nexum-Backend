@@ -80,7 +80,17 @@ verificación real en AWS.
 - [x] `GET /health/live` 200 y `/health/ready` 200 en la API pública.
 - [x] E001 `POST /auth/register` 201 con persistencia DynamoDB y replay idempotente.
 - [x] E002 `POST /auth/login` 200 (mínimo y completo) con `session.id = sessionId`,
-      `expiresIn = 900`, JWT RS256 verificado y sesión real en DynamoDB.
+      `expiresIn = 900` y sesión real en DynamoDB.
+- [x] JWT: **estructura y claims** comprobados en producción (decodificación del payload:
+      `iss`, `aud`, `sub`, `sid`, `exp-iat = 900`, `jti` y `nbf` presentes, `sub`/`sid`
+      coincidentes con usuario y sesión reales).
+- [ ] **Verificación criptográfica de la firma RS256 en producción**: no ejecutada con una
+      clave pública independiente del servidor. La firma se cubre con pruebas unitarias de Go
+      en CI (`tests/unit/security`), que no equivalen a validación externa del token emitido
+      en AWS.
+- [~] **Sesión compartida entre nodos**: comprobado que ambas instancias están `Healthy` en
+      LT v3, comparten el mismo bundle de claves y persisten la sesión en DynamoDB; **pendiente**
+      la prueba cruzada emitiendo en un nodo y validando contra el otro.
 - [x] `401 UNAUTHORIZED` genérico con contraseña incorrecta y con correo inexistente.
 - [x] Prueba personal del propietario en Postman: 200 con credenciales correctas y 401 con
       incorrectas. `E002_USER_ACCEPTED=VERIFIED` para ese alcance.

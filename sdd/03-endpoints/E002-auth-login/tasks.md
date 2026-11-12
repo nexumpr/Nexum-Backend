@@ -63,6 +63,9 @@
       inexistente; sin sesión creada.
 - [x] `E002-CT03` 400 de validación (email, contraseña vacía, `platform` no admitida).
 - [x] `E002-CT04` Fallo de persistencia ⇒ sin 200 y sin tokens.
-- [x] `E002-CT05` Dos nodos reales con la misma clave y sesión compartida: verificado en
-      AWS tras el rollout (ambas instancias en LT v3, dos targets sanos y sesión
-      persistida consultada por `GetItem`).
+- [~] `E002-CT05` Dos nodos reales con la misma clave y sesión compartida: **parcial**.
+      Comprobado en AWS: dos instancias `InService`/`Healthy` en LT v3, dos targets `healthy`,
+      ambas con el mismo `SECRETOS_URI` (mismo bundle RSA/HMAC) y sesión persistida en
+      DynamoDB consultada por `GetItem`. **Pendiente la validación empírica cruzada**: emitir
+      un token en un nodo y consumirlo/validarlo contra el otro nodo identificado, que no se
+      ejecutó.
