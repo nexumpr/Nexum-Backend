@@ -272,7 +272,28 @@ data "aws_iam_policy_document" "secretos" {
     condition {
       test     = "StringNotEquals"
       variable = "aws:PrincipalArn"
-      values   = [var.rol_runtime_arn, var.publicador_arn]
+      values   = [var.rol_runtime_arn, var.publicador_arn, var.gestor_iac_arn]
+    }
+  }
+
+  # 7. El gestor de IaC queda exceptuado del Deny anterior para poder leer y
+  #    actualizar el bundle de forma condicional (RFC-004), pero el borrado se
+  #    mantiene denegado de forma explicita aunque su policy de identidad se
+  #    ampliara por error. La excepcion es ausencia de Deny, no un Allow: el rol
+  #    necesita su propia policy para operar, y esta solo cubre su prefijo.
+  statement {
+    sid    = "DenegarBorradoAlGestor"
+    effect = "Deny"
+
+    actions = [
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion",
+    ]
+    resources = ["${aws_s3_bucket.secretos.arn}/*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [var.gestor_iac_arn]
     }
   }
 }
