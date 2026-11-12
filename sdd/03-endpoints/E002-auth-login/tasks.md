@@ -29,12 +29,20 @@
 - [x] `E002-T12` Validadores verdes: `validar_h06.py`, paridad YAML/JSON, comparador de
       contratos, `validar_sdd_integral.py` y manifiesto SHA256.
 - [x] `E002-T13` CI del PR #56 con los 13 checks en `SUCCESS`.
-- [ ] `E002-T14` Pruebas dedicadas del adaptador DynamoDB, del limitador dual y del handler
-      HTTP con dobles: **pendiente**.
-- [ ] `E002-T15` Política de IP efectiva verificada sobre la topología CloudFront→ALB y, si
-      procede, endurecimiento de la cabecera: **pendiente**.
-- [ ] `E002-T16` Seudonimización de la cuota por email mediante HMAC-SHA256 con secreto del
-      bundle (hoy SHA-256): **pendiente**, requiere Gate de bundle.
+- [x] `E002-T14` Pruebas dedicadas del handler HTTP, del keyring RSA y de la clave HMAC
+      (`tests/unit/transport/login_v602_test.go`): contrato 200 con `session.id = sessionId`,
+      400 de validación y de cadena de proxies inválida, 401, 429 con `Retry-After`,
+      `Cache-Control: no-store`, cuerpo >256 KiB y errores sin credenciales. El adaptador
+      DynamoDB sigue cubierto por las suites de integración existentes; **pendiente** una
+      suite dedicada con dobles del AWS SDK.
+- [x] `E002-T15` Política de IP confiable implementada (`internal/transport/http/clientip.go`):
+      se toma la IP escrita por CloudFront (penúltimo salto de `X-Forwarded-For`), se valida
+      con `net/netip`, se rechaza la cadena inválida con 400 y **no** se agrupa a los
+      clientes en una identidad compartida. La comprobación contra la configuración real de
+      CloudFront/ALB es **AWS_NOT_RUN**.
+- [x] `E002-T16` Seudonimización de las cuotas con **HMAC-SHA256** y clave propia
+      (`LOGIN_RATE_LIMIT_HMAC_KEY_B64`, ≥32 bytes, fail-closed sin ella). El
+      provisionamiento del secreto en el bundle RFC-004 es **AWS_GATE_PENDING**.
 - [ ] `E002-T17` Merge autorizado con `APRUEBO_MERGE_PR_56_SHA_<SHA40>`: **pendiente**.
 - [ ] `E002-T18` Release ARM64 canónico, publicación S3 y bundle de claves bajo sus Gates:
       **pendiente**.

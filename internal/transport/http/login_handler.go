@@ -79,10 +79,20 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ipConfiable, okIP := loginClientIP(r)
+	if !okIP {
+		// Cadena de proxies invalida o manipulada: se rechaza en lugar de agrupar a todos
+		// los clientes afectados en una misma cuota compartida.
+		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+			{Field: "X-Forwarded-For", Reason: "invalid_chain"},
+		})
+		return
+	}
+
 	command := appIdentity.LoginCommand{
 		Email:    request.Email,
 		Password: request.Password,
-		ClientIP: registerClientIP(r),
+		ClientIP: ipConfiable,
 	}
 	if request.DeviceID != nil {
 		command.DeviceID = *request.DeviceID
@@ -188,3 +198,10 @@ func (h *LoginHandler) writeServiceError(w http.ResponseWriter, r *http.Request,
 }
 
 var _ = strconv.Itoa
+
+// loginClientIP aplica la política de cadena de proxies documentada en clientip.go.
+// Si la cadena no permite determinar una IP verificable, se usa una identidad acotada al
+// peer inmediato; nunca el primer X-Forwarded-For controlable por el cliente.
+func loginClientIP(r *http.Request) (string, bool) {
+	return clientIPFromTrustedChain(r)
+}

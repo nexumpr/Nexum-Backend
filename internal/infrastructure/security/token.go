@@ -58,6 +58,10 @@ type RSATokenProvider struct {
 	keyID      string
 	issuer     string
 	audience   string
+	// keyring asocia cada kid reconocido con su clave pública de verificación. La clave
+	// activa siempre está presente; las anteriores se conservan mientras existan tokens
+	// válidos emitidos con ellas (rotación sin invalidar sesiones vivas).
+	keyring map[string]*rsa.PublicKey
 }
 
 // NewRSATokenProvider crea un proveedor de tokens con par de claves RSA provisto.
@@ -68,13 +72,39 @@ func NewRSATokenProvider(privateKey *rsa.PrivateKey, keyID string) (*RSATokenPro
 	if keyID == "" {
 		keyID = DefaultKeyID
 	}
-	return &RSATokenProvider{
+	proveedor := &RSATokenProvider{
 		privateKey: privateKey,
 		publicKey:  &privateKey.PublicKey,
 		keyID:      keyID,
 		issuer:     DefaultIssuer,
 		audience:   DefaultAudience,
-	}, nil
+		keyring:    make(map[string]*rsa.PublicKey, 2),
+	}
+	proveedor.keyring[keyID] = &privateKey.PublicKey
+	return proveedor, nil
+}
+
+// AddVerificationKey registra una clave pública adicional asociada a un kid concreto.
+// Permite verificar tokens emitidos antes de una rotación sin dejar de firmar con la
+// clave activa. Rechaza kid vacío, kid duplicado con otra clave y claves inválidas.
+func (p *RSATokenProvider) AddVerificationKey(keyID string, publicKey *rsa.PublicKey) error {
+	if strings.TrimSpace(keyID) == "" {
+		return errors.New("kid vacio no permitido en el keyring")
+	}
+	if publicKey == nil || publicKey.N == nil || publicKey.E <= 0 {
+		return errors.New("clave publica invalida en el keyring")
+	}
+	if publicKey.N.BitLen() < 2048 {
+		return errors.New("clave publica menor de 2048 bits en el keyring")
+	}
+	if existente, ok := p.keyring[keyID]; ok && existente.N.Cmp(publicKey.N) != 0 {
+		return fmt.Errorf("kid %q ya registrado con otra clave", keyID)
+	}
+	if p.keyring == nil {
+		p.keyring = make(map[string]*rsa.PublicKey, 2)
+	}
+	p.keyring[keyID] = publicKey
+	return nil
 }
 
 // GenerateAccessToken emite un JWT firmado digitalmente con RS256.
@@ -179,7 +209,11 @@ func (p *RSATokenProvider) ValidateAccessToken(ctx context.Context, tokenString 
 	if !strings.EqualFold(header.Type, "JWT") {
 		return nil, fmt.Errorf("%w: typ distinto de JWT", ports.ErrInvalidToken)
 	}
-	if header.KeyID == "" || header.KeyID != p.keyID {
+	if header.KeyID == "" {
+		return nil, fmt.Errorf("%w: kid ausente", ports.ErrInvalidToken)
+	}
+	claveVerificacion, conocido := p.keyring[header.KeyID]
+	if !conocido || claveVerificacion == nil {
 		return nil, fmt.Errorf("%w: kid desconocido", ports.ErrInvalidToken)
 	}
 
@@ -203,7 +237,7 @@ func (p *RSATokenProvider) ValidateAccessToken(ctx context.Context, tokenString 
 	hasher.Write([]byte(signingInput))
 	digest := hasher.Sum(nil)
 
-	if err := rsa.VerifyPKCS1v15(p.publicKey, crypto.SHA256, digest, sigBytes); err != nil {
+	if err := rsa.VerifyPKCS1v15(claveVerificacion, crypto.SHA256, digest, sigBytes); err != nil {
 		return nil, ports.ErrInvalidToken
 	}
 
