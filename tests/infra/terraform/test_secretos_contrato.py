@@ -324,11 +324,28 @@ class ModuloSecretos(unittest.TestCase):
                 self._decidir(self.IAC, accion, bucket, identidad_permite=True), "DENY", accion
             )
 
-    def test_gestor_iac_no_accede_a_los_objetos(self) -> None:
-        for accion in ("s3:GetObject", "s3:PutObject", "s3:DeleteObject"):
+    def test_gestor_iac_puede_leer_y_actualizar_sin_borrar(self) -> None:
+        """RFC-004: el gestor necesita leer y actualizar el bundle de forma condicional.
+
+        Antes de la correccion del 2026-11-12 la bucket policy denegaba GetObject y
+        PutObject al gestor, dejando inertes sus permisos de identidad (403 real).
+        El borrado sigue denegado de forma explicita.
+        """
+        for accion in ("s3:GetObject", "s3:GetObjectVersion", "s3:PutObject"):
+            self.assertEqual(
+                self._decidir(self.IAC, accion, self.OBJETO, identidad_permite=True),
+                "ALLOW",
+                accion,
+            )
+        for accion in ("s3:DeleteObject", "s3:DeleteObjectVersion"):
             self.assertEqual(
                 self._decidir(self.IAC, accion, self.OBJETO, identidad_permite=True), "DENY", accion
             )
+
+    def test_gestor_iac_sin_identidad_no_obtiene_acceso(self) -> None:
+        self.assertEqual(
+            self._decidir(self.IAC, "s3:GetObject", self.OBJETO, identidad_permite=False), "DENY"
+        )
 
     def test_list_bucket_denegado_al_resto(self) -> None:
         bucket = "arn:aws:s3:::bucket"
@@ -581,3 +598,58 @@ class Documentacion(unittest.TestCase):
         texto = leer(gate)
         self.assertIn("APRUEBO_RFC004_OPCION_B", texto)
         self.assertIn("No autoriza", texto)
+
+
+class ExcepcionGestorEnBucketPolicy(unittest.TestCase):
+    """RFC-004: el gestor de IaC debe poder leer/actualizar el bundle condicionalmente.
+
+    Defecto corregido (2026-11-12): `DenegarAPrincipalsNoAutorizados` solo exceptuaba a
+    runtime y publicador, por lo que el rol gestor recibia un Deny explicito de bucket y
+    sus permisos de identidad quedaban inertes (HeadObject -> 403).
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.texto = (RAIZ / "infra/terraform/modules/secretos/main.tf").read_text(encoding="utf-8")
+
+    def _statement(self, sid: str) -> str:
+        inicio = self.texto.find(f'sid    = "{sid}"')
+        self.assertGreater(inicio, 0, sid)
+        fin = self.texto.find("statement {", inicio)
+        return self.texto[inicio : fin if fin > 0 else len(self.texto)]
+
+    def test_gestor_esta_exceptuado_del_deny_de_objetos(self) -> None:
+        bloque = self._statement("DenegarAPrincipalsNoAutorizados")
+        self.assertIn("var.gestor_iac_arn", bloque)
+        self.assertIn("var.rol_runtime_arn", bloque)
+        self.assertIn("var.publicador_arn", bloque)
+        self.assertIn("StringNotEquals", bloque)
+        self.assertIn("aws:PrincipalArn", bloque)
+
+    def test_runtime_y_publicador_conservan_sus_restricciones(self) -> None:
+        # El runtime sigue sin poder escribir ni borrar y el publicador sin poder leer.
+        self.assertIn('sid    = "DenegarEscrituraAlRuntime"', self.texto)
+        self.assertIn('sid    = "DenegarLecturaAlPublicador"', self.texto)
+        self.assertIn('sid    = "DenegarBorradoAlPublicador"', self.texto)
+        self.assertIn('sid    = "DenegarPublicacionSinSSE"', self.texto)
+
+    def test_el_gestor_no_puede_borrar(self) -> None:
+        bloque = self._statement("DenegarBorradoAlGestor")
+        self.assertIn("s3:DeleteObject", bloque)
+        self.assertIn("s3:DeleteObjectVersion", bloque)
+        self.assertIn("var.gestor_iac_arn", bloque)
+
+    def test_no_hay_allow_publico_de_objetos(self) -> None:
+        # La politica del bucket no debe conceder Allow a Principal "*".
+        for fragmento in self.texto.split("statement {"):
+            if "effect = \"Allow\"" in fragmento:
+                self.assertNotIn('identifiers = ["*"]', fragmento)
+
+    def test_el_bucket_sigue_privado_y_cifrado(self) -> None:
+        self.assertIn("aws_s3_bucket_public_access_block", self.texto)
+        self.assertIn("aws_s3_bucket_versioning", self.texto)
+        self.assertIn("AES256", self.texto)
+
+
+if __name__ == "__main__":
+    unittest.main()
