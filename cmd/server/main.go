@@ -83,6 +83,36 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	registerHandler := nexumhttp.NewRegisterHandler(registerService, authRateLimiter, logger)
 	router.HandleFunc(http.MethodPost, "/auth/register", registerHandler.ServeHTTP)
 
+	// H08-E / E002 V6.0.2 (RFC-013): login con sesión persistida y JWT RS256.
+	// Si falta la clave de firma o la persistencia, el endpoint responde 503 (fail-closed):
+	// nunca se emiten tokens ficticios.
+	sessionStore := dynamoAdapter.NewSessionStore(clienteDynamo, cfgDeps.TablaDynamoDB)
+
+	var tokenIssuer appIdentity.AccessTokenIssuer
+	proveedorTokens, errTokens := security.LoadTokenProvider()
+	if errTokens != nil {
+		logger.Error("login: clave de firma JWT no disponible; E002 devolvera 503",
+			slog.String("error_class", "signing_key_unavailable"))
+	} else {
+		tokenIssuer = security.NewRSAAccessTokenIssuer(proveedorTokens)
+	}
+
+	// El limitador de login exige una clave HMAC propia (RFC-013). Sin ella el endpoint
+	// responde 503 y E001 sigue funcionando: no se degrada a un hash sin secreto.
+	claveHMAC, errHMAC := cacheinfra.LoadLoginHMACKey()
+	if errHMAC != nil {
+		logger.Error("login: clave HMAC del limitador no disponible; E002 devolvera 503",
+			slog.String("error_class", "login_hmac_key_unavailable"))
+	}
+	var loginLimiter nexumhttp.LoginRateLimiter
+	if clienteRedis != nil {
+		loginLimiter = cacheinfra.NewLoginRateLimiter(clienteRedis, claveHMAC)
+	}
+
+	loginService := appIdentity.NewLoginService(sessionStore, security.NewArgon2Hasher(nil), tokenIssuer)
+	loginHandler := nexumhttp.NewLoginHandler(loginService, loginLimiter, logger)
+	router.HandleFunc(http.MethodPost, "/auth/login", loginHandler.ServeHTTP)
+
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
 	// Start bloquea hasta que el listener falla o se cierra; el canal transporta

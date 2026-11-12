@@ -36,6 +36,21 @@
       "detalles": [
         "201: #/components/schemas/UserProfile -> #/components/schemas/RegisterResponse"
       ]
+    },
+    {
+      "estado": "APPROVED",
+      "alcance": "API_COMPATIBILIDAD",
+      "codigo": "ESQUEMA_RESPUESTA_CAMBIADO",
+      "ruta": "/api/v1/auth/login",
+      "metodo": "post",
+      "rfc": "RFC-013",
+      "aprobado_por": "Responsable de Nexum-Backend",
+      "gate_documento": "sdd/_control/H08/RFC-013-E002-LOGIN_V602.md",
+      "vigencia_hasta": "2026-12-31",
+      "justificacion": "El contrato V6.0.2 de E002 devuelve LoginResponse (cinco campos legacy de AuthTokens mas session.id, user y onboarding.configured). AuthTokens se conserva intacto para E003.",
+      "detalles": [
+        "200: #/components/schemas/AuthTokens -> #/components/schemas/LoginResponse"
+      ]
     }
   ]
 }

@@ -40,6 +40,26 @@ func BindJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	return nil
 }
 
+// BindJSONLimit decodifica el cuerpo JSON con un límite propio de la ruta y las mismas
+// garantías que BindJSON: Content-Type JSON, campos desconocidos rechazados y validator.
+func BindJSONLimit(w http.ResponseWriter, r *http.Request, dst any, maxBytes int64) error {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+		return errors.New("solicitudes GET/HEAD/OPTIONS no admiten cuerpo JSON")
+	}
+	if maxBytes <= 0 {
+		maxBytes = httputil.DefaultMaxRequestBodyBytes
+	}
+	if err := httputil.DecodeJSON(w, r, dst, maxBytes); err != nil {
+		return err
+	}
+	if v, ok := dst.(Validator); ok {
+		if err := v.Validate(); err != nil {
+			return fmt.Errorf("validacion del payload fallida: %w", err)
+		}
+	}
+	return nil
+}
+
 // RequireIdempotencyKey valida y extrae la clave de idempotencia obligatoria en escrituras sensibles (A-040 §2.5).
 func RequireIdempotencyKey(r *http.Request) (string, error) {
 	key := strings.TrimSpace(r.Header.Get(HeaderIdempotencyKey))

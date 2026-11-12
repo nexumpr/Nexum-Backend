@@ -23,6 +23,12 @@ const (
 	DefaultAudience = "nexum-client"
 	// DefaultKeyID identificador de la clave pública para rotación de claves (kid).
 	DefaultKeyID = "nexum-rsa-key-v1"
+
+	// LeewaySegundos es la tolerancia máxima de reloj aceptada al validar claims (RFC-013).
+	LeewaySegundos = 30
+
+	// MaxAccessTokenSegundos es la vida máxima admitida de un access token.
+	MaxAccessTokenSegundos = 900
 )
 
 // JWTHeader representa la cabecera estándar de un JWT RS256.
@@ -39,6 +45,7 @@ type JWTPayload struct {
 	Audience  string   `json:"aud"`
 	SessionID string   `json:"sid"`
 	IssuedAt  int64    `json:"iat"`
+	NotBefore int64    `json:"nbf"`
 	ExpiresAt int64    `json:"exp"`
 	Roles     []string `json:"roles,omitempty"`
 	JWTID     string   `json:"jti"`
@@ -51,6 +58,10 @@ type RSATokenProvider struct {
 	keyID      string
 	issuer     string
 	audience   string
+	// keyring asocia cada kid reconocido con su clave pública de verificación. La clave
+	// activa siempre está presente; las anteriores se conservan mientras existan tokens
+	// válidos emitidos con ellas (rotación sin invalidar sesiones vivas).
+	keyring map[string]*rsa.PublicKey
 }
 
 // NewRSATokenProvider crea un proveedor de tokens con par de claves RSA provisto.
@@ -61,13 +72,39 @@ func NewRSATokenProvider(privateKey *rsa.PrivateKey, keyID string) (*RSATokenPro
 	if keyID == "" {
 		keyID = DefaultKeyID
 	}
-	return &RSATokenProvider{
+	proveedor := &RSATokenProvider{
 		privateKey: privateKey,
 		publicKey:  &privateKey.PublicKey,
 		keyID:      keyID,
 		issuer:     DefaultIssuer,
 		audience:   DefaultAudience,
-	}, nil
+		keyring:    make(map[string]*rsa.PublicKey, 2),
+	}
+	proveedor.keyring[keyID] = &privateKey.PublicKey
+	return proveedor, nil
+}
+
+// AddVerificationKey registra una clave pública adicional asociada a un kid concreto.
+// Permite verificar tokens emitidos antes de una rotación sin dejar de firmar con la
+// clave activa. Rechaza kid vacío, kid duplicado con otra clave y claves inválidas.
+func (p *RSATokenProvider) AddVerificationKey(keyID string, publicKey *rsa.PublicKey) error {
+	if strings.TrimSpace(keyID) == "" {
+		return errors.New("kid vacio no permitido en el keyring")
+	}
+	if publicKey == nil || publicKey.N == nil || publicKey.E <= 0 {
+		return errors.New("clave publica invalida en el keyring")
+	}
+	if publicKey.N.BitLen() < 2048 {
+		return errors.New("clave publica menor de 2048 bits en el keyring")
+	}
+	if existente, ok := p.keyring[keyID]; ok && existente.N.Cmp(publicKey.N) != 0 {
+		return fmt.Errorf("kid %q ya registrado con otra clave", keyID)
+	}
+	if p.keyring == nil {
+		p.keyring = make(map[string]*rsa.PublicKey, 2)
+	}
+	p.keyring[keyID] = publicKey
+	return nil
 }
 
 // GenerateAccessToken emite un JWT firmado digitalmente con RS256.
@@ -88,11 +125,14 @@ func (p *RSATokenProvider) GenerateAccessToken(ctx context.Context, claims ports
 	}
 
 	// Generar JTI aleatorio de 16 bytes
-	jtiBytes := make([]byte, 16)
-	if _, err := rand.Read(jtiBytes); err != nil {
-		return "", fmt.Errorf("error al generar jti: %w", err)
+	jti := claims.JTI
+	if jti == "" {
+		jtiBytes := make([]byte, 16)
+		if _, err := rand.Read(jtiBytes); err != nil {
+			return "", fmt.Errorf("error al generar jti: %w", err)
+		}
+		jti = base64.RawURLEncoding.EncodeToString(jtiBytes)
 	}
-	jti := base64.RawURLEncoding.EncodeToString(jtiBytes)
 
 	header := JWTHeader{
 		Algorithm: "RS256",
@@ -106,6 +146,7 @@ func (p *RSATokenProvider) GenerateAccessToken(ctx context.Context, claims ports
 		Audience:  p.audience,
 		SessionID: claims.SessionID,
 		IssuedAt:  iat.Unix(),
+		NotBefore: iat.Unix(),
 		ExpiresAt: exp.Unix(),
 		Roles:     claims.Roles,
 		JWTID:     jti,
@@ -164,6 +205,17 @@ func (p *RSATokenProvider) ValidateAccessToken(ctx context.Context, tokenString 
 	if header.Algorithm != "RS256" {
 		return nil, fmt.Errorf("%w: algoritmo '%s' no permitido (solo RS256)", ports.ErrInvalidToken, header.Algorithm)
 	}
+	// RFC-013: typ obligatorio y kid conocido por el keyring del proveedor.
+	if !strings.EqualFold(header.Type, "JWT") {
+		return nil, fmt.Errorf("%w: typ distinto de JWT", ports.ErrInvalidToken)
+	}
+	if header.KeyID == "" {
+		return nil, fmt.Errorf("%w: kid ausente", ports.ErrInvalidToken)
+	}
+	claveVerificacion, conocido := p.keyring[header.KeyID]
+	if !conocido || claveVerificacion == nil {
+		return nil, fmt.Errorf("%w: kid desconocido", ports.ErrInvalidToken)
+	}
 
 	payloadJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
@@ -185,13 +237,45 @@ func (p *RSATokenProvider) ValidateAccessToken(ctx context.Context, tokenString 
 	hasher.Write([]byte(signingInput))
 	digest := hasher.Sum(nil)
 
-	if err := rsa.VerifyPKCS1v15(p.publicKey, crypto.SHA256, digest, sigBytes); err != nil {
+	if err := rsa.VerifyPKCS1v15(claveVerificacion, crypto.SHA256, digest, sigBytes); err != nil {
 		return nil, ports.ErrInvalidToken
 	}
 
+	// RFC-013: validación de emisor, audiencia y claims obligatorios.
+	if payload.Issuer != p.issuer {
+		return nil, fmt.Errorf("%w: issuer no reconocido", ports.ErrInvalidToken)
+	}
+	if payload.Audience != p.audience {
+		return nil, fmt.Errorf("%w: audience no reconocida", ports.ErrInvalidToken)
+	}
+	if strings.TrimSpace(payload.Subject) == "" || strings.TrimSpace(payload.SessionID) == "" {
+		return nil, fmt.Errorf("%w: sub o sid ausentes", ports.ErrInvalidToken)
+	}
+	if strings.TrimSpace(payload.JWTID) == "" {
+		return nil, fmt.Errorf("%w: jti ausente", ports.ErrInvalidToken)
+	}
+	if payload.IssuedAt <= 0 || payload.NotBefore <= 0 || payload.ExpiresAt <= 0 {
+		return nil, fmt.Errorf("%w: claims temporales enumerables", ports.ErrInvalidToken)
+	}
 	now := time.Now().UTC().Unix()
-	if now >= payload.ExpiresAt {
+	// Expirado: se evalúa primero para conservar el error de contrato ErrTokenExpired.
+	if now >= payload.ExpiresAt+LeewaySegundos {
 		return nil, ports.ErrTokenExpired
+	}
+	// nbf: el token no puede ser válido en el futuro más allá del leeway.
+	if payload.NotBefore > now+LeewaySegundos {
+		return nil, fmt.Errorf("%w: nbf en el futuro", ports.ErrInvalidToken)
+	}
+	// iat no puede estar en el futuro más allá del leeway.
+	if payload.IssuedAt > now+LeewaySegundos {
+		return nil, fmt.Errorf("%w: iat en el futuro", ports.ErrInvalidToken)
+	}
+	// Coherencia y política de vida útil.
+	if payload.ExpiresAt <= payload.IssuedAt {
+		return nil, fmt.Errorf("%w: exp no posterior a iat", ports.ErrInvalidToken)
+	}
+	if payload.ExpiresAt-payload.IssuedAt > MaxAccessTokenSegundos+LeewaySegundos {
+		return nil, fmt.Errorf("%w: vida del token fuera de política", ports.ErrInvalidToken)
 	}
 
 	return &ports.TokenClaims{

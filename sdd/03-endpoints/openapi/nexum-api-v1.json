@@ -149,6 +149,24 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHORIZED — credenciales inválidas o cuenta inhabilitada. Mensaje genérico e indistinguible; nunca revela si el correo existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "UNAUTHORIZED",
+                    "message": "Credenciales invalidas.",
+                    "traceId": "018f90ef-08e5-7a68-b09f-2b67a47c92f0",
+                    "details": []
+                  }
+                }
+              }
+            }
+          },
           "400": {
             "description": "INVALID_REQUEST",
             "content": {
@@ -310,7 +328,7 @@
         ],
         "operationId": "nexum_e002",
         "summary": "Iniciar sesión y emitir tokens",
-        "description": "E002 · Verificar contraseña en tiempo constante; refresh opaco hasheado y sesión persistida; respuesta no revela existencia de correo. Estado H06: REQUIRED_DESIGN. No implementado; pruebas HTTP reales H08.",
+        "description": "E002 · Verificar contraseña en tiempo constante; refresh opaco hasheado y sesión persistida; respuesta no revela existencia de correo. Contrato V6.0.2 (RFC-013): LoginResponse propio, sesión real en DynamoDB y 401 genérico.",
         "x-nexum-catalog-id": "E002",
         "x-nexum-source-class": "M",
         "x-nexum-implementation-scope": "REQUIRED_DESIGN",
@@ -319,18 +337,30 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Operación completada.",
+            "description": "Login correcto con sesión persistida y contrato completo V6.0.2.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthTokens"
+                  "$ref": "#/components/schemas/LoginResponse"
                 },
                 "example": {
                   "accessToken": "REDACTED_ACCESS_TOKEN",
                   "refreshToken": "REDACTED_REFRESH_TOKEN",
                   "tokenType": "Bearer",
                   "expiresIn": 900,
-                  "sessionId": "018f90ef-08e5-7a68-b09f-2b67a47c92f0"
+                  "sessionId": "018f90ef-08e5-7a68-b09f-2b67a47c92f0",
+                  "session": {
+                    "id": "018f90ef-08e5-7a68-b09f-2b67a47c92f0"
+                  },
+                  "user": {
+                    "id": "47622cbc-36ec-4b30-9b8a-d9c26833a395",
+                    "name": "Usuario de Prueba Nexum",
+                    "email": "usuario.prueba@example.com",
+                    "emailVerified": false
+                  },
+                  "onboarding": {
+                    "configured": false
+                  }
                 }
               }
             }
@@ -452,8 +482,11 @@
                 "$ref": "#/components/schemas/LoginRequest"
               },
               "example": {
-                "email": "ejemplo@example.invalid",
-                "password": "ExamplePassphrase#2026"
+                "email": "usuario.prueba@example.com",
+                "password": "ExamplePassphrase#2026",
+                "deviceId": "installation-6a4f1d8c-8b51-4e6d-bd96-c94f2adc7dd7",
+                "deviceName": "Android",
+                "platform": "android"
               }
             }
           }
@@ -15381,14 +15414,148 @@
             "type": "string",
             "example": "ExamplePassphrase#2026",
             "minLength": 1,
-            "maxLength": 128
+            "maxLength": 128,
+            "description": "Contraseña del titular. No se normaliza (sin trim ni minúsculas) y se verifica con Argon2id. Nunca se registra."
+          },
+          "deviceId": {
+            "type": "string",
+            "example": "installation-6a4f1d8c-8b51-4e6d-bd96-c94f2adc7dd7",
+            "maxLength": 128,
+            "description": "Identificador no sensible de la instalación Android. Metadato de sesión; nunca autoriza acceso."
+          },
+          "deviceName": {
+            "type": "string",
+            "example": "Android",
+            "maxLength": 80,
+            "description": "Nombre legible del dispositivo. Sólo metadato de sesión."
+          },
+          "platform": {
+            "type": "string",
+            "example": "android",
+            "enum": [
+              "android"
+            ],
+            "description": "Plataforma del cliente. Único valor admitido en V6.0.2."
           }
         },
         "required": [
           "email",
           "password"
         ],
-        "description": "Contrato formal Nexum LoginRequest"
+        "description": "Contrato formal Nexum LoginRequest (E002 V6.0.2). Los tres campos de dispositivo son opcionales."
+      },
+      "LoginSession": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "018f90ef-08e5-7a68-b09f-2b67a47c92f0",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "description": "Alias de respuesta de la sesión creada; siempre igual a sessionId. No es una sesión adicional."
+      },
+      "LoginUser": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "47622cbc-36ec-4b30-9b8a-d9c26833a395",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Usuario de Prueba Nexum"
+          },
+          "email": {
+            "type": "string",
+            "example": "usuario.prueba@example.com",
+            "format": "email"
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "emailVerified"
+        ],
+        "description": "Identidad real del perfil persistido por E001."
+      },
+      "LoginOnboarding": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "configured"
+        ],
+        "description": "Estado real del item USER#id / ONBOARDING. Un usuario histórico sin ese item devuelve false por política de compatibilidad."
+      },
+      "LoginResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "example": "REDACTED_ACCESS_TOKEN"
+          },
+          "refreshToken": {
+            "type": "string",
+            "example": "REDACTED_REFRESH_TOKEN"
+          },
+          "tokenType": {
+            "type": "string",
+            "example": "Bearer",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expiresIn": {
+            "type": "integer",
+            "example": 900,
+            "enum": [
+              900
+            ]
+          },
+          "sessionId": {
+            "type": "string",
+            "example": "018f90ef-08e5-7a68-b09f-2b67a47c92f0",
+            "format": "uuid"
+          },
+          "session": {
+            "$ref": "#/components/schemas/LoginSession"
+          },
+          "user": {
+            "$ref": "#/components/schemas/LoginUser"
+          },
+          "onboarding": {
+            "$ref": "#/components/schemas/LoginOnboarding"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "tokenType",
+          "expiresIn",
+          "sessionId",
+          "session",
+          "user",
+          "onboarding"
+        ],
+        "description": "Respuesta 200 de E002 V6.0.2. Conserva los cinco campos heredados de AuthTokens y añade sesión, usuario y onboarding. AuthTokens sigue siendo el contrato de E003 y no se modifica."
       },
       "RefreshRequest": {
         "type": "object",

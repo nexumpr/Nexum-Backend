@@ -1,25 +1,79 @@
-# Plan H06 — E002: Iniciar sesión y emitir tokens
+# Plan — E002 V6.0.2 (implementado en local)
 
-**Estado:** diseño listo para revisión humana; implementación futura H08+ con Gate H07 aprobado. **Ruta:** `POST /api/v1/auth/login`.
+**Estado:** contrato V6.0.2 (RFC-013) implementado en la rama `feat/h08e-e002-login-v602`.
+**Despliegue AWS:** `NOT_RUN`.
 
-## Arquitectura y secuencia de implementación futura
+## 1. Arquitectura implementada
 
-1. Definir caso de uso Go en capa `application` y entidades/errores en `domain`; transportar DTO `LoginRequest` → `AuthTokens` sin exponer SDK AWS a controladores.
-2. HTTP Router/middleware valida JWT, cuerpo, límites y parámetros: auth `public`, idempotencia no específica, If-Match no obligatorio.
-3. Adaptador DynamoDB: Email-reserva / USER#id PROFILE y SESSION#id / SESSIONHASH#digest; token hash con TTL y expiración funcional. Integrar condiciones, `Query`/`GetItem`, cero `Scan`, transacciones cuando aplique.
-4. Redis: política por usuario, TTL/invalidation, revocación multiinstancia y fallo seguro. Un cache hit no puede saltarse autorización.
-5. Responder HTTP 200 con esquema OpenAPI, errores uniformes y cabeceras; `Location` en 201 si corresponde.
-6. Publicar un único endpoint nuevo por release con PR, CI SAST/DAST permitido, contratos y pruebas unitarias/de integración/HTTP de dos nodos, rollback y aprobación humana.
+Clean Architecture existente, sin capas paralelas:
 
-## Decisiones específicas
+| Capa | Archivo | Responsabilidad |
+|---|---|---|
+| Aplicación | `internal/application/identity/login.go` | `LoginService`, validación canónica, flujo de autenticación, construcción de `LoginResponse`, refresh opaco CSPRNG y digest |
+| Puertos | `internal/ports/auth.go` | `PasswordHasher`, `TokenProvider` y `TokenClaims` (con `JTI`) |
+| Persistencia | `internal/adapters/dynamo/session_store.go` | `LoginStore`: reserva→perfil→onboarding y transacción de sesión |
+| Claves | `internal/domain/dynamo/keys.go` | `UserSessionKeys`, `RefreshKeys` (además del histórico `SessionKeys`, conservado) |
+| Criptografía | `internal/infrastructure/security/token.go`, `issuer.go` | RS256, validación estricta de claims, carga de PEM desde entorno |
+| Caché | `internal/infrastructure/cache/login_rate_limiter.go` | Cuota dual atómica con script Lua |
+| Transporte | `internal/transport/http/login_handler.go`, `binding.go` | DTO estricto, límite de 256 KiB, mapeo de errores, cabeceras no-store |
+| Composición | `cmd/server/main.go` | Wiring real: DynamoDB, Redis, Argon2id, RSA y limitador |
 
-- Verificar contraseña en tiempo constante; refresh opaco hasheado y sesión persistida; respuesta no revela existencia de correo.
-- Modelo de request: `LoginRequest`. Modelo de response: `AuthTokens`.
-- Patrón de persistencia: Email-reserva / USER#id PROFILE y SESSION#id / SESSIONHASH#digest; token hash con TTL y expiración funcional.
-- Obligación: `REQUIRED_DESIGN`. Requerido por el catálogo o soporte vigente; no rebajarlo a demo.
+## 2. Flujo de `LoginService`
 
-## Dependencias y riesgos
+1. `ValidateLoginCommand`: email canónico, contraseña sin normalizar, metadatos opcionales.
+2. `LookupIdentity`: `GetItem ConsistentRead` de `EMAIL#<sha256>` y de `PROFILE`.
+3. Coherencia reserva↔perfil; `status == ACTIVE`.
+4. `VerifyPassword` Argon2id; ante correo inexistente, verificación señuelo con un hash
+   derivado en construcción del propio hasher (no un literal fijo).
+5. `OnboardingConfigured`: `true`/`false` real; ausencia histórica ⇒ `false`.
+6. Emisión: `sessionId` y `familyId` UUID v4 CSPRNG, refresh 32 bytes, JWT RS256 900 s.
+7. `CreateSession` atómica; si falla ⇒ 503 sin tokens.
 
-- No crear recursos ni ejecutar despliegues en H06. AWS Free/45 días/cero pesos y ciclo IaC cerrado son condiciones de H08, no tareas manuales de Mobile.
-- Errores de concurrencia 409/412, reglas de negocio 422, disponibilidad 503 y seguridad de recursos ajenos.
-- Prueba real HTTP/HTTPS y DynamoDB/Redis: **NOT_RUN**; solo el contrato/documento es verificable ahora.
+Cualquier fallo de identidad/estado devuelve el **mismo** `ErrInvalidCredentials`.
+
+## 3. Modelo físico DynamoDB
+
+| Ítem | PK | SK |
+|---|---|---|
+| Sesión | `USER#<userId>` | `SESSION#<sessionId>` |
+| Localizador refresh | `REFRESH#<sha256(refresh)>` | `SESSION` |
+
+Escritura en una `TransactWriteItems` con `attribute_not_exists(PK)` en ambos ítems.
+`expiresAt` es **Number (epoch seconds)** porque es el atributo TTL que
+`infra/terraform/modules/dynamodb` exige; `expiresAtISO` sólo aporta legibilidad. No se crean
+tablas, índices ni particiones nuevas: IAM ya autoriza `USER#*`, `SESSION#*` y `REFRESH#*`.
+
+## 4. Criptografía y secretos
+
+- Una sola clave RSA (≥2048 bits) para ambas instancias, cargada de
+  `JWT_PRIVATE_KEY_PEM_B64` + `JWT_KEY_ID` desde el bundle privado RFC-004; decodificada en
+  memoria y nunca escrita ni registrada.
+- `kid` explícito; la validación rechaza `kid` desconocido. El `keyring` acepta el conjunto
+  de claves públicas vigentes para permitir rotación sin invalidar tokens aún válidos.
+- `iss`/`aud` fijos y aprobados; no se sustituyen por el hostname de CloudFront.
+- Sin material criptográfico el endpoint responde 503 (fail-closed).
+
+## 5. Redis
+
+Script Lua único que incrementa y expira las dos claves y decide en la misma ejecución:
+`nexum:v1:ratelimit:auth_login_ip:<sha256>` y `...:auth_login_email:<sha256>`. Clases
+separadas de E001 (que mantiene 5/15 min/IP). La instancia desplegada es Redis OSS de un
+nodo, no Cluster, por lo que dos claves en un script son válidas; si se migrara a Cluster
+deberían compartir *hash slot*.
+
+## 6. Pruebas
+
+- `tests/unit/application/login_test.go`: contrato completo, `session.id = sessionId`,
+  onboarding real e histórico, 401 en los tres escenarios, 400 de validación, fallo cerrado
+  sin emisor y sin sesión si la persistencia falla.
+- `tests/unit/security`: RS256, expiración y rechazos criptográficos.
+- Regresión de E001 en `tests/unit/transport`, `tests/integration` y `tests/security`.
+- Pendiente: pruebas dedicadas del adaptador DynamoDB, del limitador dual y del handler
+  HTTP con dependencias simuladas.
+
+## 7. Despliegue futuro (no ejecutado)
+
+Release ARM64 canónico desde CI → S3 inmutable (Gate) → bundle de secretos con la clave
+compartida (Gate) → despliegue gradual por ASG conservando dos targets sanos → verificación
+HTTPS real de E001 y E002. Rollback: release anterior en S3 y versión previa del Launch
+Template. Sin cambios de VPC, ALB, CloudFront, DynamoDB ni Redis.
