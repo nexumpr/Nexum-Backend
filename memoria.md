@@ -921,6 +921,41 @@
   `permissions: shell "terraform apply *e003-lt-iam-v2.tfplan*" → ask` y
   `policies: tool.use "shell:terraform apply *e003-lt-iam-v2.tfplan*" → allow`.
 
+### H08-E / E003 — HITO E (EN CURSO): refresh lanzado y pérdida de conectividad AWS (2026-11-13)
+
+- **Gate usado:** `APRUEBO_ASG_E003_V0.10.0`.
+- **Preflight verificado:** ASG `nexum-h08i-asg-backend` en `Min 2 / Desired 2 / Max 2`, LT
+  `lt-05445f32a7ee8a2f7` con `Version = $Latest` (ya en **v4** tras el apply), dos instancias
+  `InService/Healthy` en `us-east-2a/b` con LT **v3** (E002) y `ProtectedFromScaleIn=true`;
+  `HealthCheckType=EC2`, gracia 120 s; sin refresh previo.
+- **Mutaciones ejecutadas:**
+  1. `update-auto-scaling-group --min-size 2 --max-size 3 --desired-capacity 2` → **Max 2→3**
+     (capacidad transitoria autorizada).
+  2. `start-instance-refresh --strategy Rolling` con
+     `MinHealthyPercentage=100`, `MaxHealthyPercentage=150`, `InstanceWarmup=120`,
+     `ScaleInProtectedInstances=Refresh`, `SkipMatching=false`, sin AutoRollback.
+     **InstanceRefreshId: `8eb6837d-8be9-4bad-a787-eed102987ed4`**.
+- **Última observación válida (≈4 min tras el inicio):** refresh `InProgress`, `0 %`, y las dos
+  instancias antiguas seguían `InService/Healthy` en LT v3 → **servicio E002 sin interrupción**.
+- **Incidente bloqueante:** la CLI de AWS dejó de autenticar —
+  `Could not connect to the endpoint URL: "https://us-east-2.signin.aws.amazon.com/v1/token"`
+  (refresco del token de `aws login`). Sin credenciales no se puede consultar el refresh ni
+  restaurar `MaxSize`. No se ejecutó ninguna otra mutación.
+- **Estado pendiente y seguro:** AWS sigue ejecutando el refresh por sí mismo; el ASG puede
+  quedar con **MaxSize=3** hasta poder restaurarlo. **Nada se destruyó**: rollback disponible
+  (LT v3 y `v0.9.0+7d1ebf3d5357` intactos, 6 ARN previos conservados).
+- **Recuperación exacta (cuando vuelva la conectividad):**
+  1. `aws autoscaling describe-instance-refreshes --auto-scaling-group-name nexum-h08i-asg-backend`
+     → confirmar `Successful` y el `InstanceRefreshId` anterior.
+  2. `aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names nexum-h08i-asg-backend`
+     → dos instancias en **LT 4**, `InService/Healthy`.
+  3. `aws autoscaling update-auto-scaling-group --auto-scaling-group-name nexum-h08i-asg-backend --min-size 2 --max-size 2 --desired-capacity 2`
+     → **restaurar 2/2/2**.
+  4. Pruebas HTTPS (HITO F) y registro.
+  Si el refresh quedó fallido: `cancel-instance-refresh` y evaluar rollback a LT v3.
+- **Estado:** `E003_LT_APPLIED`; `E003_DEPLOYED=EN_CURSO_NO_VERIFICADO`;
+  `AWS_VERIFIED=NOT_RUN`; `E001/E002` servidos por las instancias antiguas hasta la sustitución.
+
 ### H08-E / E003 — HITO D: APPLY REAL (LT v4 + IAM 8 ARN) (2026-11-13)
 
 - **Gate usado:** `APRUEBO_APPLY_IAM_E003_91b9fc3a688ccd2f053b730b58d46fb251b154547e17a9830598737089a2df07`.
