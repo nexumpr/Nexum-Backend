@@ -902,6 +902,12 @@
 - Bucket `nexum-h08i-artefactos-713797602090` accesible en lectura de listado. Releases existentes: `releases/e001-d9f0696/`, `releases/v0.8.0+40f64b6653ec/`, `releases/v0.9.0+7d1ebf3d5357/`, cada una con `nexum-backend-linux-arm64` y `nexum-backend.service`. El prefijo `releases/v0.10.0+1d0c2650daab/` **no existe** todavía.
 - Política del bucket (IaC, autoridad): `s3:PutObject` permitido **solo** al rol `nexum-h08i-artefactos-publicador` y solo dentro del prefijo de releases, con `s3:x-amz-server-side-encryption = AES256` obligatorio; Deny explícito de escritura al runtime, de lectura/borrado al publicador y de **cualquier acción a principals distintos de runtime y publicador**. Consecuencia: el operador **no puede** publicar directamente; la publicación se ejecutará asumiendo `arn:aws:iam::713797602090:role/nexum-h08i-artefactos-publicador` (CD_ASISTIDO, RFC-010/RFC-011).
 - **IAM del runtime:** los ARNs de artefacto se inyectan por variable (`iam_artifact_object_arns`) con objetos exactos; los objetos de `v0.10.0` **no** están autorizados todavía. El plan del Launch Template incluirá el cambio IAM mínimo (añadir binario y unidad del release nuevo, conservando E001, v0.8.0 y v0.9.0 para rollback). La lista efectiva actual se leerá con permiso de lectura en ese Gate.
+- **Permisos del publicador (preflight honesto):** `iam simulate-principal-policy` resulta
+  **no concluyente** en este bucket — devuelve `explicitDeny` incluso al rol runtime leyendo
+  `releases/v0.9.0+…`, permiso que funciona en producción; la condición `aws:PrincipalArn` de
+  `DenegarAPrincipalsNoAutorizados` no se evalúa fielmente. No se declara permiso verificado
+  por simulación: la prueba real es la publicación, que falla cerrada con `AccessDenied` sin
+  efecto parcial. El operador conserva `ListBucket` (listado de `releases/` correcto).
 - **Estado:** `E003_MERGED`; `E003_DEPLOYED=NOT_RUN`; `E003_AWS_VERIFIED=NOT_RUN`; `E003_USER_ACCEPTED` pendiente. Siguiente Gate: publicación S3.
 
 ### H08-E / E003 — PR #61, HITO 4: RFC-014 APROBADA y contrato aplicado (2026-11-13T18:18Z)

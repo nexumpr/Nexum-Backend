@@ -54,6 +54,19 @@ hará con el operador mediante `s3api list-objects-v2 --prefix releases/v0.10.0+
 comprobando `Size` y `ChecksumSHA256` de cada objeto contra la tabla del §1. Cualquier
 discrepancia detiene el despliegue y **no** se aplica el Launch Template.
 
+## 3 bis. Resultado del preflight de permisos (2026-11-13)
+
+- `iam simulate-principal-policy` devuelve **`explicitDeny` incluso para el rol runtime
+  leyendo `releases/v0.9.0+…`, permiso que en producción funciona** (las instancias activas
+  descargan ese objeto en cada arranque). Conclusión: la simulación **no evalúa de forma fiel**
+  la condición `aws:PrincipalArn` de `DenegarAPrincipalsNoAutorizados` y **no sirve** como
+  preflight de este bucket. No se declara permiso verificado por simulación.
+- El operador **sí** tiene `ListBucket` (listado de `releases/` correcto), pero la política del
+  bucket le deniega escritura por diseño.
+- Por tanto, la prueba real de `PutObject` **es la propia publicación**: si el rol no pudiera
+  escribir, AWS devuelve `AccessDenied` y **nada cambia** (no hay efecto parcial). El script de
+  publicación aborta al primer error y no continúa con el segundo objeto.
+
 ## 4. Rollback
 
 - Revertir el despliegue es volver el Launch Template a su versión previa (v3, release
