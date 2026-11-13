@@ -877,6 +877,16 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### H08-E / E003 — PR #61, HITO 2: CI 13/13 verde (2026-11-13T18:20Z)
+
+- **Commit verificado:** `6e0f3db3041957dc86914583b89e1c4d728bcd9f`. **Run `43476195247`: 13 de 13 checks en `pass`** (`Deteccion de cambios`, `Formato, vet, build y pruebas` 5m21s, `Analisis estatico y vulnerabilidades`, `Escaneo de secretos`, `SAST Semgrep`, `Integracion HTTP y concurrencia`, `Contratos OpenAPI y herramientas`, `Validacion Terraform e IaC`, `SBOM`, `PR Quality Gate`, `Hardening Report`, `CI Success`, `validar` documental).
+- **Defecto 3 corregido (gofmt real):** gofmt quitaba los espacios en `Add(-2 * time.Hour)` → `Add(-2*time.Hour)` **solo** dentro de una expresión con `||` de menor precedencia. Detectado con el `gofmt -d` temporal del runner Linux, no reproducible en este host.
+- **Defecto 4 corregido (vet):** referencia residual a `otroToken` tras renombrar la constante de prueba (`vet: undefined: otroToken`).
+- **Pruebas realmente ejecutadas y en verde** en ese run: `tests/unit/application`, `tests/unit/dynamo` (incluye `TestE003CadenaABCDSobreAdaptadorReal` A→B→C→D, replay con revocación de familia, familia ajena intacta, concurrencia de dos servicios), `tests/unit/transport` (contrato, 400/401/409/429/503), `go test -race`, fuzzing del binding y `COBERTURA_DOMINIO_PASS: 91.4% >= 80%`.
+- **Diagnóstico temporal:** añadido en el run anterior y **retirado antes del merge** en el commit siguiente; el paso de gofmt vuelve a ser el original (`gofmt -l` + `exit 1`), sin `|| true` ni relajación.
+- **Estado:** `E003_IMPLEMENTED_LOCAL_CI_GREEN`; `E003_CONTRACT=BLOCKED_RFC014`; `AWS_NOT_RUN`; `E003_DEPLOYED=NOT_RUN`.
+- **Gate pendiente para merge:** `APRUEBO_RFC_014_E003_REFRESH` (contrato) y después `APRUEBO_MERGE_PR_61_SHA_<SHA40>`.
+
 ### H08-E / E003 — PR #61, HITO 1: corrección de CI (2026-11-13T17:40Z)
 
 - **PR:** #61 (`feat/h08e-e003-auth-refresh`), commit publicado `9910856ad9391daa7175caff180e01b2a04766e4`; `origin/main` sigue en `6125306`.
