@@ -877,6 +877,37 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### H08-E / E003 — HITO C: release PUBLICADO en S3 y verificado (2026-11-13T20:4xZ)
+
+- **Autorización:** `APRUEBO_EXCEPCION_RFC002_PUBLICACION_S3_E003` (excepción temporal) sobre el
+  Gate ya concedido `APRUEBO_PUBLICACION_S3_E003_V0.10.0`. `opencode.json` quedó como lo dejó el
+  responsable; el agente **no** lo modificó.
+- **Identidad usada:** `arn:aws:iam::713797602090:role/nexum-h08i-artefactos-publicador` asumida
+  desde el operador (`sts assume-role`, sesiones `e003-publish-3` y `-4`); credenciales
+  efímeras solo en memoria del proceso, sin ficheros ni variables persistentes.
+- **Objetos publicados** en `s3://nexum-h08i-artefactos-713797602090/releases/v0.10.0+1d0c2650daab/`:
+
+| Objeto | Bytes | SHA-256 local | `ChecksumSHA256` devuelto por S3 | ETag |
+|---|---|---|---|---|
+| `nexum-backend-linux-arm64` | 19 127 165 | `734de969…723c` | **`c03paVcFAgmdRSQ4/WBvFkbTXyJUWaRQpRz6VnUUcjw=`** (coincide) | `42ee5aa7…` |
+| `nexum-backend.service` | 1 357 | `6fa4d5fb…05cc` | **`b6TV+wUZFBArG8O2zSgU6IG/Arsm3x2Tj08NRuFXBcw=`** (coincide) | `40f331d1…` |
+
+- **Controles aplicados:** `If-None-Match: '*'` en ambos (falla si el objeto existiera),
+  `--server-side-encryption AES256` (la política del bucket **deniega** la publicación sin SSE,
+  por lo que el éxito de la operación prueba que el cifrado se aplicó) y `--checksum-algorithm SHA256`.
+- **Verificación independiente (operador, `ListObjectsV2`):** ambas claves existen con tamaño
+  exacto y ETag idéntico al devuelto por `PutObject`. `ListObjectsV2` **no** entrega el checksum
+  completo; la coincidencia de integridad se acredita con el `ChecksumSHA256` de la respuesta
+  `PutObject`, no con el ETag (que es MD5).
+- **Releases anteriores intactos:** `e001-d9f0696` (12 452 000 B), `v0.8.0+40f64b6653ec`
+  (18 721 843 B) y `v0.9.0+7d1ebf3d5357` (19 041 073 B), cada uno con su unidad de 1 357 B.
+  Ningún objeto borrado ni sobrescrito.
+- **Incidente menor durante la publicación:** el primer intento usó un `--checksum-sha256` de
+  relleno (error del agente) y S3 lo rechazó con `InvalidRequest`; **no se creó ningún objeto**
+  en ese intento. Reintentado con el digest calculado en la propia ejecución.
+- **Estado:** **`E003_ARTIFACT_PUBLISHED=VERIFIED`**. `E003_DEPLOYED=NOT_RUN` (falta LT, apply y
+  rollout). Siguiente Gate: plan Terraform del Launch Template + IAM runtime.
+
 ### E002 verificado por el responsable en Postman (2026-11-13) — incidente 401 cerrado
 
 - **Prueba personal del responsable:** `POST /api/v1/auth/login` en
