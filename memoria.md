@@ -877,6 +877,37 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### H08-E / E003 — HITO C: publicación S3 BLOQUEADA por política de herramientas (2026-11-13T19:04Z)
+
+- **Gate recibido:** `APRUEBO_PUBLICACION_S3_E003_V0.10.0` (alcance: sólo los dos objetos de
+  `releases/v0.10.0+1d0c2650daab/`). Registrado en `GATE_H08E_E003_PUBLICACION_S3.md`.
+- **Comprobaciones previas (todas correctas, sin escribir nada):** artefacto local
+  19 127 165 B / `734de969…723c`; unidad 1 357 B / `6fa4d5fb…05cc`; `main`
+  `1d0c2650daab07e20a52df518d9a69cbca51cda0`; run `43485092835`; **prefijo destino vacío**
+  (`ListObjectsV2` sin `Contents`); releases `e001-d9f0696`, `v0.8.0+40f64b6653ec` y
+  `v0.9.0+7d1ebf3d5357` intactos; cuenta `713797602090` confirmada.
+- **Bloqueo real:** `opencode.json` tiene `shell` **`aws *` = deny** y **`aws * put-*` = deny**;
+  `aws sts assume-role` devolvió `permission.rejected`. No es posible asumir
+  `nexum-h08i-artefactos-publicador` desde OpenCode con la política vigente, y el operador no
+  puede escribir por diseño del bucket. **Cero objetos escritos**; `E003_ARTIFACT_PUBLISHED`
+  queda **NOT_RUN**.
+- **Incidente menor:** una llamada `sts get-caller-identity` devolvió
+  `429 CreateOAuth2Token rate exceeded` (refresco del token de `aws login`); el listado S3
+  funcionó con las credenciales en caché. No afecta a los datos ni a los permisos.
+- **Excepción mínima solicitada (RFC-002, temporal y literal):** `shell`
+  `aws sts assume-role *` → `ask` y `shell` `aws s3api put-object *` → `ask`, añadidas después
+  de los DENY y retiradas al concluir. Para el Gate de LT/IAM: `terraform init -backend=true*`,
+  `terraform plan *` y `terraform show *` en `ask`.
+- **No se evadió nada:** no se editó `opencode.json`, no se usó otra identidad, no se tocó la
+  bucket policy ni IAM, y no se ejecutó ningún `PutObject` con el operador.
+- **Estado:** `E003_MERGED`; `E003_ARTIFACT_PUBLISHED=NOT_RUN` (bloqueado);
+  `E003_DEPLOYED=NOT_RUN`; `AWS_VERIFIED=NOT_RUN`. E001/E002 siguen intactos y en producción.
+- **Continuación exacta:** (1) humano añade las dos excepciones `ask` de RFC-002; (2) ejecutar
+  `assume-role` del publicador + los dos `put-object` con `If-None-Match '*'`,
+  `--server-side-encryption AES256` y `--checksum-algorithm SHA256`, verificando el
+  `ChecksumSHA256` devuelto por S3 contra el SHA-256 local; (3) registrar HITO C real;
+  (4) Gate de LT/IAM y luego ASG.
+
 ### H08-E / E003 — HITO A/B: MERGE EN MAIN, CI VERDE Y ARTEFACTO CANÓNICO (2026-11-13T18:41Z)
 
 **HITO A — merge y CI de main**

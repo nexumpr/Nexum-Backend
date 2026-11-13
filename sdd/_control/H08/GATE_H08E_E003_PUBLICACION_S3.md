@@ -1,11 +1,12 @@
 # Gate H08-E / E003 — Publicación S3 del release `v0.10.0+1d0c2650daab`
 
-**ESTADO:** `PREPARADO — NO EJECUTADO`. Requiere frase humana explícita.
+**ESTADO:** `AUTORIZADO — BLOQUEADO_PERMISO_OPENCODE` (2026-11-13T19:04Z).
+La frase `APRUEBO_PUBLICACION_S3_E003_V0.10.0` fue concedida, pero la política de herramientas de
+OpenCode deniega la ejecución: **no se escribió ningún objeto**.
 
 | Campo | Valor |
 |---|---|
-| Frase requerida | `APRUEBO_PUBLICACION_S3_E003_V0.10.0` |
-| Fecha de preparación | 2026-11-13 |
+| Frase recibida | `APRUEBO_PUBLICACION_S3_E003_V0.10.0` (2026-11-13) |
 | Cuenta AWS | `713797602090` |
 | Región | `us-east-2` |
 | Bucket | `nexum-h08i-artefactos-713797602090` (existente, sin cambios) |
@@ -86,3 +87,37 @@ Los dos objetos existen con tamaño y digest exactos, y `memoria.md` registra el
 real. Sólo entonces se prepara el Gate del Launch Template (que incluirá el cambio IAM mínimo
 para que el rol runtime pueda leer los dos ARN nuevos, conservando los de E001, v0.8.0 y
 v0.9.0 para rollback).
+
+## 7. Bloqueo real registrado (2026-11-13T19:04Z)
+
+**Estado: `BLOQUEADO_PERMISO_OPENCODE`. Cero objetos escritos.**
+
+Comprobaciones realizadas antes de escribir (todas correctas):
+
+| Comprobación | Resultado |
+|---|---|
+| Artefacto local | 19 127 165 B, SHA-256 `734de969…723c` (coincide con el autorizado) |
+| Unidad local | 1 357 B, SHA-256 `6fa4d5fb…05cc` (coincide con el autorizado) |
+| Commit de `main` | `1d0c2650daab07e20a52df518d9a69cbca51cda0` |
+| Run canónico | `43485092835` (binario + SBOM descargados y verificados) |
+| Prefijo destino `releases/v0.10.0+1d0c2650daab/` | **vacío** (`ListObjectsV2` sin `Contents`) |
+| Releases previos | `e001-d9f0696`, `v0.8.0+40f64b6653ec`, `v0.9.0+7d1ebf3d5357` intactos |
+| Identidad AWS | cuenta `713797602090`; una llamada a `sts` devolvió `429 CreateOAuth2Token rate exceeded` (transitorio); el listado S3 funcionó |
+
+Bloqueo exacto: en `opencode.json`, la regla base `shell` **`aws *` = `deny`** y las reglas
+**`aws * put-*` = `deny`** cubren `s3api put-object`; `aws sts assume-role` fue rechazado con
+`permission.rejected`. El rol publicador **no puede asumirse** desde OpenCode con la política
+vigente. Conforme a las reglas del proyecto **no** se editó `opencode.json`, no se usó
+`AccountFullAccessRole` para escribir (además la política del bucket lo deniega) y no se
+cambió de identidad.
+
+Excepción mínima solicitada por el procedimiento de RFC-002 (añadir tras los DENY, retirar al
+concluir):
+
+- `shell` `aws sts assume-role *` → `ask`
+- `shell` `aws s3api put-object *` → `ask`
+
+Para el Gate siguiente (LT/IAM) harán falta además, como excepciones literales y temporales:
+`terraform init -backend=true*`, `terraform plan *` y `terraform show *` en `ask`.
+
+**No se declara** `E003_ARTIFACT_PUBLISHED`.
