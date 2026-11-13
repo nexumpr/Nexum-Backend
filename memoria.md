@@ -877,6 +877,16 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### H08-E / E003 — PR #61, HITO 3: PR listo para Gate de merge (2026-11-13T18:45Z)
+
+- **HEAD publicado:** `a7ba46dfd5d13ce7cb28fbc25397d6b070f2118b` (run `43477581437`).
+- **Estado GitHub:** `OPEN`, no Draft, `MERGEABLE`, `CLEAN`; **13/13 checks en `pass`** con el workflow ya restaurado al paso de gofmt original (sin `gofmt -d`, sin `|| true`).
+- **Contenido del diff:** 15 archivos, +3724/−42 (código E003, 4 suites de pruebas, Gate local, RFC-014 propuesta, tasks/checklist, manifiesto y memoria). E001/E002 sin cambios de código, contrato ni persistencia.
+- **SDD:** `SDD_DOCUMENTAL_PASS` (751 archivos versionables, SHA-256 exacto), `H06_CONTRACT_PASS`, comparador de compatibilidad `COMPATIBLE` (0 rupturas), 207 pruebas de herramientas y 63 del contrato de CI OK.
+- **Bloqueo real y único antes del merge:** `APRUEBO_RFC_014_E003_REFRESH` (contrato). Después, `APRUEBO_MERGE_PR_61_SHA_a7ba46dfd5d13ce7cb28fbc25397d6b070f2118b`.
+- **Continuación exacta en la próxima sesión:** (1) con el Gate RFC-014 concedido, aplicar 401 + `deviceId` + `session.id` en `nexum-api-v1.yaml` y `.json` manteniendo paridad, registrar la autorización en `RFC-014` y `GATE_H08E_E003.md`, actualizar tests contractuales si aplica, recalcular `BASELINE_SHA256.json`, commit y push al **mismo** PR #61 y esperar CI; (2) solicitar el Gate de merge por SHA40; (3) tras el merge, publicar el binario ARM64 canónico del `main` nuevo y abrir el Gate de publicación S3.
+- **Sin AWS:** `AWS_NOT_RUN`, `E003_DEPLOYED=NOT_RUN`, `E003_USER_ACCEPTED` pendiente. No se ejecutó Terraform, ni publicación S3, ni instance refresh, ni se modificó IAM, Redis, ALB, CloudFront ni el bundle de secretos.
+
 ### H08-E / E003 — PR #61, HITO 2: CI 13/13 verde (2026-11-13T18:20Z)
 
 - **Commit verificado:** `6e0f3db3041957dc86914583b89e1c4d728bcd9f`. **Run `43476195247`: 13 de 13 checks en `pass`** (`Deteccion de cambios`, `Formato, vet, build y pruebas` 5m21s, `Analisis estatico y vulnerabilidades`, `Escaneo de secretos`, `SAST Semgrep`, `Integracion HTTP y concurrencia`, `Contratos OpenAPI y herramientas`, `Validacion Terraform e IaC`, `SBOM`, `PR Quality Gate`, `Hardening Report`, `CI Success`, `validar` documental).
