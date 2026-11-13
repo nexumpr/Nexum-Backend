@@ -921,6 +921,20 @@
   `permissions: shell "terraform apply *e003-lt-iam-v2.tfplan*" → ask` y
   `policies: tool.use "shell:terraform apply *e003-lt-iam-v2.tfplan*" → allow`.
 
+### E003 — excepción de permiso resuelta; el apply se bloquea por DNS del backend (2026-11-13)
+
+- La excepción `terraform apply *e003-lt-iam-v2.tfplan*` **ya existe** en `opencode.json`
+  (2 coincidencias): el comando **se ejecuta** y ya no hay `permission.rejected`.
+- **Bloqueo actual, ajeno al plan y a los permisos:**
+  `dial tcp: lookup nexum-h08i-tfstate-713797602090.s3.us-east-2.amazonaws.com: no such host`.
+  `s3/sts/autoscaling.us-east-2.amazonaws.com` resuelven y un `list-objects-v2` sobre el bucket
+  de artefactos funcionó minutos antes → fallo **transitorio de DNS / caché negativa** del
+  entorno. `ipconfig /flushdns` requiere elevación y no se ejecutó.
+- Terraform abortó **antes de escribir** (fallo listando `env:/` en el backend): **0 recursos
+  modificados**; LT sigue en v3 (E002), ASG 2/2/2; Redis, DynamoDB, CloudFront y ALB intactos.
+- Plan reutilizable sin regenerar: `dist/tmp/e003-lt-iam-v2.tfplan`, SHA-256
+  `91b9fc3a…df07`, 167 468 B, 4 update · 0 add · 0 destroy.
+
 ### H08-E / E003 — HITO D (preparado): mecanismo LT corregido y plan IAM+LT emitido
 
 - **Corrección de la conclusión anterior (demostrada):** el Launch Template **sí lo administra
