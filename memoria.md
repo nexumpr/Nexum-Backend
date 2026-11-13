@@ -877,6 +877,121 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### H08-E / E003 — PR #61, HITO 4: RFC-014 APROBADA y contrato aplicado (2026-11-13T18:18Z)
+
+- **Autorización humana recibida:** `APRUEBO_RFC_014_E003_REFRESH`, registrada en
+  `sdd/_control/H08/RFC-014-E003-REFRESH_V602.md` (estado **APPROVED**) y en
+  `GATE_H08E_E003.md` §2 bis. Alcance: sólo las tres modificaciones de E003.
+- **Cambios contractuales aplicados** en `sdd/03-endpoints/openapi/nexum-api-v1.yaml` y su
+  espejo `.json`:
+  1. respuesta **`401 UNAUTHORIZED`** en `POST /api/v1/auth/refresh` (token inválido,
+     expirado, revocado, ya utilizado o incoherente con su sesión; mensaje genérico);
+  2. **`deviceId`** opcional (`type: string`, `maxLength: 128`) en `RefreshRequest`;
+     `required` sigue siendo `["refreshToken"]` y `deviceId` nunca autoriza por sí solo;
+  3. **`session.id`** en `AuthTokens` como alias de `sessionId`; el `required` de
+     `AuthTokens` **no** cambia (los cinco campos heredados siguen obligatorios).
+- **Validaciones ejecutadas después del cambio:** `validar_h06.py` → `H06_CONTRACT_PASS`
+  (75 operaciones, 300 specs, 33M+23S+12E+7O); paridad I-150 → 75 operaciones y 55 rutas en
+  YAML y JSON, **102 esquemas comparados, 0 problemas**; comparador de compatibilidad contra
+  `origin/main` → **`COMPATIBLE`, 0 rupturas**, sin necesidad de excepciones; OpenAPI 3.1
+  válido (el primer intento falló por dos puntos en una descripción `plain` y se corrigió).
+- **Sin cambio de código Go:** el handler ya devolvía 401, aceptaba `deviceId` y emitía
+  `session.id`; ahora contrato y runtime coinciden. No se alteró E001, E002 ni otro endpoint.
+- **HEAD anterior (CI 13/13):** `04799ebe115c691649e18bee4bd6cffc29158d5f`, run `43478609688`.
+- **Estado:** `E003_CONTRACT=RFC014_APPLIED`; falta CI del HEAD nuevo y el Gate de merge.
+  `AWS_NOT_RUN`, `E003_DEPLOYED=NOT_RUN`.
+- **Efecto colateral corregido (checksum del plan de publicación):** al cambiar el contrato,
+  `verificar_publicacion_i150.py publicacion` y `tests/infra/publicacion` rechazaban el plan
+  porque el SHA-256 registrado ya no coincidía. Se actualizaron mediante el procedimiento
+  oficial el digest de `sdd/_control/H08/PLAN_PUB_OPENAPI.md` y el fixture
+  `tests/fixtures/publicacion/publicacion.json` al nuevo
+  `2512386f65086e385c2533ade367638d02c46035c0d3becde5f919be1b074fe2`; no se relajó ninguna
+  aserción (las pruebas siguen recalculando el digest real del archivo).
+- **Próximo Gate:** `APRUEBO_MERGE_PR_61_SHA_<SHA40_REAL>` (el del último commit con CI verde).
+
+### H08-E / E003 — PR #61, HITO 3: PR listo para Gate de merge (2026-11-13T18:45Z)
+
+- **HEAD publicado:** `a7ba46dfd5d13ce7cb28fbc25397d6b070f2118b` (run `43477581437`).
+- **Estado GitHub:** `OPEN`, no Draft, `MERGEABLE`, `CLEAN`; **13/13 checks en `pass`** con el workflow ya restaurado al paso de gofmt original (sin `gofmt -d`, sin `|| true`).
+- **Contenido del diff:** 15 archivos, +3724/−42 (código E003, 4 suites de pruebas, Gate local, RFC-014 propuesta, tasks/checklist, manifiesto y memoria). E001/E002 sin cambios de código, contrato ni persistencia.
+- **SDD:** `SDD_DOCUMENTAL_PASS` (751 archivos versionables, SHA-256 exacto), `H06_CONTRACT_PASS`, comparador de compatibilidad `COMPATIBLE` (0 rupturas), 207 pruebas de herramientas y 63 del contrato de CI OK.
+- **Bloqueo real y único antes del merge:** `APRUEBO_RFC_014_E003_REFRESH` (contrato). Después, `APRUEBO_MERGE_PR_61_SHA_a7ba46dfd5d13ce7cb28fbc25397d6b070f2118b`.
+- **Continuación exacta en la próxima sesión:** (1) con el Gate RFC-014 concedido, aplicar 401 + `deviceId` + `session.id` en `nexum-api-v1.yaml` y `.json` manteniendo paridad, registrar la autorización en `RFC-014` y `GATE_H08E_E003.md`, actualizar tests contractuales si aplica, recalcular `BASELINE_SHA256.json`, commit y push al **mismo** PR #61 y esperar CI; (2) solicitar el Gate de merge por SHA40; (3) tras el merge, publicar el binario ARM64 canónico del `main` nuevo y abrir el Gate de publicación S3.
+- **Sin AWS:** `AWS_NOT_RUN`, `E003_DEPLOYED=NOT_RUN`, `E003_USER_ACCEPTED` pendiente. No se ejecutó Terraform, ni publicación S3, ni instance refresh, ni se modificó IAM, Redis, ALB, CloudFront ni el bundle de secretos.
+
+### H08-E / E003 — PR #61, HITO 2: CI 13/13 verde (2026-11-13T18:20Z)
+
+- **Commit verificado:** `6e0f3db3041957dc86914583b89e1c4d728bcd9f`. **Run `43476195247`: 13 de 13 checks en `pass`** (`Deteccion de cambios`, `Formato, vet, build y pruebas` 5m21s, `Analisis estatico y vulnerabilidades`, `Escaneo de secretos`, `SAST Semgrep`, `Integracion HTTP y concurrencia`, `Contratos OpenAPI y herramientas`, `Validacion Terraform e IaC`, `SBOM`, `PR Quality Gate`, `Hardening Report`, `CI Success`, `validar` documental).
+- **Defecto 3 corregido (gofmt real):** gofmt quitaba los espacios en `Add(-2 * time.Hour)` → `Add(-2*time.Hour)` **solo** dentro de una expresión con `||` de menor precedencia. Detectado con el `gofmt -d` temporal del runner Linux, no reproducible en este host.
+- **Defecto 4 corregido (vet):** referencia residual a `otroToken` tras renombrar la constante de prueba (`vet: undefined: otroToken`).
+- **Pruebas realmente ejecutadas y en verde** en ese run: `tests/unit/application`, `tests/unit/dynamo` (incluye `TestE003CadenaABCDSobreAdaptadorReal` A→B→C→D, replay con revocación de familia, familia ajena intacta, concurrencia de dos servicios), `tests/unit/transport` (contrato, 400/401/409/429/503), `go test -race`, fuzzing del binding y `COBERTURA_DOMINIO_PASS: 91.4% >= 80%`.
+- **Diagnóstico temporal:** añadido en el run anterior y **retirado antes del merge** en el commit siguiente; el paso de gofmt vuelve a ser el original (`gofmt -l` + `exit 1`), sin `|| true` ni relajación.
+- **Estado:** `E003_IMPLEMENTED_LOCAL_CI_GREEN`; `E003_CONTRACT=BLOCKED_RFC014`; `AWS_NOT_RUN`; `E003_DEPLOYED=NOT_RUN`.
+- **Gate pendiente para merge:** `APRUEBO_RFC_014_E003_REFRESH` (contrato) y después `APRUEBO_MERGE_PR_61_SHA_<SHA40>`.
+
+### H08-E / E003 — PR #61, HITO 1: corrección de CI (2026-11-13T17:40Z)
+
+- **PR:** #61 (`feat/h08e-e003-auth-refresh`), commit publicado `9910856ad9391daa7175caff180e01b2a04766e4`; `origin/main` sigue en `6125306`.
+- **Run observado:** `43471677811`. Resultado real por job: `Deteccion de cambios` pass · `Contratos OpenAPI y herramientas` pass · `Escaneo de secretos` pass · `SAST Semgrep` pass · `Integracion HTTP y concurrencia` pass (compila y arranca el binario) · `Validacion Terraform e IaC` pass · `SBOM` pass · `Hardening Report` pass · `validar` (SDD) pass · **`Formato, vet, build y pruebas` FAIL** · **`Analisis estatico y vulnerabilidades` FAIL** · `PR Quality Gate` y `CI Success` fail por arrastre.
+- **Causa 1 — gofmt (tres archivos):** los bloques `const (`/`var (` se alinean por secciones que se cortan en líneas en blanco y en comentarios; `refresh_rate_limiter.go` y `refresh_chain_test.go` tenían un espacio de más por columna. En `refresh_store_test.go`, los literales compuestos anidados que abrían tres llaves en la misma línea (`{{Item: map[...]{`) no coincidían con la salida de gofmt.
+- **Causa 2 — gosec G101 (HIGH):** `refresh_rate_limiter.go:24`, constante `claseRefreshToken = "auth_refresh_token"`; gosec la interpreta como credencial incrustada por el nombre. No se usó `#nosec`.
+- **Correcciones aplicadas (mismo PR):** realineados los bloques; extraídos los mapas de los cuatro tests a variables locales con literales simples (sin cambiar aserciones); renombradas `claseRefreshToken` → `claseRefreshDigest` y `refreshTokenMax` → `refreshDigestMax`. Se añadió al paso de gofmt un diagnóstico temporal `gofmt -d` (sin `|| true`, el paso sigue fallando) **que debe retirarse antes del merge**.
+- **Nota de entorno:** `gofmt`/`go build`/`go test` no se ejecutan en este host (Device Guard bloquea `gofmt.exe` y el toolchain 1.27.4 que exige `go.mod`; instalado 1.27.3). La verificación es el CI Linux; no se declara PASS local.
+- **Pendiente en este hito:** confirmar el nuevo run con `calidad` y `seguridad` verdes.
+
+### H08-E / E003 — refresh implementado en local, contrato pendiente de RFC-014 (2026-11-13)
+
+- **Gate:** `sdd/_control/H08/GATE_H08E_E003.md` con `AUTHORIZED_E003_LOCAL`, registrando la
+  instrucción humana `APRUEBO_ALCANCE_LOCAL_E003_AUTH_REFRESH`. E004..E075 siguen
+  `NOT_AUTHORIZED`; merge exige `APRUEBO_MERGE_PR_<N>_SHA_<SHA40>`.
+- **Rama:** `feat/h08e-e003-auth-refresh` desde `main` `6125306` (sin cambios de otros
+  endpoints; `origin/main` verificado sin avance).
+- **Reutilización, sin duplicar identidad:** sesiones reales de E002
+  (`USER#<id>/SESSION#<id>` + `REFRESH#<digest>/SESSION`), JWT RS256 con `expiresIn=900`,
+  `SessionStore` de E002 y el mismo bundle de claves (sin rotar `JWT_KEY_ID`). El
+  `SessionService` heredado (600 s, `GetTokenByHash`+`MarkTokenUsed`+`CreateSession` no
+  atómico, puerto no cableado al runtime) **no se usa**.
+- **Rotación atómica:** una sola `TransactWriteItems` de **cuatro** acciones — consumo del
+  localizador con CAS, actualización de sesión (`#version` + `refreshHash` + `#status`),
+  `ConditionCheck` de `USER#<id>/PROFILE` `ACTIVE` y alta del localizador nuevo con TTL
+  heredado. La expiración absoluta no se extiende.
+- **Defecto corregido (CAS incompatible):** E002 crea localizadores **sin** atributo `used`
+  y E003 los crea con `used=false`. La condición exclusiva `attribute_not_exists(#used)`
+  habría impedido consumir el segundo refresh (B→C). Ahora es
+  `attribute_not_exists(#used) OR #used = :false`, con `:false` BOOL, y `#status = :active`.
+- **Cuenta activa:** lectura consistente del perfil y `ConditionCheck` en la transacción;
+  deshabilitar o eliminar al usuario impide renovar aunque la sesión siga `ACTIVE`.
+- **Replay:** token consumido ⇒ revocación durable de la sesión de la familia (`status=REVOKED`,
+  `revokeReason=REFRESH_REPLAY_DETECTED`) y `409`; si la revocación no se confirma, `503`.
+  Un conflicto sin evidencia no revoca (`409`).
+- **Cuotas Redis:** 30/min/IP y 12/min/digest con HMAC-SHA256 y una sola ejecución atómica;
+  Redis no disponible ⇒ 503.
+- **IAM:** sin cambios. La política vigente ya autoriza `GetItem`, `PutItem`, `UpdateItem`,
+  `DeleteItem`, `ConditionCheckItem` y `Query` con `LeadingKeys` `USER#*`, `REFRESH#*`,
+  `SESSION#*`.
+- **Contrato:** `RFC-014-E003-REFRESH_V602.md` en estado **PROPUESTO** con las tres
+  diferencias frente al PDF V6.0.2 (401 para token inválido, `deviceId` opcional,
+  `session.id`). **El OpenAPI no se modifica** hasta `APRUEBO_RFC_014_E003_REFRESH`; sin esa
+  aprobación el runtime de la rama no puede fusionarse ni publicarse.
+- **Pruebas escritas (no ejecutadas en local):** aplicación (contrato, validación, cuenta no
+  activa, perfil incoherente/ausente, replay, conflicto, fallo cerrado, concurrencia),
+  adaptador (estructura de la transacción de cuatro acciones y cadena A→B→C→D sobre un doble
+  con estado que interpreta las condiciones emitidas, familia ajena intacta, concurrencia de
+  dos servicios) y handler (200/400/401/409/429/503, cabeceras, sin filtrar tokens).
+- **Bloqueo local real:** `gofmt.exe` y el toolchain Go 1.27.4 (exigido por `go.mod`) están
+  bloqueados por *Device Guard* en este host Windows con Go 1.27.3
+  (`BLOCKED_POLICY_APPLICATION_CONTROL`). No se declara PASS; la validación autoritativa es
+  el CI Linux del PR.
+- **Estado:** `E003_IMPLEMENTED_LOCAL`; `E003_CONTRACT=BLOCKED_RFC014`;
+  `E003_DEPLOYED=NOT_RUN`; `AWS_NOT_RUN`; `E003_USER_ACCEPTED` pendiente de la prueba
+  personal en Postman tras el despliegue autorizado.
+- **Ruta de despliegue prevista (sin ejecutar):** CI `main` → binario ARM64 canónico →
+  `releases/<versión>` en el bucket existente con `If-None-Match` y SSE → Launch Template
+  nuevo → `instance_refresh` con capacidad transitoria → HTTPS CloudFront → pruebas E001/E002/
+  E003. Cada mutación exige su Gate propio; sin `terraform destroy`, sin recursos nuevos, sin
+  gasto personal.
+
+
 ### H08-E / E001 V6.0.2 — refactor de registro (2026-11-11)
 
 - **Rama:** `feat/h08e-e001-v602-register` desde `main` `a2a4ccab1c02d22a3f9d1efa435f0ec257bf841a`. Gate vigente `sdd/_control/H08/GATE_H08E_E001.md` (`AUTHORIZED_E001_LOCAL`). `AWS_NOT_RUN`.

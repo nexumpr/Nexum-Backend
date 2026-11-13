@@ -113,6 +113,19 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	loginHandler := nexumhttp.NewLoginHandler(loginService, loginLimiter, logger)
 	router.HandleFunc(http.MethodPost, "/auth/login", loginHandler.ServeHTTP)
 
+	// H08-E / E003: rotacion de refresh token sobre las sesiones REALES de E002.
+	// Reutiliza el mismo proveedor RS256 y la misma clave HMAC de cuotas; no crea claves,
+	// sesiones paralelas ni almacenamiento en memoria. Sin persistencia o sin firma, el
+	// endpoint responde 503 (fail-closed).
+	refreshStore := dynamoAdapter.NewRefreshStore(clienteDynamo, cfgDeps.TablaDynamoDB)
+	refreshService := appIdentity.NewRefreshService(refreshStore, tokenIssuer)
+	var refreshLimiter nexumhttp.RefreshRateLimiter
+	if clienteRedis != nil {
+		refreshLimiter = cacheinfra.NewRefreshRateLimiter(clienteRedis, claveHMAC)
+	}
+	refreshHandler := nexumhttp.NewRefreshHandler(refreshService, refreshLimiter, logger)
+	router.HandleFunc(http.MethodPost, "/auth/refresh", refreshHandler.ServeHTTP)
+
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
 	// Start bloquea hasta que el listener falla o se cierra; el canal transporta
