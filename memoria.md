@@ -894,24 +894,34 @@
   normalización de correo es `TrimSpace + ToLower` en `domain.ValidateEmail` y en
   `EmailReservationKeys`, y el lookup compara con `EqualFold`. **No hay discrepancia de esquema,
   de normalización ni de algoritmo** entre registro y login.
-- **No concluible con la evidencia actual:** existencia de la cuenta, su `status`, el formato
-  del hash y la coherencia correo↔reserva requieren leer el ítem `EMAIL#<sha256(correo)>` →
-  `USER#<id>/PROFILE` con `GetItem` consistente. Para ello faltan dos cosas: (a) el **correo
-  exacto** de la cuenta (no se solicitó ni se registrará ninguna contraseña) y (b) una
-  excepción de herramienta, porque `opencode.json` mantiene `aws *` en **deny** (sólo hay `ask`
-  para lecturas enumeradas que no incluyen `dynamodb get-item`).
-- **Excepción mínima solicitada (solo lectura):** `shell` `aws dynamodb get-item *` → `ask`,
-  añadida tras los DENY y retirada al concluir. Con ella el diagnóstico se resuelve en un paso
-  (reserva, perfil, `status`, prefijo `$argon2id$` del hash y coherencia de `userId`), **sin
-  imprimir el hash**.
+- **Corrección del diagnóstico previo:** `aws dynamodb get-item` **sí está permitido** (la
+  afirmación anterior de bloqueo era incorrecta). Se ejecutó con `--consistent-read` sobre la
+  tabla `NEXUM_CORE_H08I` (verificada `ACTIVE`, `PK`/`SK` string, `GSI1`, TTL `ENABLED`,
+  ~60 ítems) y devolvió `Item` vacío para un correo sintético, como corresponde.
+- **Control con cuenta conocida (sin datos personales):** sobre el perfil de la cuenta
+  sintética creada en la aceptación de E002 (`userId 193d042a-…`, registrada por E001 el
+  2026-11-12) el resultado es **clase F**: `entityType=USER_PROFILE`, `status=ACTIVE`,
+  `passwordHash` presente con formato **Argon2id válido**, `email` ya normalizado y `userId`
+  coherente. Es decir, **el modelo de persistencia de E001/E002 funciona en producción** y el
+  401 no proviene de un defecto de esquema.
+- **Pendiente para cerrar el caso de esta cuenta:** el literal **exacto** del correo. Las
+  capturas no son accesibles desde esta sesión y el correo no se ha recibido como texto; no se
+  adivina ni se exploran otras cuentas (prohibido `Scan`/`Query` global). Con el literal, el
+  diagnóstico se resuelve con una sola lectura de la reserva y del perfil, clasificando el
+  resultado en A–F sin imprimir hash ni datos personales.
+- **Herramienta de lectura redactada (no versionada):** `dist/tmp/diag_e002.py`
+  (`--email <correo>` o `--user-id <id>` en modo control). Consulta **solo** `EMAIL#<digest>`
+  y `USER#<id>/PROFILE` con consistencia fuerte y emite booleanos + clase A–F; nunca imprime
+  correo, hash, `userId` ni tokens. `dist/` está excluido del manifiesto SDD y de Git.
 - **Prueba controlada pendiente de autorización (escritura):** crear una cuenta sintética nueva
   con E001 y autenticarla con E002 por HTTPS. Distingue un defecto general del backend de un
   problema de esa cuenta concreta. Requiere frase explícita por crear un usuario sintético en
   producción; no se ejecutó.
 - **Sin cambios:** no se modificó ni reseteó ninguna cuenta, no se tocó DynamoDB, Redis, IAM ni
   infraestructura, y no se alteró E003.
-- **Estado:** `E002_401_DIAGNOSIS=BLOCKED_SIN_CORREO_Y_PERMISO_LECTURA`; sin defecto de
-  E001/E002 demostrado; E003 sigue `MERGED`, `ARTIFACT_PUBLISHED=NOT_RUN`.
+- **Estado:** `E002_401_DIAGNOSIS=PARCIAL_CONTROL_F_PENDIENTE_CORREO_EXACTO`; sin defecto de
+  E001/E002 demostrado (modelo verificado en producción); E003 sigue `MERGED`,
+  `ARTIFACT_PUBLISHED=NOT_RUN`.
 
 ### H08-E / E003 — HITO C: publicación S3 BLOQUEADA por política de herramientas (2026-11-13T19:04Z)
 
