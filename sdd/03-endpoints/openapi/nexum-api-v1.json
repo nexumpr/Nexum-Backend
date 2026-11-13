@@ -543,6 +543,24 @@
               }
             }
           },
+          "401": {
+            "description": "UNAUTHORIZED — refresh token inválido, expirado, revocado, ya utilizado o incoherente con su sesión (RFC-014). Mensaje genérico e indistinguible: no revela la existencia de sesiones ni de cuentas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "UNAUTHORIZED",
+                    "message": "Refresh token invalido.",
+                    "traceId": "018f90ef-08e5-7a68-b09f-2b67a47c92f0",
+                    "details": []
+                  }
+                }
+              }
+            }
+          },
           "409": {
             "description": "CONFLICT",
             "content": {
@@ -15023,6 +15041,21 @@
             "type": "string",
             "example": "018f90ef-08e5-7a68-b09f-2b67a47c92f0",
             "format": "uuid"
+          },
+          "session": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "example": "018f90ef-08e5-7a68-b09f-2b67a47c92f0",
+                "format": "uuid"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "description": "Alias de sessionId (RFC-014). Repite el mismo identificador de la sesión; no crea una sesión adicional."
           }
         },
         "required": [
@@ -15565,6 +15598,12 @@
             "type": "string",
             "example": "REDACTED_REFRESH_TOKEN",
             "minLength": 1
+          },
+          "deviceId": {
+            "type": "string",
+            "example": "installation-6a4f1d8c",
+            "maxLength": 128,
+            "description": "Identificador de instalación (RFC-014, opcional). Señal de consistencia con el dispositivo que creó la sesión; nunca autoriza por sí solo ni sustituye al refreshToken."
           }
         },
         "required": [

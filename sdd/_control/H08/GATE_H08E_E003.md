@@ -26,13 +26,25 @@ E003 (`POST /api/v1/auth/refresh`), sus pruebas, documentación de evidencia y e
 ## 2. NO autorizado aquí
 
 - **Merge**: exige `APRUEBO_MERGE_PR_<N>_SHA_<SHA40>` sobre el HEAD exacto.
-- **Cambios de contrato protegidos** (`OpenAPI`, `spec.md`, `plan.md`): exigen
-  `APRUEBO_RFC_014_E003_REFRESH`. Sin esa frase, el OpenAPI de E003 queda intacto y el
-  runtime actual (401 + `deviceId` + `session.id`) **no puede fusionarse ni publicarse**.
 - AWS mutante, `terraform plan/apply/destroy`, publicación S3, Launch Template, ASG,
   CloudFront, ALB, IAM, secretos y presupuesto.
 - E004..E075 y cualquier refactor ajeno a E003.
 - Declarar `E003_DEPLOYED`, `E003_AWS_VERIFIED` o `E003_USER_ACCEPTED`.
+
+## 2 bis. Autorización posterior recibida — contrato E003 (2026-11-13T18:18Z)
+
+**Frase humana:** `APRUEBO_RFC_014_E003_REFRESH`.
+
+Autoriza **exclusivamente** las tres modificaciones contractuales de E003 documentadas en
+`sdd/_control/H08/RFC-014-E003-REFRESH_V602.md`:
+
+1. `401 UNAUTHORIZED` para refresh token inválido, expirado o revocado.
+2. `deviceId` opcional en `RefreshRequest`, sin cambiar `refreshToken` como obligatorio.
+3. `session.id` como alias de `sessionId` en la respuesta `AuthTokens`.
+
+Límites que se mantienen: no se altera E001, E002 ni otro endpoint; no cambia el `required`
+de `AuthTokens`; `deviceId` nunca sustituye la autenticación por `refreshToken`; el merge
+sigue requiriendo su propio Gate por PR + SHA40; no autoriza AWS mutante ni despliegue.
 
 ## 3. Decisiones de implementación
 
@@ -55,13 +67,11 @@ E003 (`POST /api/v1/auth/refresh`), sus pruebas, documentación de evidencia y e
 | Comprobación | Estado (2026-11-13) |
 |---|---|
 | Implementación local | **COMPLETADA** (7 archivos nuevos, 1 modificado) |
-| Alineación de formato | Verificada con comprobador de columnas propio; **gofmt no ejecutable** en este host |
-| `gofmt` / `go build` / `go vet` / `go test` locales | **BLOCKED_POLICY_APPLICATION_CONTROL**: Device Guard bloquea `gofmt.exe` y el toolchain 1.27.4 que exige `go.mod`; la instalación local es 1.27.3. No se declara PASS |
-| Validación autoritativa | **CI Linux del PR** |
-| RFC-014 | **PROPUESTO — pendiente de `APRUEBO_RFC_014_E003_REFRESH`** |
+| CI del PR #61 | **13/13 `SUCCESS`** en run `43478609688` (HEAD `04799eb`): gofmt, vet, staticcheck, build, `go test`, `-race`, fuzzing, cobertura 91.4 %, govulncheck, gosec, gitleaks, Semgrep, integración, contratos, IaC y SBOM |
+| RFC-014 | **APPROVED** (`APRUEBO_RFC_014_E003_REFRESH`, 2026-11-13T18:18Z) y aplicada en YAML/JSON |
+| Validación tras el contrato | `H06_CONTRACT_PASS` · paridad 75 ops/55 rutas/102 esquemas · comparador `COMPATIBLE` (0 rupturas) |
 | Merge | **BLOQUEADO** hasta Gate de merge por PR + SHA40 |
 | AWS / despliegue | `AWS_NOT_RUN`, `E003_DEPLOYED=NOT_RUN` |
 
-**No se declara** `IMPLEMENTED` como verificado, ni `AWS_VERIFIED`, ni aceptación del
-usuario. El bloqueo local se registra con su mensaje exacto y no se sustituye por una
-afirmación de PASS.
+**No se declara** `E003_DEPLOYED` ni `AWS_VERIFIED`; la aceptación del usuario queda pendiente
+de la prueba en Postman después del despliegue autorizado.

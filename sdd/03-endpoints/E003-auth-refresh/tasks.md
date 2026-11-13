@@ -6,8 +6,9 @@ La compilación y las pruebas se validan en el **CI Linux** del PR: en el host W
 (`BLOCKED_POLICY_APPLICATION_CONTROL`). Ninguna casilla se marca por existir el documento.
 
 - [x] `E003-T01` Contrato revisado: `operationId=nexum_e003`, `POST /api/v1/auth/refresh`,
-      `RefreshRequest` → `AuthTokens` (200). Diferencias con el PDF V6.0.2 (401, `deviceId`,
-      `session.id`) registradas en `RFC-014`, **pendiente de Gate**.
+      `RefreshRequest` → `AuthTokens` (200). Diferencias con el PDF V6.0.2 aprobadas por
+      **RFC-014** (`APRUEBO_RFC_014_E003_REFRESH`, 2026-11-13T18:18Z) y aplicadas en el
+      OpenAPI: `401`, `deviceId` opcional y `session.id`.
 - [x] `E003-T02` DTO estricto: `RefreshRequest` (`refreshToken` obligatorio, `deviceId`
       opcional) con `additionalProperties` cerrado vía `BindJSONLimit` (8 KiB) y
       `DisallowUnknownFields`. `AuthTokens` construido en el borde de transporte.
@@ -29,8 +30,9 @@ La compilación y las pruebas se validan en el **CI Linux** del PR: en el host W
 - [x] `E003-T09` Pruebas del adaptador con doble con estado que interpreta las condiciones
       emitidas: cadena A→B→C→D, consumo durable, familia ajena intacta, concurrencia.
 - [x] `E003-T10` Negativas de autenticación, propiedad, reutilización y cuotas en el handler.
-- [ ] `E003-T11` CI + seguridad + revisión de contratos: **pendiente de la ejecución del PR**
-      (no se declara PASS local).
+- [ ] `E003-T11` CI + seguridad + revisión de contratos: **PASS** en el run `43478609688`
+      (HEAD `04799eb`) con el contrato aún sin modificar. Tras aplicar RFC-014 se reejecuta CI
+      sobre el HEAD nuevo; hasta entonces no se declara verde para el contrato final.
 - [ ] `E003-T12` Autorización humana de release, despliegue, prueba en dos nodos y evidencia
       real: **NOT_RUN**; requiere Gates AWS separados.
 

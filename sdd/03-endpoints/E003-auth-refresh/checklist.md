@@ -6,8 +6,9 @@ local). **Respuesta prevista:** 200 `AuthTokens`. **AWS/HTTP real:** `NOT_RUN`.
 
 - [x] Método y ruta conservan el ID del inventario H04 (`E003`, `POST /api/v1/auth/refresh`).
 - [x] Payload válido y negativo revisado; `additionalProperties: false` aplicado en runtime.
-- [x] Respuesta 200 conforme al contrato vigente; alias `session.id` y `401` dependen de
-      **RFC-014** (`sdd/_control/H08/RFC-014-E003-REFRESH_V602.md`), estado `PROPUESTO`.
+- [x] Respuesta 200 conforme al contrato vigente; `401`, `deviceId` opcional y `session.id`
+      aprobados por **RFC-014** (`APRUEBO_RFC_014_E003_REFRESH`, 2026-11-13T18:18Z) y
+      aplicados en `nexum-api-v1.yaml` y `.json` con paridad verificada.
 - [x] Semántica de credencial: token opaco en el cuerpo, `security: []`; sin JWT previo.
 - [x] Idempotencia no exigida por el contrato; concurrencia resuelta por compare-and-swap y
       documentada (un doble envío consume el token y revoca la familia, según el SDD).
@@ -19,7 +20,9 @@ local). **Respuesta prevista:** 200 `AuthTokens`. **AWS/HTTP real:** `NOT_RUN`.
 - [x] Sin PII ni secretos en logs; el token nunca se registra ni se persiste en claro.
 - [ ] Contrato OpenAPI actualizado: **bloqueado** hasta `APRUEBO_RFC_014_E003_REFRESH`.
 - [ ] `gofmt`, `go build`, `go vet`, `staticcheck`, `govulncheck`, `gosec`, `gitleaks`,
-      Semgrep y `go test -race`: **pendientes de CI**; no se declaran PASS en local.
+      Semgrep y `go test -race`: **PASS** en el run `43478609688` (HEAD `04799eb`); se
+      reejecutarán sobre el HEAD con el contrato RFC-014 aplicado antes de declarar el cierre
+      contractual.
 - [ ] API en dos instancias, TLS público, CI/CD e IaC: `NOT_RUN`.
 - [ ] Gate individual de release H08 y rollback aprobados antes de cualquier `terraform apply`.
 - [x] Dependencias del cliente Mobile no constituyen Gate del Backend.

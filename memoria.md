@@ -877,6 +877,31 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### H08-E / E003 — PR #61, HITO 4: RFC-014 APROBADA y contrato aplicado (2026-11-13T18:18Z)
+
+- **Autorización humana recibida:** `APRUEBO_RFC_014_E003_REFRESH`, registrada en
+  `sdd/_control/H08/RFC-014-E003-REFRESH_V602.md` (estado **APPROVED**) y en
+  `GATE_H08E_E003.md` §2 bis. Alcance: sólo las tres modificaciones de E003.
+- **Cambios contractuales aplicados** en `sdd/03-endpoints/openapi/nexum-api-v1.yaml` y su
+  espejo `.json`:
+  1. respuesta **`401 UNAUTHORIZED`** en `POST /api/v1/auth/refresh` (token inválido,
+     expirado, revocado, ya utilizado o incoherente con su sesión; mensaje genérico);
+  2. **`deviceId`** opcional (`type: string`, `maxLength: 128`) en `RefreshRequest`;
+     `required` sigue siendo `["refreshToken"]` y `deviceId` nunca autoriza por sí solo;
+  3. **`session.id`** en `AuthTokens` como alias de `sessionId`; el `required` de
+     `AuthTokens` **no** cambia (los cinco campos heredados siguen obligatorios).
+- **Validaciones ejecutadas después del cambio:** `validar_h06.py` → `H06_CONTRACT_PASS`
+  (75 operaciones, 300 specs, 33M+23S+12E+7O); paridad I-150 → 75 operaciones y 55 rutas en
+  YAML y JSON, **102 esquemas comparados, 0 problemas**; comparador de compatibilidad contra
+  `origin/main` → **`COMPATIBLE`, 0 rupturas**, sin necesidad de excepciones; OpenAPI 3.1
+  válido (el primer intento falló por dos puntos en una descripción `plain` y se corrigió).
+- **Sin cambio de código Go:** el handler ya devolvía 401, aceptaba `deviceId` y emitía
+  `session.id`; ahora contrato y runtime coinciden. No se alteró E001, E002 ni otro endpoint.
+- **HEAD anterior (CI 13/13):** `04799ebe115c691649e18bee4bd6cffc29158d5f`, run `43478609688`.
+- **Estado:** `E003_CONTRACT=RFC014_APPLIED`; falta CI del HEAD nuevo y el Gate de merge.
+  `AWS_NOT_RUN`, `E003_DEPLOYED=NOT_RUN`.
+- **Próximo Gate:** `APRUEBO_MERGE_PR_61_SHA_<SHA40_REAL>` (el del último commit con CI verde).
+
 ### H08-E / E003 — PR #61, HITO 3: PR listo para Gate de merge (2026-11-13T18:45Z)
 
 - **HEAD publicado:** `a7ba46dfd5d13ce7cb28fbc25397d6b070f2118b` (run `43477581437`).

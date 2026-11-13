@@ -3,17 +3,28 @@
 | Campo | Valor |
 |---|---|
 | ID | RFC-014 |
-| Fecha | 2026-11-13 |
-| Estado | **PROPUESTO — NO APROBADO** |
+| Fecha de propuesta | 2026-11-13 |
+| Fecha de aprobación | **2026-11-13T18:18Z** |
+| Estado | **APPROVED** |
 | Alcance | `POST /api/v1/auth/refresh` (E003) exclusivamente |
-| Frase de aprobación solicitada | `APRUEBO_RFC_014_E003_REFRESH` |
+| Frase de aprobación recibida | **`APRUEBO_RFC_014_E003_REFRESH`** |
 | Aprobador | Responsable de Nexum-Backend (humano) |
 | Base | `main` `612530610726640eb94f0e9506029cb746e07884` |
 | Rama | `feat/h08e-e003-auth-refresh` |
+| PR | #61 |
+| HEAD al aprobar | `04799ebe115c691649e18bee4bd6cffc29158d5f` (run `43478609688`, 13/13 pass) |
 
-> Este documento **no** aprueba nada por sí mismo. Sin la frase humana registrada en
-> `GATE_H08E_E003.md`, el OpenAPI de E003 permanece intacto y la rama no puede fusionarse
-> con el runtime actual.
+**Autorización humana registrada (texto recibido):** «APRUEBO_RFC_014_E003_REFRESH … AUTORIZO el
+RFC-014 de E003 V6.0.2, exclusivamente para las tres modificaciones contractuales
+documentadas … 1. HTTP 401 UNAUTHORIZED para tokens de renovación inválidos, expirados o
+revocados. 2. deviceId opcional en RefreshRequest, sin cambiar el campo obligatorio
+refreshToken. 3. session.id como alias de sessionId en la respuesta AuthTokens.»
+
+**Aplicación:** las tres modificaciones se aplicaron en `nexum-api-v1.yaml` y
+`nexum-api-v1.json` en el **mismo PR #61**. Restricciones respetadas: no se alteró E001,
+E002 ni ningún otro endpoint; `required` de `AuthTokens` no cambió (los cinco campos
+heredados siguen obligatorios) y `required` de `RefreshRequest` sigue siendo
+`["refreshToken"]`; `deviceId` es una señal de consistencia que nunca autoriza por sí sola.
 
 ## 1. Motivo
 
@@ -111,6 +122,19 @@ migración de datos ni cambio de esquema persistido: el rollback es sólo de con
 
 ## 7. Consecuencia de no aprobarlo
 
-El PR puede quedar abierto con el runtime actual (401 + `deviceId` + `session.id`) **sin
-fusionarse**, o bien ajustarse a `422` y sin las dos adiciones. En ningún caso se publicará
-en AWS un comportamiento que contradiga el OpenAPI vigente.
+*(Histórico: ya no aplica.)* Si no se hubiera aprobado, el PR habría quedado abierto con el
+runtime actual (401 + `deviceId` + `session.id`) sin fusionarse, o bien ajustado a `422` y sin
+las dos adiciones.
+
+## 8. Registro de aplicación (2026-11-13T18:18Z)
+
+- Gate recibido: `APRUEBO_RFC_014_E003_REFRESH`, registrado en `GATE_H08E_E003.md`.
+- Cambios aplicados en `sdd/03-endpoints/openapi/nexum-api-v1.yaml` y su espejo `.json`:
+  respuesta `401` en la operación E003, propiedad `deviceId` (opcional, `maxLength: 128`) en
+  `RefreshRequest`, y objeto `session` con `id` en `AuthTokens`.
+- Validaciones ejecutadas tras el cambio: `validar_h06.py` → `H06_CONTRACT_PASS` (75
+  operaciones, 300 specs, 33M+23S+12E+7O, refs válidos); paridad I-150 → 75 operaciones y
+  55 rutas en YAML y JSON, 102 esquemas comparados, 0 problemas; comparador de
+  compatibilidad contra `origin/main` → `COMPATIBLE`, 0 rupturas, sin excepciones.
+- Sin cambio de runtime: el handler ya devolvía `401`, aceptaba `deviceId` y emitía
+  `session.id`, por lo que el contrato y el código quedan alineados sin tocar Go.
