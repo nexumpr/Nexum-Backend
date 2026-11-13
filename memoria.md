@@ -877,6 +877,33 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### H08-E / E003 — HITO A/B: MERGE EN MAIN, CI VERDE Y ARTEFACTO CANÓNICO (2026-11-13T18:41Z)
+
+**HITO A — merge y CI de main**
+
+- **Gate humano usado:** `APRUEBO_MERGE_PR_61_SHA_a8fc6340a4118104d8907bdfc3a5bf61ee750fe5`.
+- **PR #61 MERGED** el `2026-11-13T18:41:35Z`; HEAD autorizado `a8fc634` verificado e idéntico antes de fusionar (`MERGEABLE`, `CLEAN`, no Draft, 13/13 checks).
+- **Merge commit y `main`:** `1d0c2650daab07e20a52df518d9a69cbca51cda0`. `main` local actualizado por fast-forward, sin pérdida de cambios locales.
+- **CI de `main`:** Go Backend CI run **`43485092835` SUCCESS** y SDD documental run **`43485093104` SUCCESS**, ambos sobre `1d0c265`.
+- **Integrado:** implementación E003, RFC-014 (401, `deviceId`, `session.id`) con YAML/JSON sincronizados, Gate local, pruebas y manifiesto. **E001/E002 sin cambios** de código, contrato ni persistencia.
+
+**HITO B — artefacto ARM64 canónico verificado**
+
+- **Run de origen:** `43485092835` (Go Backend CI de `main` en `1d0c265`), no un binario local ni el de E002.
+- **Release ID según `POLITICA_RELEASES.md`:** `v0.10.0+1d0c2650daab` (`vX.Y.Z+<sha12>`).
+- **Artefacto `binario-1d0c2650daab07e20a52df518d9a69cbca51cda0`:** `nexum-backend-linux-arm64`, **19 127 165 bytes**, SHA-256 **`734de969570502099d452438fd606f1646d35f225459a450a51cfa567514723c`**, idéntico al `dist/binario.sha256` publicado por CI (verificado dos veces).
+- **SBOM `sbom-spdx-1d0c2650daab07e20a52df518d9a69cbca51cda0`:** `sbom.spdx.json`, 85 571 bytes, del mismo run.
+- **Unidad systemd:** `infra/systemd/nexum-backend.service`, **1 357 bytes**, SHA-256 **`6fa4d5fb051914102b1bc3b6cd2814e881bf02bb26df1d938f4f0d46e15705cc`**, byte a byte idéntica a la que corre E002; 11 pruebas de contrato systemd OK. E003 no la modifica.
+- **Custodia local:** `C:\Nexum-Custodia\H08E-E003-20261113\` (artefacto y SBOM descargados del run; sin secretos).
+
+**Preflight S3 (solo lectura, sin mutaciones)**
+
+- Identidad AWS verificada: cuenta **713797602090**, `assumed-role/AccountFullAccessRole` (región `us-east-2`).
+- Bucket `nexum-h08i-artefactos-713797602090` accesible en lectura de listado. Releases existentes: `releases/e001-d9f0696/`, `releases/v0.8.0+40f64b6653ec/`, `releases/v0.9.0+7d1ebf3d5357/`, cada una con `nexum-backend-linux-arm64` y `nexum-backend.service`. El prefijo `releases/v0.10.0+1d0c2650daab/` **no existe** todavía.
+- Política del bucket (IaC, autoridad): `s3:PutObject` permitido **solo** al rol `nexum-h08i-artefactos-publicador` y solo dentro del prefijo de releases, con `s3:x-amz-server-side-encryption = AES256` obligatorio; Deny explícito de escritura al runtime, de lectura/borrado al publicador y de **cualquier acción a principals distintos de runtime y publicador**. Consecuencia: el operador **no puede** publicar directamente; la publicación se ejecutará asumiendo `arn:aws:iam::713797602090:role/nexum-h08i-artefactos-publicador` (CD_ASISTIDO, RFC-010/RFC-011).
+- **IAM del runtime:** los ARNs de artefacto se inyectan por variable (`iam_artifact_object_arns`) con objetos exactos; los objetos de `v0.10.0` **no** están autorizados todavía. El plan del Launch Template incluirá el cambio IAM mínimo (añadir binario y unidad del release nuevo, conservando E001, v0.8.0 y v0.9.0 para rollback). La lista efectiva actual se leerá con permiso de lectura en ese Gate.
+- **Estado:** `E003_MERGED`; `E003_DEPLOYED=NOT_RUN`; `E003_AWS_VERIFIED=NOT_RUN`; `E003_USER_ACCEPTED` pendiente. Siguiente Gate: publicación S3.
+
 ### H08-E / E003 — PR #61, HITO 4: RFC-014 APROBADA y contrato aplicado (2026-11-13T18:18Z)
 
 - **Autorización humana recibida:** `APRUEBO_RFC_014_E003_REFRESH`, registrada en
