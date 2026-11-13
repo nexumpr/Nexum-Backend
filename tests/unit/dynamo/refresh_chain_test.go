@@ -567,12 +567,12 @@ func TestE003LocalizadorDeOtraFamiliaNoSeAfecta(t *testing.T) {
 		"userId":      strAttr(refreshUser),
 		"sessionId":   strAttr(otraSesion),
 		"familyId":    strAttr(otraFamilia),
-		"refreshHash": strAttr(appIdentity.HashToken(otroToken)),
+		"refreshHash": strAttr(appIdentity.HashToken(otraFamiliaRefresh)),
 		"status":      strAttr("ACTIVE"),
 		"version":     numAttr(1),
 		"expiresAt":   numAttr(cadenaAhora.Add(20 * 24 * time.Hour).Unix()),
 	})
-	mem.sembrar("REFRESH#"+appIdentity.HashToken(otroToken), "SESSION", map[string]types.AttributeValue{
+	mem.sembrar("REFRESH#"+appIdentity.HashToken(otraFamiliaRefresh), "SESSION", map[string]types.AttributeValue{
 		"entityType": strAttr("REFRESH_LOOKUP"),
 		"userId":     strAttr(refreshUser),
 		"sessionId":  strAttr(otraSesion),
