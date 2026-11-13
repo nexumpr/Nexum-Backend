@@ -877,6 +877,45 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### H08-E / E003 — HITO D (preparado): mecanismo LT corregido y plan IAM+LT emitido
+
+- **Corrección de la conclusión anterior (demostrada):** el Launch Template **sí lo administra
+  Terraform**. `module.computo` declara `aws_launch_template.backend` con `user_data` construida
+  desde `artefacto_s3_uri`, `artefacto_sha256`, `unidad_s3_uri` y `unidad_sha256`
+  (`envs/h08i/variables.tf`), y el ASG referencia el LT por `id` sin fijar versión. Por tanto este
+  release se despliega con `terraform apply` del módulo, igual que LT v3 en E002. **No** se crea
+  una versión LT por CLI ni se duplica el mecanismo.
+- **Backend remoto inicializado** (`terraform init -backend=true` OK, provider `hashicorp/aws`
+  5.100.0 del lock) usando el puente de credenciales `nexum-tf` (`AWS_CONFIG_FILE` en `%TEMP%`;
+  sin secretos en el repositorio).
+- **Descubrimiento de los ARN vigentes:** `iam get-role-policy` está **denegado** por la política
+  de herramientas y el tfvars de custodia es de la fase base (sólo 2 ARN). Los 6 ARN actuales se
+  recuperaron del `before` del recurso en un plan borrador: **ningún ARN se perdió**.
+- **Plan borrador (sin recorte):** `0 add, 5 change, 0 destroy`; incluía el **drift de Redis**
+  (`aws_elasticache_user.default_deshabilitado`, `no-password → no-password-required`), que se
+  **excluye** por instrucción expresa.
+- **Plan definitivo acotado** (`-target module.iam.aws_iam_role_policy.runtime`,
+  `module.iam.terraform_data.iam_preconditions`, `module.computo[0].aws_launch_template.backend`,
+  `module.computo[0].terraform_data.invariantes_computo`; el `-target` se usa para excluir el
+  drift de Redis y se documenta como excepción):
+
+| Dato | Valor |
+|---|---|
+| Archivo | `dist/tmp/e003-lt-iam.tfplan` (159 KB, no versionado) |
+| **SHA-256** | **`2b9e6c5ea9883e25ae979391270bc2b0011277c02beb9389763008c01885bf34`** |
+| Tamaño | 167 185 bytes |
+| Acciones | **4 update, 0 add, 0 destroy** |
+| Recursos | LT `aws_launch_template.backend` (release E003) · `terraform_data.invariantes_computo` · `aws_iam_role_policy.runtime` (**8 ARN exactos**: 6 previos + binario y unidad de `v0.10.0`) · `terraform_data.iam_preconditions` |
+| Excluidos | Redis (drift), DynamoDB, CloudFront, ALB, VPC, bucket policy, secretos |
+| Rollback | LT v3 y release `v0.9.0+7d1ebf3d5357` intactos; los ARN de E001, v0.8.0 y v0.9.0 se conservan |
+
+- **Gate solicitado:** `APRUEBO_APPLY_IAM_E003_2b9e6c5ea9883e25ae979391270bc2b0011277c02beb9389763008c01885bf34`.
+- **ASG preparado, no ejecutado:** capacidad final 2/2/2, `MinHealthyPercentage=100`,
+  `MaxHealthyPercentage=150`, `InstanceWarmup=120`; Max 3 sólo si el Gate lo autoriza; sin
+  `instance refresh` activo (verificado: ASG 2/2/2 con dos instancias `InService`/`Healthy`).
+- **Estado:** `E003_ARTIFACT_PUBLISHED=VERIFIED`; `E003_DEPLOYED=NOT_RUN`;
+  `E001/E002=OPERATIVOS`.
+
 ### H08-E / E003 — HITO C: release PUBLICADO en S3 y verificado (2026-11-13T20:4xZ)
 
 - **Autorización:** `APRUEBO_EXCEPCION_RFC002_PUBLICACION_S3_E003` (excepción temporal) sobre el
