@@ -912,6 +912,14 @@
   que evalúa CI.
 - **Estado:** `E003_ARTIFACT_PUBLISHED=VERIFIED`; `E003_DEPLOYED=NOT_RUN`;
   `E001/E002=OPERATIVOS`; dos EC2 en LT v3 sirviendo E002.
+- **Bloqueo del apply (patrón de permiso, no AWS):** el responsable preparó la excepción para
+  `terraform apply *e003-lt-iam.tfplan*`, pero el plan autorizado se llama
+  `e003-lt-iam-v2.tfplan`; el glob **no** coincide (`-v2` rompe la cadena) y aplica el `deny`
+  general (`terraform apply*`). `git`/`AWS` no intervienen: no se ejecutó ningún `apply` y **no
+  se renombró el archivo** para forzar la coincidencia (sería eludir el control por nombre).
+  Patrón mínimo que falta:
+  `permissions: shell "terraform apply *e003-lt-iam-v2.tfplan*" → ask` y
+  `policies: tool.use "shell:terraform apply *e003-lt-iam-v2.tfplan*" → allow`.
 
 ### H08-E / E003 — HITO D (preparado): mecanismo LT corregido y plan IAM+LT emitido
 
