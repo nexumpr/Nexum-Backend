@@ -900,6 +900,13 @@
 - **HEAD anterior (CI 13/13):** `04799ebe115c691649e18bee4bd6cffc29158d5f`, run `43478609688`.
 - **Estado:** `E003_CONTRACT=RFC014_APPLIED`; falta CI del HEAD nuevo y el Gate de merge.
   `AWS_NOT_RUN`, `E003_DEPLOYED=NOT_RUN`.
+- **Efecto colateral corregido (checksum del plan de publicación):** al cambiar el contrato,
+  `verificar_publicacion_i150.py publicacion` y `tests/infra/publicacion` rechazaban el plan
+  porque el SHA-256 registrado ya no coincidía. Se actualizaron mediante el procedimiento
+  oficial el digest de `sdd/_control/H08/PLAN_PUB_OPENAPI.md` y el fixture
+  `tests/fixtures/publicacion/publicacion.json` al nuevo
+  `2512386f65086e385c2533ade367638d02c46035c0d3becde5f919be1b074fe2`; no se relajó ninguna
+  aserción (las pruebas siguen recalculando el digest real del archivo).
 - **Próximo Gate:** `APRUEBO_MERGE_PR_61_SHA_<SHA40_REAL>` (el del último commit con CI verde).
 
 ### H08-E / E003 — PR #61, HITO 3: PR listo para Gate de merge (2026-11-13T18:45Z)
