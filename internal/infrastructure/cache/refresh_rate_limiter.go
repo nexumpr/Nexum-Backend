@@ -17,11 +17,11 @@ import (
 // IP acota el abuso distribuido y la cuota por digest evita martillear un mismo token.
 // Ambos contadores se evalúan en un único script atómico del servidor Redis.
 const (
-	refreshIPMax     int64 = 30
-	refreshTokenMax  int64 = 12
-	refreshWindow          = time.Minute
-	claseRefreshIP         = "auth_refresh_ip"
-	claseRefreshToken      = "auth_refresh_token"
+	refreshIPMax       int64 = 30
+	refreshDigestMax   int64 = 12
+	refreshWindow            = time.Minute
+	claseRefreshIP           = "auth_refresh_ip"
+	claseRefreshDigest       = "auth_refresh_token"
 )
 
 // ErrRefreshRateLimitKeyUnavailable indica que falta la clave HMAC: el endpoint falla
@@ -94,11 +94,11 @@ func (l *RefreshRateLimiter) AllowRefresh(ctx context.Context, ip, tokenDigest s
 		ipLimpia = "unknown"
 	}
 	claveIP := loginRateLimitKey(claseRefreshIP, l.refreshIdentifier(claseRefreshIP, ipLimpia))
-	claveToken := loginRateLimitKey(claseRefreshToken, l.refreshIdentifier(claseRefreshToken, tokenDigest))
+	claveToken := loginRateLimitKey(claseRefreshDigest, l.refreshIdentifier(claseRefreshDigest, tokenDigest))
 	ventanaSegundos := int64(refreshWindow / time.Second)
 
 	res, err := l.script.Run(ctx, l.client, []string{claveIP, claveToken},
-		refreshIPMax, refreshTokenMax, ventanaSegundos).Slice()
+		refreshIPMax, refreshDigestMax, ventanaSegundos).Slice()
 	if err != nil {
 		return false, 0, fmt.Errorf("%w: %v", ErrAuthRateLimitFailClosed, err)
 	}

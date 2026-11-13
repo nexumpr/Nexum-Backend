@@ -81,6 +81,8 @@ jobs:
           if [ -n "$fuera" ]; then
             echo "Archivos sin gofmt:"
             echo "$fuera"
+            echo "--- gofmt -d (diagnostico temporal autorizado; se retira antes del merge) ---"
+            gofmt -d $fuera
             exit 1
           fi
 

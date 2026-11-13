@@ -95,10 +95,10 @@ func (m *memoriaDynamo) TransactWriteItems(_ context.Context, params *dynamodb.T
 
 func (m *memoriaDynamo) comprobar(item types.TransactWriteItem) error {
 	var (
-		clave    map[string]types.AttributeValue
-		expr     *string
-		nombres  map[string]string
-		valores  map[string]types.AttributeValue
+		clave   map[string]types.AttributeValue
+		expr    *string
+		nombres map[string]string
+		valores map[string]types.AttributeValue
 	)
 	switch {
 	case item.Put != nil:

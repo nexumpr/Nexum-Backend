@@ -232,7 +232,7 @@ func TestRotateRefreshRechazaDigestsInvalidos(t *testing.T) {
 }
 
 func TestLocateRefreshLeeConConsistenciaFuerte(t *testing.T) {
-	fake := &fakeRefreshDynamo{getOutputs: []*dynamodb.GetItemOutput{{Item: map[string]types.AttributeValue{
+	item := map[string]types.AttributeValue{
 		"PK":        strAttr("REFRESH#" + refreshDigest),
 		"SK":        strAttr("SESSION"),
 		"userId":    strAttr(refreshUser),
@@ -241,7 +241,8 @@ func TestLocateRefreshLeeConConsistenciaFuerte(t *testing.T) {
 		"status":    strAttr("ACTIVE"),
 		"used":      &types.AttributeValueMemberBOOL{Value: true},
 		"expiresAt": numAttr(refreshAhora.Add(time.Hour).Unix()),
-	}}}}
+	}
+	fake := &fakeRefreshDynamo{getOutputs: []*dynamodb.GetItemOutput{{Item: item}}}
 	store := dynamoAdapter.NewRefreshStore(fake, refreshTable)
 
 	locator, err := store.LocateRefresh(context.Background(), refreshDigest)
@@ -268,10 +269,11 @@ func TestLocateRefreshInexistenteDevuelveNil(t *testing.T) {
 		t.Fatalf("un localizador inexistente debe ser nil, nil: %v %+v", err, locator)
 	}
 
-	incoherente := &fakeRefreshDynamo{getOutputs: []*dynamodb.GetItemOutput{{Item: map[string]types.AttributeValue{
+	incompleto := map[string]types.AttributeValue{
 		"PK": strAttr("REFRESH#" + refreshDigest),
 		"SK": strAttr("SESSION"),
-	}}}}
+	}
+	incoherente := &fakeRefreshDynamo{getOutputs: []*dynamodb.GetItemOutput{{Item: incompleto}}}
 	if locator, err := dynamoAdapter.NewRefreshStore(incoherente, refreshTable).
 		LocateRefresh(context.Background(), refreshDigest); err != nil || locator != nil {
 		t.Fatalf("un localizador sin identidad no puede autenticar: %v %+v", err, locator)
@@ -288,7 +290,7 @@ func TestLocateRefreshErrorEsIndisponibilidad(t *testing.T) {
 }
 
 func TestLoadSessionInterpretaVersionYExpiracion(t *testing.T) {
-	fake := &fakeRefreshDynamo{getOutputs: []*dynamodb.GetItemOutput{{Item: map[string]types.AttributeValue{
+	item := map[string]types.AttributeValue{
 		"PK":          strAttr("USER#" + refreshUser),
 		"SK":          strAttr("SESSION#" + refreshSesion),
 		"entityType":  strAttr("USER_SESSION"),
@@ -304,7 +306,8 @@ func TestLoadSessionInterpretaVersionYExpiracion(t *testing.T) {
 		"lastUsedAt":  strAttr(refreshAhora.Add(-time.Hour).Format(time.RFC3339)),
 		"expiresAt":   numAttr(refreshAhora.Add(24 * time.Hour).Unix()),
 		"version":     numAttr(7),
-	}}}}
+	}
+	fake := &fakeRefreshDynamo{getOutputs: []*dynamodb.GetItemOutput{{Item: item}}}
 	store := dynamoAdapter.NewRefreshStore(fake, refreshTable)
 
 	session, err := store.LoadSession(context.Background(), refreshUser, refreshSesion)
@@ -329,13 +332,14 @@ func TestLoadSessionInterpretaVersionYExpiracion(t *testing.T) {
 }
 
 func TestLoadSessionRechazaOtraEntidad(t *testing.T) {
-	fake := &fakeRefreshDynamo{getOutputs: []*dynamodb.GetItemOutput{{Item: map[string]types.AttributeValue{
+	item := map[string]types.AttributeValue{
 		"PK":         strAttr("USER#" + refreshUser),
 		"SK":         strAttr("SESSION#" + refreshSesion),
 		"entityType": strAttr("REFRESH_LOOKUP"),
 		"userId":     strAttr(refreshOtraUser),
 		"sessionId":  strAttr(refreshSesion),
-	}}}}
+	}
+	fake := &fakeRefreshDynamo{getOutputs: []*dynamodb.GetItemOutput{{Item: item}}}
 	store := dynamoAdapter.NewRefreshStore(fake, refreshTable)
 
 	if session, err := store.LoadSession(context.Background(), refreshUser, refreshSesion); err != nil || session != nil {

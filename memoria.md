@@ -877,6 +877,16 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### H08-E / E003 — PR #61, HITO 1: corrección de CI (2026-11-13T17:40Z)
+
+- **PR:** #61 (`feat/h08e-e003-auth-refresh`), commit publicado `9910856ad9391daa7175caff180e01b2a04766e4`; `origin/main` sigue en `6125306`.
+- **Run observado:** `43471677811`. Resultado real por job: `Deteccion de cambios` pass · `Contratos OpenAPI y herramientas` pass · `Escaneo de secretos` pass · `SAST Semgrep` pass · `Integracion HTTP y concurrencia` pass (compila y arranca el binario) · `Validacion Terraform e IaC` pass · `SBOM` pass · `Hardening Report` pass · `validar` (SDD) pass · **`Formato, vet, build y pruebas` FAIL** · **`Analisis estatico y vulnerabilidades` FAIL** · `PR Quality Gate` y `CI Success` fail por arrastre.
+- **Causa 1 — gofmt (tres archivos):** los bloques `const (`/`var (` se alinean por secciones que se cortan en líneas en blanco y en comentarios; `refresh_rate_limiter.go` y `refresh_chain_test.go` tenían un espacio de más por columna. En `refresh_store_test.go`, los literales compuestos anidados que abrían tres llaves en la misma línea (`{{Item: map[...]{`) no coincidían con la salida de gofmt.
+- **Causa 2 — gosec G101 (HIGH):** `refresh_rate_limiter.go:24`, constante `claseRefreshToken = "auth_refresh_token"`; gosec la interpreta como credencial incrustada por el nombre. No se usó `#nosec`.
+- **Correcciones aplicadas (mismo PR):** realineados los bloques; extraídos los mapas de los cuatro tests a variables locales con literales simples (sin cambiar aserciones); renombradas `claseRefreshToken` → `claseRefreshDigest` y `refreshTokenMax` → `refreshDigestMax`. Se añadió al paso de gofmt un diagnóstico temporal `gofmt -d` (sin `|| true`, el paso sigue fallando) **que debe retirarse antes del merge**.
+- **Nota de entorno:** `gofmt`/`go build`/`go test` no se ejecutan en este host (Device Guard bloquea `gofmt.exe` y el toolchain 1.27.4 que exige `go.mod`; instalado 1.27.3). La verificación es el CI Linux; no se declara PASS local.
+- **Pendiente en este hito:** confirmar el nuevo run con `calidad` y `seguridad` verdes.
+
 ### H08-E / E003 — refresh implementado en local, contrato pendiente de RFC-014 (2026-11-13)
 
 - **Gate:** `sdd/_control/H08/GATE_H08E_E003.md` con `AUTHORIZED_E003_LOCAL`, registrando la
