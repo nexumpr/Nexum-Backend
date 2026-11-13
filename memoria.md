@@ -877,6 +877,374 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### H08-E / E003 — HITO D-bis: preflight DETIENE el plan autorizado y emite plan correcto
+
+- **Gate recibido:** `APRUEBO_APPLY_IAM_E003_2b9e6c5e…bf34` (plan `dist/tmp/e003-lt-iam.tfplan`,
+  167 185 B). **NO se aplicó.**
+- **Hallazgo del preflight (defecto real evitado):** ese plan **no contenía E003**:
+  - `user_data` del LT apuntaba a `releases/e001-d9f0696/…` (release E001 primitivo), no a
+    `v0.10.0+1d0c2650daab`;
+  - la política IAM quedaba con **2 ARN** (sólo el par de `e001-d9f0696`), perdiendo los de
+    `v0.8.0` y `v0.9.0` → se habría roto el rollback.
+  - **Causa demostrada:** `-var-file` **tiene precedencia sobre** `TF_VAR_*` en Terraform, y el
+    tfvars de custodia fija los valores de la fase base. Los `TF_VAR_*` con los valores de E003
+    fueron ignorados; el plan se generó íntegro con el tfvars antiguo. El `-target` sí se aplicó
+    (4 recursos), lo que hizo que el plan pareciera correcto.
+- **Plan corregido (v2)**: mismos cuatro recursos acotados, con `-var` explícitos (precedencia
+  superior al tfvars):
+
+| Dato | Valor |
+|---|---|
+| Archivo | `dist/tmp/e003-lt-iam-v2.tfplan` |
+| **SHA-256** | **`91b9fc3a688ccd2f053b730b58d46fb251b154547e17a9830598737089a2df07`** |
+| Tamaño | 167 468 bytes |
+| Acciones | **4 update · 0 add · 0 destroy** |
+| `user_data` verificado (texto) | `BINARIO_URI=…/v0.10.0+1d0c2650daab/nexum-backend-linux-arm64`, `BINARIO_SHA=734de969…723c`, `UNIDAD_URI=…/nexum-backend.service`, `UNIDAD_SHA=6fa4d5fb…05cc` |
+| IAM verificado | **8 ARN exactos**: `e001-d9f0696` (2), `v0.8.0+40f64b6653ec` (2), `v0.9.0+7d1ebf3d5357` (2), `v0.10.0+1d0c2650daab` (2) |
+| Excluidos | Redis (drift), DynamoDB, CloudFront, ALB, VPC, bucket policy, secretos |
+
+- **Nuevo Gate solicitado:** `APRUEBO_APPLY_IAM_E003_91b9fc3a688ccd2f053b730b58d46fb251b154547e17a9830598737089a2df07`.
+  El Gate anterior queda **consumido y no utilizado**: su plan no debía aplicarse.
+- **Corrección del CI del PR #62:** el paso `Integridad integral y rutas rastreadas en Git`
+  fallaba porque `BASELINE_SHA256.json` se regeneró con el `opencode.json` **modificado** por los
+  permisos temporales del responsable, mientras ese archivo **no** se commitea. El manifiesto se
+  recalcula ahora contra el contenido **commiteado** (`git show HEAD:opencode.json`), que es lo
+  que evalúa CI.
+- **Estado:** `E003_ARTIFACT_PUBLISHED=VERIFIED`; `E003_DEPLOYED=NOT_RUN`;
+  `E001/E002=OPERATIVOS`; dos EC2 en LT v3 sirviendo E002.
+- **Bloqueo del apply (patrón de permiso, no AWS):** el responsable preparó la excepción para
+  `terraform apply *e003-lt-iam.tfplan*`, pero el plan autorizado se llama
+  `e003-lt-iam-v2.tfplan`; el glob **no** coincide (`-v2` rompe la cadena) y aplica el `deny`
+  general (`terraform apply*`). `git`/`AWS` no intervienen: no se ejecutó ningún `apply` y **no
+  se renombró el archivo** para forzar la coincidencia (sería eludir el control por nombre).
+  Patrón mínimo que falta:
+  `permissions: shell "terraform apply *e003-lt-iam-v2.tfplan*" → ask` y
+  `policies: tool.use "shell:terraform apply *e003-lt-iam-v2.tfplan*" → allow`.
+
+### H08-E / E003 — HITOS E y F: ROLLOUT COMPLETADO Y E003 VERIFICADO POR HTTPS (2026-11-13)
+
+**HITO E — rollout**
+
+- Refresh `8eb6837d-8be9-4bad-a787-eed102987ed4` → **`Successful`, 100 %**.
+- Instancias finales, ambas **Launch Template v4** (`v0.10.0+1d0c2650daab`), `InService/Healthy`:
+  `i-02666abdd2bdfae8d` y `i-0acdf148c0ffe16f2`. Las dos anteriores (`i-0058034756c36b716`,
+  `i-0d12ab8fd2a5e6c11`, LT v3) fueron sustituidas tras quedar la nueva saludable.
+- Capacidad **restaurada a Min 2 / Desired 2 / Max 2** (se había elevado Max a 3 solo para el
+  refresh). `MaxSize=3` fue transitorio y ya no está activo.
+- Sin pérdida de servicio observada: en la última lectura con nodos antiguos, ambos seguían
+  `InService/Healthy`.
+
+**HITO F — pruebas HTTPS reales** (`https://d2lpmqy5w6x9es.cloudfront.net/api/v1`)
+
+| Prueba | Esperado | Obtenido |
+|---|---|---|
+| E001 `POST /auth/register` (cuenta sintética nueva) | 201 | **201** ✅ |
+| E002 `POST /auth/login` | 200 · `Bearer` · `expiresIn=900` · `session.id==sessionId` | **200** · ✅ todo |
+| E003 `A→B`, `B→C`, `C→D` | 200 cada uno | **200/200/200** ✅ |
+| Tokens distintos en la cadena | sí | **A≠B≠C≠D** ✅ |
+| Identidad de sesión estable entre rotaciones | sí | ✅ |
+| E002 segundo login (familia 2) + rotación | 200 | **200 / 200** ✅ |
+| **Replay de un token ya consumido** | **409** | **409** ✅ |
+| Refresh del token vigente de esa familia tras el replay | **401** (familia revocada) | **401** ✅ |
+| Refresh de la familia 2 tras la revocación de la familia 1 | **200** (aislamiento) | **200** ✅ |
+| E002 con contraseña incorrecta | 401 | **401** ✅ |
+
+- **Persistencia y servicios reales:** DynamoDB `NEXUM_CORE_H08I` (rotación CAS y consumo durable)
+  y Redis compartido; sin mocks.
+- **Dos nodos:** ambos en LT v4 y `Healthy`; la sesión vive en DynamoDB, no en memoria local.
+  *No hay evidencia por petición de qué instancia atendió cada llamada* (CloudFront/ALB no
+  exponen ese dato en la respuesta): la consistencia entre nodos se apoya en el almacén
+  compartido y en las dos instancias sanas, no en una prueba cruzada instrumentada.
+- **Sin secretos registrados:** no se imprimieron ni guardaron tokens ni contraseñas; la cuenta
+  sintética se identifica solo por su correo de pruebas `@example.invalid`.
+- **Estado:** **`E003_AWS_VERIFIED = VERIFIED`** (HTTP real, rotación, replay y aislamiento).
+  `E003_USER_ACCEPTED` permanece **pendiente** de la prueba del responsable en Postman.
+
+### H08-E / E003 — HITO E (EN CURSO): refresh lanzado y pérdida de conectividad AWS (2026-11-13)
+
+- **Gate usado:** `APRUEBO_ASG_E003_V0.10.0`.
+- **Preflight verificado:** ASG `nexum-h08i-asg-backend` en `Min 2 / Desired 2 / Max 2`, LT
+  `lt-05445f32a7ee8a2f7` con `Version = $Latest` (ya en **v4** tras el apply), dos instancias
+  `InService/Healthy` en `us-east-2a/b` con LT **v3** (E002) y `ProtectedFromScaleIn=true`;
+  `HealthCheckType=EC2`, gracia 120 s; sin refresh previo.
+- **Mutaciones ejecutadas:**
+  1. `update-auto-scaling-group --min-size 2 --max-size 3 --desired-capacity 2` → **Max 2→3**
+     (capacidad transitoria autorizada).
+  2. `start-instance-refresh --strategy Rolling` con
+     `MinHealthyPercentage=100`, `MaxHealthyPercentage=150`, `InstanceWarmup=120`,
+     `ScaleInProtectedInstances=Refresh`, `SkipMatching=false`, sin AutoRollback.
+     **InstanceRefreshId: `8eb6837d-8be9-4bad-a787-eed102987ed4`**.
+- **Última observación válida (≈4 min tras el inicio):** refresh `InProgress`, `0 %`, y las dos
+  instancias antiguas seguían `InService/Healthy` en LT v3 → **servicio E002 sin interrupción**.
+- **Incidente bloqueante:** la CLI de AWS dejó de autenticar —
+  `Could not connect to the endpoint URL: "https://us-east-2.signin.aws.amazon.com/v1/token"`
+  (refresco del token de `aws login`). Sin credenciales no se puede consultar el refresh ni
+  restaurar `MaxSize`. No se ejecutó ninguna otra mutación.
+- **Estado pendiente y seguro:** AWS sigue ejecutando el refresh por sí mismo; el ASG puede
+  quedar con **MaxSize=3** hasta poder restaurarlo. **Nada se destruyó**: rollback disponible
+  (LT v3 y `v0.9.0+7d1ebf3d5357` intactos, 6 ARN previos conservados).
+- **Recuperación exacta (cuando vuelva la conectividad):**
+  1. `aws autoscaling describe-instance-refreshes --auto-scaling-group-name nexum-h08i-asg-backend`
+     → confirmar `Successful` y el `InstanceRefreshId` anterior.
+  2. `aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names nexum-h08i-asg-backend`
+     → dos instancias en **LT 4**, `InService/Healthy`.
+  3. `aws autoscaling update-auto-scaling-group --auto-scaling-group-name nexum-h08i-asg-backend --min-size 2 --max-size 2 --desired-capacity 2`
+     → **restaurar 2/2/2**.
+  4. Pruebas HTTPS (HITO F) y registro.
+  Si el refresh quedó fallido: `cancel-instance-refresh` y evaluar rollback a LT v3.
+- **Estado:** `E003_LT_APPLIED`; `E003_DEPLOYED=EN_CURSO_NO_VERIFICADO`;
+  `AWS_VERIFIED=NOT_RUN`; `E001/E002` servidos por las instancias antiguas hasta la sustitución.
+
+### H08-E / E003 — HITO D: APPLY REAL (LT v4 + IAM 8 ARN) (2026-11-13)
+
+- **Gate usado:** `APRUEBO_APPLY_IAM_E003_91b9fc3a688ccd2f053b730b58d46fb251b154547e17a9830598737089a2df07`.
+- **Plan aplicado sin regenerar:** `dist/tmp/e003-lt-iam-v2.tfplan`, SHA-256 verificado antes de
+  ejecutar (`91b9fc3a…df07`), 167 468 B, backend remoto y perfil `nexum-tf`.
+- **Resultado real, verificado en el estado posterior** (`terraform show -json`):
+  - **Launch Template `latest_version = 4`**, con `user_data` apuntando a
+    `releases/v0.10.0+1d0c2650daab/nexum-backend-linux-arm64`
+    (`BINARIO_SHA=734de969…723c`) y `…/nexum-backend.service`;
+  - **IAM `aws_iam_role_policy.runtime` con 8 ARN** de artefactos (E001, `v0.8.0`,
+    `v0.9.0` y `v0.10.0`: 2 cada uno) → rollback conservado;
+  - **Redis intacto**: `aws_elasticache_user.default_deshabilitado` sigue en `no-password`
+    (el drift `no-password-required` **no** se aplicó);
+  - sin cambios en DynamoDB, CloudFront, ALB, VPC, bucket policy ni secretos.
+- **Incidente previo resuelto:** el apply había fallado por DNS del bucket de state
+  (`no such host`); tras `Clear-DnsClientCache` + `ipconfig /flushdns` del responsable, el mismo
+  plan se aplicó sin cambios. No se regeneró, no se cambió el backend ni se usó el plan v1.
+- **Las dos EC2 siguen sirviendo E002** (LT v3) hasta el rollout: el apply **no** toca instancias.
+  ASG `Min 2 / Desired 2 / Max 2`, dos instancias `InService/Healthy`, sin refresh activo.
+- **Estado:** `E003_LT_APPLIED` · `E003_ARTIFACT_PUBLISHED=VERIFIED` ·
+  **`E003_DEPLOYED=NOT_RUN`** (falta `instance refresh`) · `E001/E002=OPERATIVOS`.
+- **Siguiente Gate:** ASG (rollout). Excepciones ASK necesarias:
+  `aws autoscaling update-auto-scaling-group *`, `aws autoscaling set-instance-protection *`,
+  `aws autoscaling start-instance-refresh *`, `aws autoscaling describe-instance-refreshes *`.
+  Parámetros: `MinHealthyPercentage=100`, `MaxHealthyPercentage=150`, `InstanceWarmup=120`,
+  Max 3 transitorio, restauración 2/2/2 y rollback a LT v3.
+
+### E003 — excepción de permiso resuelta; el apply se bloquea por DNS del backend (2026-11-13)
+
+- La excepción `terraform apply *e003-lt-iam-v2.tfplan*` **ya existe** en `opencode.json`
+  (2 coincidencias): el comando **se ejecuta** y ya no hay `permission.rejected`.
+- **Bloqueo actual, ajeno al plan y a los permisos:**
+  `dial tcp: lookup nexum-h08i-tfstate-713797602090.s3.us-east-2.amazonaws.com: no such host`.
+  `s3/sts/autoscaling.us-east-2.amazonaws.com` resuelven y un `list-objects-v2` sobre el bucket
+  de artefactos funcionó minutos antes → fallo **transitorio de DNS / caché negativa** del
+  entorno. `ipconfig /flushdns` requiere elevación y no se ejecutó.
+- Terraform abortó **antes de escribir** (fallo listando `env:/` en el backend): **0 recursos
+  modificados**; LT sigue en v3 (E002), ASG 2/2/2; Redis, DynamoDB, CloudFront y ALB intactos.
+- Plan reutilizable sin regenerar: `dist/tmp/e003-lt-iam-v2.tfplan`, SHA-256
+  `91b9fc3a…df07`, 167 468 B, 4 update · 0 add · 0 destroy.
+
+### H08-E / E003 — HITO D (preparado): mecanismo LT corregido y plan IAM+LT emitido
+
+- **Corrección de la conclusión anterior (demostrada):** el Launch Template **sí lo administra
+  Terraform**. `module.computo` declara `aws_launch_template.backend` con `user_data` construida
+  desde `artefacto_s3_uri`, `artefacto_sha256`, `unidad_s3_uri` y `unidad_sha256`
+  (`envs/h08i/variables.tf`), y el ASG referencia el LT por `id` sin fijar versión. Por tanto este
+  release se despliega con `terraform apply` del módulo, igual que LT v3 en E002. **No** se crea
+  una versión LT por CLI ni se duplica el mecanismo.
+- **Backend remoto inicializado** (`terraform init -backend=true` OK, provider `hashicorp/aws`
+  5.100.0 del lock) usando el puente de credenciales `nexum-tf` (`AWS_CONFIG_FILE` en `%TEMP%`;
+  sin secretos en el repositorio).
+- **Descubrimiento de los ARN vigentes:** `iam get-role-policy` está **denegado** por la política
+  de herramientas y el tfvars de custodia es de la fase base (sólo 2 ARN). Los 6 ARN actuales se
+  recuperaron del `before` del recurso en un plan borrador: **ningún ARN se perdió**.
+- **Plan borrador (sin recorte):** `0 add, 5 change, 0 destroy`; incluía el **drift de Redis**
+  (`aws_elasticache_user.default_deshabilitado`, `no-password → no-password-required`), que se
+  **excluye** por instrucción expresa.
+- **Plan definitivo acotado** (`-target module.iam.aws_iam_role_policy.runtime`,
+  `module.iam.terraform_data.iam_preconditions`, `module.computo[0].aws_launch_template.backend`,
+  `module.computo[0].terraform_data.invariantes_computo`; el `-target` se usa para excluir el
+  drift de Redis y se documenta como excepción):
+
+| Dato | Valor |
+|---|---|
+| Archivo | `dist/tmp/e003-lt-iam.tfplan` (159 KB, no versionado) |
+| **SHA-256** | **`2b9e6c5ea9883e25ae979391270bc2b0011277c02beb9389763008c01885bf34`** |
+| Tamaño | 167 185 bytes |
+| Acciones | **4 update, 0 add, 0 destroy** |
+| Recursos | LT `aws_launch_template.backend` (release E003) · `terraform_data.invariantes_computo` · `aws_iam_role_policy.runtime` (**8 ARN exactos**: 6 previos + binario y unidad de `v0.10.0`) · `terraform_data.iam_preconditions` |
+| Excluidos | Redis (drift), DynamoDB, CloudFront, ALB, VPC, bucket policy, secretos |
+| Rollback | LT v3 y release `v0.9.0+7d1ebf3d5357` intactos; los ARN de E001, v0.8.0 y v0.9.0 se conservan |
+
+- **Gate solicitado:** `APRUEBO_APPLY_IAM_E003_2b9e6c5ea9883e25ae979391270bc2b0011277c02beb9389763008c01885bf34`.
+- **ASG preparado, no ejecutado:** capacidad final 2/2/2, `MinHealthyPercentage=100`,
+  `MaxHealthyPercentage=150`, `InstanceWarmup=120`; Max 3 sólo si el Gate lo autoriza; sin
+  `instance refresh` activo (verificado: ASG 2/2/2 con dos instancias `InService`/`Healthy`).
+- **Estado:** `E003_ARTIFACT_PUBLISHED=VERIFIED`; `E003_DEPLOYED=NOT_RUN`;
+  `E001/E002=OPERATIVOS`.
+
+### H08-E / E003 — HITO C: release PUBLICADO en S3 y verificado (2026-11-13T20:4xZ)
+
+- **Autorización:** `APRUEBO_EXCEPCION_RFC002_PUBLICACION_S3_E003` (excepción temporal) sobre el
+  Gate ya concedido `APRUEBO_PUBLICACION_S3_E003_V0.10.0`. `opencode.json` quedó como lo dejó el
+  responsable; el agente **no** lo modificó.
+- **Identidad usada:** `arn:aws:iam::713797602090:role/nexum-h08i-artefactos-publicador` asumida
+  desde el operador (`sts assume-role`, sesiones `e003-publish-3` y `-4`); credenciales
+  efímeras solo en memoria del proceso, sin ficheros ni variables persistentes.
+- **Objetos publicados** en `s3://nexum-h08i-artefactos-713797602090/releases/v0.10.0+1d0c2650daab/`:
+
+| Objeto | Bytes | SHA-256 local | `ChecksumSHA256` devuelto por S3 | ETag |
+|---|---|---|---|---|
+| `nexum-backend-linux-arm64` | 19 127 165 | `734de969…723c` | **`c03paVcFAgmdRSQ4/WBvFkbTXyJUWaRQpRz6VnUUcjw=`** (coincide) | `42ee5aa7…` |
+| `nexum-backend.service` | 1 357 | `6fa4d5fb…05cc` | **`b6TV+wUZFBArG8O2zSgU6IG/Arsm3x2Tj08NRuFXBcw=`** (coincide) | `40f331d1…` |
+
+- **Controles aplicados:** `If-None-Match: '*'` en ambos (falla si el objeto existiera),
+  `--server-side-encryption AES256` (la política del bucket **deniega** la publicación sin SSE,
+  por lo que el éxito de la operación prueba que el cifrado se aplicó) y `--checksum-algorithm SHA256`.
+- **Verificación independiente (operador, `ListObjectsV2`):** ambas claves existen con tamaño
+  exacto y ETag idéntico al devuelto por `PutObject`. `ListObjectsV2` **no** entrega el checksum
+  completo; la coincidencia de integridad se acredita con el `ChecksumSHA256` de la respuesta
+  `PutObject`, no con el ETag (que es MD5).
+- **Releases anteriores intactos:** `e001-d9f0696` (12 452 000 B), `v0.8.0+40f64b6653ec`
+  (18 721 843 B) y `v0.9.0+7d1ebf3d5357` (19 041 073 B), cada uno con su unidad de 1 357 B.
+  Ningún objeto borrado ni sobrescrito.
+- **Incidente menor durante la publicación:** el primer intento usó un `--checksum-sha256` de
+  relleno (error del agente) y S3 lo rechazó con `InvalidRequest`; **no se creó ningún objeto**
+  en ese intento. Reintentado con el digest calculado en la propia ejecución.
+- **Estado:** **`E003_ARTIFACT_PUBLISHED=VERIFIED`**. `E003_DEPLOYED=NOT_RUN` (falta LT, apply y
+  rollout). Siguiente Gate: plan Terraform del Launch Template + IAM runtime.
+
+### E002 verificado por el responsable en Postman (2026-11-13) — incidente 401 cerrado
+
+- **Prueba personal del responsable:** `POST /api/v1/auth/login` en
+  `https://d2lpmqy5w6x9es.cloudfront.net/api/v1/` devolvió **HTTP 200** con `accessToken`,
+  `refreshToken`, `expiresIn=900` y sesión correcta. No se registran tokens ni credenciales.
+- **Consecuencia:** **E001 y E002 quedan funcionalmente verificados** por el responsable. El
+  incidente de 401 se cierra como **problema de credencial/dato introducido**, no del backend:
+  con las credenciales correctas el login responde 200 y el control de persistencia ya había
+  dado **clase F** (perfil `USER_PROFILE`, `ACTIVE`, `Argon2id` válido, correo normalizado y
+  `userId` coherente).
+- **Sin cambios en producción:** ninguna cuenta creada, modificada ni reseteada; sin cambios en
+  DynamoDB, Redis, IAM ni infraestructura. Ningún defecto de E001/E002 demostrado, por lo que
+  **no procede PR técnico**.
+- **Estado:** `E002_USER_ACCEPTED=VERIFIED` para el alcance de esta prueba (login correcto);
+  `E001/E002=OPERATIVOS`.
+
+### Bloqueo de publicación E003 y Gate de permisos (2026-11-13)
+
+- **Gate S3 ya concedido** (`APRUEBO_PUBLICACION_S3_E003_V0.10.0`), pendiente sólo de permiso de
+  herramienta: `aws sts assume-role` (regla `aws *` deny) y `aws s3api put-object`
+  (regla `aws * put-*` deny).
+- **Corrección de un informe previo:** `terraform plan*` e `terraform init -backend=true*` ya
+  están en `ask` con su `tool.use: allow`; el plan del LT **no** necesita excepción.
+- **Instrumento preparado:** `sdd/_control/H08/GATE_H08E_E003_PERMISOS_TEMPORALES.md` con el
+  cambio exacto (dos patrones `ask` en `permissions` + dos `allow` en `policies`), su ubicación
+  tras los DENY, la duración limitada y la retirada verificable con `git diff`. `opencode.json`
+  **no se ha modificado**.
+- **Frase solicitada:** `APRUEBO_EXCEPCION_RFC002_PUBLICACION_S3_E003`.
+
+### Diagnóstico 401 en E002 (2026-11-13) — sin defecto demostrado todavía
+
+- **Síntoma reportado:** `POST /api/v1/auth/login` devuelve `401 UNAUTHORIZED` /
+  «Credenciales inválidas.» para una cuenta que el responsable considera válida. El mensaje es
+  el genérico de E002: **no distingue** correo inexistente, contraseña incorrecta ni cuenta no
+  `ACTIVE` (por diseño, AC-A-050-03).
+- **Verificado por lectura:** el ASG `nexum-h08i-asg-backend` está en `Min 2 / Desired 2 / Max 2`
+  con las dos instancias `InService`/`Healthy` en la **versión 3** del Launch Template
+  (`lt-05445f32aee*/lt-05445f32a7ee8a2f7`), es decir, el release `v0.9.0+7d1ebf3d5357` (**E002**).
+  Un nodo sin E002 respondería **404**, no 401; por tanto el 401 proviene del handler de login
+  real, no de un nodo desactualizado.
+- **Verificado por código (sin datos de usuario):** E001 escribe `PROFILE.passwordHash`
+  (`entityType=USER_PROFILE`, `status=ACTIVE`) tanto en la versión inicial (`275f598`) como en
+  V6.0.2 (`92a086b`); E002 lee exactamente `passwordHash` y exige `status=ACTIVE`; la
+  normalización de correo es `TrimSpace + ToLower` en `domain.ValidateEmail` y en
+  `EmailReservationKeys`, y el lookup compara con `EqualFold`. **No hay discrepancia de esquema,
+  de normalización ni de algoritmo** entre registro y login.
+- **Corrección del diagnóstico previo:** `aws dynamodb get-item` **sí está permitido** (la
+  afirmación anterior de bloqueo era incorrecta). Se ejecutó con `--consistent-read` sobre la
+  tabla `NEXUM_CORE_H08I` (verificada `ACTIVE`, `PK`/`SK` string, `GSI1`, TTL `ENABLED`,
+  ~60 ítems) y devolvió `Item` vacío para un correo sintético, como corresponde.
+- **Control con cuenta conocida (sin datos personales):** sobre el perfil de la cuenta
+  sintética creada en la aceptación de E002 (`userId 193d042a-…`, registrada por E001 el
+  2026-11-12) el resultado es **clase F**: `entityType=USER_PROFILE`, `status=ACTIVE`,
+  `passwordHash` presente con formato **Argon2id válido**, `email` ya normalizado y `userId`
+  coherente. Es decir, **el modelo de persistencia de E001/E002 funciona en producción** y el
+  401 no proviene de un defecto de esquema.
+- **Pendiente para cerrar el caso de esta cuenta:** el literal **exacto** del correo. Las
+  capturas no son accesibles desde esta sesión y el correo no se ha recibido como texto; no se
+  adivina ni se exploran otras cuentas (prohibido `Scan`/`Query` global). Con el literal, el
+  diagnóstico se resuelve con una sola lectura de la reserva y del perfil, clasificando el
+  resultado en A–F sin imprimir hash ni datos personales.
+- **Herramienta de lectura redactada (no versionada):** `dist/tmp/diag_e002.py`
+  (`--email <correo>` o `--user-id <id>` en modo control). Consulta **solo** `EMAIL#<digest>`
+  y `USER#<id>/PROFILE` con consistencia fuerte y emite booleanos + clase A–F; nunca imprime
+  correo, hash, `userId` ni tokens. `dist/` está excluido del manifiesto SDD y de Git.
+- **Prueba controlada pendiente de autorización (escritura):** crear una cuenta sintética nueva
+  con E001 y autenticarla con E002 por HTTPS. Distingue un defecto general del backend de un
+  problema de esa cuenta concreta. Requiere frase explícita por crear un usuario sintético en
+  producción; no se ejecutó.
+- **Sin cambios:** no se modificó ni reseteó ninguna cuenta, no se tocó DynamoDB, Redis, IAM ni
+  infraestructura, y no se alteró E003.
+- **Estado:** `E002_401_DIAGNOSIS=PARCIAL_CONTROL_F_PENDIENTE_CORREO_EXACTO`; sin defecto de
+  E001/E002 demostrado (modelo verificado en producción); E003 sigue `MERGED`,
+  `ARTIFACT_PUBLISHED=NOT_RUN`.
+
+### H08-E / E003 — HITO C: publicación S3 BLOQUEADA por política de herramientas (2026-11-13T19:04Z)
+
+- **Gate recibido:** `APRUEBO_PUBLICACION_S3_E003_V0.10.0` (alcance: sólo los dos objetos de
+  `releases/v0.10.0+1d0c2650daab/`). Registrado en `GATE_H08E_E003_PUBLICACION_S3.md`.
+- **Comprobaciones previas (todas correctas, sin escribir nada):** artefacto local
+  19 127 165 B / `734de969…723c`; unidad 1 357 B / `6fa4d5fb…05cc`; `main`
+  `1d0c2650daab07e20a52df518d9a69cbca51cda0`; run `43485092835`; **prefijo destino vacío**
+  (`ListObjectsV2` sin `Contents`); releases `e001-d9f0696`, `v0.8.0+40f64b6653ec` y
+  `v0.9.0+7d1ebf3d5357` intactos; cuenta `713797602090` confirmada.
+- **Bloqueo real:** `opencode.json` tiene `shell` **`aws *` = deny** y **`aws * put-*` = deny**;
+  `aws sts assume-role` devolvió `permission.rejected`. No es posible asumir
+  `nexum-h08i-artefactos-publicador` desde OpenCode con la política vigente, y el operador no
+  puede escribir por diseño del bucket. **Cero objetos escritos**; `E003_ARTIFACT_PUBLISHED`
+  queda **NOT_RUN**.
+- **Incidente menor:** una llamada `sts get-caller-identity` devolvió
+  `429 CreateOAuth2Token rate exceeded` (refresco del token de `aws login`); el listado S3
+  funcionó con las credenciales en caché. No afecta a los datos ni a los permisos.
+- **Excepción mínima solicitada (RFC-002, temporal y literal):** `shell`
+  `aws sts assume-role *` → `ask` y `shell` `aws s3api put-object *` → `ask`, añadidas después
+  de los DENY y retiradas al concluir. Para el Gate de LT/IAM: `terraform init -backend=true*`,
+  `terraform plan *` y `terraform show *` en `ask`.
+- **No se evadió nada:** no se editó `opencode.json`, no se usó otra identidad, no se tocó la
+  bucket policy ni IAM, y no se ejecutó ningún `PutObject` con el operador.
+- **Estado:** `E003_MERGED`; `E003_ARTIFACT_PUBLISHED=NOT_RUN` (bloqueado);
+  `E003_DEPLOYED=NOT_RUN`; `AWS_VERIFIED=NOT_RUN`. E001/E002 siguen intactos y en producción.
+- **Continuación exacta:** (1) humano añade las dos excepciones `ask` de RFC-002; (2) ejecutar
+  `assume-role` del publicador + los dos `put-object` con `If-None-Match '*'`,
+  `--server-side-encryption AES256` y `--checksum-algorithm SHA256`, verificando el
+  `ChecksumSHA256` devuelto por S3 contra el SHA-256 local; (3) registrar HITO C real;
+  (4) Gate de LT/IAM y luego ASG.
+
+### H08-E / E003 — HITO A/B: MERGE EN MAIN, CI VERDE Y ARTEFACTO CANÓNICO (2026-11-13T18:41Z)
+
+**HITO A — merge y CI de main**
+
+- **Gate humano usado:** `APRUEBO_MERGE_PR_61_SHA_a8fc6340a4118104d8907bdfc3a5bf61ee750fe5`.
+- **PR #61 MERGED** el `2026-11-13T18:41:35Z`; HEAD autorizado `a8fc634` verificado e idéntico antes de fusionar (`MERGEABLE`, `CLEAN`, no Draft, 13/13 checks).
+- **Merge commit y `main`:** `1d0c2650daab07e20a52df518d9a69cbca51cda0`. `main` local actualizado por fast-forward, sin pérdida de cambios locales.
+- **CI de `main`:** Go Backend CI run **`43485092835` SUCCESS** y SDD documental run **`43485093104` SUCCESS**, ambos sobre `1d0c265`.
+- **Integrado:** implementación E003, RFC-014 (401, `deviceId`, `session.id`) con YAML/JSON sincronizados, Gate local, pruebas y manifiesto. **E001/E002 sin cambios** de código, contrato ni persistencia.
+
+**HITO B — artefacto ARM64 canónico verificado**
+
+- **Run de origen:** `43485092835` (Go Backend CI de `main` en `1d0c265`), no un binario local ni el de E002.
+- **Release ID según `POLITICA_RELEASES.md`:** `v0.10.0+1d0c2650daab` (`vX.Y.Z+<sha12>`).
+- **Artefacto `binario-1d0c2650daab07e20a52df518d9a69cbca51cda0`:** `nexum-backend-linux-arm64`, **19 127 165 bytes**, SHA-256 **`734de969570502099d452438fd606f1646d35f225459a450a51cfa567514723c`**, idéntico al `dist/binario.sha256` publicado por CI (verificado dos veces).
+- **SBOM `sbom-spdx-1d0c2650daab07e20a52df518d9a69cbca51cda0`:** `sbom.spdx.json`, 85 571 bytes, del mismo run.
+- **Unidad systemd:** `infra/systemd/nexum-backend.service`, **1 357 bytes**, SHA-256 **`6fa4d5fb051914102b1bc3b6cd2814e881bf02bb26df1d938f4f0d46e15705cc`**, byte a byte idéntica a la que corre E002; 11 pruebas de contrato systemd OK. E003 no la modifica.
+- **Custodia local:** `C:\Nexum-Custodia\H08E-E003-20261113\` (artefacto y SBOM descargados del run; sin secretos).
+
+**Preflight S3 (solo lectura, sin mutaciones)**
+
+- Identidad AWS verificada: cuenta **713797602090**, `assumed-role/AccountFullAccessRole` (región `us-east-2`).
+- Bucket `nexum-h08i-artefactos-713797602090` accesible en lectura de listado. Releases existentes: `releases/e001-d9f0696/`, `releases/v0.8.0+40f64b6653ec/`, `releases/v0.9.0+7d1ebf3d5357/`, cada una con `nexum-backend-linux-arm64` y `nexum-backend.service`. El prefijo `releases/v0.10.0+1d0c2650daab/` **no existe** todavía.
+- Política del bucket (IaC, autoridad): `s3:PutObject` permitido **solo** al rol `nexum-h08i-artefactos-publicador` y solo dentro del prefijo de releases, con `s3:x-amz-server-side-encryption = AES256` obligatorio; Deny explícito de escritura al runtime, de lectura/borrado al publicador y de **cualquier acción a principals distintos de runtime y publicador**. Consecuencia: el operador **no puede** publicar directamente; la publicación se ejecutará asumiendo `arn:aws:iam::713797602090:role/nexum-h08i-artefactos-publicador` (CD_ASISTIDO, RFC-010/RFC-011).
+- **IAM del runtime:** los ARNs de artefacto se inyectan por variable (`iam_artifact_object_arns`) con objetos exactos; los objetos de `v0.10.0` **no** están autorizados todavía. El plan del Launch Template incluirá el cambio IAM mínimo (añadir binario y unidad del release nuevo, conservando E001, v0.8.0 y v0.9.0 para rollback). La lista efectiva actual se leerá con permiso de lectura en ese Gate.
+- **Permisos del publicador (preflight honesto):** `iam simulate-principal-policy` resulta
+  **no concluyente** en este bucket — devuelve `explicitDeny` incluso al rol runtime leyendo
+  `releases/v0.9.0+…`, permiso que funciona en producción; la condición `aws:PrincipalArn` de
+  `DenegarAPrincipalsNoAutorizados` no se evalúa fielmente. No se declara permiso verificado
+  por simulación: la prueba real es la publicación, que falla cerrada con `AccessDenied` sin
+  efecto parcial. El operador conserva `ListBucket` (listado de `releases/` correcto).
+- **Estado:** `E003_MERGED`; `E003_DEPLOYED=NOT_RUN`; `E003_AWS_VERIFIED=NOT_RUN`; `E003_USER_ACCEPTED` pendiente. Siguiente Gate: publicación S3.
+
 ### H08-E / E003 — PR #61, HITO 4: RFC-014 APROBADA y contrato aplicado (2026-11-13T18:18Z)
 
 - **Autorización humana recibida:** `APRUEBO_RFC_014_E003_REFRESH`, registrada en
