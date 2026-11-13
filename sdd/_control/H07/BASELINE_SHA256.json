@@ -195,7 +195,7 @@
     "infra/terraform/operacion/inventario.json": "a3facdc1b42795d47ab3fe82f0e533188f026af60d703c714e53745e4a02d11a",
     "infra/terraform/policies/terraform-state-access.json.tftpl": "e666d80aaadbd2c2f4af414e20ab22d09f27848f570ef7079cbab2bde01629aa",
     "infra/terraform/respaldo/inventario_backup.json": "e2b6a6f2306e2a4f9c65c2225c3cfbf480b637a7d64d2eb548477b5dd67327ee",
-    "memoria.md": "2c8539e7b440ca6b1e63918adb503856d1bc4c2150c2fb43a4675aca0edccab8",
+    "memoria.md": "025e341a1feadb3fb18a3e10262f1d730cd3ad0caa0364e980057c38d301c3f2",
     "opencode.json": "1dca0b4c589c0a5d7d21618cfc34c1cd8185a074677817810cf55c511859b287",
     "scripts/build-backend.ps1": "bbf09e25ade53e404dac35e5e13e0d80f22710611307739f6b325d92b4f17dc7",
     "sdd/01-arquitectura-general/A-000-contexto-sistema/checklist.md": "ef7b3a1b9228f3241a0cf04e02ce8be4de045b59d83101a6ee69ee66edda370c",

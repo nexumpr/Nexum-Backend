@@ -921,6 +921,33 @@
   `permissions: shell "terraform apply *e003-lt-iam-v2.tfplan*" → ask` y
   `policies: tool.use "shell:terraform apply *e003-lt-iam-v2.tfplan*" → allow`.
 
+### H08-E / E003 — HITO D: APPLY REAL (LT v4 + IAM 8 ARN) (2026-11-13)
+
+- **Gate usado:** `APRUEBO_APPLY_IAM_E003_91b9fc3a688ccd2f053b730b58d46fb251b154547e17a9830598737089a2df07`.
+- **Plan aplicado sin regenerar:** `dist/tmp/e003-lt-iam-v2.tfplan`, SHA-256 verificado antes de
+  ejecutar (`91b9fc3a…df07`), 167 468 B, backend remoto y perfil `nexum-tf`.
+- **Resultado real, verificado en el estado posterior** (`terraform show -json`):
+  - **Launch Template `latest_version = 4`**, con `user_data` apuntando a
+    `releases/v0.10.0+1d0c2650daab/nexum-backend-linux-arm64`
+    (`BINARIO_SHA=734de969…723c`) y `…/nexum-backend.service`;
+  - **IAM `aws_iam_role_policy.runtime` con 8 ARN** de artefactos (E001, `v0.8.0`,
+    `v0.9.0` y `v0.10.0`: 2 cada uno) → rollback conservado;
+  - **Redis intacto**: `aws_elasticache_user.default_deshabilitado` sigue en `no-password`
+    (el drift `no-password-required` **no** se aplicó);
+  - sin cambios en DynamoDB, CloudFront, ALB, VPC, bucket policy ni secretos.
+- **Incidente previo resuelto:** el apply había fallado por DNS del bucket de state
+  (`no such host`); tras `Clear-DnsClientCache` + `ipconfig /flushdns` del responsable, el mismo
+  plan se aplicó sin cambios. No se regeneró, no se cambió el backend ni se usó el plan v1.
+- **Las dos EC2 siguen sirviendo E002** (LT v3) hasta el rollout: el apply **no** toca instancias.
+  ASG `Min 2 / Desired 2 / Max 2`, dos instancias `InService/Healthy`, sin refresh activo.
+- **Estado:** `E003_LT_APPLIED` · `E003_ARTIFACT_PUBLISHED=VERIFIED` ·
+  **`E003_DEPLOYED=NOT_RUN`** (falta `instance refresh`) · `E001/E002=OPERATIVOS`.
+- **Siguiente Gate:** ASG (rollout). Excepciones ASK necesarias:
+  `aws autoscaling update-auto-scaling-group *`, `aws autoscaling set-instance-protection *`,
+  `aws autoscaling start-instance-refresh *`, `aws autoscaling describe-instance-refreshes *`.
+  Parámetros: `MinHealthyPercentage=100`, `MaxHealthyPercentage=150`, `InstanceWarmup=120`,
+  Max 3 transitorio, restauración 2/2/2 y rollback a LT v3.
+
 ### E003 — excepción de permiso resuelta; el apply se bloquea por DNS del backend (2026-11-13)
 
 - La excepción `terraform apply *e003-lt-iam-v2.tfplan*` **ya existe** en `opencode.json`
