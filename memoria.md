@@ -877,6 +877,35 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### E002 verificado por el responsable en Postman (2026-11-13) — incidente 401 cerrado
+
+- **Prueba personal del responsable:** `POST /api/v1/auth/login` en
+  `https://d2lpmqy5w6x9es.cloudfront.net/api/v1/` devolvió **HTTP 200** con `accessToken`,
+  `refreshToken`, `expiresIn=900` y sesión correcta. No se registran tokens ni credenciales.
+- **Consecuencia:** **E001 y E002 quedan funcionalmente verificados** por el responsable. El
+  incidente de 401 se cierra como **problema de credencial/dato introducido**, no del backend:
+  con las credenciales correctas el login responde 200 y el control de persistencia ya había
+  dado **clase F** (perfil `USER_PROFILE`, `ACTIVE`, `Argon2id` válido, correo normalizado y
+  `userId` coherente).
+- **Sin cambios en producción:** ninguna cuenta creada, modificada ni reseteada; sin cambios en
+  DynamoDB, Redis, IAM ni infraestructura. Ningún defecto de E001/E002 demostrado, por lo que
+  **no procede PR técnico**.
+- **Estado:** `E002_USER_ACCEPTED=VERIFIED` para el alcance de esta prueba (login correcto);
+  `E001/E002=OPERATIVOS`.
+
+### Bloqueo de publicación E003 y Gate de permisos (2026-11-13)
+
+- **Gate S3 ya concedido** (`APRUEBO_PUBLICACION_S3_E003_V0.10.0`), pendiente sólo de permiso de
+  herramienta: `aws sts assume-role` (regla `aws *` deny) y `aws s3api put-object`
+  (regla `aws * put-*` deny).
+- **Corrección de un informe previo:** `terraform plan*` e `terraform init -backend=true*` ya
+  están en `ask` con su `tool.use: allow`; el plan del LT **no** necesita excepción.
+- **Instrumento preparado:** `sdd/_control/H08/GATE_H08E_E003_PERMISOS_TEMPORALES.md` con el
+  cambio exacto (dos patrones `ask` en `permissions` + dos `allow` en `policies`), su ubicación
+  tras los DENY, la duración limitada y la retirada verificable con `git diff`. `opencode.json`
+  **no se ha modificado**.
+- **Frase solicitada:** `APRUEBO_EXCEPCION_RFC002_PUBLICACION_S3_E003`.
+
 ### Diagnóstico 401 en E002 (2026-11-13) — sin defecto demostrado todavía
 
 - **Síntoma reportado:** `POST /api/v1/auth/login` devuelve `401 UNAUTHORIZED` /
