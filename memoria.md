@@ -877,6 +877,59 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### H08-E / E003 — refresh implementado en local, contrato pendiente de RFC-014 (2026-11-13)
+
+- **Gate:** `sdd/_control/H08/GATE_H08E_E003.md` con `AUTHORIZED_E003_LOCAL`, registrando la
+  instrucción humana `APRUEBO_ALCANCE_LOCAL_E003_AUTH_REFRESH`. E004..E075 siguen
+  `NOT_AUTHORIZED`; merge exige `APRUEBO_MERGE_PR_<N>_SHA_<SHA40>`.
+- **Rama:** `feat/h08e-e003-auth-refresh` desde `main` `6125306` (sin cambios de otros
+  endpoints; `origin/main` verificado sin avance).
+- **Reutilización, sin duplicar identidad:** sesiones reales de E002
+  (`USER#<id>/SESSION#<id>` + `REFRESH#<digest>/SESSION`), JWT RS256 con `expiresIn=900`,
+  `SessionStore` de E002 y el mismo bundle de claves (sin rotar `JWT_KEY_ID`). El
+  `SessionService` heredado (600 s, `GetTokenByHash`+`MarkTokenUsed`+`CreateSession` no
+  atómico, puerto no cableado al runtime) **no se usa**.
+- **Rotación atómica:** una sola `TransactWriteItems` de **cuatro** acciones — consumo del
+  localizador con CAS, actualización de sesión (`#version` + `refreshHash` + `#status`),
+  `ConditionCheck` de `USER#<id>/PROFILE` `ACTIVE` y alta del localizador nuevo con TTL
+  heredado. La expiración absoluta no se extiende.
+- **Defecto corregido (CAS incompatible):** E002 crea localizadores **sin** atributo `used`
+  y E003 los crea con `used=false`. La condición exclusiva `attribute_not_exists(#used)`
+  habría impedido consumir el segundo refresh (B→C). Ahora es
+  `attribute_not_exists(#used) OR #used = :false`, con `:false` BOOL, y `#status = :active`.
+- **Cuenta activa:** lectura consistente del perfil y `ConditionCheck` en la transacción;
+  deshabilitar o eliminar al usuario impide renovar aunque la sesión siga `ACTIVE`.
+- **Replay:** token consumido ⇒ revocación durable de la sesión de la familia (`status=REVOKED`,
+  `revokeReason=REFRESH_REPLAY_DETECTED`) y `409`; si la revocación no se confirma, `503`.
+  Un conflicto sin evidencia no revoca (`409`).
+- **Cuotas Redis:** 30/min/IP y 12/min/digest con HMAC-SHA256 y una sola ejecución atómica;
+  Redis no disponible ⇒ 503.
+- **IAM:** sin cambios. La política vigente ya autoriza `GetItem`, `PutItem`, `UpdateItem`,
+  `DeleteItem`, `ConditionCheckItem` y `Query` con `LeadingKeys` `USER#*`, `REFRESH#*`,
+  `SESSION#*`.
+- **Contrato:** `RFC-014-E003-REFRESH_V602.md` en estado **PROPUESTO** con las tres
+  diferencias frente al PDF V6.0.2 (401 para token inválido, `deviceId` opcional,
+  `session.id`). **El OpenAPI no se modifica** hasta `APRUEBO_RFC_014_E003_REFRESH`; sin esa
+  aprobación el runtime de la rama no puede fusionarse ni publicarse.
+- **Pruebas escritas (no ejecutadas en local):** aplicación (contrato, validación, cuenta no
+  activa, perfil incoherente/ausente, replay, conflicto, fallo cerrado, concurrencia),
+  adaptador (estructura de la transacción de cuatro acciones y cadena A→B→C→D sobre un doble
+  con estado que interpreta las condiciones emitidas, familia ajena intacta, concurrencia de
+  dos servicios) y handler (200/400/401/409/429/503, cabeceras, sin filtrar tokens).
+- **Bloqueo local real:** `gofmt.exe` y el toolchain Go 1.27.4 (exigido por `go.mod`) están
+  bloqueados por *Device Guard* en este host Windows con Go 1.27.3
+  (`BLOCKED_POLICY_APPLICATION_CONTROL`). No se declara PASS; la validación autoritativa es
+  el CI Linux del PR.
+- **Estado:** `E003_IMPLEMENTED_LOCAL`; `E003_CONTRACT=BLOCKED_RFC014`;
+  `E003_DEPLOYED=NOT_RUN`; `AWS_NOT_RUN`; `E003_USER_ACCEPTED` pendiente de la prueba
+  personal en Postman tras el despliegue autorizado.
+- **Ruta de despliegue prevista (sin ejecutar):** CI `main` → binario ARM64 canónico →
+  `releases/<versión>` en el bucket existente con `If-None-Match` y SSE → Launch Template
+  nuevo → `instance_refresh` con capacidad transitoria → HTTPS CloudFront → pruebas E001/E002/
+  E003. Cada mutación exige su Gate propio; sin `terraform destroy`, sin recursos nuevos, sin
+  gasto personal.
+
+
 ### H08-E / E001 V6.0.2 — refactor de registro (2026-11-11)
 
 - **Rama:** `feat/h08e-e001-v602-register` desde `main` `a2a4ccab1c02d22a3f9d1efa435f0ec257bf841a`. Gate vigente `sdd/_control/H08/GATE_H08E_E001.md` (`AUTHORIZED_E001_LOCAL`). `AWS_NOT_RUN`.
