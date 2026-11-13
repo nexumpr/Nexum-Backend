@@ -877,6 +877,42 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### Diagnóstico 401 en E002 (2026-11-13) — sin defecto demostrado todavía
+
+- **Síntoma reportado:** `POST /api/v1/auth/login` devuelve `401 UNAUTHORIZED` /
+  «Credenciales inválidas.» para una cuenta que el responsable considera válida. El mensaje es
+  el genérico de E002: **no distingue** correo inexistente, contraseña incorrecta ni cuenta no
+  `ACTIVE` (por diseño, AC-A-050-03).
+- **Verificado por lectura:** el ASG `nexum-h08i-asg-backend` está en `Min 2 / Desired 2 / Max 2`
+  con las dos instancias `InService`/`Healthy` en la **versión 3** del Launch Template
+  (`lt-05445f32aee*/lt-05445f32a7ee8a2f7`), es decir, el release `v0.9.0+7d1ebf3d5357` (**E002**).
+  Un nodo sin E002 respondería **404**, no 401; por tanto el 401 proviene del handler de login
+  real, no de un nodo desactualizado.
+- **Verificado por código (sin datos de usuario):** E001 escribe `PROFILE.passwordHash`
+  (`entityType=USER_PROFILE`, `status=ACTIVE`) tanto en la versión inicial (`275f598`) como en
+  V6.0.2 (`92a086b`); E002 lee exactamente `passwordHash` y exige `status=ACTIVE`; la
+  normalización de correo es `TrimSpace + ToLower` en `domain.ValidateEmail` y en
+  `EmailReservationKeys`, y el lookup compara con `EqualFold`. **No hay discrepancia de esquema,
+  de normalización ni de algoritmo** entre registro y login.
+- **No concluible con la evidencia actual:** existencia de la cuenta, su `status`, el formato
+  del hash y la coherencia correo↔reserva requieren leer el ítem `EMAIL#<sha256(correo)>` →
+  `USER#<id>/PROFILE` con `GetItem` consistente. Para ello faltan dos cosas: (a) el **correo
+  exacto** de la cuenta (no se solicitó ni se registrará ninguna contraseña) y (b) una
+  excepción de herramienta, porque `opencode.json` mantiene `aws *` en **deny** (sólo hay `ask`
+  para lecturas enumeradas que no incluyen `dynamodb get-item`).
+- **Excepción mínima solicitada (solo lectura):** `shell` `aws dynamodb get-item *` → `ask`,
+  añadida tras los DENY y retirada al concluir. Con ella el diagnóstico se resuelve en un paso
+  (reserva, perfil, `status`, prefijo `$argon2id$` del hash y coherencia de `userId`), **sin
+  imprimir el hash**.
+- **Prueba controlada pendiente de autorización (escritura):** crear una cuenta sintética nueva
+  con E001 y autenticarla con E002 por HTTPS. Distingue un defecto general del backend de un
+  problema de esa cuenta concreta. Requiere frase explícita por crear un usuario sintético en
+  producción; no se ejecutó.
+- **Sin cambios:** no se modificó ni reseteó ninguna cuenta, no se tocó DynamoDB, Redis, IAM ni
+  infraestructura, y no se alteró E003.
+- **Estado:** `E002_401_DIAGNOSIS=BLOCKED_SIN_CORREO_Y_PERMISO_LECTURA`; sin defecto de
+  E001/E002 demostrado; E003 sigue `MERGED`, `ARTIFACT_PUBLISHED=NOT_RUN`.
+
 ### H08-E / E003 — HITO C: publicación S3 BLOQUEADA por política de herramientas (2026-11-13T19:04Z)
 
 - **Gate recibido:** `APRUEBO_PUBLICACION_S3_E003_V0.10.0` (alcance: sólo los dos objetos de
