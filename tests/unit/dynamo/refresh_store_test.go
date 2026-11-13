@@ -326,7 +326,7 @@ func TestLoadSessionInterpretaVersionYExpiracion(t *testing.T) {
 	if !session.HasExpiry || !session.ExpiresAt.Equal(refreshAhora.Add(24*time.Hour)) {
 		t.Fatalf("expiracion mal interpretada: %+v", session)
 	}
-	if !session.CreatedAt.Equal(refreshAhora.Add(-2 * time.Hour)) || !session.LastUsedAt.Equal(refreshAhora.Add(-time.Hour)) {
+	if !session.CreatedAt.Equal(refreshAhora.Add(-2*time.Hour)) || !session.LastUsedAt.Equal(refreshAhora.Add(-time.Hour)) {
 		t.Fatalf("marcas temporales mal interpretadas: %+v", session)
 	}
 }
