@@ -921,6 +921,45 @@
   `permissions: shell "terraform apply *e003-lt-iam-v2.tfplan*" → ask` y
   `policies: tool.use "shell:terraform apply *e003-lt-iam-v2.tfplan*" → allow`.
 
+### H08-E / E003 — HITOS E y F: ROLLOUT COMPLETADO Y E003 VERIFICADO POR HTTPS (2026-11-13)
+
+**HITO E — rollout**
+
+- Refresh `8eb6837d-8be9-4bad-a787-eed102987ed4` → **`Successful`, 100 %**.
+- Instancias finales, ambas **Launch Template v4** (`v0.10.0+1d0c2650daab`), `InService/Healthy`:
+  `i-02666abdd2bdfae8d` y `i-0acdf148c0ffe16f2`. Las dos anteriores (`i-0058034756c36b716`,
+  `i-0d12ab8fd2a5e6c11`, LT v3) fueron sustituidas tras quedar la nueva saludable.
+- Capacidad **restaurada a Min 2 / Desired 2 / Max 2** (se había elevado Max a 3 solo para el
+  refresh). `MaxSize=3` fue transitorio y ya no está activo.
+- Sin pérdida de servicio observada: en la última lectura con nodos antiguos, ambos seguían
+  `InService/Healthy`.
+
+**HITO F — pruebas HTTPS reales** (`https://d2lpmqy5w6x9es.cloudfront.net/api/v1`)
+
+| Prueba | Esperado | Obtenido |
+|---|---|---|
+| E001 `POST /auth/register` (cuenta sintética nueva) | 201 | **201** ✅ |
+| E002 `POST /auth/login` | 200 · `Bearer` · `expiresIn=900` · `session.id==sessionId` | **200** · ✅ todo |
+| E003 `A→B`, `B→C`, `C→D` | 200 cada uno | **200/200/200** ✅ |
+| Tokens distintos en la cadena | sí | **A≠B≠C≠D** ✅ |
+| Identidad de sesión estable entre rotaciones | sí | ✅ |
+| E002 segundo login (familia 2) + rotación | 200 | **200 / 200** ✅ |
+| **Replay de un token ya consumido** | **409** | **409** ✅ |
+| Refresh del token vigente de esa familia tras el replay | **401** (familia revocada) | **401** ✅ |
+| Refresh de la familia 2 tras la revocación de la familia 1 | **200** (aislamiento) | **200** ✅ |
+| E002 con contraseña incorrecta | 401 | **401** ✅ |
+
+- **Persistencia y servicios reales:** DynamoDB `NEXUM_CORE_H08I` (rotación CAS y consumo durable)
+  y Redis compartido; sin mocks.
+- **Dos nodos:** ambos en LT v4 y `Healthy`; la sesión vive en DynamoDB, no en memoria local.
+  *No hay evidencia por petición de qué instancia atendió cada llamada* (CloudFront/ALB no
+  exponen ese dato en la respuesta): la consistencia entre nodos se apoya en el almacén
+  compartido y en las dos instancias sanas, no en una prueba cruzada instrumentada.
+- **Sin secretos registrados:** no se imprimieron ni guardaron tokens ni contraseñas; la cuenta
+  sintética se identifica solo por su correo de pruebas `@example.invalid`.
+- **Estado:** **`E003_AWS_VERIFIED = VERIFIED`** (HTTP real, rotación, replay y aislamiento).
+  `E003_USER_ACCEPTED` permanece **pendiente** de la prueba del responsable en Postman.
+
 ### H08-E / E003 — HITO E (EN CURSO): refresh lanzado y pérdida de conectividad AWS (2026-11-13)
 
 - **Gate usado:** `APRUEBO_ASG_E003_V0.10.0`.
