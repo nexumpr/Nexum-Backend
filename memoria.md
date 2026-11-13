@@ -877,6 +877,42 @@
 - **Segundo apply de fase base (2026-11-11, `072297AA…DB45`):** +29 creados y 3 actualizaciones in-place (DynamoDB PITR/TTL, usuarios Redis); la trust policy con `/managed/` permitió crear los 3 roles IAM. Fallaron 2 más por `already exists`: **instance profile** `nexum-h08i-backend-runtime` y **user group** `nexum-app`; ambos adoptados después (`Import successful!`). Sin `destroy`.
 - **D-BASE-09 (defecto real, corregido):** la política de ambos buckets denegaba `s3:ListBucket` a todos salvo `nexum-h08i-secretos-gestor-iac`, pero Terraform corre como el operador. El `HeadBucket` del refresh devolvía 403, el proveedor concluía «bucket inexistente» y el plan proponía **crear** los buckets y **reemplazar** sus 12 subrecursos. Corrección: la exención de `ListBucket` es `var.principal_operador_arn` (la identidad que ejecuta Terraform); el rol dedicado sigue existiendo para asumirlo en publicaciones. Los planes v3/v4 se descartan por ese motivo.
 
+### H08-E / E003 — HITO D-bis: preflight DETIENE el plan autorizado y emite plan correcto
+
+- **Gate recibido:** `APRUEBO_APPLY_IAM_E003_2b9e6c5e…bf34` (plan `dist/tmp/e003-lt-iam.tfplan`,
+  167 185 B). **NO se aplicó.**
+- **Hallazgo del preflight (defecto real evitado):** ese plan **no contenía E003**:
+  - `user_data` del LT apuntaba a `releases/e001-d9f0696/…` (release E001 primitivo), no a
+    `v0.10.0+1d0c2650daab`;
+  - la política IAM quedaba con **2 ARN** (sólo el par de `e001-d9f0696`), perdiendo los de
+    `v0.8.0` y `v0.9.0` → se habría roto el rollback.
+  - **Causa demostrada:** `-var-file` **tiene precedencia sobre** `TF_VAR_*` en Terraform, y el
+    tfvars de custodia fija los valores de la fase base. Los `TF_VAR_*` con los valores de E003
+    fueron ignorados; el plan se generó íntegro con el tfvars antiguo. El `-target` sí se aplicó
+    (4 recursos), lo que hizo que el plan pareciera correcto.
+- **Plan corregido (v2)**: mismos cuatro recursos acotados, con `-var` explícitos (precedencia
+  superior al tfvars):
+
+| Dato | Valor |
+|---|---|
+| Archivo | `dist/tmp/e003-lt-iam-v2.tfplan` |
+| **SHA-256** | **`91b9fc3a688ccd2f053b730b58d46fb251b154547e17a9830598737089a2df07`** |
+| Tamaño | 167 468 bytes |
+| Acciones | **4 update · 0 add · 0 destroy** |
+| `user_data` verificado (texto) | `BINARIO_URI=…/v0.10.0+1d0c2650daab/nexum-backend-linux-arm64`, `BINARIO_SHA=734de969…723c`, `UNIDAD_URI=…/nexum-backend.service`, `UNIDAD_SHA=6fa4d5fb…05cc` |
+| IAM verificado | **8 ARN exactos**: `e001-d9f0696` (2), `v0.8.0+40f64b6653ec` (2), `v0.9.0+7d1ebf3d5357` (2), `v0.10.0+1d0c2650daab` (2) |
+| Excluidos | Redis (drift), DynamoDB, CloudFront, ALB, VPC, bucket policy, secretos |
+
+- **Nuevo Gate solicitado:** `APRUEBO_APPLY_IAM_E003_91b9fc3a688ccd2f053b730b58d46fb251b154547e17a9830598737089a2df07`.
+  El Gate anterior queda **consumido y no utilizado**: su plan no debía aplicarse.
+- **Corrección del CI del PR #62:** el paso `Integridad integral y rutas rastreadas en Git`
+  fallaba porque `BASELINE_SHA256.json` se regeneró con el `opencode.json` **modificado** por los
+  permisos temporales del responsable, mientras ese archivo **no** se commitea. El manifiesto se
+  recalcula ahora contra el contenido **commiteado** (`git show HEAD:opencode.json`), que es lo
+  que evalúa CI.
+- **Estado:** `E003_ARTIFACT_PUBLISHED=VERIFIED`; `E003_DEPLOYED=NOT_RUN`;
+  `E001/E002=OPERATIVOS`; dos EC2 en LT v3 sirviendo E002.
+
 ### H08-E / E003 — HITO D (preparado): mecanismo LT corregido y plan IAM+LT emitido
 
 - **Corrección de la conclusión anterior (demostrada):** el Launch Template **sí lo administra
