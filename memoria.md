@@ -1556,3 +1556,10 @@
 - **E065/E066:** el contrato ya tiene `dueAt` y `timezone`; `triggerAt` y `timeZone` pasan a **CONSERVAR** (eran duplicados). `relatedEntityId` se **descarta** (el recordatorio se modela con titulo + `dueAt`). Solo `frequency` entra en A8, opcional (`daily|weekly|monthly`).
 - **A8 definitiva: 31 campos** con endpoint, ubicación, tipo, required, nullability, enum, ejemplo y pantalla. Sin duplicar A2/A3/A5/A7 ni los efectos de 204.
 - **Estado:** 812 diferencias, 0 sin clasificar, 0 pendientes; 206 de compatibilidad instrumentadas (A8=40/31, A3=26, A5=2, A4=5, CONSERVAR=33, CALCULAR=66, DESCARTAR=34). `CONTRATOS_E005_E075_FROZEN=NOT_VERIFIED`; nada aplicado; sin implementacion.
+
+### H08 - Pre-E005: revision 8 (ida y vuelta de A8) — 2026-11-16
+
+- **Componentes compartidos verificados:** `RecurringPayment` lo usan E032 (lista), E033 (response), E034 (detalle) y E035 (response); `Reminder` lo usan E064, E065 y E066. Anadir `type`, `startDate` y `dueDay` en `RecurringCreate` + `RecurringPayment` + `RecurringPatch`, y `frequency` en `ReminderCreate` + `Reminder` + `ReminderPatch`, garantiza crear, persistir, consultar, listar y editar con el mismo enum y formato.
+- **Semantica de `frequency`:** ausente en CREATE = disparo unico; `null` solo en PATCH para cancelar la recurrencia; en CREATE no se admite `null`. «Ausente» y «null» quedan documentados como distintos.
+- **Invariante `validar_ida_vuelta()`:** todo campo escribible debe declarar al menos un destino de request y uno de respuesta. Resultado: **0 problemas**.
+- **Estado:** A8 = 31 incorporaciones; ESENCIAL = 2. Nada aplicado; `CONTRATOS_E005_E075_FROZEN=NOT_VERIFIED`. Sin implementacion; E001-E004, AWS y `opencode.json` intactos.

@@ -86,7 +86,7 @@ Todas las filas están `CONTRACT_FROZEN=NOT_VERIFIED` porque las enmiendas A1–
 | 4 | A3 contrato E058 (12 campos) | `APRUEBO_ENMIENDA_A3_E058` |
 | 5 | A5 `enoughData`/`minimumSamples` (E052) | `APRUEBO_ENMIENDA_A5_E052` |
 | 6 | A7 `openingSaved` (E040/E039) | `APRUEBO_ENMIENDA_A7_E040` |
-| 7 | **A8: 31 incorporaciones con schema** (199 candidatos revisados) | `APRUEBO_ENMIENDA_A8_ADITIVOS` |
+| 7 | **A8: 31 incorporaciones con ida y vuelta** (199 candidatos revisados) | `APRUEBO_ENMIENDA_A8_ADITIVOS` |
 | 8 | A4 registrar las 5 decisiones HTTP | incluido en (1) |
 | 9 | A6 época de revocación (código compartido) | `APRUEBO_RFC_A6_EPOCA_SESION` |
 | 10 | A9 secreto de sellado · A10 IAM `QUEUE#*`/`RESET#*` | Gates propios (no bloquean congelar) |

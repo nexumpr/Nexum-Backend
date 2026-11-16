@@ -591,6 +591,9 @@ Tipos abreviados: `s` string, `b` boolean, `i` integer, `dt` date-time, `d` date
 | 30 | E068 `GET /users/me/preferences` | 200 body | `timeZone` | s | sí | no | IANA (`America/*`) | Preferencias | A8 |
 | 31 | E069 `PATCH /users/me/preferences` | request | `timeZone` | s | no | no | IANA | Preferencias | A8 |
 
+> **Ida y vuelta:** el destino exacto de cada campo escribible (request, respuesta compartida, lista
+> y detalle) está en §17.11.
+
 **Ejemplo válido (E065):**
 ```json
 {"title":"Pagar renta","dueAt":"2026-12-01T18:00:00Z","timezone":"America/Mexico_City",
@@ -606,6 +609,43 @@ E031/E042 (§17.7). **Conservados** por existir ya en el contrato: `email`, `ver
 **Correcciones de conteo:** 31 campos nuevos únicos · 31 incorporaciones (una por campo y endpoint) ·
 2 ESENCIALES ajenos a A8 (E040, E055) · 5 campos de E031/E042 fuera por 204 · 26 de E057/E058 en A3 ·
 2 de E052 en A5 · 1 de E055 en A2 · 1 de E040 en A7.
+
+## 17.11 Ida y vuelta — todo campo escribible se puede volver a leer
+
+**Regla:** ningún campo que Android pueda crear o modificar puede quedar solo en el request.
+
+**Componentes compartidos verificados en el contrato:** `RecurringPayment` (usado por E032 lista,
+E033 response, E034 detalle y E035 response) y `Reminder` (E064 lista, E065 response, E066 response).
+Añadir allí el campo lo hace visible en LIST y DETAIL sin duplicar modelos.
+
+| Campo | Request | Respuesta compartida | Lista | Detalle / PATCH | Regla |
+|---|---|---|---|---|---|
+| `type` | `RecurringCreate` | `RecurringPayment` | E032 (item) + filtro `type` | E034 / `RecurringPatch` | enum `income|expense|saving` idéntico |
+| `startDate` | `RecurringCreate` | `RecurringPayment` | E032 | E034 / `RecurringPatch` | ISO `YYYY-MM-DD` |
+| `dueDay` | `RecurringCreate` (opt) | `RecurringPayment` | E032 | E034 / `RecurringPatch` (opt) | entero 1..28, null = sin día fijo |
+| `frequency` (recordatorio) | `ReminderCreate` (opt) | `Reminder` | E064 | E066 / `ReminderPatch` (opt) | `daily|weekly|monthly`; **ausente ≠ null**: ausente = disparo único, `null` prohibido |
+| `microphone`, `notifications`, `configured` | `OnboardingPatch` | `Onboarding` | — | E018 GET | booleanos |
+| `completedAt` | — | `Onboarding` | — | E018/E019 | date-time, null si no completado |
+| `timeZone` | `PreferencesPatch` (E069) | `Preferences` | — | E068 GET | IANA |
+
+**Semántica de `frequency` (explícita):**
+
+| Estado | Representación | Efecto en el servidor |
+|---|---|---|
+| Disparo único | campo **ausente** | `dueAt` se dispara una vez y el recordatorio queda `active=false` |
+| Recurrente | `daily`/`weekly`/`monthly` | se recalcula `dueAt` tras cada disparo |
+| Pasar a único | `frequency: null` en PATCH | se cancela la recurrencia; el próximo `dueAt` es el último |
+| Editar frecuencia | valor del enum | se reprograma desde `dueAt` vigente |
+
+`null` **solo** es válido en PATCH para cancelar; en CREATE la ausencia ya significa disparo único.
+Así «ausente» y «null» no se confunden.
+
+**Campos de solo lectura (no aplican ida y vuelta):** `content`, `requiresAcceptance`,
+`deletionRequestId`, `contributionId`, `recurringPaymentId`, `totals.activeCount`, `totals.saved`,
+`unreadCount` y los filtros `status`/`type`.
+
+**Invariante automatizada:** `validar_ida_vuelta()` exige que cada campo escribible tenga al menos
+un destino de request y uno de respuesta declarados. Resultado actual: **0 problemas**.
 
 ## 17.10 Frases de aprobación
 

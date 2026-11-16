@@ -497,6 +497,56 @@ def instrumento(campo: str, eid: str) -> tuple[str, str]:
     return ("A8", "campo del prototipo sin instrumento demostrado: se propone aditivo")
 
 
+# Destino exacto de cada incorporacion A8 para garantizar ida y vuelta.
+# (req) = schema de request; (resp) = schema de respuesta. Los componentes compartidos
+# (RecurringPayment, Reminder, Onboarding, Preferences) son los que usan LIST y DETAIL,
+# de modo que anadir alli el campo lo hace consultable y editable sin duplicar modelos.
+A8_DESTINO: dict[str, list[str]] = {
+    "type": ["RecurringCreate(req)", "RecurringPayment(resp)", "RecurringPatch(req)", "E032 query"],
+    "startDate": ["RecurringCreate(req)", "RecurringPayment(resp)", "RecurringPatch(req)"],
+    "dueDay": ["RecurringCreate(req)", "RecurringPayment(resp)", "RecurringPatch(req)"],
+    "frequency_reminder": ["ReminderCreate(req)", "Reminder(resp)", "ReminderPatch(req)"],
+    "microphone": ["OnboardingPatch(req)", "Onboarding(resp)"],
+    "notifications": ["OnboardingPatch(req)", "Onboarding(resp)"],
+    "configured": ["OnboardingPatch(req)", "Onboarding(resp)"],
+    "completedAt": ["Onboarding(resp)", "OnboardingPatch(resp)"],
+    "timeZone_prefs": ["Preferences(resp E068)", "PreferencesPatch(req E069)"],
+    "content": ["PrivacyNotice(resp)"],
+    "requiresAcceptance": ["PrivacyNotice(resp)"],
+    "deletionRequestId": ["DeletionAccepted(resp)"],
+    "contributionId": ["Movement(resp)"],
+    "recurringPaymentId": ["Movement(resp)"],
+    "totals.activeCount": ["PageOfGoal.totals(resp)"],
+    "totals.saved": ["PageOfGoal.totals(resp)"],
+    "status_filter": ["E045 query"],
+    "type_filter_notif": ["E061 query"],
+    "unreadCount": ["Notification list(resp)", "Notification read(resp)"],
+}
+
+# Campos escribibles por Android: exigen presencia en request Y en respuesta.
+A8_ESCRIBIBLES = (
+    "type",
+    "startDate",
+    "dueDay",
+    "frequency_reminder",
+    "microphone",
+    "notifications",
+    "configured",
+    "timeZone_prefs",
+)
+
+
+def validar_ida_vuelta() -> list[str]:
+    problemas = []
+    for campo in A8_ESCRIBIBLES:
+        destinos = A8_DESTINO.get(campo, [])
+        if not any("(req" in d for d in destinos):
+            problemas.append(f"A8_SIN_REQUEST {campo}")
+        if not any("(resp" in d for d in destinos):
+            problemas.append(f"A8_SIN_RESPUESTA {campo}")
+    return problemas
+
+
 def cargar(ruta: Path):
     return json.loads(ruta.read_text(encoding="utf-8"))
 
@@ -585,6 +635,7 @@ def clasificar(raiz: Path) -> dict:
     componentes = (api.get("components") or {}).get("schemas") or {}
     operaciones = []
     problemas: list[str] = []
+    problemas.extend(validar_ida_vuelta())
     resumen_clases = {"ESENCIAL": 0, "COMPATIBILIDAD": 0, "OPCIONAL": 0, "OBSOLETA": 0}
 
     for fila in matriz:
