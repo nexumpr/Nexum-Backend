@@ -1598,3 +1598,15 @@
 - **Invariante:** sin sellador o sin correo el servicio devuelve ErrResetNoDisponible -> 503. Nunca se acepta trabajo que nadie podria enviar.
 - **Pruebas:** 	ests/unit/application/password_reset_test.go con 7 casos (sin componente, cuenta existente, inexistente, fallo de correo, fallo de persistencia, reintento, validacion). No se ejecutan en este host por la politica de Control de aplicaciones (binario de prueba bloqueado); go build y go vet ./... PASS. La autoridad es el CI Linux.
 - **No desplegado:** el endpoint no se registra en cmd/server hasta tener adaptador DynamoDB + sellador (A9) y correo real (SES). A9/A10/SES siguen en sus Gates de AWS.
+
+### H08-E / E005 - correccion de defectos y worker real (2026-11-16)
+
+- **A (latencia):** el envio sale de la peticion; Solicitar solo persiste. La latencia deja de depender de que la cuenta exista.
+- **B (errores):** BuscarCuenta devuelve (userID, encontrada, err). Un fallo de DynamoDB se propaga; nunca se convierte en «cuenta inexistente».
+- **C (AAD):** vuelve a ser userID|outboxID en Sellar y en Abrir; ResetTrabajo lleva UserID.
+- **D (worker real):** password_reset_worker.go con liderazgo por lease, reclamacion atomica por trabajo, backoff 30 s/2/10 min/1/6 h, maximo 6 intentos, descarte de expirados y Run(ctx) con apagado por contexto.
+- **E (cuotas):** Limitador se aplica antes de crear trabajo; si el limitador falla se responde 503 (fail-closed).
+- **F/G:** requestId UUIDv4 con crypto/rand; el handler rechaza campos desconocidos y JSON concatenado.
+- **H/I/J:** 202 solo tras persistir; misma admision con o sin cuenta; el worker documenta semantica at-least-once.
+- **Pruebas:** 12 casos. No ejecutables en este host (Control de aplicaciones); go build y go vet PASS; la autoridad es el CI Linux.
+- **Pendiente para desplegar:** adaptador DynamoDB (RESET#/QUEUE#PWRESET), sellador AES real (A9), SES y registro en cmd/server.

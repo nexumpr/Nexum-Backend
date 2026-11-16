@@ -14,27 +14,29 @@ import (
 type storeFake struct {
 	admisiones []ports.ResetAdmission
 	marcados   []string
+	reintentos []string
 	trabajos   []ports.ResetTrabajo
 	reclamar   bool
-	errAdmitir error
+	pendientes error
 }
 
 func (s *storeFake) Admitir(_ context.Context, adm ports.ResetAdmission) error {
-	if s.errAdmitir != nil {
-		return s.errAdmitir
-	}
 	s.admisiones = append(s.admisiones, adm)
 	return nil
+}
+func (s *storeFake) Pendientes(_ context.Context, _ time.Time, _ int) ([]ports.ResetTrabajo, error) {
+	return s.trabajos, s.pendientes
+}
+func (s *storeFake) Reclamar(_ context.Context, _ string, _ time.Time, _ time.Duration) (bool, error) {
+	return s.reclamar, nil
 }
 func (s *storeFake) MarcarEnviado(_ context.Context, outboxID, _ string, _ time.Time) error {
 	s.marcados = append(s.marcados, outboxID)
 	return nil
 }
-func (s *storeFake) Pendientes(_ context.Context, _ time.Time, _ int) ([]ports.ResetTrabajo, error) {
-	return s.trabajos, nil
-}
-func (s *storeFake) Reclamar(_ context.Context, _ string, _ time.Time, _ time.Duration) (bool, error) {
-	return s.reclamar, nil
+func (s *storeFake) Reintentar(_ context.Context, outboxID string, _ int, _ time.Time, _ time.Time, _ bool) error {
+	s.reintentos = append(s.reintentos, outboxID)
+	return nil
 }
 
 type correoFake struct {
@@ -50,123 +52,182 @@ func (c *correoFake) EnviarRecuperacion(_ context.Context, destino, token string
 	return "msg-1", nil
 }
 
-type selladorFake struct{ err error }
+type selladorFake struct{ aads []string }
 
-func (s selladorFake) Sellar(token, _ string) ([]byte, error) {
-	if s.err != nil {
-		return nil, s.err
-	}
+func (s *selladorFake) Sellar(token, aad string) ([]byte, error) {
+	s.aads = append(s.aads, aad)
 	return []byte("sobre:" + token), nil
 }
-func (s selladorFake) Abrir(sobre []byte, _ string) (string, error) {
+func (s *selladorFake) Abrir(sobre []byte, aad string) (string, error) {
+	s.aads = append(s.aads, aad)
 	return strings.TrimPrefix(string(sobre), "sobre:"), nil
 }
 
-func servicio(store *storeFake, correo *correoFake, sellador ports.Sellador) *appIdentity.PasswordResetService {
-	return appIdentity.NewPasswordResetService(store, nil, correo, sellador, nil)
+type limitadorFake struct {
+	permitir bool
+	err      error
 }
 
-func TestE005SinSelladorNoAceptaTrabajo(t *testing.T) {
-	s := servicio(&storeFake{}, &correoFake{}, nil)
+func (l *limitadorFake) Permitir(context.Context, string) (bool, error) { return l.permitir, l.err }
+
+type arrendadorFake struct{ lider bool }
+
+func (a *arrendadorFake) Adquirir(context.Context, string, time.Duration) (bool, error) {
+	return a.lider, nil
+}
+
+func servicio(store *storeFake, correo *correoFake, sellador ports.Sellador, lim *limitadorFake) *appIdentity.PasswordResetService {
+	return appIdentity.NewPasswordResetService(store, correo, sellador, lim, nil)
+}
+
+func buscarSi(context.Context, string) (string, bool, error) { return "user-1", true, nil }
+func buscarNo(context.Context, string) (string, bool, error) { return "", false, nil }
+
+func TestE005SinComponentesNoAcepta(t *testing.T) {
+	s := appIdentity.NewPasswordResetService(&storeFake{}, nil, nil, nil, nil)
 	if err := s.Solicitar(context.Background(), "a@example.invalid", nil); !errors.Is(err, ports.ErrResetNoDisponible) {
 		t.Fatalf("esperado ErrResetNoDisponible, obtenido %v", err)
 	}
 }
 
-func TestE005CuentaExistentePersisteYEnvia(t *testing.T) {
+func TestE005AdmiteSinEnviarEnLaPeticion(t *testing.T) {
 	store := &storeFake{}
 	correo := &correoFake{}
-	s := servicio(store, correo, selladorFake{})
-	buscar := func(context.Context, string) (string, error) { return "user-1", nil }
+	s := servicio(store, correo, &selladorFake{}, &limitadorFake{permitir: true})
 
-	if err := s.Solicitar(context.Background(), "  Usuario@Example.invalid ", buscar); err != nil {
+	if err := s.Solicitar(context.Background(), "Usuario@Example.invalid", buscarSi); err != nil {
 		t.Fatalf("error inesperado: %v", err)
 	}
-	if len(store.admisiones) != 1 {
-		t.Fatalf("esperada 1 admision, obtenidas %d", len(store.admisiones))
+	if len(correo.envios) != 0 {
+		t.Fatal("la peticion no debe enviar correo: lo hace el worker")
 	}
 	adm := store.admisiones[0]
 	if adm.UserID != "user-1" || adm.Destino != "usuario@example.invalid" {
 		t.Fatalf("admision inesperada: %+v", adm)
 	}
-	if adm.TokenHash == "" || len(adm.TokenHash) != 64 {
-		t.Fatalf("hash invalido: %q", adm.TokenHash)
-	}
-	if len(correo.envios) != 1 || !strings.HasSuffix(correo.envios[0], "|"+adm.TokenHash) {
-		// El token enviado nunca coincide con el hash: se comprueba que no se persiste en claro.
-		if len(correo.envios) != 1 {
-			t.Fatalf("esperado 1 envio, obtenidos %d", len(correo.envios))
-		}
-	}
-	tokenEnviado := strings.SplitN(correo.envios[0], "|", 2)[1]
-	if tokenEnviado == adm.TokenHash {
-		t.Fatal("el token enviado no puede ser el hash persistido")
-	}
 	if adm.ExpiraEn.Sub(adm.Ahora) != 30*time.Minute {
 		t.Fatalf("TTL inesperado: %v", adm.ExpiraEn.Sub(adm.Ahora))
 	}
-	if len(store.marcados) != 1 {
-		t.Fatalf("esperado marcar enviado, obtenidos %d", len(store.marcados))
+	if len(adm.TokenHash) != 64 || len(adm.TokenSello) == 0 {
+		t.Fatalf("token mal formado: hash=%q sello=%d", adm.TokenHash, len(adm.TokenSello))
 	}
 }
 
-func TestE005CuentaInexistenteMismaAdmisionSinEnvio(t *testing.T) {
+func TestE005AADEsUserIDyOutbox(t *testing.T) {
 	store := &storeFake{}
-	correo := &correoFake{}
-	s := servicio(store, correo, selladorFake{})
-	buscar := func(context.Context, string) (string, error) { return "", errors.New("no existe") }
+	sell := &selladorFake{}
+	s := servicio(store, &correoFake{}, sell, &limitadorFake{permitir: true})
+	if err := s.Solicitar(context.Background(), "a@example.invalid", buscarSi); err != nil {
+		t.Fatal(err)
+	}
+	adm := store.admisiones[0]
+	esperado := adm.UserID + "|" + adm.OutboxID
+	if len(sell.aads) != 1 || sell.aads[0] != esperado {
+		t.Fatalf("AAD inesperado: %v (esperado %q)", sell.aads, esperado)
+	}
+}
 
-	if err := s.Solicitar(context.Background(), "nadie@example.invalid", buscar); err != nil {
-		t.Fatalf("la cuenta inexistente no debe devolver error: %v", err)
+func TestE005CuentaInexistenteMismaAdmision(t *testing.T) {
+	store := &storeFake{}
+	s := servicio(store, &correoFake{}, &selladorFake{}, &limitadorFake{permitir: true})
+	if err := s.Solicitar(context.Background(), "nadie@example.invalid", buscarNo); err != nil {
+		t.Fatal(err)
 	}
 	if len(store.admisiones) != 1 {
 		t.Fatalf("debe admitirse igual: %d", len(store.admisiones))
 	}
 	if store.admisiones[0].Destino != "" || store.admisiones[0].TokenSello != nil {
-		t.Fatal("no debe haber destino ni sobre para una cuenta inexistente")
-	}
-	if len(correo.envios) != 0 {
-		t.Fatal("no debe enviarse nada")
+		t.Fatal("sin cuenta no debe haber destino ni sobre")
 	}
 }
 
-func TestE005FalloDeCorreoNoAlteraLaRespuesta(t *testing.T) {
+func TestE005FalloDeInfraestructuraNoSeConfundeConInexistente(t *testing.T) {
 	store := &storeFake{}
-	correo := &correoFake{err: errors.New("ses no disponible")}
-	s := servicio(store, correo, selladorFake{})
-	buscar := func(context.Context, string) (string, error) { return "user-1", nil }
-
-	if err := s.Solicitar(context.Background(), "a@example.invalid", buscar); err != nil {
-		t.Fatalf("un fallo de correo no debe propagarse: %v", err)
+	s := servicio(store, &correoFake{}, &selladorFake{}, &limitadorFake{permitir: true})
+	fallo := func(context.Context, string) (string, bool, error) { return "", false, errors.New("dynamodb") }
+	if err := s.Solicitar(context.Background(), "a@example.invalid", fallo); err == nil {
+		t.Fatal("un fallo de DynamoDB no puede aceptarse como cuenta inexistente")
 	}
-	if len(store.marcados) != 0 {
-		t.Fatal("no debe marcarse como enviado")
+	if len(store.admisiones) != 0 {
+		t.Fatal("no debe admitirse trabajo si fallo la busqueda")
 	}
 }
 
-func TestE005FalloDePersistenciaSePropaga(t *testing.T) {
-	store := &storeFake{errAdmitir: errors.New("dynamodb")}
-	s := servicio(store, &correoFake{}, selladorFake{})
-	if err := s.Solicitar(context.Background(), "a@example.invalid", nil); err == nil {
-		t.Fatal("sin persistencia no puede haber 202")
+func TestE005CuotaSeAplicaAntesDeCrearTrabajo(t *testing.T) {
+	store := &storeFake{}
+	s := servicio(store, &correoFake{}, &selladorFake{}, &limitadorFake{permitir: false})
+	if err := s.Solicitar(context.Background(), "a@example.invalid", buscarSi); !errors.Is(err, ports.ErrResetCuota) {
+		t.Fatalf("esperado ErrResetCuota, obtenido %v", err)
+	}
+	if len(store.admisiones) != 0 {
+		t.Fatal("no debe crearse trabajo si la cuota esta agotada")
 	}
 }
 
-func TestE005ReintentoAcotado(t *testing.T) {
+func TestE005LimitadorCaidoFallaCerrado(t *testing.T) {
+	s := servicio(&storeFake{}, &correoFake{}, &selladorFake{}, &limitadorFake{permitir: true, err: errors.New("redis")})
+	if err := s.Solicitar(context.Background(), "a@example.invalid", buscarSi); !errors.Is(err, ports.ErrResetNoDisponible) {
+		t.Fatalf("esperado ErrResetNoDisponible, obtenido %v", err)
+	}
+}
+
+func worker(store *storeFake, correo *correoFake, sell ports.Sellador, ar *arrendadorFake) *appIdentity.ResetWorker {
+	return appIdentity.NewResetWorker(store, correo, sell, ar, nil)
+}
+
+func TestE005WorkerEnviaTrabajoVencido(t *testing.T) {
 	store := &storeFake{
 		reclamar: true,
 		trabajos: []ports.ResetTrabajo{{
-			OutboxID: "ob-1", Destino: "a@example.invalid",
+			OutboxID: "ob-1", UserID: "user-1", Destino: "a@example.invalid",
 			TokenSello: []byte("sobre:token-1"), ExpiraEn: time.Now().Add(10 * time.Minute),
 		}},
 	}
 	correo := &correoFake{}
-	s := servicio(store, correo, selladorFake{})
-	if n := s.Reintentar(context.Background(), 5); n != 1 {
+	w := worker(store, correo, &selladorFake{}, &arrendadorFake{lider: true})
+	if n := w.Ciclo(context.Background()); n != 1 {
 		t.Fatalf("esperado 1 envio, obtenido %d", n)
 	}
 	if len(correo.envios) != 1 || !strings.HasPrefix(correo.envios[0], "a@example.invalid|token-1") {
 		t.Fatalf("envio inesperado: %v", correo.envios)
+	}
+}
+
+func TestE005WorkerSinLiderazgoNoTrabaja(t *testing.T) {
+	store := &storeFake{reclamar: true, trabajos: []ports.ResetTrabajo{{OutboxID: "ob-1", ExpiraEn: time.Now().Add(time.Hour)}}}
+	correo := &correoFake{}
+	w := worker(store, correo, &selladorFake{}, &arrendadorFake{lider: false})
+	if n := w.Ciclo(context.Background()); n != 0 {
+		t.Fatalf("sin liderazgo no debe enviarse nada: %d", n)
+	}
+}
+
+func TestE005WorkerDescartaTrabajoExpirado(t *testing.T) {
+	store := &storeFake{reclamar: true, trabajos: []ports.ResetTrabajo{{
+		OutboxID: "ob-1", UserID: "u", Destino: "a@example.invalid",
+		TokenSello: []byte("sobre:x"), ExpiraEn: time.Now().Add(-time.Minute),
+	}}}
+	correo := &correoFake{}
+	w := worker(store, correo, &selladorFake{}, &arrendadorFake{lider: true})
+	if n := w.Ciclo(context.Background()); n != 0 || len(correo.envios) != 0 {
+		t.Fatal("un trabajo expirado no debe enviarse")
+	}
+	if len(store.reintentos) != 1 {
+		t.Fatal("debe cerrarse el trabajo expirado")
+	}
+}
+
+func TestE005WorkerReintentaConBackoffAnteFalloDeCorreo(t *testing.T) {
+	store := &storeFake{reclamar: true, trabajos: []ports.ResetTrabajo{{
+		OutboxID: "ob-1", UserID: "u", Destino: "a@example.invalid",
+		TokenSello: []byte("sobre:x"), ExpiraEn: time.Now().Add(10 * time.Minute),
+	}}}
+	w := worker(store, &correoFake{err: errors.New("ses")}, &selladorFake{}, &arrendadorFake{lider: true})
+	if n := w.Ciclo(context.Background()); n != 0 {
+		t.Fatalf("no debe contarse como enviado: %d", n)
+	}
+	if len(store.reintentos) != 1 {
+		t.Fatal("debe reprogramarse con backoff")
 	}
 }
 

@@ -62,9 +62,17 @@ func (h *PasswordForgotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		writeResetError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Solicitud invalida.")
 		return
 	}
+	// Rechaza JSON adicional tras el objeto (p. ej. dos cuerpos concatenados).
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		writeResetError(w, http.StatusBadRequest, "INVALID_JSON", "Solicitud invalida.")
+		return
+	}
 
 	if err := h.servicio.Solicitar(r.Context(), req.Email, h.buscar); err != nil {
 		switch {
+		case errors.Is(err, ports.ErrResetCuota):
+			w.Header().Set("Retry-After", "900")
+			writeResetError(w, http.StatusTooManyRequests, "RATE_LIMITED", "Demasiadas solicitudes.")
 		case errors.Is(err, ports.ErrResetNoDisponible):
 			writeResetError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "Servicio no disponible.")
 		default:

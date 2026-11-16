@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -15,14 +16,13 @@ import (
 
 // PasswordResetService implementa la solicitud de recuperacion (E005).
 //
-// Contrato (RFC-016 17.2): el 202 implica que la solicitud quedo persistida y que
-// existe un camino real de envio. Sin sellador o sin correo configurado se devuelve
-// ErrResetNoDisponible (503): nunca se acepta trabajo que nadie podria entregar.
+// El 202 solo se emite cuando el trabajo quedo persistido. El envio NO se hace en la
+// peticion: lo realiza el worker, de modo que la latencia no revela si la cuenta existe.
 type PasswordResetService struct {
 	store     ports.ResetStore
-	tokens    ports.ResetTokenStore
 	correo    ports.Correo
 	sellador  ports.Sellador
+	limitador ports.Limitador
 	reloj     func() time.Time
 	ttl       time.Duration
 	logger    *slog.Logger
@@ -33,16 +33,16 @@ type PasswordResetService struct {
 // servicio no disponible en lugar de degradar a un comportamiento ficticio.
 func NewPasswordResetService(
 	store ports.ResetStore,
-	tokens ports.ResetTokenStore,
 	correo ports.Correo,
 	sellador ports.Sellador,
+	limitador ports.Limitador,
 	logger *slog.Logger,
 ) *PasswordResetService {
 	return &PasswordResetService{
 		store:     store,
-		tokens:    tokens,
 		correo:    correo,
 		sellador:  sellador,
+		limitador: limitador,
 		reloj:     time.Now,
 		ttl:       30 * time.Minute,
 		logger:    logger,
@@ -52,22 +52,42 @@ func NewPasswordResetService(
 
 // Disponible indica si el endpoint puede operar de verdad.
 func (s *PasswordResetService) Disponible() bool {
-	return s != nil && s.store != nil && s.correo != nil && s.sellador != nil
+	return s != nil && s.store != nil && s.correo != nil && s.sellador != nil && s.limitador != nil
 }
 
-// BuscarCuenta resuelve el usuario a partir del correo. Se inyecta para no acoplar
-// el flujo al repositorio de identidad y poder probarlo con dobles.
-type BuscarCuenta func(ctx context.Context, email string) (userID string, err error)
-
-// Solicitar ejecuta la admision y el intento de envio.
+// BuscarCuenta resuelve el usuario a partir del correo.
 //
-// Devuelve nil (202) cuando el trabajo quedo persistido, exista o no la cuenta.
-// Devuelve ErrResetNoDisponible (503) cuando falta un componente real.
+// Devuelve encontrada=false solo cuando la cuenta no existe. Un fallo de DynamoDB
+// debe devolverse como error: nunca se convierte en "cuenta inexistente".
+type BuscarCuenta func(ctx context.Context, email string) (userID string, encontrada bool, err error)
+
+// Solicitar ejecuta la admision del trabajo. No envia correo.
 func (s *PasswordResetService) Solicitar(ctx context.Context, email string, buscar BuscarCuenta) error {
 	if !s.Disponible() {
 		return ports.ErrResetNoDisponible
 	}
 	email = strings.ToLower(strings.TrimSpace(email))
+
+	permitido, err := s.limitador.Permitir(ctx, "pwreset:"+email)
+	if err != nil {
+		// Fail-closed: sin cuota fiable no se crea trabajo.
+		return ports.ErrResetNoDisponible
+	}
+	if !permitido {
+		return ports.ErrResetCuota
+	}
+
+	userID, encontrada, err := "", false, error(nil)
+	if buscar != nil {
+		userID, encontrada, err = buscar(ctx, email)
+		if err != nil {
+			// Fallo real de infraestructura: no se acepta la solicitud como si no existiera.
+			return err
+		}
+	}
+	if !encontrada {
+		userID = ""
+	}
 
 	tokenBytes, err := s.generador(32)
 	if err != nil {
@@ -76,21 +96,14 @@ func (s *PasswordResetService) Solicitar(ctx context.Context, email string, busc
 	token := base64.RawURLEncoding.EncodeToString(tokenBytes)
 	suma := sha256.Sum256([]byte(token))
 	hash := hex.EncodeToString(suma[:])
-
 	ahora := s.reloj()
 	outboxID := hash[:16]
 
-	userID := ""
 	destino := ""
-	if buscar != nil {
-		if id, err := buscar(ctx, email); err == nil {
-			userID, destino = id, email
-		}
-	}
-
 	var sobre []byte
-	if destino != "" {
-		if sobre, err = s.sellador.Sellar(token, outboxID); err != nil {
+	if encontrada {
+		destino = email
+		if sobre, err = s.sellador.Sellar(token, userID+"|"+outboxID); err != nil {
 			return err
 		}
 	}
@@ -104,64 +117,18 @@ func (s *PasswordResetService) Solicitar(ctx context.Context, email string, busc
 		OutboxID:   outboxID,
 		Ahora:      ahora,
 	}
-	// Mismas dos acciones con o sin cuenta: no hay condicion que falle solo
-	// para correos inexistentes.
+	// Mismas dos acciones con o sin cuenta: ninguna condicion falla solo para
+	// correos inexistentes.
 	if err := s.store.Admitir(ctx, adm); err != nil {
 		return err
 	}
-
-	if destino == "" {
-		return nil
-	}
-	if _, err := s.correo.EnviarRecuperacion(ctx, destino, token, adm.ExpiraEn); err != nil {
-		// El trabajo queda persistido; se reintentara. No se altera la respuesta
-		// para no filtrar el estado del correo.
-		if s.logger != nil {
-			s.logger.WarnContext(ctx, "envio de recuperacion diferido", "motivo", "correo_no_aceptado")
-		}
-		return nil
-	}
-	if err := s.store.MarcarEnviado(ctx, outboxID, "", ahora); err != nil && s.logger != nil {
-		s.logger.WarnContext(ctx, "no se pudo marcar el envio", "motivo", "persistencia")
+	if s.logger != nil {
+		s.logger.InfoContext(ctx, "solicitud de recuperacion admitida", "outbox", outboxID)
 	}
 	return nil
 }
 
-// Reintentar procesa hasta `limite` trabajos vencidos. Barrido acotado por peticion
-// mientras no exista el worker dedicado (RFC-016 17.2).
-func (s *PasswordResetService) Reintentar(ctx context.Context, limite int) int {
-	if !s.Disponible() || limite <= 0 {
-		return 0
-	}
-	ahora := s.reloj()
-	trabajos, err := s.store.Pendientes(ctx, ahora, limite)
-	if err != nil {
-		return 0
-	}
-	enviados := 0
-	for _, t := range trabajos {
-		if !t.ExpiraEn.After(ahora) || len(t.TokenSello) == 0 {
-			continue
-		}
-		ok, err := s.store.Reclamar(ctx, t.OutboxID, ahora, 30*time.Second)
-		if err != nil || !ok {
-			continue
-		}
-		token, err := s.sellador.Abrir(t.TokenSello, t.OutboxID)
-		if err != nil {
-			continue
-		}
-		if _, err := s.correo.EnviarRecuperacion(ctx, t.Destino, token, t.ExpiraEn); err != nil {
-			continue
-		}
-		if err := s.store.MarcarEnviado(ctx, t.OutboxID, "", ahora); err == nil {
-			enviados++
-		}
-	}
-	return enviados
-}
-
-// ValidarEmail aplica la validacion minima del contrato (formato y longitud).
+// ValidarEmail aplica la validacion del contrato (formato y longitud).
 func ValidarEmail(email string) bool {
 	email = strings.TrimSpace(email)
 	if len(email) < 3 || len(email) > 254 {
@@ -169,4 +136,15 @@ func ValidarEmail(email string) bool {
 	}
 	at := strings.LastIndex(email, "@")
 	return at > 0 && at < len(email)-1 && strings.Contains(email[at+1:], ".")
+}
+
+// ErrResetNoDisponible se reexporta para que la capa de transporte no dependa de ports.
+var ErrResetNoDisponible = ports.ErrResetNoDisponible
+
+// ErrResetCuota se reexporta por la misma razon.
+var ErrResetCuota = ports.ErrResetCuota
+
+// EsConflicto indica si el error corresponde a un token ya consumido.
+func EsConflicto(err error) bool {
+	return errors.Is(err, ports.ErrResetTokenInvalido)
 }
