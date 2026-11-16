@@ -288,6 +288,184 @@ def decidir(campo: str, eid: str) -> tuple[str, str, str]:
     )
 
 
+# Depuracion de A8: cada campo de compatibilidad recibe un instrumento concreto.
+# A2/A3/A5/A7 = enmienda ya definida; A8 = aditivo nuevo; CONSERVAR = el contrato ya lo cubre;
+# CALCULAR = formula con fuente exacta; DESCARTAR = no requerido por la pantalla.
+DEPURACION: dict[str, tuple[str, str]] = {
+    "reset": ("DESCARTAR", "diagnostico redundante con status/requestId"),
+    "revokedSessions": ("DESCARTAR", "efecto interno de revocacion; no lo consume la pantalla"),
+    "revokedOtherSessions": ("DESCARTAR", "diagnostico interno"),
+    "changedAt": ("CALCULAR", "= updatedAt del propio recurso"),
+    "reversedAt": ("CALCULAR", "= updatedAt de la aportacion revertida"),
+    "deletionRequestId": ("A8", "el cliente necesita referenciar el borrado solicitado"),
+    "content": ("A8", "texto del aviso de privacidad que solo el backend puede servir"),
+    "requiresAcceptance": ("A8", "regla de aceptacion decidida por el servidor"),
+    "microphone": ("A8", "estado de onboarding persistido por el servidor"),
+    "notifications": ("A8", "estado de onboarding persistido por el servidor"),
+    "configured": ("A8", "estado de onboarding persistido por el servidor"),
+    "completedAt": ("A8", "sello del onboarding completado"),
+    "format": ("DESCARTAR", "el servidor aplica su formato por defecto"),
+    "include": ("DESCARTAR", "el servidor aplica el conjunto por defecto"),
+    "includeInactive": ("DESCARTAR", "el catalogo devuelve activos por defecto"),
+    "context": ("DESCARTAR", "el servidor aplica el contexto por defecto"),
+    "limit": ("DESCARTAR", "el servidor aplica limite y devuelve cursor"),
+    "cursor": ("DESCARTAR", "la paginacion por cursor ya esta definida"),
+    "goalId": ("DESCARTAR", "es path param o queda en allocations[]"),
+    "unreadOnly": ("DESCARTAR", "filtro de cliente sobre el listado"),
+    "activeOnly": ("DESCARTAR", "filtro de cliente sobre el listado"),
+    "before": ("DESCARTAR", "el marcado masivo aplica a todas las no leidas"),
+    "type": ("DESCARTAR", "filtro de cliente; el listado devuelve todo"),
+    "locale": ("DESCARTAR", "el contenido se sirve en el idioma por defecto del producto"),
+    "currency": ("DESCARTAR", "MXN fijo por contrato; no hay multimoneda"),
+    "confidence": ("DESCARTAR", "la inferencia es determinista; el valor no aporta"),
+    "reason": ("DESCARTAR", "motivo de borrado opcional sin uso funcional en la pantalla"),
+    "appVersion": ("DESCARTAR", "solo diagnostico de flota"),
+    "active": ("CALCULAR", "= estado del registro push"),
+    "platform": ("A8", "el registro push necesita la plataforma del dispositivo"),
+    "unreadCount": ("A8", "total no leido no calculable con paginacion"),
+    "updatedCount": ("A8", "cuantas notificaciones se marcaron; solo el servidor lo sabe"),
+    "timeZone": ("A8", "zona horaria para recordatorios y preferencias"),
+    "frequency": ("A8", "recurrencia del recordatorio o del recurrente"),
+    "appearance": ("A8", "preferencia de tema persistida por el servidor"),
+    "recurringPaymentId": ("A8", "referencia para navegar al recurrente"),
+    "contributionId": ("A8", "referencia para navegar a la aportacion"),
+    "affectedGoalId": ("A8", "efecto verificable del borrado sobre una meta"),
+    "reversedContributionId": ("A8", "efecto verificable del borrado sobre una aportacion"),
+    "releasedAmount": ("A8", "importe liberado por el borrado de meta"),
+    "reversedAllocations": ("A8", "aportaciones revertidas por el borrado"),
+    "affectedPeriods": ("A8", "periodos contables afectados por la reversion"),
+    "accepted": ("CONSERVAR", "= status \"accepted\""),
+    "accountStatus": ("CONSERVAR", "= status del perfil (E012)"),
+    "emailVerified": ("CONSERVAR", "E012 ya lo expone"),
+    "name": ("CONSERVAR", "= displayName"),
+    "concept": ("CONSERVAR", "= description / name del recurrente"),
+    "category": ("CONSERVAR", "= categoryId"),
+    "target": ("A7", "= targetAmount; expuesto con A7"),
+    "saved": ("CONSERVAR", "= savedAmount"),
+    "openingSaved": ("A7", "= initialSavedAmount; expuesto con A7"),
+    "totalAmount": ("CONSERVAR", "= amount"),
+    "allocatedAmount": ("CALCULAR", "= suma de allocations[].amount"),
+    "unallocatedAmount": ("CONSERVAR", "= remaining (E043)"),
+    "totalRequested": ("CONSERVAR", "= amount"),
+    "totalApplied": ("CALCULAR", "= suma de allocations[].amount aceptadas"),
+    "unallocated": ("CONSERVAR", "= remaining"),
+    "contribution": ("CONSERVAR", "= objeto raiz de E044"),
+    "movement": ("CONSERVAR", "= objeto raiz de E037"),
+    "reversedAmount": ("CONSERVAR", "= amount de la aportacion revertida"),
+    "deletedMovementId": ("CONSERVAR", "= id de la ruta de E031"),
+    "deletedGoalId": ("CONSERVAR", "= id de la ruta de E042"),
+    "incomeMonthly": ("CALCULAR", "derivado de E024 en centavos"),
+    "recurringFixedMonthly": ("CALCULAR", "E032 x factores de E023"),
+    "oneTimeFixedMonthly": ("CALCULAR", "E032 x factores de E023"),
+    "fixedMonthly": ("CALCULAR", "= recurringFixedMonthly + oneTimeFixedMonthly"),
+    "antMonthly": ("CALCULAR", "E032 x factores de E023"),
+    "reservedMonthly": ("CALCULAR", "derivado de E038/E044"),
+    "availableEstimated": ("CALCULAR", "= income - fixed - ant - reserved"),
+    "antExpenseCount": ("CALCULAR", "conteo sobre E027 en la ventana"),
+    "count": ("CALCULAR", "longitud de la ventana"),
+    "afternoonWindowStart": ("DESCARTAR", "constante de configuracion interna"),
+    "afternoonWindowEndExclusive": ("DESCARTAR", "constante de configuracion interna"),
+    "allCategoriesTotal": ("CALCULAR", "= suma de categories[].total"),
+    "lastSavingDate": ("CALCULAR", "derivado de E027"),
+    "nextMilestoneDays": ("CALCULAR", "tabla de hitos de E056"),
+    "contributedNet": ("CALCULAR", "= savedAmount - initialSavedAmount"),
+    "monthlyEquivalent": ("CALCULAR", "= amount x factor de E023"),
+    "summary": ("CALCULAR", "bloque derivado de E026 (mismos importes)"),
+    "calculatedAt": ("CALCULAR", "sello temporal del calculo"),
+    "isNegative": ("CALCULAR", "= availableEstimated < 0"),
+    "period": ("CALCULAR", "el periodo ya se conoce por la peticion"),
+    "title": ("DESCARTAR", "texto de presentacion"),
+    "message": ("DESCARTAR", "texto de presentacion"),
+    "body": ("DESCARTAR", "texto de presentacion"),
+    "verifiedAt": ("CALCULAR", "= updatedAt del perfil"),
+    "acceptedAt": ("CALCULAR", "= updatedAt del consentimiento"),
+    "startDate": ("A8", "inicio de la serie recurrente no expuesto por el contrato"),
+    "dueDay": ("A8", "dia de vencimiento no expuesto por el contrato"),
+    "remaining": ("CALCULAR", "= targetAmount - savedAmount"),
+    "percentage": ("CALCULAR", "= savedAmount / targetAmount"),
+    "completed": ("CALCULAR", "= savedAmount >= targetAmount"),
+    "emoji": ("DESCARTAR", "adorno de presentacion; no lo produce el backend"),
+    "totals": ("CALCULAR", "agregado de la propia lista"),
+    "activeCount": ("CALCULAR", "= items.filter(status=active).length"),
+    "shareOfTotal": ("CALCULAR", "= total / sum(categories.total)"),
+    "relativePercentage": ("CALCULAR", "= total / max(categories.total)"),
+    "total": ("CALCULAR", "suma de los movimientos de la categoria"),
+    "windowDays": ("CALCULAR", "la ventana la fija la peticion"),
+    "from": ("CALCULAR", "extremo de la ventana solicitada"),
+    "to": ("CALCULAR", "extremo de la ventana solicitada"),
+    "endDate": ("CALCULAR", "eje de la ventana solicitada"),
+    "asOf": ("CALCULAR", "instante de calculo"),
+    "checkedAt": ("CALCULAR", "instante del chequeo de salud"),
+    "readAt": ("CALCULAR", "= updatedAt de la notificacion"),
+    "nextTriggerAt": ("CALCULAR", "= triggerAt + frecuencia"),
+    "triggerAt": ("A8", "instante del recordatorio: sin el no se puede programar"),
+    "createdAt": ("CALCULAR", "sello de creacion expuesto por el recurso"),
+    "nextDueDate": ("CALCULAR", "= ultima fecha + frecuencia"),
+    "lastPaidAt": ("CALCULAR", "ultimo movimiento asociado al recurrente"),
+    "topic": ("DESCARTAR", "filtro de cliente sobre el catalogo de tips"),
+    "financialSummary": ("CALCULAR", "bloque derivado de E026"),
+    "topCategories": ("CALCULAR", "agregado de E053"),
+    "recurringPreview": ("CALCULAR", "composicion desde E032"),
+    "progressPercentage": ("CALCULAR", "= dias / hito siguiente"),
+    "pigMessage": ("DESCARTAR", "texto de presentacion"),
+    "status": ("CONSERVAR", "el contrato ya expone status del recurso"),
+}
+
+# Excepciones por endpoint cuando el mismo nombre tiene otro papel.
+DEPURACION_EID: dict[str, tuple[str, str]] = {
+    "E033:type": ("A8", "sin tipo, el recurrente no puede clasificarse"),
+    "E035:type": ("A8", "permite cambiar el tipo del recurrente"),
+    "E033:frequency": ("A8", "frecuencia con la que se crea el recurrente"),
+    "E035:frequency": ("A8", "permite cambiar la frecuencia"),
+    "E033:dueDay": ("A8", "dia de vencimiento del recurrente"),
+    "E035:dueDay": ("A8", "permite cambiar el dia de vencimiento"),
+    "E033:startDate": ("A8", "inicio de la serie recurrente"),
+    "E035:startDate": ("A8", "permite cambiar el inicio"),
+    "E037:occurrenceDate": ("CONSERVAR", "= paidAt del request"),
+    "E057:timeZone": ("A3", "zona horaria de preferencias (A3)"),
+    "E058:timeZone": ("A3", "zona horaria de preferencias (A3)"),
+    "E059:timeZone": ("DESCARTAR", "el servidor usa la zona del perfil"),
+    "E068:timeZone": ("A8", "el perfil no declara zona horaria"),
+    "E069:timeZone": ("A8", "el perfil no declara zona horaria"),
+    "E070:locale": ("DESCARTAR", "FAQ en el idioma por defecto"),
+    "E071:locale": ("DESCARTAR", "tips en el idioma por defecto"),
+    "E015:locale": ("DESCARTAR", "aviso en el idioma por defecto"),
+    "E005:locale": ("DESCARTAR", "correo en el idioma por defecto"),
+    "E010:locale": ("DESCARTAR", "correo en el idioma por defecto"),
+    "E028:frequency": ("CALCULAR", "propiedad del recurrente (E034)"),
+    "E029:frequency": ("CALCULAR", "propiedad del recurrente (E034)"),
+    "E075:frequency": ("DESCARTAR", "la intencion no crea recurrentes"),
+    "E028:source": ("CALCULAR", "derivable de las referencias de E029"),
+    "E006:resetToken": ("CONSERVAR", "se conserva `token`"),
+    "E075:transcript": ("CONSERVAR", "se conserva `text`"),
+}
+
+
+def instrumento(campo: str, eid: str) -> tuple[str, str]:
+    if campo == "http_success":
+        return ("A4", "decision HTTP registrada en A4")
+    if campo == "persistencia":
+        return ("A1", "enmienda documental de persistencia A1")
+    limpio = campo.replace("[]", "")
+    raiz = limpio.split(".")[0]
+    base = limpio.split(".")[-1]
+    if eid in ("E057", "E058"):
+        return ("A3", "contrato de preferencias de notificacion (A3)")
+    if eid == "E052" and base in ("enoughData", "minimumSamples"):
+        return ("A5", "suficiencia de datos en insights (A5)")
+    if eid == "E055" and raiz == "recommendations":
+        return ("A2", "el contenedor items[] se conserva (A2)")
+    if f"{eid}:{raiz}" in DEPURACION_EID:
+        return DEPURACION_EID[f"{eid}:{raiz}"]
+    if f"{eid}:{base}" in DEPURACION_EID:
+        return DEPURACION_EID[f"{eid}:{base}"]
+    if raiz in DEPURACION:
+        return DEPURACION[raiz]
+    if base in DEPURACION:
+        return DEPURACION[base]
+    return ("A8", "campo del prototipo sin instrumento demostrado: se propone aditivo")
+
+
 def cargar(ruta: Path):
     return json.loads(ruta.read_text(encoding="utf-8"))
 
@@ -389,16 +567,19 @@ def clasificar(raiz: Path) -> dict:
 
         def agregar(campo, tipo, clase, necesidad, decision, motivo):
             resumen_clases[clase] += 1
-            diferencias.append(
-                {
-                    "campo": campo,
-                    "tipo": tipo,
-                    "clase": clase,
-                    "necesidad_android": necesidad,
-                    "decision": decision,
-                    "motivo": motivo,
-                }
-            )
+            entrada = {
+                "campo": campo,
+                "tipo": tipo,
+                "clase": clase,
+                "necesidad_android": necesidad,
+                "decision": decision,
+                "motivo": motivo,
+            }
+            if clase == "COMPATIBILIDAD":
+                instr, motivo_instr = instrumento(campo, eid)
+                entrada["instrumento"] = instr
+                entrada["motivo_instrumento"] = motivo_instr
+            diferencias.append(entrada)
 
         # 1) Codigo de exito.
         if str(fila.get("pdf_success")) != str(fila.get("sdd_success")):
@@ -542,6 +723,18 @@ def clasificar(raiz: Path) -> dict:
             },
             "operaciones_con_pendientes": sum(
                 1 for o in operaciones if any(d["decision"] == "PENDIENTE_DE_DECISION" for d in o["diferencias"])
+            ),
+            "por_instrumento": {
+                k: sum(1 for o in operaciones for d in o["diferencias"] if d.get("instrumento") == k)
+                for k in ("A2", "A3", "A5", "A7", "A8", "A1", "CONSERVAR", "CALCULAR", "DESCARTAR")
+            },
+            "a8": sorted(
+                {
+                    f"{o['id']}:{d['campo']}"
+                    for o in operaciones
+                    for d in o["diferencias"]
+                    if d.get("instrumento") == "A8"
+                }
             ),
         },
         "operaciones": operaciones,

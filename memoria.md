@@ -1532,3 +1532,11 @@
 - **E006 corregido:** `GetItem` del token y transaccion de **2 acciones sobre 2 items**; condicion incluye `expiresAt > :now`; **A6** con diseno completo (claim `epo`, `sessionEpoch` en sesion, comparacion en middleware, coste de una lectura extra o cache con ventana declarada). **Se descarta la variante de 30 sesiones**: la revocacion es total y sin limite.
 - **Enmiendas:** A1, A2, A3, A4, A5, A7, **A8 (199 aditivos)**, **A9 (secreto)**, **A10 (IAM)**, A6 (codigo). Ninguna aplicada. `CONTRATOS_E005_E075_FROZEN=NOT_VERIFIED`; `AWR_READY=NOT_READY`. E001-E004, AWS y `opencode.json` intactos.
 
+### H08 - Pre-E005: revision 5 (A8 depurada) — 2026-11-16
+
+- **A8 depurada de 199 a 37 campos** tras revisar cada diferencia de compatibilidad contra el contrato de **su** operacion (no con equivalencias globales). Instrumentos: A8=48 entradas/37 campos, A3=26, A5=2, A4=5, CONSERVAR=14, CALCULAR=69, DESCARTAR=35.
+- **A8 real (37):** onboarding E018/E019 (4 campos x2), recordatorios E065/E066 (`frequency`, `timeZone`, `triggerAt`), recurrentes E033/E034/E035 (`type`, `startDate`, `dueDay`), referencias E029 (2), efectos E031 (2), efectos E042 (3), contadores `unreadCount`/`updatedCount`, `deletionRequestId`, `content`, `requiresAcceptance`, `platform`. Nada de esto es calculable por el cliente.
+- **Descartados explicitamente (no se inventan campos):** `emoji`, `pigMessage`, `title`, `message`, `body`, `confidence`, `reset`, `revokedSessions`, `revokedOtherSessions`, `reason`, `appVersion`, todos los filtros de cliente y las constantes internas de ventana. 69 campos quedan documentados como **calculables** con formula y fuente exactas.
+- **Sin contradicciones normativas:** RFC-016 v4 §17.6 sustituye la cifra anterior; `CLASIFICACION_E005_E075.json` lleva `instrumento` y `motivo_instrumento` por diferencia.
+- **Estado:** 812 diferencias, 0 sin clasificar, 0 pendientes; ESENCIAL=9. `CONTRATOS_E005_E075_FROZEN=NOT_VERIFIED` (A1-A5/A7/A8 sin aplicar). `AWS_READY=NOT_READY`. Nada implementado; E001-E004 intactos.
+

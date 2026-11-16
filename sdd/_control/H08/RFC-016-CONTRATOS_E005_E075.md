@@ -495,10 +495,43 @@ refresh posterior (rechazado); logout posterior (idempotente).
 | A4 | 5 decisiones HTTP (registro) | `DECISIONES_CONTRATO_*.json` | Sí |
 | A5 | E052 `enoughData`+`minimumSamples` | OpenAPI + specs E052 | Sí |
 | A7 | E039/E040 `openingSaved` | OpenAPI + specs | Sí |
-| **A8** | **aditivos E005–E075 (199 campos)** | OpenAPI + specs afectadas | Sí |
+| **A8** | **37 campos depurados** (§17.6) | OpenAPI + specs afectadas | Sí |
 | **A9** | **secreto `PASSWORD_RESET_SEAL_KEY_B64`** | bundle RFC-004 | No (despliegue E005) |
 | **A10** | **IAM `QUEUE#*` y `RESET#*`** | módulo IAM (I-060) | No (despliegue E005) |
 | A6 | época de revocación (código) | E002/E003/middleware/E006 | No (implementación E006) |
+
+### 17.6 A8 depurada — 199 candidatos revisados, 37 campos reales
+
+Las 199 diferencias de compatibilidad **no** se convirtieron en 199 campos: se revisó cada una
+contra el contrato de **su** operación y recibió un instrumento.
+
+| Instrumento | N | Significado |
+|---|---|---|
+| **A8** | **48 entradas / 37 campos** | dato que solo el servidor tiene y la pantalla necesita |
+| **A3** | 26 | preferencias E057/E058 ya cubiertas |
+| **A5** | 2 | suficiencia de datos E052 |
+| **A4** | 5 | decisiones HTTP (conservar) |
+| **CONSERVAR** | 14 | el contrato ya lo expone con otro nombre |
+| **CALCULAR** | 69 | fórmula exacta con datos del propio contrato |
+| **DESCARTAR** | 35 | filtro de cliente, diagnóstico o adorno |
+
+**Los 37 campos de A8** (agrupados):
+
+| Grupo | Campos | Por qué no es calculable |
+|---|---|---|
+| Onboarding E018/E019 | `microphone`, `notifications`, `configured`, `completedAt` (×2) | el servidor persiste el estado; el cliente no puede inferirlo |
+| Recordatorios E065/E066 | `frequency`, `timeZone`, `triggerAt` (×2) | sin ellos no se puede programar el disparo |
+| Recurrentes E033/E034/E035 | `type`, `startDate`, `dueDay` | definen la serie; no están en el contrato |
+| Referencias E029 | `recurringPaymentId`, `contributionId` | enlazan el movimiento con su origen |
+| Efectos E031 | `affectedGoalId`, `reversedContributionId` | verifican el efecto del borrado |
+| Efectos E042 | `releasedAmount`, `reversedAllocations`, `affectedPeriods` | verifican la reversión de la meta |
+| Contadores | `unreadCount` (E061/E062), `updatedCount` (E063) | con paginación el cliente no puede contarlos |
+| Varios | `deletionRequestId`, `content`, `requiresAcceptance`, `platform` | datos exclusivos del servidor |
+
+**Descartados explícitamente** (no se inventan): `emoji`, `pigMessage`, `title`, `message`, `body`,
+`confidence`, `reset`, `revokedSessions`, `revokedOtherSessions`, `reason`, `appVersion`,
+filtros (`type`, `limit`, `cursor`, `locale`, `unreadOnly`, `activeOnly`, `before`, `include`,
+`format`, `context`, `includeInactive`, `topic`) y constantes internas de ventana.
 
 ## 17.5 Estado de los contratos
 

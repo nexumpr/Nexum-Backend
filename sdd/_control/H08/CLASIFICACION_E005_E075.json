@@ -24,7 +24,57 @@
       "POSPUESTA_CONFIRMADA": 597,
       "PENDIENTE_DE_DECISION": 0
     },
-    "operaciones_con_pendientes": 0
+    "operaciones_con_pendientes": 0,
+    "por_instrumento": {
+      "A2": 0,
+      "A3": 26,
+      "A5": 2,
+      "A7": 0,
+      "A8": 48,
+      "A1": 0,
+      "CONSERVAR": 14,
+      "CALCULAR": 69,
+      "DESCARTAR": 35
+    },
+    "a8": [
+      "E014:deletionRequestId",
+      "E015:content",
+      "E015:requiresAcceptance",
+      "E018:completedAt",
+      "E018:configured",
+      "E018:microphone",
+      "E018:notifications",
+      "E019:completedAt",
+      "E019:configured",
+      "E019:microphone",
+      "E019:notifications",
+      "E029:contributionId",
+      "E029:recurringPaymentId",
+      "E031:affectedGoalId",
+      "E031:reversedContributionId",
+      "E033:dueDay",
+      "E033:startDate",
+      "E033:type",
+      "E034:startDate",
+      "E035:dueDay",
+      "E035:startDate",
+      "E035:type",
+      "E042:affectedPeriods[]",
+      "E042:releasedAmount",
+      "E042:reversedAllocations",
+      "E059:platform",
+      "E061:unreadCount",
+      "E062:unreadCount",
+      "E063:updatedCount",
+      "E065:frequency",
+      "E065:timeZone",
+      "E065:triggerAt",
+      "E066:frequency",
+      "E066:timeZone",
+      "E066:triggerAt",
+      "E068:timeZone",
+      "E069:timeZone"
+    ]
   },
   "operaciones": [
     {
@@ -47,7 +97,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar"
+          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "correo en el idioma por defecto"
         },
         {
           "campo": "accepted",
@@ -63,7 +115,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`message` no tiene equivalente demostrado en el contrato de E005: se propone aditivo opcional en A8"
+          "motivo": "`message` no tiene equivalente demostrado en el contrato de E005: se propone aditivo opcional en A8",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "texto de presentacion"
         },
         {
           "campo": "retryAfterSeconds",
@@ -107,7 +161,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "El cliente envia el nombre del campo; renombrarlo rompe la integracion.",
           "decision": "CONSERVAR token",
-          "motivo": "Renombrado respecto al contrato aprobado."
+          "motivo": "Renombrado respecto al contrato aprobado.",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "se conserva `token`"
         },
         {
           "campo": "reset",
@@ -115,7 +171,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "resultado booleano del restablecimiento"
+          "motivo": "resultado booleano del restablecimiento",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "diagnostico redundante con status/requestId"
         },
         {
           "campo": "revokedSessions",
@@ -123,7 +181,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "evidencia de revocacion que solo el servidor conoce"
+          "motivo": "evidencia de revocacion que solo el servidor conoce",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "efecto interno de revocacion; no lo consume la pantalla"
         }
       ],
       "resumen": {
@@ -167,7 +227,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "evidencia de revocacion que solo el servidor conoce"
+          "motivo": "evidencia de revocacion que solo el servidor conoce",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "diagnostico interno"
         }
       ],
       "resumen": {
@@ -345,7 +407,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar"
+          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "correo en el idioma por defecto"
         },
         {
           "campo": "accepted",
@@ -405,7 +469,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "resultado de la verificacion"
+          "motivo": "resultado de la verificacion",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "E012 ya lo expone"
         },
         {
           "campo": "verifiedAt",
@@ -413,7 +479,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`verifiedAt` no tiene equivalente demostrado en el contrato de E011: se propone aditivo opcional en A8"
+          "motivo": "`verifiedAt` no tiene equivalente demostrado en el contrato de E011: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= updatedAt del perfil"
         }
       ],
       "resumen": {
@@ -525,7 +593,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "referencia del borrado solicitado"
+          "motivo": "referencia del borrado solicitado",
+          "instrumento": "A8",
+          "motivo_instrumento": "el cliente necesita referenciar el borrado solicitado"
         },
         {
           "campo": "message",
@@ -533,7 +603,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`message` no tiene equivalente demostrado en el contrato de E014: se propone aditivo opcional en A8"
+          "motivo": "`message` no tiene equivalente demostrado en el contrato de E014: se propone aditivo opcional en A8",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "texto de presentacion"
         }
       ],
       "resumen": {
@@ -560,7 +632,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar"
+          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "aviso en el idioma por defecto"
         },
         {
           "campo": "noticeId",
@@ -576,7 +650,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`title` no tiene equivalente demostrado en el contrato de E015: se propone aditivo opcional en A8"
+          "motivo": "`title` no tiene equivalente demostrado en el contrato de E015: se propone aditivo opcional en A8",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "texto de presentacion"
         },
         {
           "campo": "content",
@@ -584,7 +660,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "texto del aviso de privacidad; lo sirve el backend"
+          "motivo": "texto del aviso de privacidad; lo sirve el backend",
+          "instrumento": "A8",
+          "motivo_instrumento": "texto del aviso de privacidad que solo el backend puede servir"
         },
         {
           "campo": "locale",
@@ -592,7 +670,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar"
+          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "aviso en el idioma por defecto"
         },
         {
           "campo": "requiresAcceptance",
@@ -600,7 +680,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "regla de aceptacion que decide el servidor"
+          "motivo": "regla de aceptacion que decide el servidor",
+          "instrumento": "A8",
+          "motivo_instrumento": "regla de aceptacion decidida por el servidor"
         }
       ],
       "resumen": {
@@ -685,7 +767,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "El cliente distingue creacion, exito con cuerpo y borrado segun el codigo.",
           "decision": "CONSERVAR 201",
-          "motivo": "Crea un consentimiento: recurso nuevo. Conservar el contrato aprobado."
+          "motivo": "Crea un consentimiento: recurso nuevo. Conservar el contrato aprobado.",
+          "instrumento": "A4",
+          "motivo_instrumento": "decision HTTP registrada en A4"
         },
         {
           "campo": "noticeId",
@@ -733,7 +817,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`acceptedAt` no tiene equivalente demostrado en el contrato de E017: se propone aditivo opcional en A8"
+          "motivo": "`acceptedAt` no tiene equivalente demostrado en el contrato de E017: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= updatedAt del consentimiento"
         }
       ],
       "resumen": {
@@ -760,7 +846,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor"
+          "motivo": "estado de onboarding que persiste el servidor",
+          "instrumento": "A8",
+          "motivo_instrumento": "estado de onboarding persistido por el servidor"
         },
         {
           "campo": "notifications",
@@ -768,7 +856,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor"
+          "motivo": "estado de onboarding que persiste el servidor",
+          "instrumento": "A8",
+          "motivo_instrumento": "estado de onboarding persistido por el servidor"
         },
         {
           "campo": "configured",
@@ -776,7 +866,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor"
+          "motivo": "estado de onboarding que persiste el servidor",
+          "instrumento": "A8",
+          "motivo_instrumento": "estado de onboarding persistido por el servidor"
         },
         {
           "campo": "completedAt",
@@ -784,7 +876,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "sello del onboarding completado"
+          "motivo": "sello del onboarding completado",
+          "instrumento": "A8",
+          "motivo_instrumento": "sello del onboarding completado"
         }
       ],
       "resumen": {
@@ -811,7 +905,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor"
+          "motivo": "estado de onboarding que persiste el servidor",
+          "instrumento": "A8",
+          "motivo_instrumento": "estado de onboarding persistido por el servidor"
         },
         {
           "campo": "notifications",
@@ -819,7 +915,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor"
+          "motivo": "estado de onboarding que persiste el servidor",
+          "instrumento": "A8",
+          "motivo_instrumento": "estado de onboarding persistido por el servidor"
         },
         {
           "campo": "configured",
@@ -827,7 +925,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor"
+          "motivo": "estado de onboarding que persiste el servidor",
+          "instrumento": "A8",
+          "motivo_instrumento": "estado de onboarding persistido por el servidor"
         },
         {
           "campo": "microphone",
@@ -835,7 +935,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor"
+          "motivo": "estado de onboarding que persiste el servidor",
+          "instrumento": "A8",
+          "motivo_instrumento": "estado de onboarding persistido por el servidor"
         },
         {
           "campo": "notifications",
@@ -843,7 +945,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor"
+          "motivo": "estado de onboarding que persiste el servidor",
+          "instrumento": "A8",
+          "motivo_instrumento": "estado de onboarding persistido por el servidor"
         },
         {
           "campo": "configured",
@@ -851,7 +955,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor"
+          "motivo": "estado de onboarding que persiste el servidor",
+          "instrumento": "A8",
+          "motivo_instrumento": "estado de onboarding persistido por el servidor"
         },
         {
           "campo": "completedAt",
@@ -859,7 +965,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "sello del onboarding completado"
+          "motivo": "sello del onboarding completado",
+          "instrumento": "A8",
+          "motivo_instrumento": "sello del onboarding completado"
         },
         {
           "campo": "updatedAt",
@@ -1496,7 +1604,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`period` no tiene equivalente demostrado en el contrato de E021: se propone aditivo opcional en A8"
+          "motivo": "`period` no tiene equivalente demostrado en el contrato de E021: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "el periodo ya se conoce por la peticion"
         },
         {
           "campo": "user",
@@ -2355,7 +2465,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`isNegative` no tiene equivalente demostrado en el contrato de E026: se propone aditivo opcional en A8"
+          "motivo": "`isNegative` no tiene equivalente demostrado en el contrato de E026: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= availableEstimated < 0"
         },
         {
           "campo": "calculatedAt",
@@ -2363,7 +2475,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`calculatedAt` no tiene equivalente demostrado en el contrato de E026: se propone aditivo opcional en A8"
+          "motivo": "`calculatedAt` no tiene equivalente demostrado en el contrato de E026: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "sello temporal del calculo"
         }
       ],
       "resumen": {
@@ -2398,7 +2512,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`period` no tiene equivalente demostrado en el contrato de E027: se propone aditivo opcional en A8"
+          "motivo": "`period` no tiene equivalente demostrado en el contrato de E027: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "el periodo ya se conoce por la peticion"
         },
         {
           "campo": "from",
@@ -2585,7 +2701,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034"
+          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "propiedad del recurrente (E034)"
         },
         {
           "campo": "source",
@@ -2617,7 +2735,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034"
+          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "propiedad del recurrente (E034)"
         },
         {
           "campo": "source",
@@ -2633,7 +2753,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`summary` no tiene equivalente demostrado en el contrato de E028: se propone aditivo opcional en A8"
+          "motivo": "`summary` no tiene equivalente demostrado en el contrato de E028: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026 (mismos importes)"
         },
         {
           "campo": "summary.period",
@@ -2641,7 +2763,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`summary.period` no tiene equivalente demostrado en el contrato de E028: se propone aditivo opcional en A8"
+          "motivo": "`summary.period` no tiene equivalente demostrado en el contrato de E028: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026 (mismos importes)"
         },
         {
           "campo": "summary.currency",
@@ -2713,7 +2837,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`summary.isNegative` no tiene equivalente demostrado en el contrato de E028: se propone aditivo opcional en A8"
+          "motivo": "`summary.isNegative` no tiene equivalente demostrado en el contrato de E028: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026 (mismos importes)"
         },
         {
           "campo": "summary.calculatedAt",
@@ -2721,7 +2847,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`summary.calculatedAt` no tiene equivalente demostrado en el contrato de E028: se propone aditivo opcional en A8"
+          "motivo": "`summary.calculatedAt` no tiene equivalente demostrado en el contrato de E028: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026 (mismos importes)"
         }
       ],
       "resumen": {
@@ -2772,7 +2900,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034"
+          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "propiedad del recurrente (E034)"
         },
         {
           "campo": "recurringPaymentId",
@@ -2780,7 +2910,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`recurringPaymentId` no tiene equivalente demostrado en el contrato de E029: se propone aditivo opcional en A8"
+          "motivo": "`recurringPaymentId` no tiene equivalente demostrado en el contrato de E029: se propone aditivo opcional en A8",
+          "instrumento": "A8",
+          "motivo_instrumento": "referencia para navegar al recurrente"
         },
         {
           "campo": "goalId",
@@ -2796,7 +2928,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`contributionId` no tiene equivalente demostrado en el contrato de E029: se propone aditivo opcional en A8"
+          "motivo": "`contributionId` no tiene equivalente demostrado en el contrato de E029: se propone aditivo opcional en A8",
+          "instrumento": "A8",
+          "motivo_instrumento": "referencia para navegar a la aportacion"
         }
       ],
       "resumen": {
@@ -2905,7 +3039,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "El cliente distingue creacion, exito con cuerpo y borrado segun el codigo.",
           "decision": "CONSERVAR 204",
-          "motivo": "Borrado idempotente sin cuerpo. Conservar el contrato aprobado."
+          "motivo": "Borrado idempotente sin cuerpo. Conservar el contrato aprobado.",
+          "instrumento": "A4",
+          "motivo_instrumento": "decision HTTP registrada en A4"
         },
         {
           "campo": "movementId",
@@ -2921,7 +3057,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "motivo de borrado, opcional y aditivo"
+          "motivo": "motivo de borrado, opcional y aditivo",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "motivo de borrado opcional sin uso funcional en la pantalla"
         },
         {
           "campo": "deletedMovementId",
@@ -2937,7 +3075,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "efecto del borrado sobre una meta"
+          "motivo": "efecto del borrado sobre una meta",
+          "instrumento": "A8",
+          "motivo_instrumento": "efecto verificable del borrado sobre una meta"
         },
         {
           "campo": "reversedContributionId",
@@ -2945,7 +3085,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "efecto del borrado sobre una aportacion"
+          "motivo": "efecto del borrado sobre una aportacion",
+          "instrumento": "A8",
+          "motivo_instrumento": "efecto verificable del borrado sobre una aportacion"
         },
         {
           "campo": "summary",
@@ -2953,7 +3095,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`summary` no tiene equivalente demostrado en el contrato de E031: se propone aditivo opcional en A8"
+          "motivo": "`summary` no tiene equivalente demostrado en el contrato de E031: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026 (mismos importes)"
         },
         {
           "campo": "summary.period",
@@ -2961,7 +3105,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`summary.period` no tiene equivalente demostrado en el contrato de E031: se propone aditivo opcional en A8"
+          "motivo": "`summary.period` no tiene equivalente demostrado en el contrato de E031: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026 (mismos importes)"
         },
         {
           "campo": "summary.currency",
@@ -3033,7 +3179,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`summary.isNegative` no tiene equivalente demostrado en el contrato de E031: se propone aditivo opcional en A8"
+          "motivo": "`summary.isNegative` no tiene equivalente demostrado en el contrato de E031: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026 (mismos importes)"
         },
         {
           "campo": "summary.calculatedAt",
@@ -3041,7 +3189,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`summary.calculatedAt` no tiene equivalente demostrado en el contrato de E031: se propone aditivo opcional en A8"
+          "motivo": "`summary.calculatedAt` no tiene equivalente demostrado en el contrato de E031: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026 (mismos importes)"
         }
       ],
       "resumen": {
@@ -3068,7 +3218,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "filtro de cliente; el listado devuelve todo"
         },
         {
           "campo": "limit",
@@ -3215,7 +3367,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "A8",
+          "motivo_instrumento": "sin tipo, el recurrente no puede clasificarse"
         },
         {
           "campo": "startDate",
@@ -3223,7 +3377,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`startDate` no tiene equivalente demostrado en el contrato de E033: se propone aditivo opcional en A8"
+          "motivo": "`startDate` no tiene equivalente demostrado en el contrato de E033: se propone aditivo opcional en A8",
+          "instrumento": "A8",
+          "motivo_instrumento": "inicio de la serie recurrente"
         },
         {
           "campo": "dueDay",
@@ -3231,7 +3387,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`dueDay` no tiene equivalente demostrado en el contrato de E033: se propone aditivo opcional en A8"
+          "motivo": "`dueDay` no tiene equivalente demostrado en el contrato de E033: se propone aditivo opcional en A8",
+          "instrumento": "A8",
+          "motivo_instrumento": "dia de vencimiento del recurrente"
         },
         {
           "campo": "concept",
@@ -3255,7 +3413,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "A8",
+          "motivo_instrumento": "sin tipo, el recurrente no puede clasificarse"
         },
         {
           "campo": "monthlyEquivalent",
@@ -3271,7 +3431,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`startDate` no tiene equivalente demostrado en el contrato de E033: se propone aditivo opcional en A8"
+          "motivo": "`startDate` no tiene equivalente demostrado en el contrato de E033: se propone aditivo opcional en A8",
+          "instrumento": "A8",
+          "motivo_instrumento": "inicio de la serie recurrente"
         }
       ],
       "resumen": {
@@ -3322,7 +3484,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "filtro de cliente; el listado devuelve todo"
         },
         {
           "campo": "monthlyEquivalent",
@@ -3338,7 +3502,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`startDate` no tiene equivalente demostrado en el contrato de E034: se propone aditivo opcional en A8"
+          "motivo": "`startDate` no tiene equivalente demostrado en el contrato de E034: se propone aditivo opcional en A8",
+          "instrumento": "A8",
+          "motivo_instrumento": "inicio de la serie recurrente no expuesto por el contrato"
         }
       ],
       "resumen": {
@@ -3397,7 +3563,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "A8",
+          "motivo_instrumento": "permite cambiar el tipo del recurrente"
         },
         {
           "campo": "startDate",
@@ -3405,7 +3573,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`startDate` no tiene equivalente demostrado en el contrato de E035: se propone aditivo opcional en A8"
+          "motivo": "`startDate` no tiene equivalente demostrado en el contrato de E035: se propone aditivo opcional en A8",
+          "instrumento": "A8",
+          "motivo_instrumento": "permite cambiar el inicio"
         },
         {
           "campo": "dueDay",
@@ -3413,7 +3583,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`dueDay` no tiene equivalente demostrado en el contrato de E035: se propone aditivo opcional en A8"
+          "motivo": "`dueDay` no tiene equivalente demostrado en el contrato de E035: se propone aditivo opcional en A8",
+          "instrumento": "A8",
+          "motivo_instrumento": "permite cambiar el dia de vencimiento"
         },
         {
           "campo": "concept",
@@ -3437,7 +3609,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "A8",
+          "motivo_instrumento": "permite cambiar el tipo del recurrente"
         },
         {
           "campo": "monthlyEquivalent",
@@ -3506,7 +3680,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "El cliente distingue creacion, exito con cuerpo y borrado segun el codigo.",
           "decision": "CONSERVAR 200",
-          "motivo": "Conservar hasta confirmar con Gate que la operacion crea un movimiento."
+          "motivo": "Conservar hasta confirmar con Gate que la operacion crea un movimiento.",
+          "instrumento": "A4",
+          "motivo_instrumento": "decision HTTP registrada en A4"
         },
         {
           "campo": "recurringPaymentId",
@@ -3530,7 +3706,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`movement.id` no tiene equivalente demostrado en el contrato de E037: se propone aditivo opcional en A8"
+          "motivo": "`movement.id` no tiene equivalente demostrado en el contrato de E037: se propone aditivo opcional en A8",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "= objeto raiz de E037"
         },
         {
           "campo": "movement.concept",
@@ -3538,7 +3716,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`movement.concept` no tiene equivalente demostrado en el contrato de E037: se propone aditivo opcional en A8"
+          "motivo": "`movement.concept` no tiene equivalente demostrado en el contrato de E037: se propone aditivo opcional en A8",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "= objeto raiz de E037"
         },
         {
           "campo": "movement.amount",
@@ -3554,7 +3734,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`movement.category` no tiene equivalente demostrado en el contrato de E037: se propone aditivo opcional en A8"
+          "motivo": "`movement.category` no tiene equivalente demostrado en el contrato de E037: se propone aditivo opcional en A8",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "= objeto raiz de E037"
         },
         {
           "campo": "movement.type",
@@ -3562,7 +3744,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "= objeto raiz de E037"
         },
         {
           "campo": "movement.recurringPaymentId",
@@ -3570,7 +3754,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`movement.recurringPaymentId` no tiene equivalente demostrado en el contrato de E037: se propone aditivo opcional en A8"
+          "motivo": "`movement.recurringPaymentId` no tiene equivalente demostrado en el contrato de E037: se propone aditivo opcional en A8",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "= objeto raiz de E037"
         },
         {
           "campo": "movement.occurredAt",
@@ -3578,7 +3764,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`movement.occurredAt` no tiene equivalente demostrado en el contrato de E037: se propone aditivo opcional en A8"
+          "motivo": "`movement.occurredAt` no tiene equivalente demostrado en el contrato de E037: se propone aditivo opcional en A8",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "= objeto raiz de E037"
         },
         {
           "campo": "occurrenceDate",
@@ -3594,7 +3782,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`recurringPayment.nextDueDate` no tiene equivalente demostrado en el contrato de E037: se propone aditivo opcional en A8"
+          "motivo": "`recurringPayment.nextDueDate` no tiene equivalente demostrado en el contrato de E037: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= ultima fecha + frecuencia"
         }
       ],
       "resumen": {
@@ -3741,7 +3931,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`totals.saved` no tiene equivalente demostrado en el contrato de E038: se propone aditivo opcional en A8"
+          "motivo": "`totals.saved` no tiene equivalente demostrado en el contrato de E038: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "agregado de la propia lista"
         },
         {
           "campo": "totals.activeCount",
@@ -3749,7 +3941,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`totals.activeCount` no tiene equivalente demostrado en el contrato de E038: se propone aditivo opcional en A8"
+          "motivo": "`totals.activeCount` no tiene equivalente demostrado en el contrato de E038: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "agregado de la propia lista"
         }
       ],
       "resumen": {
@@ -3792,7 +3986,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`emoji` no tiene equivalente demostrado en el contrato de E039: se propone aditivo opcional en A8"
+          "motivo": "`emoji` no tiene equivalente demostrado en el contrato de E039: se propone aditivo opcional en A8",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "adorno de presentacion; no lo produce el backend"
         },
         {
           "campo": "target",
@@ -3824,7 +4020,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`emoji` no tiene equivalente demostrado en el contrato de E039: se propone aditivo opcional en A8"
+          "motivo": "`emoji` no tiene equivalente demostrado en el contrato de E039: se propone aditivo opcional en A8",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "adorno de presentacion; no lo produce el backend"
         },
         {
           "campo": "remaining",
@@ -3832,7 +4030,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`remaining` no tiene equivalente demostrado en el contrato de E039: se propone aditivo opcional en A8"
+          "motivo": "`remaining` no tiene equivalente demostrado en el contrato de E039: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= targetAmount - savedAmount"
         },
         {
           "campo": "percentage",
@@ -3840,7 +4040,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`percentage` no tiene equivalente demostrado en el contrato de E039: se propone aditivo opcional en A8"
+          "motivo": "`percentage` no tiene equivalente demostrado en el contrato de E039: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= savedAmount / targetAmount"
         },
         {
           "campo": "completed",
@@ -3848,7 +4050,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`completed` no tiene equivalente demostrado en el contrato de E039: se propone aditivo opcional en A8"
+          "motivo": "`completed` no tiene equivalente demostrado en el contrato de E039: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= savedAmount >= targetAmount"
         },
         {
           "campo": "createdAt",
@@ -3856,7 +4060,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`createdAt` no tiene equivalente demostrado en el contrato de E039: se propone aditivo opcional en A8"
+          "motivo": "`createdAt` no tiene equivalente demostrado en el contrato de E039: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "sello de creacion expuesto por el recurso"
         }
       ],
       "resumen": {
@@ -3923,7 +4129,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`emoji` no tiene equivalente demostrado en el contrato de E040: se propone aditivo opcional en A8"
+          "motivo": "`emoji` no tiene equivalente demostrado en el contrato de E040: se propone aditivo opcional en A8",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "adorno de presentacion; no lo produce el backend"
         },
         {
           "campo": "remaining",
@@ -3931,7 +4139,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`remaining` no tiene equivalente demostrado en el contrato de E040: se propone aditivo opcional en A8"
+          "motivo": "`remaining` no tiene equivalente demostrado en el contrato de E040: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= targetAmount - savedAmount"
         },
         {
           "campo": "percentage",
@@ -3939,7 +4149,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`percentage` no tiene equivalente demostrado en el contrato de E040: se propone aditivo opcional en A8"
+          "motivo": "`percentage` no tiene equivalente demostrado en el contrato de E040: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= savedAmount / targetAmount"
         },
         {
           "campo": "completed",
@@ -3947,7 +4159,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`completed` no tiene equivalente demostrado en el contrato de E040: se propone aditivo opcional en A8"
+          "motivo": "`completed` no tiene equivalente demostrado en el contrato de E040: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= savedAmount >= targetAmount"
         }
       ],
       "resumen": {
@@ -3998,7 +4212,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`emoji` no tiene equivalente demostrado en el contrato de E041: se propone aditivo opcional en A8"
+          "motivo": "`emoji` no tiene equivalente demostrado en el contrato de E041: se propone aditivo opcional en A8",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "adorno de presentacion; no lo produce el backend"
         },
         {
           "campo": "target",
@@ -4038,7 +4254,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`emoji` no tiene equivalente demostrado en el contrato de E041: se propone aditivo opcional en A8"
+          "motivo": "`emoji` no tiene equivalente demostrado en el contrato de E041: se propone aditivo opcional en A8",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "adorno de presentacion; no lo produce el backend"
         },
         {
           "campo": "remaining",
@@ -4046,7 +4264,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`remaining` no tiene equivalente demostrado en el contrato de E041: se propone aditivo opcional en A8"
+          "motivo": "`remaining` no tiene equivalente demostrado en el contrato de E041: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= targetAmount - savedAmount"
         },
         {
           "campo": "percentage",
@@ -4054,7 +4274,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`percentage` no tiene equivalente demostrado en el contrato de E041: se propone aditivo opcional en A8"
+          "motivo": "`percentage` no tiene equivalente demostrado en el contrato de E041: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= savedAmount / targetAmount"
         }
       ],
       "resumen": {
@@ -4081,7 +4303,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "El cliente distingue creacion, exito con cuerpo y borrado segun el codigo.",
           "decision": "CONSERVAR 204",
-          "motivo": "Borrado idempotente sin cuerpo. Conservar el contrato aprobado."
+          "motivo": "Borrado idempotente sin cuerpo. Conservar el contrato aprobado.",
+          "instrumento": "A4",
+          "motivo_instrumento": "decision HTTP registrada en A4"
         },
         {
           "campo": "goalId",
@@ -4105,7 +4329,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "importe liberado por el borrado de meta"
+          "motivo": "importe liberado por el borrado de meta",
+          "instrumento": "A8",
+          "motivo_instrumento": "importe liberado por el borrado de meta"
         },
         {
           "campo": "reversedAllocations",
@@ -4113,7 +4339,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "aportaciones revertidas por el borrado"
+          "motivo": "aportaciones revertidas por el borrado",
+          "instrumento": "A8",
+          "motivo_instrumento": "aportaciones revertidas por el borrado"
         },
         {
           "campo": "affectedPeriods[]",
@@ -4121,7 +4349,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "periodos contables afectados por la reversion"
+          "motivo": "periodos contables afectados por la reversion",
+          "instrumento": "A8",
+          "motivo_instrumento": "periodos contables afectados por la reversion"
         }
       ],
       "resumen": {
@@ -4374,7 +4604,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`contribution.id` no tiene equivalente demostrado en el contrato de E044: se propone aditivo opcional en A8"
+          "motivo": "`contribution.id` no tiene equivalente demostrado en el contrato de E044: se propone aditivo opcional en A8",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "= objeto raiz de E044"
         },
         {
           "campo": "contribution.totalRequested",
@@ -4406,7 +4638,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`contribution.mode` no tiene equivalente demostrado en el contrato de E044: se propone aditivo opcional en A8"
+          "motivo": "`contribution.mode` no tiene equivalente demostrado en el contrato de E044: se propone aditivo opcional en A8",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "= objeto raiz de E044"
         },
         {
           "campo": "contribution.splitMode",
@@ -4414,7 +4648,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`contribution.splitMode` no tiene equivalente demostrado en el contrato de E044: se propone aditivo opcional en A8"
+          "motivo": "`contribution.splitMode` no tiene equivalente demostrado en el contrato de E044: se propone aditivo opcional en A8",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "= objeto raiz de E044"
         },
         {
           "campo": "contribution.createdAt",
@@ -4422,7 +4658,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`contribution.createdAt` no tiene equivalente demostrado en el contrato de E044: se propone aditivo opcional en A8"
+          "motivo": "`contribution.createdAt` no tiene equivalente demostrado en el contrato de E044: se propone aditivo opcional en A8",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "= objeto raiz de E044"
         },
         {
           "campo": "allocations[]",
@@ -4521,7 +4759,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "estado del recurso en listados E038/E045"
+          "motivo": "estado del recurso en listados E038/E045",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "el contrato ya expone status del recurso"
         },
         {
           "campo": "limit",
@@ -4732,7 +4972,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`createdAt` no tiene equivalente demostrado en el contrato de E046: se propone aditivo opcional en A8"
+          "motivo": "`createdAt` no tiene equivalente demostrado en el contrato de E046: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "sello de creacion expuesto por el recurso"
         },
         {
           "campo": "allocations[]",
@@ -5141,7 +5383,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`calculatedAt` no tiene equivalente demostrado en el contrato de E050: se propone aditivo opcional en A8"
+          "motivo": "`calculatedAt` no tiene equivalente demostrado en el contrato de E050: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "sello temporal del calculo"
         }
       ],
       "resumen": {
@@ -5248,7 +5492,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`financialSummary.period` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`financialSummary.period` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026"
         },
         {
           "campo": "financialSummary.currency",
@@ -5264,7 +5510,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`financialSummary.incomeMonthl` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`financialSummary.incomeMonthl` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026"
         },
         {
           "campo": "financialSummary.recurringFixe",
@@ -5272,7 +5520,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`financialSummary.recurringFixe` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`financialSummary.recurringFixe` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026"
         },
         {
           "campo": "financialSummary.oneTimeFixed",
@@ -5280,7 +5530,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`financialSummary.oneTimeFixed` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`financialSummary.oneTimeFixed` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026"
         },
         {
           "campo": "financialSummary.fixedMonthly",
@@ -5304,7 +5556,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`financialSummary.reservedMont` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`financialSummary.reservedMont` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026"
         },
         {
           "campo": "financialSummary.availableEsti",
@@ -5312,7 +5566,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`financialSummary.availableEsti` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`financialSummary.availableEsti` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026"
         },
         {
           "campo": "financialSummary.isNegative",
@@ -5320,7 +5576,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`financialSummary.isNegative` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`financialSummary.isNegative` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026"
         },
         {
           "campo": "financialSummary.calculatedAt",
@@ -5328,7 +5586,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`financialSummary.calculatedAt` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`financialSummary.calculatedAt` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026"
         },
         {
           "campo": "streak.days",
@@ -5400,7 +5660,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`recurringPreview[].id` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`recurringPreview[].id` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "composicion desde E032"
         },
         {
           "campo": "recurringPreview[].concept",
@@ -5408,7 +5670,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`recurringPreview[].concept` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`recurringPreview[].concept` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "composicion desde E032"
         },
         {
           "campo": "recurringPreview[].amount",
@@ -5424,7 +5688,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034"
+          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "composicion desde E032"
         },
         {
           "campo": "recurringPreview[].category",
@@ -5432,7 +5698,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`recurringPreview[].category` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`recurringPreview[].category` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "composicion desde E032"
         },
         {
           "campo": "recurringPreview[].type",
@@ -5440,7 +5708,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "composicion desde E032"
         },
         {
           "campo": "recurringPreview[].monthlyEquiv",
@@ -5448,7 +5718,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`recurringPreview[].monthlyEquiv` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`recurringPreview[].monthlyEquiv` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "composicion desde E032"
         },
         {
           "campo": "recurringPreview[].nextDueDate",
@@ -5456,7 +5728,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`recurringPreview[].nextDueDate` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`recurringPreview[].nextDueDate` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "composicion desde E032"
         },
         {
           "campo": "recurringPreview[].lastPaidAt",
@@ -5464,7 +5738,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`recurringPreview[].lastPaidAt` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`recurringPreview[].lastPaidAt` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "composicion desde E032"
         },
         {
           "campo": "recurringPreview[].active",
@@ -5472,7 +5748,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "estado del registro push"
+          "motivo": "estado del registro push",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "composicion desde E032"
         },
         {
           "campo": "topCategories[].category",
@@ -5480,7 +5758,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`topCategories[].category` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`topCategories[].category` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "agregado de E053"
         },
         {
           "campo": "topCategories[].total",
@@ -5488,7 +5768,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`topCategories[].total` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`topCategories[].total` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "agregado de E053"
         },
         {
           "campo": "topCategories[].relativePercenta",
@@ -5496,7 +5778,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`topCategories[].relativePercenta` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`topCategories[].relativePercenta` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "agregado de E053"
         },
         {
           "campo": "topCategories[].shareOfTotal",
@@ -5504,7 +5788,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`topCategories[].shareOfTotal` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8"
+          "motivo": "`topCategories[].shareOfTotal` no tiene equivalente demostrado en el contrato de E051: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "agregado de E053"
         }
       ],
       "resumen": {
@@ -5531,7 +5817,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`windowDays` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8"
+          "motivo": "`windowDays` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "la ventana la fija la peticion"
         },
         {
           "campo": "endDate",
@@ -5539,7 +5827,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`endDate` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8"
+          "motivo": "`endDate` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "eje de la ventana solicitada"
         },
         {
           "campo": "windowDays",
@@ -5547,7 +5837,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`windowDays` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8"
+          "motivo": "`windowDays` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "la ventana la fija la peticion"
         },
         {
           "campo": "from",
@@ -5555,7 +5847,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`from` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8"
+          "motivo": "`from` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "extremo de la ventana solicitada"
         },
         {
           "campo": "to",
@@ -5563,7 +5857,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`to` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8"
+          "motivo": "`to` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "extremo de la ventana solicitada"
         },
         {
           "campo": "antExpenseCount",
@@ -5579,7 +5875,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "El consumidor necesita conocer el umbral aplicado para interpretar el vacio."
+          "motivo": "El consumidor necesita conocer el umbral aplicado para interpretar el vacio.",
+          "instrumento": "A5",
+          "motivo_instrumento": "suficiencia de datos en insights (A5)"
         },
         {
           "campo": "enoughData",
@@ -5587,7 +5885,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "Sin marca de suficiencia, un array vacio no distingue 'sin historial' de 'sin patrones'."
+          "motivo": "Sin marca de suficiencia, un array vacio no distingue 'sin historial' de 'sin patrones'.",
+          "instrumento": "A5",
+          "motivo_instrumento": "suficiencia de datos en insights (A5)"
         },
         {
           "campo": "title",
@@ -5595,7 +5895,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`title` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8"
+          "motivo": "`title` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "texto de presentacion"
         },
         {
           "campo": "summary",
@@ -5603,7 +5905,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`summary` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8"
+          "motivo": "`summary` no tiene equivalente demostrado en el contrato de E052: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "bloque derivado de E026 (mismos importes)"
         },
         {
           "campo": "afternoonCount",
@@ -5686,7 +5990,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "filtro de cliente; el listado devuelve todo"
         },
         {
           "campo": "period",
@@ -5769,7 +6075,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`windowDays` no tiene equivalente demostrado en el contrato de E054: se propone aditivo opcional en A8"
+          "motivo": "`windowDays` no tiene equivalente demostrado en el contrato de E054: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "la ventana la fija la peticion"
         },
         {
           "campo": "windowDays",
@@ -5777,7 +6085,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`windowDays` no tiene equivalente demostrado en el contrato de E054: se propone aditivo opcional en A8"
+          "motivo": "`windowDays` no tiene equivalente demostrado en el contrato de E054: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "la ventana la fija la peticion"
         },
         {
           "campo": "count",
@@ -5967,7 +6277,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`asOf` no tiene equivalente demostrado en el contrato de E056: se propone aditivo opcional en A8"
+          "motivo": "`asOf` no tiene equivalente demostrado en el contrato de E056: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "instante de calculo"
         },
         {
           "campo": "lastSavingDate",
@@ -5991,7 +6303,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`progressPercentage` no tiene equivalente demostrado en el contrato de E056: se propone aditivo opcional en A8"
+          "motivo": "`progressPercentage` no tiene equivalente demostrado en el contrato de E056: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= dias / hito siguiente"
         },
         {
           "campo": "pigMessage",
@@ -5999,7 +6313,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`pigMessage` no tiene equivalente demostrado en el contrato de E056: se propone aditivo opcional en A8"
+          "motivo": "`pigMessage` no tiene equivalente demostrado en el contrato de E056: se propone aditivo opcional en A8",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "texto de presentacion"
         },
         {
           "campo": "milestones[]",
@@ -6058,7 +6374,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "preferencia granular (A3)"
+          "motivo": "preferencia granular (A3)",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "goalUpdates",
@@ -6066,7 +6384,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "preferencia granular (A3)"
+          "motivo": "preferencia granular (A3)",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "recurringReminders",
@@ -6074,7 +6394,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "preferencia granular (A3)"
+          "motivo": "preferencia granular (A3)",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "streakReminders",
@@ -6082,7 +6404,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "preferencia granular (A3)"
+          "motivo": "preferencia granular (A3)",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "quietHours.enabled",
@@ -6090,7 +6414,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.enabled` no tiene equivalente demostrado en el contrato de E057: se propone aditivo opcional en A8"
+          "motivo": "`quietHours.enabled` no tiene equivalente demostrado en el contrato de E057: se propone aditivo opcional en A8",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "quietHours.start",
@@ -6098,7 +6424,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.start` no tiene equivalente demostrado en el contrato de E057: se propone aditivo opcional en A8"
+          "motivo": "`quietHours.start` no tiene equivalente demostrado en el contrato de E057: se propone aditivo opcional en A8",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "quietHours.end",
@@ -6106,7 +6434,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.end` no tiene equivalente demostrado en el contrato de E057: se propone aditivo opcional en A8"
+          "motivo": "`quietHours.end` no tiene equivalente demostrado en el contrato de E057: se propone aditivo opcional en A8",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "timeZone",
@@ -6114,7 +6444,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)"
+          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "updatedAt",
@@ -6149,7 +6481,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "Sustituye al conjunto pushEnabled/emailEnabled/reminderEnabled del SDD."
+          "motivo": "Sustituye al conjunto pushEnabled/emailEnabled/reminderEnabled del SDD.",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "budgetAlerts",
@@ -6157,7 +6491,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "Preferencia granular sin equivalente en el contrato vigente."
+          "motivo": "Preferencia granular sin equivalente en el contrato vigente.",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "goalUpdates",
@@ -6165,7 +6501,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "Preferencia granular sin equivalente en el contrato vigente."
+          "motivo": "Preferencia granular sin equivalente en el contrato vigente.",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "recurringReminders",
@@ -6173,7 +6511,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "Preferencia granular sin equivalente en el contrato vigente."
+          "motivo": "Preferencia granular sin equivalente en el contrato vigente.",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "streakReminders",
@@ -6181,7 +6521,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "Preferencia granular sin equivalente en el contrato vigente."
+          "motivo": "Preferencia granular sin equivalente en el contrato vigente.",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "quietHours.enabled",
@@ -6189,7 +6531,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.enabled` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8"
+          "motivo": "`quietHours.enabled` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "quietHours.start",
@@ -6197,7 +6541,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.start` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8"
+          "motivo": "`quietHours.start` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "quietHours.end",
@@ -6205,7 +6551,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.end` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8"
+          "motivo": "`quietHours.end` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "enabled",
@@ -6213,7 +6561,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "Sustituye al conjunto pushEnabled/emailEnabled/reminderEnabled del SDD."
+          "motivo": "Sustituye al conjunto pushEnabled/emailEnabled/reminderEnabled del SDD.",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "budgetAlerts",
@@ -6221,7 +6571,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "Preferencia granular sin equivalente en el contrato vigente."
+          "motivo": "Preferencia granular sin equivalente en el contrato vigente.",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "goalUpdates",
@@ -6229,7 +6581,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "Preferencia granular sin equivalente en el contrato vigente."
+          "motivo": "Preferencia granular sin equivalente en el contrato vigente.",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "recurringReminders",
@@ -6237,7 +6591,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "Preferencia granular sin equivalente en el contrato vigente."
+          "motivo": "Preferencia granular sin equivalente en el contrato vigente.",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "streakReminders",
@@ -6245,7 +6601,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "Preferencia granular sin equivalente en el contrato vigente."
+          "motivo": "Preferencia granular sin equivalente en el contrato vigente.",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "quietHours",
@@ -6253,7 +6611,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "Horario de silencio sin equivalente en el contrato vigente."
+          "motivo": "Horario de silencio sin equivalente en el contrato vigente.",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "timeZone",
@@ -6261,7 +6621,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "El contrato vigente no declara zona horaria del usuario."
+          "motivo": "El contrato vigente no declara zona horaria del usuario.",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "updatedAt",
@@ -6277,7 +6639,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.enabled` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8"
+          "motivo": "`quietHours.enabled` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "quietHours.start",
@@ -6285,7 +6649,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.start` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8"
+          "motivo": "`quietHours.start` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         },
         {
           "campo": "quietHours.end",
@@ -6293,7 +6659,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.end` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8"
+          "motivo": "`quietHours.end` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8",
+          "instrumento": "A3",
+          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
         }
       ],
       "resumen": {
@@ -6328,7 +6696,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "plataforma del dispositivo para el registro push"
+          "motivo": "plataforma del dispositivo para el registro push",
+          "instrumento": "A8",
+          "motivo_instrumento": "el registro push necesita la plataforma del dispositivo"
         },
         {
           "campo": "appVersion",
@@ -6336,7 +6706,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "version de la app para diagnostico push"
+          "motivo": "version de la app para diagnostico push",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "solo diagnostico de flota"
         },
         {
           "campo": "locale",
@@ -6344,7 +6716,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar"
+          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "el contenido se sirve en el idioma por defecto del producto"
         },
         {
           "campo": "timeZone",
@@ -6352,7 +6726,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)"
+          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "el servidor usa la zona del perfil"
         },
         {
           "campo": "deviceRegistrationId",
@@ -6376,7 +6752,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "estado del registro push"
+          "motivo": "estado del registro push",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= estado del registro push"
         }
       ],
       "resumen": {
@@ -6429,7 +6807,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro que altera el conjunto paginado"
+          "motivo": "filtro que altera el conjunto paginado",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "filtro de cliente sobre el listado"
         },
         {
           "campo": "type",
@@ -6437,7 +6817,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "filtro de cliente; el listado devuelve todo"
         },
         {
           "campo": "limit",
@@ -6525,7 +6907,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "total no leido; con paginacion el cliente no puede contarlo"
+          "motivo": "total no leido; con paginacion el cliente no puede contarlo",
+          "instrumento": "A8",
+          "motivo_instrumento": "total no leido no calculable con paginacion"
         }
       ],
       "resumen": {
@@ -6560,7 +6944,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`readAt` no tiene equivalente demostrado en el contrato de E062: se propone aditivo opcional en A8"
+          "motivo": "`readAt` no tiene equivalente demostrado en el contrato de E062: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= updatedAt de la notificacion"
         },
         {
           "campo": "unreadCount",
@@ -6568,7 +6954,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "total no leido; con paginacion el cliente no puede contarlo"
+          "motivo": "total no leido; con paginacion el cliente no puede contarlo",
+          "instrumento": "A8",
+          "motivo_instrumento": "total no leido no calculable con paginacion"
         }
       ],
       "resumen": {
@@ -6595,7 +6983,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "El cliente distingue creacion, exito con cuerpo y borrado segun el codigo.",
           "decision": "CONSERVAR 202",
-          "motivo": "Conservar 202 mientras no se demuestre que read-all es sincrono."
+          "motivo": "Conservar 202 mientras no se demuestre que read-all es sincrono.",
+          "instrumento": "A4",
+          "motivo_instrumento": "decision HTTP registrada en A4"
         },
         {
           "campo": "before",
@@ -6603,7 +6993,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "cota temporal del marcado masivo (E063)"
+          "motivo": "cota temporal del marcado masivo (E063)",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "el marcado masivo aplica a todas las no leidas"
         },
         {
           "campo": "updatedCount",
@@ -6611,7 +7003,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "cuantas notificaciones se marcaron; solo el servidor lo sabe"
+          "motivo": "cuantas notificaciones se marcaron; solo el servidor lo sabe",
+          "instrumento": "A8",
+          "motivo_instrumento": "cuantas notificaciones se marcaron; solo el servidor lo sabe"
         },
         {
           "campo": "readAt",
@@ -6619,7 +7013,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`readAt` no tiene equivalente demostrado en el contrato de E063: se propone aditivo opcional en A8"
+          "motivo": "`readAt` no tiene equivalente demostrado en el contrato de E063: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= updatedAt de la notificacion"
         }
       ],
       "resumen": {
@@ -6646,7 +7042,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "filtro de cliente; el listado devuelve todo"
         },
         {
           "campo": "activeOnly",
@@ -6769,7 +7167,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "filtro de cliente; el listado devuelve todo"
         },
         {
           "campo": "relatedEntityId",
@@ -6785,7 +7185,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`triggerAt` no tiene equivalente demostrado en el contrato de E065: se propone aditivo opcional en A8"
+          "motivo": "`triggerAt` no tiene equivalente demostrado en el contrato de E065: se propone aditivo opcional en A8",
+          "instrumento": "A8",
+          "motivo_instrumento": "instante del recordatorio: sin el no se puede programar"
         },
         {
           "campo": "frequency",
@@ -6793,7 +7195,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034"
+          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034",
+          "instrumento": "A8",
+          "motivo_instrumento": "recurrencia del recordatorio o del recurrente"
         },
         {
           "campo": "timeZone",
@@ -6801,7 +7205,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)"
+          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
+          "instrumento": "A8",
+          "motivo_instrumento": "zona horaria para recordatorios y preferencias"
         },
         {
           "campo": "enabled",
@@ -6817,7 +7223,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "filtro de cliente; el listado devuelve todo"
         },
         {
           "campo": "relatedEntityId",
@@ -6833,7 +7241,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`nextTriggerAt` no tiene equivalente demostrado en el contrato de E065: se propone aditivo opcional en A8"
+          "motivo": "`nextTriggerAt` no tiene equivalente demostrado en el contrato de E065: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= triggerAt + frecuencia"
         },
         {
           "campo": "frequency",
@@ -6841,7 +7251,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034"
+          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034",
+          "instrumento": "A8",
+          "motivo_instrumento": "recurrencia del recordatorio o del recurrente"
         },
         {
           "campo": "timeZone",
@@ -6849,7 +7261,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)"
+          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
+          "instrumento": "A8",
+          "motivo_instrumento": "zona horaria para recordatorios y preferencias"
         },
         {
           "campo": "enabled",
@@ -6865,7 +7279,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`createdAt` no tiene equivalente demostrado en el contrato de E065: se propone aditivo opcional en A8"
+          "motivo": "`createdAt` no tiene equivalente demostrado en el contrato de E065: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "sello de creacion expuesto por el recurso"
         }
       ],
       "resumen": {
@@ -6900,7 +7316,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`triggerAt` no tiene equivalente demostrado en el contrato de E066: se propone aditivo opcional en A8"
+          "motivo": "`triggerAt` no tiene equivalente demostrado en el contrato de E066: se propone aditivo opcional en A8",
+          "instrumento": "A8",
+          "motivo_instrumento": "instante del recordatorio: sin el no se puede programar"
         },
         {
           "campo": "frequency",
@@ -6908,7 +7326,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034"
+          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034",
+          "instrumento": "A8",
+          "motivo_instrumento": "recurrencia del recordatorio o del recurrente"
         },
         {
           "campo": "timeZone",
@@ -6916,7 +7336,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)"
+          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
+          "instrumento": "A8",
+          "motivo_instrumento": "zona horaria para recordatorios y preferencias"
         },
         {
           "campo": "enabled",
@@ -6932,7 +7354,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`nextTriggerAt` no tiene equivalente demostrado en el contrato de E066: se propone aditivo opcional en A8"
+          "motivo": "`nextTriggerAt` no tiene equivalente demostrado en el contrato de E066: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "= triggerAt + frecuencia"
         },
         {
           "campo": "frequency",
@@ -6940,7 +7364,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034"
+          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034",
+          "instrumento": "A8",
+          "motivo_instrumento": "recurrencia del recordatorio o del recurrente"
         },
         {
           "campo": "timeZone",
@@ -6948,7 +7374,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)"
+          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
+          "instrumento": "A8",
+          "motivo_instrumento": "zona horaria para recordatorios y preferencias"
         },
         {
           "campo": "enabled",
@@ -7033,7 +7461,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)"
+          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
+          "instrumento": "A8",
+          "motivo_instrumento": "el perfil no declara zona horaria"
         },
         {
           "campo": "updatedAt",
@@ -7076,7 +7506,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)"
+          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
+          "instrumento": "A8",
+          "motivo_instrumento": "el perfil no declara zona horaria"
         },
         {
           "campo": "appearance",
@@ -7100,7 +7532,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)"
+          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
+          "instrumento": "A8",
+          "motivo_instrumento": "el perfil no declara zona horaria"
         },
         {
           "campo": "updatedAt",
@@ -7135,7 +7569,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar"
+          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "FAQ en el idioma por defecto"
         },
         {
           "campo": "items[]",
@@ -7210,7 +7646,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar"
+          "motivo": "idioma del contenido y del correo; sin el, el servidor no puede localizar",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "tips en el idioma por defecto"
         },
         {
           "campo": "topic",
@@ -7218,7 +7656,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`topic` no tiene equivalente demostrado en el contrato de E071: se propone aditivo opcional en A8"
+          "motivo": "`topic` no tiene equivalente demostrado en el contrato de E071: se propone aditivo opcional en A8",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "filtro de cliente sobre el catalogo de tips"
         },
         {
           "campo": "limit",
@@ -7343,7 +7783,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "`checkedAt` no tiene equivalente demostrado en el contrato de E073: se propone aditivo opcional en A8"
+          "motivo": "`checkedAt` no tiene equivalente demostrado en el contrato de E073: se propone aditivo opcional en A8",
+          "instrumento": "CALCULAR",
+          "motivo_instrumento": "instante del chequeo de salud"
         }
       ],
       "resumen": {
@@ -7788,7 +8230,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "El cliente envia el nombre del campo; renombrarlo rompe la integracion.",
           "decision": "CONSERVAR text",
-          "motivo": "Renombrado respecto al contrato aprobado."
+          "motivo": "Renombrado respecto al contrato aprobado.",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "se conserva `text`"
         },
         {
           "campo": "concept",
@@ -7820,7 +8264,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034"
+          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "la intencion no crea recurrentes"
         },
         {
           "campo": "type",
@@ -7828,7 +8274,9 @@
           "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado"
+          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "filtro de cliente; el listado devuelve todo"
         },
         {
           "campo": "confidence",
