@@ -1572,3 +1572,13 @@
 - **Correcciones de CI:** 7 excepciones de compatibilidad registradas para RFC-016 (12 roturas cubiertas, 0 restantes); `ReminderPatch.frequency` anadido; `nullable` sustituido por union con `null` (OpenAPI 3.1); checksum de publicacion actualizado a `ce60c2388e2d0...`.
 - **Validacion:** `H06_CONTRACT_PASS`, `PREPARACION_CONTRATO_PASS` (12 decisiones aprobadas, 0 pendientes, SESSIONHASH=0), `CLASIFICACION_OK` (805 diferencias, ESENCIAL=0, OBSOLETA=0), paridad y publicacion OK, `go build` OK, CI **13/13 PASS**.
 - **Estado:** `CONTRATOS_E005_E075_FROZEN=PENDIENTE_DE_MERGE`. Sin implementacion; E001-E004, AWS y `opencode.json` intactos.
+
+### H08 - Pre-E005: merge de PR #65 y preflight de permisos (2026-11-16)
+
+- **PR #65 MERGED** con `APRUEBO_MERGE_PR_65_SHA_6f1de230d13ab798188e38668d43402de0a4fa4e`, verificado con `--match-head-commit`. Merge commit y `main`: **`8024f878e575d076a87ac2f5d656ce977691a641`**. CI de `main`: SDD documental `43948996106` SUCCESS y Go Backend CI `43948996189` SUCCESS.
+- **Congelamiento:** `CONTRATOS_E005_E075_FROZEN=VERIFIED`. Integrado y verificado en `main`: `hasEnoughData`, `enoughData`/`minimumSamples`, `openingSaved`, `Reminder` y `ReminderPatch` con `frequency`. Quedan 3 referencias `SESSIONHASH` en **E003** (fuera del alcance de A1; requiere enmienda propia).
+- **Preflight `sdd/_control/H08/PREFLIGHT_E005_E075.md`:** permisos locales 161/43 (versionado 151/33); **cero reglas para `ses`, `logs` y `ssm`**; DynamoDB y Redis citados en 75/75 specs; SES **no se cita en ninguna** (`D-PRE-02`).
+- **Hallazgo `D-PRE-01`:** las enmiendas A1-A8 se aplicaron por script bajo Gate humano, pero la politica `edit` seguia **denegando** `sdd/**/spec.md`; el control tecnico no reflejaba la autorizacion. Refuerza la necesidad de aplicar RFC-017.
+- **Estados:** `PERMISSIONS_READY=NO`, `AWS_RUNTIME_READY=NO` (A9/A10 inexistentes), `SES_READY=NO` (identidad, sandbox, IAM y red sin resolver).
+- **Coste SES:** interface endpoint 2 AZ x 45 d ~ 21,60 USD frente a 6,9387 de margen de I-000 → requiere decision FinOps.
+- **Gates propuestos (6):** RFC-017, A9, A10, SES identidad/sandbox, FinOps SES endpoint y A6. Ninguno aplicado; sin recursos creados.
