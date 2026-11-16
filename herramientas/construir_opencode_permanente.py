@@ -150,9 +150,13 @@ def construir(texto: str) -> str:
     texto = texto.replace("\r\n", "\n")
     for cid, descripcion, viejo, nuevo in CAMBIOS:
         n = texto.count(viejo)
-        if n != 1:
+        if n == 1:
+            texto = texto.replace(viejo, nuevo, 1)
+        elif n == 0 and (nuevo == "" or nuevo in texto):
+            # Ya aplicado: el anclaje desaparecio y el estado objetivo esta presente.
+            continue
+        else:
             raise ErrorConstruccion(f"ANCLA_NO_UNICA ({n}) {cid} {descripcion}")
-        texto = texto.replace(viejo, nuevo, 1)
 
     datos = __import__("json").loads(texto)
     permisos = [e for e in datos.get("permissions", []) if e.get("resource") not in REDUNDANTES]

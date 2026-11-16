@@ -52,22 +52,22 @@
     {
       "action": "edit",
       "resource": "sdd/**/spec.md",
-      "effect": "deny"
+      "effect": "ask"
     },
     {
       "action": "edit",
       "resource": "sdd/**/plan.md",
-      "effect": "deny"
+      "effect": "ask"
     },
     {
       "action": "edit",
       "resource": "sdd/03-endpoints/**/openapi/**",
-      "effect": "deny"
+      "effect": "ask"
     },
     {
       "action": "edit",
       "resource": "sdd/03-endpoints/**/openapi.*",
-      "effect": "deny"
+      "effect": "ask"
     },
     {
       "action": "edit",
@@ -422,7 +422,7 @@
     {
       "action": "shell",
       "resource": "aws sts get-caller-identity*",
-      "effect": "ask"
+      "effect": "allow"
     },
     {
       "action": "shell",
@@ -457,7 +457,7 @@
     {
       "action": "shell",
       "resource": "aws ec2 describe-instances*",
-      "effect": "ask"
+      "effect": "allow"
     },
     {
       "action": "shell",
@@ -482,17 +482,17 @@
     {
       "action": "shell",
       "resource": "aws autoscaling describe-auto-scaling-groups*",
-      "effect": "ask"
+      "effect": "allow"
     },
     {
       "action": "shell",
       "resource": "aws elbv2 describe-load-balancers*",
-      "effect": "ask"
+      "effect": "allow"
     },
     {
       "action": "shell",
       "resource": "aws elbv2 describe-target-groups*",
-      "effect": "ask"
+      "effect": "allow"
     },
     {
       "action": "shell",
@@ -557,7 +557,7 @@
     {
       "action": "shell",
       "resource": "aws ec2 describe-instance-types*",
-      "effect": "ask"
+      "effect": "allow"
     },
     {
       "action": "shell",
@@ -614,8 +614,16 @@
       "resource": "terraform plan*",
       "effect": "ask"
     },
-    {"action": "shell", "resource": "terraform plan -input=false -out=bootstrap.tfplan", "effect": "ask"},
-    {"action": "shell", "resource": "terraform show*", "effect": "ask"},
+    {
+      "action": "shell",
+      "resource": "terraform plan -input=false -out=bootstrap.tfplan",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform show*",
+      "effect": "ask"
+    },
     {
       "action": "shell",
       "resource": "terraform init -backend=false",
@@ -755,6 +763,171 @@
       "action": "websearch",
       "resource": "*",
       "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling describe-instance-refreshes *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling describe-scaling-activities *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling update-auto-scaling-group *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling start-instance-refresh *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling cancel-instance-refresh *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling set-instance-protection *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws elbv2 describe-target-health *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-launch-template-versions *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform apply *.tfplan",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform apply -input=false *.tfplan",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-launch-templates *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-instance-type-offerings *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws s3api put-object *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws sts assume-role *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 create-launch-template *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 create-launch-template-version *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 modify-launch-template *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam create-role *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam put-role-policy *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam get-role-policy *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam list-role-policies *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam create-instance-profile *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam add-role-to-instance-profile *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam get-instance-profile *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws dynamodb get-item *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws dynamodb query *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 terminate-instances *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "aws dynamodb delete-table *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam delete-*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ses get-account*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ses list-identities*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws sesv2 get-account*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws logs describe-log-groups*",
+      "effect": "allow"
     }
   ],
   "policies": [
@@ -850,11 +1023,6 @@
     },
     {
       "action": "tool.use",
-      "resource": "shell:terraform apply*",
-      "effect": "deny"
-    },
-    {
-      "action": "tool.use",
       "resource": "shell:terraform destroy*",
       "effect": "deny"
     },
@@ -893,8 +1061,16 @@
       "resource": "shell:terraform plan*",
       "effect": "allow"
     },
-    {"action": "tool.use", "resource": "shell:terraform plan -input=false -out=bootstrap.tfplan", "effect": "allow"},
-    {"action": "tool.use", "resource": "shell:terraform show*", "effect": "allow"},
+    {
+      "action": "tool.use",
+      "resource": "shell:terraform plan -input=false -out=bootstrap.tfplan",
+      "effect": "allow"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:terraform show*",
+      "effect": "allow"
+    },
     {
       "action": "tool.use",
       "resource": "shell:docker *",
@@ -913,6 +1089,81 @@
     {
       "action": "tool.use",
       "resource": "shell:rm *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws autoscaling describe-auto-scaling-groups *",
+      "effect": "allow"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws autoscaling describe-instance-refreshes *",
+      "effect": "allow"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws autoscaling describe-scaling-activities *",
+      "effect": "allow"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws autoscaling update-auto-scaling-group *",
+      "effect": "allow"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws autoscaling start-instance-refresh *",
+      "effect": "allow"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws autoscaling cancel-instance-refresh *",
+      "effect": "allow"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws autoscaling set-instance-protection *",
+      "effect": "allow"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws elbv2 describe-target-health *",
+      "effect": "allow"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws ec2 describe-instances *",
+      "effect": "allow"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws ec2 describe-launch-template-versions *",
+      "effect": "allow"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws * delete-*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws ec2 terminate-instances *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws dynamodb delete-table *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws iam delete-*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:git push -f *",
       "effect": "deny"
     }
   ]

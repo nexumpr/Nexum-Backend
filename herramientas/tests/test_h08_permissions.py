@@ -23,7 +23,12 @@ class PermisosH08I(unittest.TestCase):
   for p in ['cmd/server/main.go','internal/ports/a.go','tests/infra/finops/test_a.py','infra/finops/preflight.ps1','opencode.json','AGENTS.md','.github/workflows/ci.yml','sdd/_control/H08/RFC-004.md','sdd/02-infraestructura/I-000-cuenta-finops/tasks.md']:
    self.assertEqual(self.eff('edit',p),'ask',p)
  def test_normative_and_secrets_denied(self):
-  for p in ['constitution.md','sdd/02-infraestructura/I-000-cuenta-finops/spec.md','sdd/01-arquitectura-general/A-000-contexto-sistema/plan.md','sdd/03-endpoints/E001-auth/spec.md','.env','dir/.env.secret','a.tfstate','a.tfvars','keys.pem','secrets.key']:
+  # RFC-017 (2026-11-16): constitution.md sigue DENY; spec/plan/OpenAPI pasan a ASK
+  # porque una enmienda exige autorizacion humana, no denegacion ciega.
+  self.assertEqual(self.eff('edit','constitution.md'),'deny')
+  for p in ['sdd/02-infraestructura/I-000-cuenta-finops/spec.md','sdd/01-arquitectura-general/A-000-contexto-sistema/plan.md','sdd/03-endpoints/E001-auth/spec.md']:
+   self.assertEqual(self.eff('edit',p),'ask',p)
+  for p in ['.env','dir/.env.secret','a.tfstate','a.tfvars','keys.pem','secrets.key']:
    self.assertEqual(self.eff('edit',p),'deny',p)
   for p in ['.env','a.tfstate','a.tfvars','private.pem']:
    self.assertEqual(self.eff('read',p),'deny',p)
@@ -37,7 +42,9 @@ class PermisosH08I(unittest.TestCase):
    self.assertEqual(self.eff('shell',cmd),'deny',cmd)
   # RFC-011: `plan` e `init -backend=true` pasaron de DENY a ASK con aprobacion humana
   # por ejecucion; `show` se añadio tambien en ASK. Ninguno autoriza mutacion.
-  for cmd in ['aws sts get-caller-identity --profile nexum','aws freetier get-account-plan-state --region us-east-2','aws pricing get-products --service-code AmazonEC2','terraform fmt -check','terraform plan -input=false -var-file x.tfvars -out y.tfplan','terraform init -backend=true','terraform show -json fase-base.tfplan']:
+  # RFC-017: `sts get-caller-identity` es lectura operativa -> ALLOW.
+  self.assertEqual(self.eff('shell','aws sts get-caller-identity --profile nexum'),'allow')
+  for cmd in ['aws freetier get-account-plan-state --region us-east-2','aws pricing get-products --service-code AmazonEC2','terraform fmt -check','terraform plan -input=false -var-file x.tfvars -out y.tfplan','terraform init -backend=true','terraform show -json fase-base.tfplan']:
    self.assertEqual(self.eff('shell',cmd),'ask',cmd)
  def test_specialists_and_skills(self):
   for sub in ['finops-guardian','aws-terraform-engineer','qa-evidence-verifier']:
@@ -79,7 +86,16 @@ class TerraformGateTests(unittest.TestCase):
         self.assertIn(("shell:terraform init -reconfigure*", "deny"), self.politicas)
 
     def test_operaciones_mutantes_denegadas(self) -> None:
-        for verbo in ("apply", "destroy", "import", "state"):
+        # RFC-017: se retiro la `policy` DENY de apply para permitir ASK sobre un plan
+        # guardado; el DENY del permiso generico sigue y destroy/import/state conservan
+        # ademas su denegacion dura. Un `apply -auto-approve` no tiene regla propia: cae
+        # en `terraform apply*` DENY.
+        self.assertIn(("terraform apply*", "deny"), self.permisos)
+        self.assertFalse(
+            any(r.startswith("shell:terraform apply") and e == "deny" for r, e in self.politicas),
+            "apply ya no tiene denegacion dura: el control es el DENY generico + ASK por plan",
+        )
+        for verbo in ("destroy", "import", "state"):
             self.assertTrue(
                 any(r == f"shell:terraform {verbo}*" and e == "deny" for r, e in self.politicas),
                 verbo,
