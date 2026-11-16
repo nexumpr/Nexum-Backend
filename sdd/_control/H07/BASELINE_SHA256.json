@@ -62,7 +62,7 @@
     "herramientas/tests/test_h08_permissions.py": "b62ddd8ae8883d2304150e931c6ea743ea669c9815819b2c86163714c4bd1e30",
     "herramientas/tests/test_iac_devsecops.py": "36b6453691e0c03c0a20bc4adaeb2e0151dbf33a7faaec0375a7b67266ceb193",
     "herramientas/tests/test_integridad_sdd.py": "c396d1d11bb5c86f05a06058b3ea2265d96e68107151432e10e7bcd26fa87ab9",
-    "herramientas/tests/test_permisos_opencode.py": "847a46b04ff1be0274faf5ef5fa9533ba3d1bfae59da52fbc164fd18f7d80e50",
+    "herramientas/tests/test_permisos_opencode.py": "1d0ce3f4f28c9ccb05f37562acf0b5cf68d6a83bf817f53224ff2b1285e10326",
     "herramientas/tests/test_plan_bootstrap.py": "ea8ea4ab0b8b38317c6e5c40cb1196b55d20a05cdd9205808bd9d1f739131435",
     "herramientas/tests/test_preparacion_e005.py": "cbfc34da973d50f568739ec6b5af4291d602db242a5c096e67121500849415d5",
     "herramientas/tests/test_run_ci_y_entorno.py": "4bfe9bb37f23493d2623a461de6692eda7938debe4e1d9f57a74ad098a633f55",
