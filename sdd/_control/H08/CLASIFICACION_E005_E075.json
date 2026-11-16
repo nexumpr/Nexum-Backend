@@ -20,6 +20,7 @@
       "OBSOLETA": 7
     },
     "sin_clasificar": 0,
+    "problemas": [],
     "por_decision": {
       "POSPUESTA_CONFIRMADA": 597,
       "PENDIENTE_DE_DECISION": 0
@@ -30,11 +31,11 @@
       "A3": 26,
       "A5": 2,
       "A7": 0,
-      "A8": 48,
+      "A8": 49,
       "A1": 0,
-      "CONSERVAR": 14,
-      "CALCULAR": 69,
-      "DESCARTAR": 35
+      "CONSERVAR": 19,
+      "CALCULAR": 67,
+      "DESCARTAR": 31
     },
     "a8": [
       "E014:deletionRequestId",
@@ -50,8 +51,7 @@
       "E019:notifications",
       "E029:contributionId",
       "E029:recurringPaymentId",
-      "E031:affectedGoalId",
-      "E031:reversedContributionId",
+      "E032:type",
       "E033:dueDay",
       "E033:startDate",
       "E033:type",
@@ -59,13 +59,15 @@
       "E035:dueDay",
       "E035:startDate",
       "E035:type",
-      "E042:affectedPeriods[]",
-      "E042:releasedAmount",
-      "E042:reversedAllocations",
+      "E038:totals.activeCount",
+      "E038:totals.saved",
+      "E045:status",
       "E059:platform",
+      "E061:type",
       "E061:unreadCount",
       "E062:unreadCount",
       "E063:updatedCount",
+      "E064:type",
       "E065:frequency",
       "E065:timeZone",
       "E065:triggerAt",
@@ -3076,8 +3078,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "efecto del borrado sobre una meta",
-          "instrumento": "A8",
-          "motivo_instrumento": "efecto verificable del borrado sobre una meta"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "204 sin cuerpo: el efecto se consulta con E029/E038"
         },
         {
           "campo": "reversedContributionId",
@@ -3086,8 +3088,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "efecto del borrado sobre una aportacion",
-          "instrumento": "A8",
-          "motivo_instrumento": "efecto verificable del borrado sobre una aportacion"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "204 sin cuerpo: el efecto se consulta con E029"
         },
         {
           "campo": "summary",
@@ -3219,8 +3221,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
-          "instrumento": "DESCARTAR",
-          "motivo_instrumento": "filtro de cliente; el listado devuelve todo"
+          "instrumento": "A8",
+          "motivo_instrumento": "filtro por tipo sobre la lista paginada de recurrentes"
         },
         {
           "campo": "limit",
@@ -3932,8 +3934,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "`totals.saved` no tiene equivalente demostrado en el contrato de E038: se propone aditivo opcional en A8",
-          "instrumento": "CALCULAR",
-          "motivo_instrumento": "agregado de la propia lista"
+          "instrumento": "A8",
+          "motivo_instrumento": "contadores globales: con paginacion el cliente no puede sumarlos"
         },
         {
           "campo": "totals.activeCount",
@@ -3942,8 +3944,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "`totals.activeCount` no tiene equivalente demostrado en el contrato de E038: se propone aditivo opcional en A8",
-          "instrumento": "CALCULAR",
-          "motivo_instrumento": "agregado de la propia lista"
+          "instrumento": "A8",
+          "motivo_instrumento": "contadores globales: con paginacion el cliente no puede sumarlos"
         }
       ],
       "resumen": {
@@ -4330,8 +4332,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "importe liberado por el borrado de meta",
-          "instrumento": "A8",
-          "motivo_instrumento": "importe liberado por el borrado de meta"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "204 sin cuerpo: el efecto se consulta con E038/E040"
         },
         {
           "campo": "reversedAllocations",
@@ -4340,8 +4342,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "aportaciones revertidas por el borrado",
-          "instrumento": "A8",
-          "motivo_instrumento": "aportaciones revertidas por el borrado"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "204 sin cuerpo: el efecto se consulta con E045/E047"
         },
         {
           "campo": "affectedPeriods[]",
@@ -4350,8 +4352,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "periodos contables afectados por la reversion",
-          "instrumento": "A8",
-          "motivo_instrumento": "periodos contables afectados por la reversion"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "204 sin cuerpo: el efecto se consulta con E053"
         }
       ],
       "resumen": {
@@ -4760,8 +4762,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "estado del recurso en listados E038/E045",
-          "instrumento": "CONSERVAR",
-          "motivo_instrumento": "el contrato ya expone status del recurso"
+          "instrumento": "A8",
+          "motivo_instrumento": "filtro por estado sobre la lista paginada de aportaciones"
         },
         {
           "campo": "limit",
@@ -6808,8 +6810,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "filtro que altera el conjunto paginado",
-          "instrumento": "DESCARTAR",
-          "motivo_instrumento": "filtro de cliente sobre el listado"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "equivale al parametro `isRead` de E061"
         },
         {
           "campo": "type",
@@ -6818,8 +6820,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
-          "instrumento": "DESCARTAR",
-          "motivo_instrumento": "filtro de cliente; el listado devuelve todo"
+          "instrumento": "A8",
+          "motivo_instrumento": "filtro por tipo sobre la lista paginada de notificaciones"
         },
         {
           "campo": "limit",
@@ -7043,8 +7045,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
-          "instrumento": "DESCARTAR",
-          "motivo_instrumento": "filtro de cliente; el listado devuelve todo"
+          "instrumento": "A8",
+          "motivo_instrumento": "filtro por tipo sobre la lista paginada de recordatorios"
         },
         {
           "campo": "activeOnly",

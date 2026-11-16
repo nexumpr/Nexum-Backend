@@ -409,6 +409,17 @@ DEPURACION: dict[str, tuple[str, str]] = {
     "progressPercentage": ("CALCULAR", "= dias / hito siguiente"),
     "pigMessage": ("DESCARTAR", "texto de presentacion"),
     "status": ("CONSERVAR", "el contrato ya expone status del recurso"),
+    # Filtros: varios YA existen en OpenAPI con otro nombre; los ausentes van a A8.
+    "unreadOnly": ("CONSERVAR", "equivale al parametro `isRead` de E061"),
+    "activeOnly": ("CONSERVAR", "equivale al parametro `active` de E032/E064"),
+    "totals": ("A8", "contadores globales: con paginacion el cliente no puede sumarlos"),
+    "activeCount": ("A8", "contador global de metas activas sobre una lista paginada"),
+    # Efectos de un 204: no hay cuerpo; se consultan por GET.
+    "affectedGoalId": ("CONSERVAR", "204 sin cuerpo: el efecto se consulta con E029/E038"),
+    "reversedContributionId": ("CONSERVAR", "204 sin cuerpo: el efecto se consulta con E029"),
+    "releasedAmount": ("CONSERVAR", "204 sin cuerpo: el efecto se consulta con E038/E040"),
+    "reversedAllocations": ("CONSERVAR", "204 sin cuerpo: el efecto se consulta con E045/E047"),
+    "affectedPeriods": ("CONSERVAR", "204 sin cuerpo: el efecto se consulta con E053"),
 }
 
 # Excepciones por endpoint cuando el mismo nombre tiene otro papel.
@@ -438,6 +449,11 @@ DEPURACION_EID: dict[str, tuple[str, str]] = {
     "E028:source": ("CALCULAR", "derivable de las referencias de E029"),
     "E006:resetToken": ("CONSERVAR", "se conserva `token`"),
     "E075:transcript": ("CONSERVAR", "se conserva `text`"),
+    # Filtros ausentes sobre listas paginadas: filtrar una pagina no equivale a filtrar el total.
+    "E032:type": ("A8", "filtro por tipo sobre la lista paginada de recurrentes"),
+    "E061:type": ("A8", "filtro por tipo sobre la lista paginada de notificaciones"),
+    "E064:type": ("A8", "filtro por tipo sobre la lista paginada de recordatorios"),
+    "E045:status": ("A8", "filtro por estado sobre la lista paginada de aportaciones"),
 }
 
 
@@ -553,6 +569,7 @@ def clasificar(raiz: Path) -> dict:
     api = cargar(raiz / OPENAPI)
     componentes = (api.get("components") or {}).get("schemas") or {}
     operaciones = []
+    problemas: list[str] = []
     resumen_clases = {"ESENCIAL": 0, "COMPATIBILIDAD": 0, "OPCIONAL": 0, "OBSOLETA": 0}
 
     for fila in matriz:
@@ -579,6 +596,11 @@ def clasificar(raiz: Path) -> dict:
                 instr, motivo_instr = instrumento(campo, eid)
                 entrada["instrumento"] = instr
                 entrada["motivo_instrumento"] = motivo_instr
+                # Invariante: un 204 no puede llevar cuerpo; ningun campo A8 de respuesta.
+                respuesta = (op.get("responses") or {}).get(str(fila.get("sdd_success"))) or {}
+                sin_cuerpo = not (((respuesta.get("content") or {}).get("application/json")))
+                if instr == "A8" and tipo == "RESPONSE" and sin_cuerpo:
+                    problemas.append(f"A8_SOBRE_RESPUESTA_SIN_CUERPO {eid}:{campo}")
             diferencias.append(entrada)
 
         # 1) Codigo de exito.
@@ -713,6 +735,7 @@ def clasificar(raiz: Path) -> dict:
             "diferencias": total,
             "por_clase": resumen_clases,
             "sin_clasificar": sin_clasificar,
+            "problemas": problemas,
             "por_decision": {
                 "POSPUESTA_CONFIRMADA": sum(
                     1 for o in operaciones for d in o["diferencias"] if d["decision"] == "POSPUESTA_CONFIRMADA"

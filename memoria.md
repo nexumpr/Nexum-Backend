@@ -1540,3 +1540,11 @@
 - **Sin contradicciones normativas:** RFC-016 v4 §17.6 sustituye la cifra anterior; `CLASIFICACION_E005_E075.json` lleva `instrumento` y `motivo_instrumento` por diferencia.
 - **Estado:** 812 diferencias, 0 sin clasificar, 0 pendientes; ESENCIAL=9. `CONTRATOS_E005_E075_FROZEN=NOT_VERIFIED` (A1-A5/A7/A8 sin aplicar). `AWS_READY=NOT_READY`. Nada implementado; E001-E004 intactos.
 
+### H08 - Pre-E005: revision 6 (204, filtros y A8 con schema) — 2026-11-16
+
+- **HTTP 204 (E031/E042):** verificado que ambas declaran `204` con `content: {}`. Se **retiran de A8** `affectedGoalId`, `reversedContributionId`, `releasedAmount`, `reversedAllocations` y `affectedPeriods`: añadirlos contradice HTTP. Los efectos se consultan con E029/E038/E040/E045/E046/E026 (tabla en RFC-016 17.7). Invariante automatizada `A8_SOBRE_RESPUESTA_SIN_CUERPO`: **0 problemas**.
+- **Filtros y paginacion:** revisados contra los parametros reales. Ya existen `type`/`from`/`to` en E027, `active` en E032/E064, `status` en E038, `goalId` en E045, `isRead` en E061. Por tanto `unreadOnly` ≡ `isRead` y `activeOnly` ≡ `active` se **conservan** (no se descartan). Faltan y se incorporan a A8: `type` en E032/E061/E064 y `status` en E045. `limit` de E053/E071 no se añade (el servidor acota).
+- **Contadores sobre listas paginadas:** `unreadCount` (E061/E062), `updatedCount` (E063) y `totals.activeCount` (E038) pasan de «calculables» a **A8**: con paginacion el cliente no puede sumarlos.
+- **A8 definitiva: 38 incorporaciones** con endpoint, ubicacion JSON, tipo, required, nullability, restricciones, ejemplo y pantalla consumidora (RFC-016 17.9). Sin duplicar A2/A3/A5/A7.
+- **Estado:** 199 compatibilidad instrumentadas (A8=49 entradas/38 campos, A3=26, A5=2, A4=5, CONSERVAR=19, CALCULAR=67, DESCARTAR=31). Nada aplicado; `CONTRATOS_E005_E075_FROZEN=NOT_VERIFIED`. Sin implementacion; E001-E004, AWS y `opencode.json` intactos.
+

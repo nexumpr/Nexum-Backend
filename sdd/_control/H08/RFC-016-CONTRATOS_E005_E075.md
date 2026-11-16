@@ -539,3 +539,103 @@ filtros (`type`, `limit`, `cursor`, `locale`, `unreadOnly`, `activeOnly`, `befor
 `CONTRACT_FROZEN = NOT_VERIFIED` mientras A1–A5, A7 y A8 no estén **aprobadas y aplicadas**.
 `AWS_READY = NOT_READY` (SES sin remitente, sin preflight y con coste de endpoint sin aprobar).
 `IMPLEMENTED / MERGED / DEPLOYED / AWS_VERIFIED / USER_ACCEPTED = NOT_RUN`.
+
+## 17.7 Respuestas 204 (E031, E042) — resuelto sin añadir cuerpo
+
+**Hecho verificado:** `nexum_e031` y `nexum_e042` declaran `204` con `content: {}`. Añadir
+`affectedGoalId`, `reversedContributionId`, `releasedAmount`, `reversedAllocations` o
+`affectedPeriods` a su respuesta **contradice HTTP**. Se retiran de A8.
+
+**Decisión (opción A):** se conserva `204` sin cuerpo y los efectos se consultan con operaciones
+existentes, en este orden:
+
+| Efecto tras | Se consulta con | Qué devuelve |
+|---|---|---|
+| E031 borrar movimiento | `GET /movements/{movementId}` (E029) → `404` | confirma el borrado |
+| E031 efecto en meta | `GET /goals` (E038) / `GET /goals/{id}` (E040) | `savedAmount` ya recalculado |
+| E031 efecto en aportación | `GET /goal-contributions` (E045) | aportaciones vigentes |
+| E042 borrar meta | `GET /goals/{id}` (E042→404) | confirma el borrado |
+| E042 importe liberado | `GET /financial-summary` (E026) | `availableEstimated` recalculado |
+| E042 aportaciones revertidas | `GET /goal-contributions` (E045) + `GET .../{id}` (E046) | `status: reversed` |
+
+**Invariante automatizada:** el clasificador emite `A8_SOBRE_RESPUESTA_SIN_CUERPO` si algún campo
+A8 se propone sobre una respuesta sin `application/json`. Hoy: **0 problemas**.
+
+## 17.8 Filtros y paginación — verificado contra OpenAPI
+
+Filtrar una página en Android **no** equivale a filtrar el conjunto. Revisión con los parámetros
+reales del contrato:
+
+| Operación | Filtros que YA existen | Decisión |
+|---|---|---|
+| E027 movimientos | `limit`, `cursor`, `type`, `from`, `to` | conservar; nada que añadir |
+| E032 recurrentes | `limit`, `cursor`, `active` | **falta `type`** → A8 |
+| E038 metas | `limit`, `cursor`, `status` | conservar |
+| E045 aportaciones | `limit`, `cursor`, `goalId`, `from`, `to` | **falta `status`** → A8 |
+| E053 categorías | `period` | `limit` no se añade: el servidor acota el top-N |
+| E061 notificaciones | `limit`, `cursor`, `isRead` | `unreadOnly` ≡ `isRead` → conservar; **falta `type`** → A8 |
+| E064 recordatorios | `limit`, `cursor`, `active` | `activeOnly` ≡ `active` → conservar; **falta `type`** → A8 |
+| E071 tips | — | catálogo pequeño; el servidor acota; no se añade |
+
+**Contadores sobre listas paginadas:** `unreadCount` (E061, E062), `updatedCount` (E063) y
+`totals.activeCount` (E038) **no** son calculables por el cliente desde una página. Se incorporan a A8
+en lugar de tratarse como calculables.
+
+## 17.9 A8 definitiva — 38 incorporaciones con schema
+
+Todas son **aditivas y opcionales** salvo donde se indica `required`; ninguna rompe a un cliente que
+ignore campos desconocidos. Tipos: `string`, `boolean`, `integer`, `object`, `array<object>`.
+
+| # | Endpoint | Ubicación JSON | Campo | Tipo | Req | Null | Restricciones / formato | Pantalla | Enmienda |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | E014 `DELETE /users/me` | 202 `.deletionRequestId` | `deletionRequestId` | string(uuid) | sí | no | uuid v7 | Cuenta → borrado | A8 |
+| 2 | E015 `GET /privacy/notices/current` | 200 `.content` | `content` | string | sí | no | 1..20000 | Aviso de privacidad | A8 |
+| 3 | E015 idem | 200 `.requiresAcceptance` | `requiresAcceptance` | boolean | sí | no | — | Aviso de privacidad | A8 |
+| 4-7 | E018 `GET /users/me/onboarding` | 200 | `microphone`,`notifications`,`configured` (boolean, sí) · `completedAt` (string date-time, sí, null si no completado) | | | | | Onboarding | A8 |
+| 8-11 | E019 `PATCH /users/me/onboarding` | request y 200 | ídem 4-7, `completedAt` solo en respuesta | | | | `additionalProperties:false` | Onboarding | A8 |
+| 12 | E029 `GET /movements/{id}` | 200 `.recurringPaymentId` | string(uuid) | no | sí | uuid v7 | Movimiento ↔ recurrente | A8 |
+| 13 | E029 idem | 200 `.contributionId` | string(uuid) | no | sí | uuid v7 | Movimiento ↔ aportación | A8 |
+| 14 | E032 `GET /recurring-payments` | query `type` | enum `income|expense|saving` | no | — | — | Lista recurrentes | A8 |
+| 15-17 | E033 `POST /recurring-payments` | request/201 | `type` (enum), `startDate` (date), `dueDay` (integer 1..28) | sí | no | fecha ISO; `dueDay` 1–28 | Crear recurrente | A8 |
+| 18 | E034 `GET /recurring-payments/{id}` | 200 `.startDate` | string(date) | sí | no | ISO date | Detalle recurrente | A8 |
+| 19-21 | E035 `PATCH /recurring-payments/{id}` | request/200 | `type`, `startDate`, `dueDay` (opcionales) | no | no | mismas restricciones | Editar recurrente | A8 |
+| 22 | E038 `GET /goals` | 200 `.totals.activeCount` | integer ≥0 | sí | no | — | Lista de metas | A8 |
+| 23 | E045 `GET /goal-contributions` | query `status` | enum `active|reversed` | no | — | — | Historial aportaciones | A8 |
+| 24 | E059 `POST /devices/push-tokens` | request/201 | `platform` | enum `android|ios` | sí | no | — | Registro push | A8 |
+| 25 | E061 `GET /notifications` | query `type` | enum `budget|goal|recurring|streak|system` | no | — | — | Bandeja | A8 |
+| 26 | E061 idem | 200 `.unreadCount` | integer ≥0 | sí | no | total global (no de página) | Bandeja | A8 |
+| 27 | E062 `PATCH /notifications/{id}/read` | 200 `.unreadCount` | integer ≥0 | sí | no | total global | Bandeja | A8 |
+| 28 | E063 `POST /notifications/read-all` | 200 `.updatedCount` | integer ≥0 | sí | no | — | Bandeja | A8 |
+| 29 | E064 `GET /reminders` | query `type` | enum `budget|goal|recurring|streak` | no | — | — | Recordatorios | A8 |
+| 30-32 | E065 `POST /reminders` | request/201 | `triggerAt` (date-time), `frequency` (enum `daily|weekly|monthly`), `timeZone` (IANA) | sí | no | `triggerAt` futuro; IANA en `America/*` | Crear recordatorio | A8 |
+| 33-35 | E066 `PATCH /reminders/{id}` | request/200 | `triggerAt`, `frequency`, `timeZone` (opcionales) | no | no | mismas restricciones | Editar recordatorio | A8 |
+| 36 | E068 `GET /users/me/preferences` | 200 `.timeZone` | string(IANA) | sí | no | — | Preferencias | A8 |
+| 37 | E069 `PATCH /users/me/preferences` | request/200 | `timeZone` (opcional) | no | no | — | Preferencias | A8 |
+| 38 | E039/E040 `POST/GET /goals` | 200 | `openingSaved` | string(dinero) | sí | no | 2 decimales, ≥0 | Meta → detalle | **A7** |
+
+**Ejemplo válido (E065):**
+```json
+{"type":"budget","relatedEntityId":"018f90ef-08e5-7a68-b09f-2b67a47c92f0",
+ "triggerAt":"2026-12-01T18:00:00Z","frequency":"monthly","timeZone":"America/Mexico_City",
+ "enabled":true}
+```
+
+**No duplicados:** `hasEnoughData` (A2), `quietHours`/preferencias (A3), `enoughData`/`minimumSamples`
+(A5) y `openingSaved` (A7) **no** se cuentan en A8. `affectedGoalId`, `reversedContributionId`,
+`releasedAmount`, `reversedAllocations` y `affectedPeriods` **quedan fuera** (§17.7).
+
+**Compatibilidad:** todos son campos nuevos u opcionales; ningún cliente actual (E001–E004) los envía
+ni los recibe. `additionalProperties: false` obliga a declararlos en el schema antes de poder usarlos.
+
+## 17.10 Frases de aprobación
+
+| Instrumento | Frase |
+|---|---|
+| RFC completa | `APRUEBO_RFC_016_CONTRATOS_E005_E075` |
+| Persistencia | `APRUEBO_ENMIENDA_A1_PERSISTENCIA` |
+| E055 | `APRUEBO_ENMIENDA_A2_E055` |
+| E057/E058 | `APRUEBO_ENMIENDA_A3_E058` |
+| E052 | `APRUEBO_ENMIENDA_A5_E052` |
+| E039/E040 | `APRUEBO_ENMIENDA_A7_E040` |
+| A8 (38) | `APRUEBO_ENMIENDA_A8_ADITIVOS` |
+| Merge | `APRUEBO_MERGE_PR_65_SHA_<SHA40>` |
