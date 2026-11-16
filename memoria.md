@@ -1046,3 +1046,11 @@
 - **`-race` local:** `NOT_RUN - BLOCKED_TOOLCHAIN` (`-race` exige cgo y este host Windows no tiene `gcc`). La autoridad es el job de CI en Linux; no se declara PASS local.
 - **No se declara:** `E004_DEPLOYED`, `E004_AWS_VERIFIED` ni dos nodos AWS verificados. Las pruebas de dos instancias son logicas, sobre el mismo almacen.
 - **Bloqueo documental:** `spec.md` 4 y `plan.md` 3 citan `SESSIONHASH#digest`, mientras la implementacion usa `REFRESH#<digest>/SESSION`. La politica `edit` deniega `sdd/**/spec.md` y `sdd/**/plan.md`, por lo que **no se editaron**: la discrepancia queda registrada en el Gate (D-E004-01) para enmienda humana. El `201` del PDF se trata como error editorial (D-E004-02) y `allDevices`/`refreshToken` en el cuerpo no se implementan (D-E004-03).
+
+### H08-E / E004 - CI verde del PR #63 (2026-11-16)
+
+- **Run `43786668813`, HEAD `a31d2d6fbad229485f0e68435c3b40881c0c5356`:** 13 de 13 checks en `pass` (Deteccion de cambios, Formato/vet/build/pruebas, Analisis estatico, Escaneo de secretos, SAST Semgrep, Integracion HTTP y concurrencia, Contratos OpenAPI, Validacion Terraform e IaC, SBOM, PR Quality Gate, Hardening Report, CI Success y `validar` documental).
+- **`go test -race` ejecutado realmente en CI** (`./cmd/... ./tests/unit/... ./tests/security/...`, 01:32:42Z) con resultado `PASS`; **cobertura de dominio 91.4%** >= umbral 80% (`COBERTURA_DOMINIO_PASS`). Esto cubre el `NOT_RUN` local por falta de gcc.
+- **Fallo previo corregido en el mismo PR:** el run `43786436437` fallo por `staticcheck U1000` (metodo `revocar` del doble sin uso). Se sustituyo por una prueba real del autorizador (`TestE004SesionesRevocacionAfectaAlAutorizador`), sin `//nolint` ni supresiones.
+- **Perfil del commit documental:** un cambio limitado a `memoria.md` y `sdd/**` produce perfil `sdd` (`go=false`) por RFC-008, por lo que los jobs Go aparecen `skipping` justificados. El codigo no cambia entre `a31d2d6` y este commit; el artefacto de release se generara desde el CI de `main` tras el merge.
+- **Estado:** `E004_IMPLEMENTED` + `CI_GREEN`. `E004_MERGED`, `E004_DEPLOYED`, `E004_AWS_VERIFIED` y `E004_USER_ACCEPTED` siguen `NOT_RUN`.

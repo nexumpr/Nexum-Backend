@@ -24,8 +24,8 @@
   _Integración sobre adaptadores **reales** con doble con estado de DynamoDB (`tests/unit/dynamo/logout_store_test.go`, 10 casos) y HTTP con `httptest` (`tests/unit/transport/logout_v602_test.go`, 10 casos). HTTP público/AWS: `NOT_RUN`._
 - [x] `E004-T10` Ejecutar negativas de auth/ownership/concurrencia y carga paginada cuando aplique.
   _Negativas de Bearer, sujeto ajeno, sesión ajena, cuerpo no permitido, dependencia caída y concurrencia logout↔refresh (25 iteraciones). Carga paginada no aplica._
-- [ ] `E004-T11` CI + seguridad + revisión de contratos + rollback y trazas saneadas.
-  _Pendiente: CI del PR técnico. Ejecutado en local: gofmt, build, vet, `go test ./...`, validación H06, paridad I-150 y comparador de compatibilidad (`COMPATIBLE`). `-race` local `NOT_RUN` por falta de gcc; lo ejecuta CI en Linux._
+- [x] `E004-T11` CI + seguridad + revisión de contratos + rollback y trazas saneadas.
+  _CI del PR #63: run `43786668813`, HEAD `a31d2d6`, **13/13 `pass`**, con `go test -race` ejecutado en Linux (`PASS`) y cobertura de dominio 91.4 %. En local: gofmt, build, vet, `go test ./...`, validación H06, paridad I-150 y comparador `COMPATIBLE`. Rollback de la operación: basta revocar/no revocar; no hay migración de esquema._
 - [ ] `E004-T12` Solicitar autorización humana de release; desplegar desde IaC/CI, probar en dos nodos y registrar evidencia real.
   _**BLOQUEADO**: exige Gate de merge y, después, Gates de publicación S3, `terraform apply` del LT/IAM y `instance refresh`. `AWS_NOT_RUN`._
 
