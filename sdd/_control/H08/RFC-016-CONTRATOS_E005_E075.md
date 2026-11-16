@@ -362,26 +362,23 @@ Estados separados y no intercambiables: `CONTRACT_FROZEN` · `AWS_READY` · `IMP
 
 ```
 71 operaciones · 812 diferencias · 0 sin clasificar · 0 pendientes de decisión
-ESENCIAL=9 · COMPATIBILIDAD=199 · OPCIONAL=597 (todas POSPUESTA_CONFIRMADA con motivo) · OBSOLETA=7
+ESENCIAL=2 · COMPATIBILIDAD=206 · OPCIONAL=597 · OBSOLETA=7
 ```
 
-**ESENCIAL (9)** — sin el dato, el flujo es imposible:
+**ESENCIAL (2)** — únicos datos que solo el servidor tiene y el contrato no expone:
 
 | Endpoint | Campo | Por qué |
 |---|---|---|
-| E010 | `email` | E010 es pública y debe identificar la cuenta a verificar |
-| E011 | `verificationToken` | E011 es pública y solo recibe el token |
-| E040 | `openingSaved` | E039 lo acepta y nadie lo devuelve; `contributedNet` no es calculable |
-| E055 | `hasEnoughData` | sin él, `items: []` no distingue «sin historial» de «sin patrones» |
-| E059 | `deviceId` (request y response) | deduplicación del registro push |
-| E059 | `deviceRegistrationId` | identificador que E060 debe eliminar |
-| E065, E066 | `relatedEntityId` | sin vínculo, el recordatorio es inutilizable |
+| E040 | `openingSaved` | E039 acepta `initialSavedAmount` y no lo devuelve; sin él `contributedNet` es incalculable (enmienda A7) |
+| E055 | `hasEnoughData` | sin él, `items: []` no distingue «sin historial» de «sin patrones» (enmienda A2) |
 
-**COMPATIBILIDAD (199)**: ampliación **aditiva** agrupada en **A8** (§17.6). Cada entrada tiene su
-motivo concreto en `CLASIFICACION_E005_E075.json`; ninguna se justifica con «es de presentación».
+Los otros siete candidatos que se habían marcado ESENCIALES quedaron **resueltos por el contrato
+real** y pasan a CONSERVAR: `email` (E010 exige Bearer), `verificationToken` (E011 ya exige `token`),
+`deviceId` y `deviceRegistrationId` (≡ `PushDevice.id`), `platform` (≡ `provider`),
+`relatedEntityId` (el recordatorio no tiene vínculo) y `updatedCount` (un `202` no devuelve conteo).
 
-**OPCIONAL (597)**: todas con derivación declarada (equivalencia de nombre, cálculo aritmético o
-composición desde un endpoint atómico concreto).
+Instrumentos sobre las 206 diferencias de compatibilidad: A8=40 entradas/31 campos · A3=26 · A5=2 ·
+A4=5 · CONSERVAR=33 · CALCULAR=66 · DESCARTAR=34. **OPCIONAL=597**, todas con derivación.
 
 ## 17.2 E005 — correcciones de diseño
 
@@ -500,39 +497,6 @@ refresh posterior (rechazado); logout posterior (idempotente).
 | **A10** | **IAM `QUEUE#*` y `RESET#*`** | módulo IAM (I-060) | No (despliegue E005) |
 | A6 | época de revocación (código) | E002/E003/middleware/E006 | No (implementación E006) |
 
-### 17.6 A8 depurada — 199 candidatos revisados, 37 campos reales
-
-Las 199 diferencias de compatibilidad **no** se convirtieron en 199 campos: se revisó cada una
-contra el contrato de **su** operación y recibió un instrumento.
-
-| Instrumento | N | Significado |
-|---|---|---|
-| **A8** | **48 entradas / 37 campos** | dato que solo el servidor tiene y la pantalla necesita |
-| **A3** | 26 | preferencias E057/E058 ya cubiertas |
-| **A5** | 2 | suficiencia de datos E052 |
-| **A4** | 5 | decisiones HTTP (conservar) |
-| **CONSERVAR** | 14 | el contrato ya lo expone con otro nombre |
-| **CALCULAR** | 69 | fórmula exacta con datos del propio contrato |
-| **DESCARTAR** | 35 | filtro de cliente, diagnóstico o adorno |
-
-**Los 37 campos de A8** (agrupados):
-
-| Grupo | Campos | Por qué no es calculable |
-|---|---|---|
-| Onboarding E018/E019 | `microphone`, `notifications`, `configured`, `completedAt` (×2) | el servidor persiste el estado; el cliente no puede inferirlo |
-| Recordatorios E065/E066 | `frequency`, `timeZone`, `triggerAt` (×2) | sin ellos no se puede programar el disparo |
-| Recurrentes E033/E034/E035 | `type`, `startDate`, `dueDay` | definen la serie; no están en el contrato |
-| Referencias E029 | `recurringPaymentId`, `contributionId` | enlazan el movimiento con su origen |
-| Efectos E031 | `affectedGoalId`, `reversedContributionId` | verifican el efecto del borrado |
-| Efectos E042 | `releasedAmount`, `reversedAllocations`, `affectedPeriods` | verifican la reversión de la meta |
-| Contadores | `unreadCount` (E061/E062), `updatedCount` (E063) | con paginación el cliente no puede contarlos |
-| Varios | `deletionRequestId`, `content`, `requiresAcceptance`, `platform` | datos exclusivos del servidor |
-
-**Descartados explícitamente** (no se inventan): `emoji`, `pigMessage`, `title`, `message`, `body`,
-`confidence`, `reset`, `revokedSessions`, `revokedOtherSessions`, `reason`, `appVersion`,
-filtros (`type`, `limit`, `cursor`, `locale`, `unreadOnly`, `activeOnly`, `before`, `include`,
-`format`, `context`, `includeInactive`, `topic`) y constantes internas de ventana.
-
 ## 17.5 Estado de los contratos
 
 `DECISION_READY = VERIFIED` para los 71 (todas las diferencias tienen decisión).
@@ -574,58 +538,74 @@ reales del contrato:
 | E045 aportaciones | `limit`, `cursor`, `goalId`, `from`, `to` | **falta `status`** → A8 |
 | E053 categorías | `period` | `limit` no se añade: el servidor acota el top-N |
 | E061 notificaciones | `limit`, `cursor`, `isRead` | `unreadOnly` ≡ `isRead` → conservar; **falta `type`** → A8 |
-| E064 recordatorios | `limit`, `cursor`, `active` | `activeOnly` ≡ `active` → conservar; **falta `type`** → A8 |
+| E064 recordatorios | `limit`, `cursor`, `active` | `activeOnly` ≡ `active` → conservar; **`type` no se añade**: el recordatorio no tiene tipo en el modelo |
 | E071 tips | — | catálogo pequeño; el servidor acota; no se añade |
 
-**Contadores sobre listas paginadas:** `unreadCount` (E061, E062), `updatedCount` (E063) y
-`totals.activeCount` (E038) **no** son calculables por el cliente desde una página. Se incorporan a A8
-en lugar de tratarse como calculables.
+**Contadores sobre listas paginadas:** `unreadCount` (E061, E062) y `totals.{activeCount,saved}`
+(E038) **no** son calculables desde una página → A8. `updatedCount` de E063 **no** entra: la operación
+es `202` y no puede devolver el conteo final; Android lo obtiene con `GET /notifications` (E061) —
+`unreadCount` — o filtrando por `isRead`.
 
-## 17.9 A8 definitiva — 38 incorporaciones con schema
+## 17.9 A8 definitiva — 31 incorporaciones con schema
 
-Todas son **aditivas y opcionales** salvo donde se indica `required`; ninguna rompe a un cliente que
-ignore campos desconocidos. Tipos: `string`, `boolean`, `integer`, `object`, `array<object>`.
+> Sustituye por completo a la tabla anterior de A8. Se eliminan las duplicidades detectadas
+> verificando el contrato real: `email` (E010 exige Bearer), `verificationToken` (E011 ya exige
+> `token`), `deviceId`/`deviceRegistrationId` (≡ `PushDevice.id`), `platform` (≡ `provider`),
+> `triggerAt`/`timeZone` (≡ `dueAt`/`timezone`), `relatedEntityId` y `E064:type` (no existen en el
+> modelo), `updatedCount` (un 202 no puede devolver el conteo final).
 
-| # | Endpoint | Ubicación JSON | Campo | Tipo | Req | Null | Restricciones / formato | Pantalla | Enmienda |
+Tipos abreviados: `s` string, `b` boolean, `i` integer, `dt` date-time, `d` date, `u` uuid, `m` dinero.
+`Req` = requerido en el schema. Todos son aditivos y no rompen clientes que ignoren campos nuevos.
+
+| # | Endpoint | Dónde | Campo | Tipo | Req | Null | Restricciones / enum | Pantalla | Enmienda |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | E014 `DELETE /users/me` | 202 `.deletionRequestId` | `deletionRequestId` | string(uuid) | sí | no | uuid v7 | Cuenta → borrado | A8 |
-| 2 | E015 `GET /privacy/notices/current` | 200 `.content` | `content` | string | sí | no | 1..20000 | Aviso de privacidad | A8 |
-| 3 | E015 idem | 200 `.requiresAcceptance` | `requiresAcceptance` | boolean | sí | no | — | Aviso de privacidad | A8 |
-| 4-7 | E018 `GET /users/me/onboarding` | 200 | `microphone`,`notifications`,`configured` (boolean, sí) · `completedAt` (string date-time, sí, null si no completado) | | | | | Onboarding | A8 |
-| 8-11 | E019 `PATCH /users/me/onboarding` | request y 200 | ídem 4-7, `completedAt` solo en respuesta | | | | `additionalProperties:false` | Onboarding | A8 |
-| 12 | E029 `GET /movements/{id}` | 200 `.recurringPaymentId` | string(uuid) | no | sí | uuid v7 | Movimiento ↔ recurrente | A8 |
-| 13 | E029 idem | 200 `.contributionId` | string(uuid) | no | sí | uuid v7 | Movimiento ↔ aportación | A8 |
-| 14 | E032 `GET /recurring-payments` | query `type` | enum `income|expense|saving` | no | — | — | Lista recurrentes | A8 |
-| 15-17 | E033 `POST /recurring-payments` | request/201 | `type` (enum), `startDate` (date), `dueDay` (integer 1..28) | sí | no | fecha ISO; `dueDay` 1–28 | Crear recurrente | A8 |
-| 18 | E034 `GET /recurring-payments/{id}` | 200 `.startDate` | string(date) | sí | no | ISO date | Detalle recurrente | A8 |
-| 19-21 | E035 `PATCH /recurring-payments/{id}` | request/200 | `type`, `startDate`, `dueDay` (opcionales) | no | no | mismas restricciones | Editar recurrente | A8 |
-| 22 | E038 `GET /goals` | 200 `.totals.activeCount` | integer ≥0 | sí | no | — | Lista de metas | A8 |
-| 23 | E045 `GET /goal-contributions` | query `status` | enum `active|reversed` | no | — | — | Historial aportaciones | A8 |
-| 24 | E059 `POST /devices/push-tokens` | request/201 | `platform` | enum `android|ios` | sí | no | — | Registro push | A8 |
-| 25 | E061 `GET /notifications` | query `type` | enum `budget|goal|recurring|streak|system` | no | — | — | Bandeja | A8 |
-| 26 | E061 idem | 200 `.unreadCount` | integer ≥0 | sí | no | total global (no de página) | Bandeja | A8 |
-| 27 | E062 `PATCH /notifications/{id}/read` | 200 `.unreadCount` | integer ≥0 | sí | no | total global | Bandeja | A8 |
-| 28 | E063 `POST /notifications/read-all` | 200 `.updatedCount` | integer ≥0 | sí | no | — | Bandeja | A8 |
-| 29 | E064 `GET /reminders` | query `type` | enum `budget|goal|recurring|streak` | no | — | — | Recordatorios | A8 |
-| 30-32 | E065 `POST /reminders` | request/201 | `triggerAt` (date-time), `frequency` (enum `daily|weekly|monthly`), `timeZone` (IANA) | sí | no | `triggerAt` futuro; IANA en `America/*` | Crear recordatorio | A8 |
-| 33-35 | E066 `PATCH /reminders/{id}` | request/200 | `triggerAt`, `frequency`, `timeZone` (opcionales) | no | no | mismas restricciones | Editar recordatorio | A8 |
-| 36 | E068 `GET /users/me/preferences` | 200 `.timeZone` | string(IANA) | sí | no | — | Preferencias | A8 |
-| 37 | E069 `PATCH /users/me/preferences` | request/200 | `timeZone` (opcional) | no | no | — | Preferencias | A8 |
-| 38 | E039/E040 `POST/GET /goals` | 200 | `openingSaved` | string(dinero) | sí | no | 2 decimales, ≥0 | Meta → detalle | **A7** |
+| 1 | E014 `DELETE /users/me` | 202 body | `deletionRequestId` | u | sí | no | uuid v7 | Cuenta | A8 |
+| 2 | E015 `GET /privacy/notices/current` | 200 body | `content` | s | sí | no | 1..20000 | Aviso | A8 |
+| 3 | E015 idem | 200 body | `requiresAcceptance` | b | sí | no | — | Aviso | A8 |
+| 4 | E018 `GET /users/me/onboarding` | 200 body | `microphone` | b | sí | no | — | Onboarding | A8 |
+| 5 | E018 idem | 200 body | `notifications` | b | sí | no | — | Onboarding | A8 |
+| 6 | E018 idem | 200 body | `configured` | b | sí | no | — | Onboarding | A8 |
+| 7 | E018 idem | 200 body | `completedAt` | dt | sí | sí | null si no completado | Onboarding | A8 |
+| 8 | E019 `PATCH /users/me/onboarding` | request | `microphone` | b | no | no | — | Onboarding | A8 |
+| 9 | E019 idem | request | `notifications` | b | no | no | — | Onboarding | A8 |
+| 10 | E019 idem | request | `configured` | b | no | no | — | Onboarding | A8 |
+| 11 | E019 idem | 200 body | `completedAt` | dt | sí | sí | — | Onboarding | A8 |
+| 12 | E029 `GET /movements/{id}` | 200 body | `contributionId` | u | no | sí | uuid v7 | Movimiento | A8 |
+| 13 | E029 idem | 200 body | `recurringPaymentId` | u | no | sí | uuid v7 | Movimiento | A8 |
+| 14 | E032 `GET /recurring-payments` | query | `type` | s | no | — | enum `income|expense|saving` | Recurrentes | A8 |
+| 15 | E033 `POST /recurring-payments` | request | `type` | s | sí | no | mismo enum | Crear recurrente | A8 |
+| 16 | E033 idem | request | `startDate` | d | sí | no | ISO `YYYY-MM-DD` | Crear recurrente | A8 |
+| 17 | E033 idem | request | `dueDay` | i | no | sí | 1..28 | Crear recurrente | A8 |
+| 18 | E034 `GET /recurring-payments/{id}` | 200 body | `startDate` | d | sí | no | ISO | Detalle recurrente | A8 |
+| 19 | E035 `PATCH /recurring-payments/{id}` | request | `type` | s | no | no | mismo enum | Editar recurrente | A8 |
+| 20 | E035 idem | request | `startDate` | d | no | no | ISO | Editar recurrente | A8 |
+| 21 | E035 idem | request | `dueDay` | i | no | sí | 1..28 | Editar recurrente | A8 |
+| 22 | E038 `GET /goals` | 200 body `totals` | `activeCount` | i | sí | no | ≥0 | Lista de metas | A8 |
+| 23 | E038 idem | 200 body `totals` | `saved` | m | sí | no | 2 decimales, ≥0 | Lista de metas | A8 |
+| 24 | E045 `GET /goal-contributions` | query | `status` | s | no | — | enum `active|reversed` | Aportaciones | A8 |
+| 25 | E061 `GET /notifications` | query | `type` | s | no | — | enum `budget|goal|recurring|streak|system` | Bandeja | A8 |
+| 26 | E061 idem | 200 body | `unreadCount` | i | sí | no | ≥0, total global | Bandeja | A8 |
+| 27 | E062 `PATCH /notifications/{id}/read` | 200 body | `unreadCount` | i | sí | no | ≥0, total global | Bandeja | A8 |
+| 28 | E065 `POST /reminders` | request | `frequency` | s | no | sí | enum `daily|weekly|monthly`; ausente = disparo único | Crear recordatorio | A8 |
+| 29 | E066 `PATCH /reminders/{id}` | request | `frequency` | s | no | sí | mismo enum | Editar recordatorio | A8 |
+| 30 | E068 `GET /users/me/preferences` | 200 body | `timeZone` | s | sí | no | IANA (`America/*`) | Preferencias | A8 |
+| 31 | E069 `PATCH /users/me/preferences` | request | `timeZone` | s | no | no | IANA | Preferencias | A8 |
 
 **Ejemplo válido (E065):**
 ```json
-{"type":"budget","relatedEntityId":"018f90ef-08e5-7a68-b09f-2b67a47c92f0",
- "triggerAt":"2026-12-01T18:00:00Z","frequency":"monthly","timeZone":"America/Mexico_City",
- "enabled":true}
+{"title":"Pagar renta","dueAt":"2026-12-01T18:00:00Z","timezone":"America/Mexico_City",
+ "frequency":"monthly"}
 ```
 
-**No duplicados:** `hasEnoughData` (A2), `quietHours`/preferencias (A3), `enoughData`/`minimumSamples`
-(A5) y `openingSaved` (A7) **no** se cuentan en A8. `affectedGoalId`, `reversedContributionId`,
-`releasedAmount`, `reversedAllocations` y `affectedPeriods` **quedan fuera** (§17.7).
+**No se cuentan en A8:** `hasEnoughData` (A2), preferencias y `quietHours` (A3),
+`enoughData`/`minimumSamples` (A5), `openingSaved` (A7). **Fuera de A8 por HTTP:** los efectos de
+E031/E042 (§17.7). **Conservados** por existir ya en el contrato: `email`, `verificationToken`,
+`deviceId`, `deviceRegistrationId`, `platform`, `triggerAt`, `timeZone` de recordatorios y
+`updatedCount`.
 
-**Compatibilidad:** todos son campos nuevos u opcionales; ningún cliente actual (E001–E004) los envía
-ni los recibe. `additionalProperties: false` obliga a declararlos en el schema antes de poder usarlos.
+**Correcciones de conteo:** 31 campos nuevos únicos · 31 incorporaciones (una por campo y endpoint) ·
+2 ESENCIALES ajenos a A8 (E040, E055) · 5 campos de E031/E042 fuera por 204 · 26 de E057/E058 en A3 ·
+2 de E052 en A5 · 1 de E055 en A2 · 1 de E040 en A7.
 
 ## 17.10 Frases de aprobación
 

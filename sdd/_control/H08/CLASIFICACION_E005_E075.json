@@ -14,8 +14,8 @@
     "operaciones": 71,
     "diferencias": 812,
     "por_clase": {
-      "ESENCIAL": 9,
-      "COMPATIBILIDAD": 199,
+      "ESENCIAL": 2,
+      "COMPATIBILIDAD": 206,
       "OPCIONAL": 597,
       "OBSOLETA": 7
     },
@@ -31,11 +31,11 @@
       "A3": 26,
       "A5": 2,
       "A7": 0,
-      "A8": 49,
+      "A8": 40,
       "A1": 0,
-      "CONSERVAR": 19,
-      "CALCULAR": 67,
-      "DESCARTAR": 31
+      "CONSERVAR": 33,
+      "CALCULAR": 66,
+      "DESCARTAR": 34
     },
     "a8": [
       "E014:deletionRequestId",
@@ -62,18 +62,11 @@
       "E038:totals.activeCount",
       "E038:totals.saved",
       "E045:status",
-      "E059:platform",
       "E061:type",
       "E061:unreadCount",
       "E062:unreadCount",
-      "E063:updatedCount",
-      "E064:type",
       "E065:frequency",
-      "E065:timeZone",
-      "E065:triggerAt",
       "E066:frequency",
-      "E066:timeZone",
-      "E066:triggerAt",
       "E068:timeZone",
       "E069:timeZone"
     ]
@@ -398,10 +391,12 @@
         {
           "campo": "email",
           "tipo": "REQUEST",
-          "clase": "ESENCIAL",
+          "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
-          "decision": "DECIDIR_EN_RFC_016",
-          "motivo": "E010 debe identificar la cuenta a verificar y no hay sesion"
+          "decision": "CONSERVAR",
+          "motivo": "E010 exige Bearer: el correo procede del usuario autenticado",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "E010 exige Bearer; el correo sale del usuario autenticado"
         },
         {
           "campo": "locale",
@@ -431,8 +426,8 @@
         }
       ],
       "resumen": {
-        "ESENCIAL": 1,
-        "COMPATIBILIDAD": 1,
+        "ESENCIAL": 0,
+        "COMPATIBILIDAD": 2,
         "OPCIONAL": 2,
         "OBSOLETA": 1
       },
@@ -460,10 +455,12 @@
         {
           "campo": "verificationToken",
           "tipo": "REQUEST",
-          "clase": "ESENCIAL",
+          "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
-          "decision": "DECIDIR_EN_RFC_016",
-          "motivo": "E011 es publica y solo recibe el token: sin el campo el flujo es imposible"
+          "decision": "CONSERVAR",
+          "motivo": "VerifyEmailRequest ya exige `token`",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "VerifyEmailRequest ya exige `token`"
         },
         {
           "campo": "emailVerified",
@@ -487,8 +484,8 @@
         }
       ],
       "resumen": {
-        "ESENCIAL": 1,
-        "COMPATIBILIDAD": 2,
+        "ESENCIAL": 0,
+        "COMPATIBILIDAD": 3,
         "OPCIONAL": 0,
         "OBSOLETA": 1
       },
@@ -6687,10 +6684,12 @@
         {
           "campo": "deviceId",
           "tipo": "REQUEST",
-          "clase": "ESENCIAL",
+          "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
-          "decision": "DECIDIR_EN_RFC_016",
-          "motivo": "identificador del dispositivo: sin el no se puede deduplicar el registro push"
+          "decision": "CONSERVAR",
+          "motivo": "equivale a `id` de PushDevice; el contrato ya lo expone",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "equivale a `id` de PushDevice"
         },
         {
           "campo": "platform",
@@ -6699,8 +6698,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "plataforma del dispositivo para el registro push",
-          "instrumento": "A8",
-          "motivo_instrumento": "el registro push necesita la plataforma del dispositivo"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "equivale a `provider` (enum fcm) del request"
         },
         {
           "campo": "appVersion",
@@ -6735,18 +6734,22 @@
         {
           "campo": "deviceRegistrationId",
           "tipo": "RESPONSE",
-          "clase": "ESENCIAL",
+          "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
-          "decision": "DECIDIR_EN_RFC_016",
-          "motivo": "identifica el registro que E060 debe eliminar"
+          "decision": "CONSERVAR",
+          "motivo": "es el `id` de PushDevice usado en la ruta de E060",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "es el `id` de PushDevice que usa E060"
         },
         {
           "campo": "deviceId",
           "tipo": "RESPONSE",
-          "clase": "ESENCIAL",
+          "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
-          "decision": "DECIDIR_EN_RFC_016",
-          "motivo": "identificador del dispositivo: sin el no se puede deduplicar el registro push"
+          "decision": "CONSERVAR",
+          "motivo": "equivale a `id` de PushDevice; el contrato ya lo expone",
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "equivale a `id` de PushDevice"
         },
         {
           "campo": "active",
@@ -6755,13 +6758,13 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "estado del registro push",
-          "instrumento": "CALCULAR",
-          "motivo_instrumento": "= estado del registro push"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "la baja del registro es DELETE E060"
         }
       ],
       "resumen": {
-        "ESENCIAL": 3,
-        "COMPATIBILIDAD": 5,
+        "ESENCIAL": 0,
+        "COMPATIBILIDAD": 8,
         "OPCIONAL": 0,
         "OBSOLETA": 0
       },
@@ -7006,8 +7009,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "cuantas notificaciones se marcaron; solo el servidor lo sabe",
-          "instrumento": "A8",
-          "motivo_instrumento": "cuantas notificaciones se marcaron; solo el servidor lo sabe"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "202 no puede devolver el conteo final: se lee `unreadCount` en E061"
         },
         {
           "campo": "readAt",
@@ -7045,8 +7048,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
-          "instrumento": "A8",
-          "motivo_instrumento": "filtro por tipo sobre la lista paginada de recordatorios"
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "el recordatorio no tiene tipo en el contrato"
         },
         {
           "campo": "activeOnly",
@@ -7176,10 +7179,12 @@
         {
           "campo": "relatedEntityId",
           "tipo": "REQUEST",
-          "clase": "ESENCIAL",
+          "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
-          "decision": "DECIDIR_EN_RFC_016",
-          "motivo": "vinculo del recordatorio con su entidad; sin el el recordatorio es inutilizable"
+          "decision": "DESCARTAR",
+          "motivo": "el contrato modela el recordatorio con titulo y dueAt; no hay vinculo",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "el contrato usa titulo + dueAt; no hay vinculo"
         },
         {
           "campo": "triggerAt",
@@ -7188,8 +7193,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "`triggerAt` no tiene equivalente demostrado en el contrato de E065: se propone aditivo opcional en A8",
-          "instrumento": "A8",
-          "motivo_instrumento": "instante del recordatorio: sin el no se puede programar"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "equivale a `dueAt` (date-time)"
         },
         {
           "campo": "frequency",
@@ -7208,8 +7213,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
-          "instrumento": "A8",
-          "motivo_instrumento": "zona horaria para recordatorios y preferencias"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "equivale a `timezone` del contrato"
         },
         {
           "campo": "enabled",
@@ -7232,10 +7237,12 @@
         {
           "campo": "relatedEntityId",
           "tipo": "RESPONSE",
-          "clase": "ESENCIAL",
+          "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
-          "decision": "DECIDIR_EN_RFC_016",
-          "motivo": "vinculo del recordatorio con su entidad; sin el el recordatorio es inutilizable"
+          "decision": "DESCARTAR",
+          "motivo": "el contrato modela el recordatorio con titulo y dueAt; no hay vinculo",
+          "instrumento": "DESCARTAR",
+          "motivo_instrumento": "el contrato usa titulo + dueAt; no hay vinculo"
         },
         {
           "campo": "nextTriggerAt",
@@ -7264,8 +7271,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
-          "instrumento": "A8",
-          "motivo_instrumento": "zona horaria para recordatorios y preferencias"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "equivale a `timezone` del contrato"
         },
         {
           "campo": "enabled",
@@ -7287,8 +7294,8 @@
         }
       ],
       "resumen": {
-        "ESENCIAL": 2,
-        "COMPATIBILIDAD": 9,
+        "ESENCIAL": 0,
+        "COMPATIBILIDAD": 11,
         "OPCIONAL": 2,
         "OBSOLETA": 0
       },
@@ -7319,8 +7326,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "`triggerAt` no tiene equivalente demostrado en el contrato de E066: se propone aditivo opcional en A8",
-          "instrumento": "A8",
-          "motivo_instrumento": "instante del recordatorio: sin el no se puede programar"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "equivale a `dueAt`"
         },
         {
           "campo": "frequency",
@@ -7339,8 +7346,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
-          "instrumento": "A8",
-          "motivo_instrumento": "zona horaria para recordatorios y preferencias"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "equivale a `timezone`"
         },
         {
           "campo": "enabled",
@@ -7377,8 +7384,8 @@
           "necesidad_android": "Ver motivo.",
           "decision": "ANADIR_EN_A8",
           "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
-          "instrumento": "A8",
-          "motivo_instrumento": "zona horaria para recordatorios y preferencias"
+          "instrumento": "CONSERVAR",
+          "motivo_instrumento": "equivale a `timezone`"
         },
         {
           "campo": "enabled",

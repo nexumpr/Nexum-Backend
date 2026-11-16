@@ -1548,3 +1548,11 @@
 - **A8 definitiva: 38 incorporaciones** con endpoint, ubicacion JSON, tipo, required, nullability, restricciones, ejemplo y pantalla consumidora (RFC-016 17.9). Sin duplicar A2/A3/A5/A7.
 - **Estado:** 199 compatibilidad instrumentadas (A8=49 entradas/38 campos, A3=26, A5=2, A4=5, CONSERVAR=19, CALCULAR=67, DESCARTAR=31). Nada aplicado; `CONTRATOS_E005_E075_FROZEN=NOT_VERIFIED`. Sin implementacion; E001-E004, AWS y `opencode.json` intactos.
 
+### H08 - Pre-E005: revision 7 (E063, recordatorios y esenciales reales) — 2026-11-16
+
+- **E010/E011/E059 verificados:** `E010` exige **Bearer** y no tiene body (el correo sale del usuario); `VerifyEmailRequest` de E011 **ya exige `token`**; `PushTokenRegister` usa `provider`/`token`/`deviceLabel` y `PushDevice.id` es el `deviceRegistrationId` de E060. Los cinco campos marcados ESENCIALES pasan a **CONSERVAR**: no eran necesarios.
+- **ESENCIAL real: 2** (E040 `openingSaved`, E055 `hasEnoughData`). Cero esenciales sin tratamiento.
+- **E063:** `202 Accepted {status, requestId}` se conserva; `updatedCount` **sale de A8** porque un `202` no puede devolver el conteo final. Android lo obtiene de `GET /notifications` (`unreadCount`).
+- **E065/E066:** el contrato ya tiene `dueAt` y `timezone`; `triggerAt` y `timeZone` pasan a **CONSERVAR** (eran duplicados). `relatedEntityId` se **descarta** (el recordatorio se modela con titulo + `dueAt`). Solo `frequency` entra en A8, opcional (`daily|weekly|monthly`).
+- **A8 definitiva: 31 campos** con endpoint, ubicación, tipo, required, nullability, enum, ejemplo y pantalla. Sin duplicar A2/A3/A5/A7 ni los efectos de 204.
+- **Estado:** 812 diferencias, 0 sin clasificar, 0 pendientes; 206 de compatibilidad instrumentadas (A8=40/31, A3=26, A5=2, A4=5, CONSERVAR=33, CALCULAR=66, DESCARTAR=34). `CONTRATOS_E005_E075_FROZEN=NOT_VERIFIED`; nada aplicado; sin implementacion.
