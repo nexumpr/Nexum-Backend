@@ -1591,3 +1591,10 @@
 - **Sin instalar:** `opencode.json` local intacto; nada aplicado. Gates pendientes: RFC-017, A9, A10, SES y FinOps.
 
 - **RFC-017 revisado (base local):** candidato reconstruido desde el `opencode.json` local (no del versionado) → **184 permisos / 47 politicas**, 0 duplicados. `aws ssm get-parameter*` **retirado** por admitir `--with-decryption`; SSM queda en DENY y exige excepcion por operacion. Verificado: `terraform apply` y `-auto-approve` DENY; solo `<archivo>.tfplan` ASK; `aws *` nunca en allow; denies de destruccion/git/secretos intactos.
+
+### H08-E / E005 - corte vertical implementado (2026-11-16)
+
+- **Codigo:** internal/ports/passwordreset.go (puertos ResetStore/ResetTokenStore/Correo/Sellador y errores), internal/application/identity/password_reset.go (admission de 2 acciones identica con o sin cuenta, token 32B CSPRNG, hash SHA-256 persistido, sello AES para reintento, TTL 30 min, barrido acotado Reintentar, validacion de email) y internal/transport/http/password_forgot_handler.go (202 Accepted, 422/503/500, sin enumeracion).
+- **Invariante:** sin sellador o sin correo el servicio devuelve ErrResetNoDisponible -> 503. Nunca se acepta trabajo que nadie podria enviar.
+- **Pruebas:** 	ests/unit/application/password_reset_test.go con 7 casos (sin componente, cuenta existente, inexistente, fallo de correo, fallo de persistencia, reintento, validacion). No se ejecutan en este host por la politica de Control de aplicaciones (binario de prueba bloqueado); go build y go vet ./... PASS. La autoridad es el CI Linux.
+- **No desplegado:** el endpoint no se registra en cmd/server hasta tener adaptador DynamoDB + sellador (A9) y correo real (SES). A9/A10/SES siguen en sus Gates de AWS.
