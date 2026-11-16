@@ -15,7 +15,7 @@
 
 - Revocación inmediata del refresh y sesión; JWT access corto controlado por sesión/revocación en Redis y DynamoDB.
 - Modelo de request: `sin cuerpo`. Modelo de response: `sin cuerpo`.
-- Patrón de persistencia: Email-reserva / USER#id PROFILE y SESSION#id / SESSIONHASH#digest; token hash con TTL y expiración funcional.
+- Patrón de persistencia: Email-reserva / USER#id PROFILE y SESSION#id / REFRESH#<digest> SESSION; token hash con TTL y expiración funcional.
 - Obligación: `REQUIRED_DESIGN`. Requerido por el catálogo o soporte vigente; no rebajarlo a demo.
 
 ## Dependencias y riesgos

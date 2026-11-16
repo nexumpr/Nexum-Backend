@@ -16,6 +16,7 @@ import (
 	cacheinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/cache"
 	healthinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/health"
 	"github.com/nexumpr/Nexum-Backend/internal/infrastructure/security"
+	"github.com/nexumpr/Nexum-Backend/internal/ports"
 	"github.com/nexumpr/Nexum-Backend/internal/system"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 	"github.com/nexumpr/Nexum-Backend/pkg/telemetry"
@@ -125,6 +126,24 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	}
 	refreshHandler := nexumhttp.NewRefreshHandler(refreshService, refreshLimiter, logger)
 	router.HandleFunc(http.MethodPost, "/auth/refresh", refreshHandler.ServeHTTP)
+
+	// H08-E / E004: cierre de sesion real sobre las sesiones de E002/E003. La ruta exige JWT
+	// RS256 y estado autoritativo de la sesion en DynamoDB (lectura consistente): un token de
+	// una sesion revocada deja de autorizar en el acto, en cualquier instancia.
+	// Se pasa un interface nil cuando falta el cliente para fallar cerrado con 503 en lugar de
+	// operar sobre un puntero nil.
+	var dynamoAPI dynamoAdapter.DynamoAPI
+	if clienteDynamo != nil {
+		dynamoAPI = clienteDynamo
+	}
+	logoutStore := dynamoAdapter.NewLogoutStore(dynamoAPI, cfgDeps.TablaDynamoDB)
+	logoutService := appIdentity.NewLogoutService(logoutStore)
+	var verificadorTokens ports.TokenProvider
+	if errTokens == nil && proveedorTokens != nil {
+		verificadorTokens = proveedorTokens
+	}
+	logoutHandler := nexumhttp.NewLogoutHandler(logoutService, verificadorTokens, logoutStore, logger)
+	router.HandleFunc(http.MethodPost, "/auth/logout", logoutHandler.ServeHTTP)
 
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
