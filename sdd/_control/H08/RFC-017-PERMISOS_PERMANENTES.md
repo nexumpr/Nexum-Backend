@@ -70,7 +70,7 @@ posterior con prueba en motor real, no en esta RFC.
 
 | Regla | Motivo | Riesgo que permanece |
 |---|---|---|
-| `permission shell terraform apply*` | Deploy autorizado por Gate de plan + SHA-256 | **Alto**: un `apply` sin revisión de plan ya no lo impide el archivo. Mitigación: Gate por plan y por SHA-256, `destroy/import/state` siguen denegados |
+| ~~`permission shell terraform apply*` → ask~~ **RETIRADO**: `terraform apply*` sigue en **DENY**; solo `terraform apply <archivo>.tfplan` (y `-input=false`) pasan a ASK, con Gate por plan y SHA-256 | Superficie mínima: no se puede aplicar sin plan guardado | **Medio**: sigue exigiendo revisión humana del plan |
 | `permission edit sdd/**/spec.md` | Enmiendas aprobadas por RFC | Aplicar una enmienda sin RFC deja de ser imposible por permiso. Mitigación: `DECISIONES_CONTRATO_*.json` detecta cambios fuera de decisión; `constitution.md` sigue denegado |
 | `permission edit sdd/**/plan.md` | Idem | Idem |
 | `permission edit sdd/03-endpoints/**/openapi/**` | Enmiendas de contrato aprobadas | `comparar_contrato_api.py` en CI detecta rupturas |
@@ -177,3 +177,64 @@ aplicada surtirá efecto en sesión nueva.
 
 **No se ha modificado `opencode.json`.** El archivo local del usuario permanece intacto
 (SHA-256 `B281E263…3A37`) y el candidato vive fuera del árbol versionado.
+
+## 12. Diff definitivo de tres vías (2026-11-16)
+
+| Configuración | Permissions | Policies |
+|---|---|---|
+| `main` (versionada) | 151 | 33 |
+| Local del usuario (intacta) | 161 | 43 |
+| **Candidato reconciliado** | **178** | **47** |
+
+**Reglas nuevas respecto a `main`: 27.** Incluyen lecturas operativas sin datos
+personales (STS, EC2/ELBv2/ASG `describe-*`), ASK para `s3api put-object`, `sts assume-role`,
+ASG/LT, IAM de despliegue, `dynamodb get-item|query`, y DENY explícitos de
+`terminate-instances`, `delete-table`, `iam delete-*`.
+
+**Reglas retiradas: 0.**
+
+- ninguna
+
+**Reglas con efecto cambiado: 11** (todas deliberadas: SDD a ASK, apply a ASK y
+lecturas a ALLOW; ver §5).
+
+**Policies retiradas: 1.** Solo la denegación dura de `terraform apply`, que es
+la decisión central de esta RFC. Las 10 `policy ... allow` de la configuración local **se conservan**.
+
+**Adiciones de este preflight** (lecturas, sin mutación): `aws ses get-account*`,
+`aws ses list-email-identities*`, `aws sesv2 get-account*`, `aws logs describe-log-groups*`,
+`aws ssm get-parameter*`. Con ellas el total asciende a **183 permisos**.
+
+**No se aplica nada**: instalar el candidato exige `APRUEBO_RFC_017_PERMISOS_PERMANENTES`.
+
+## 13. Artefacto verificable (2026-11-16)
+
+El candidato **existe como archivo**, no como promesa:
+
+`sdd/_control/H08/opencode.PROPUESTA_RFC017.json` — **184 permissions / 47 policies**, generado de
+forma determinista desde el `opencode.json` versionado con
+`herramientas/construir_opencode_permanente.py`.
+
+Comprobaciones programáticas ejecutadas sobre ese archivo:
+
+| Invariante | Resultado |
+|---|---|
+| `verificar_permisos_opencode.py --objetivo-permanente` (63 casos) | **PASS** |
+| Reglas duplicadas (`action`,`resource`) | **0** |
+| `aws *` convertido en `allow` | **No** |
+| `terraform apply` genérico en ASK | **No**: sigue DENY; solo `<archivo>.tfplan` va a ASK |
+| `terraform destroy/import/state/init -migrate-state/-reconfigure` | **DENY** intactos |
+| `git push origin main`, force push, `reset --hard`, `clean` | **DENY** intactos |
+| Lectura/edición de `.env`, tfstate, tfvars, `.pem`, `.key`, `.aws`, `.ssh` | **DENY** intactos |
+| `docker`, `wsl`, `kubectl`, `Remove-Item`, `rm` | **DENY** intactos |
+| Reglas locales preservadas | 3 sustituidas y justificadas: 2 variantes redundantes con espacio y la denegación dura de `apply` (reemplazada por el ASK acotado a plan) |
+| Lecturas SES/Logs/SSM | 5 reglas **allow** de solo lectura, con comando exacto y sin comodín de servicio |
+| Datos de usuario y secretos | `dynamodb get-item|query` en **ASK**; secretos en **DENY** |
+
+**Apply seguro:** `terraform apply plan.tfplan` → ASK · `terraform apply -auto-approve` → **DENY**.
+
+**Revisión 2026-11-16 (base local):** el candidato parte del `opencode.json` **local** del
+usuario (161/43), no del versionado. Se retiró `aws ssm get-parameter*` (permitía
+`--with-decryption`) y las dos variantes redundantes con espacio. Resultado: **184 permisos / 47
+políticas**, 0 duplicados. SSM queda sin regla: cualquier lectura de parámetros exige excepción
+por operación.

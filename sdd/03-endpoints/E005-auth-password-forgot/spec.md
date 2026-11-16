@@ -85,3 +85,17 @@ Gate: `APRUEBO_RFC_016_CONTRATOS_E005_E075` y `APRUEBO_ENMIENDA_A1`.
 - Contrato tras la enmienda: referencias de persistencia corregidas a `USER#<userId>/SESSION#<sessionId>` y `REFRESH#<sha256(refreshToken)>/SESSION`; sin cambio de tabla ni de codigo.
 - Compatibilidad: cambio aditivo; ningun cliente existente (E001-E004) se ve afectado.
 - Autoridad: el OpenAPI actualizado es la fuente de transporte.
+
+## Enmienda A11 — proveedor de correo: Amazon SES (2026-11-16)
+
+Gate: `APRUEBO_RFC_016_CONTRATOS_E005_E075` (§4, decisión del Scrum Master). Las enmiendas A1-A8
+no citaban el proveedor; esta precisión documenta la decisión ya ratificada.
+
+- Proveedor: **Amazon Simple Email Service (SES)**, región `us-east-2`.
+- Flujo: validar `email` → transacción de admisión (token + trabajo durable) → intento de envío →
+  `202 Accepted {status, requestId}`.
+- El `202` significa **solicitud aceptada y persistida**; nunca «correo entregado».
+- Errores: `400`, `409`, `422`, `429`, `500`, `503` con envelope común.
+- No enumeración: misma respuesta, mismo cuerpo y mismo trabajo para cuenta existente e
+  inexistente; límites por IP y por correo (HMAC); prueba estadística de tiempos (α = 0,01).
+- Token: 32 bytes CSPRNG `base64url`, un solo uso, TTL 30 min, solo su SHA-256 en `RESET#`.

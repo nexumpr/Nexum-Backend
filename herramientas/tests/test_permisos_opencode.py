@@ -141,7 +141,7 @@ class ConstructorPermanente(unittest.TestCase):
         b = cp.construir(texto)
         self.assertEqual(a, b)
         datos = cp.validar(a)
-        self.assertEqual(len(datos["permissions"]), 178)
+        self.assertEqual(len(datos["permissions"]), 184)
         self.assertEqual(len(datos["policies"]), 47)
 
     def test_base_sin_ancla_falla(self):
@@ -177,3 +177,4 @@ class ConstructorPermanente(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
