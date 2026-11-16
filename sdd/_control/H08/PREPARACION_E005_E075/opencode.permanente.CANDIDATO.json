@@ -1,0 +1,1100 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "nexum-orchestrator",
+  "instructions": [
+    "constitution.md",
+    "AGENTS.md",
+    "memoria.md",
+    "sdd/_control/H07/ESTADO_Y_GATES.md",
+    "sdd/_control/H08/GATE_H08I_I000.md"
+  ],
+  "permissions": [
+    {
+      "action": "*",
+      "resource": "*",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "glob",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "grep",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "list",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*",
+      "effect": "ask"
+    },
+    {
+      "action": "edit",
+      "resource": "constitution.md",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "sdd/**/spec.md",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "sdd/**/plan.md",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "sdd/03-endpoints/**/openapi/**",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "sdd/03-endpoints/**/openapi.*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": ".env*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "**/.env*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*.tfstate*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "**/*.tfstate*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*.tfvars*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "**/*.tfvars*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*.pem",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "**/*.pem",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*.key",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "**/*.key",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*/.aws/*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*/.ssh/*",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "*.env*",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "**/.env*",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "*.tfstate*",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "**/*.tfstate*",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "*.tfvars*",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "**/*.tfvars*",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "*.pem",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "**/*.pem",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "*.key",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "**/*.key",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "*/.aws/*",
+      "effect": "deny"
+    },
+    {
+      "action": "read",
+      "resource": "*/.ssh/*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "git status*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git diff*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git log*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git branch --show-current*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git branch -a*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git ls-files*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "go build *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "go vet *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "go test *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "gofmt -l *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git rev-parse *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git remote -v*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "gh pr list *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "gh pr view *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "gh run list *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "gh run view *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "py -3.13 herramientas/validar_sdd_integral.py*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git add *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "git commit *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "git switch *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "git checkout *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "git fetch *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "git pull --ff-only *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "git push *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "gh pr create *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "gh pr merge *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "gh pr checks *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "gh workflow run *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "gh run watch *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "git push origin main*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "git push --force*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "git push -f *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "git reset --hard*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "git clean *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "Remove-Item *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "rm *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "docker *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "wsl *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "kubectl *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "aws *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform fmt *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform validate *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform version*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform -version*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws sts get-caller-identity*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws freetier get-account-plan-state*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws freetier get-free-tier-usage*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ce get-cost-and-usage*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws budgets describe-budgets*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws service-quotas get-service-quota*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws service-quotas list-service-quotas*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-instances*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-vpcs*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-subnets*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-vpc-endpoints*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-security-groups*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling describe-auto-scaling-groups*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws elbv2 describe-load-balancers*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws elbv2 describe-target-groups*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws elasticache describe-cache-clusters*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws elasticache describe-replication-groups*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws dynamodb list-tables*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws dynamodb describe-table*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws s3api list-buckets*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws s3api list-objects-v2*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws cloudfront list-distributions*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam list-open-id-connect-providers*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam get-open-id-connect-provider*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam get-role *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws organizations describe-organization*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws billing get-credits*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-instance-types*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-instance-type-offerings*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws elasticache describe-cache-engine-versions*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws cloudfront list-vpc-origins*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws dynamodb describe-limits*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws pricing get-products*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam simulate-principal-policy*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform destroy*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform import*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform state*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform plan*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform plan -input=false -out=bootstrap.tfplan",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform show*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform init -backend=false",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform init -backend=false *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform init -backend=true*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform init -migrate-state*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform init -reconfigure*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform init -backend=false*",
+      "effect": "ask"
+    },
+    {
+      "action": "subagent",
+      "resource": "sdd-guardian",
+      "effect": "ask"
+    },
+    {
+      "action": "subagent",
+      "resource": "go-backend-architect",
+      "effect": "ask"
+    },
+    {
+      "action": "subagent",
+      "resource": "qa-evidence-verifier",
+      "effect": "ask"
+    },
+    {
+      "action": "subagent",
+      "resource": "devsecops-security",
+      "effect": "ask"
+    },
+    {
+      "action": "subagent",
+      "resource": "api-contract-guardian",
+      "effect": "ask"
+    },
+    {
+      "action": "subagent",
+      "resource": "finops-guardian",
+      "effect": "ask"
+    },
+    {
+      "action": "subagent",
+      "resource": "aws-terraform-engineer",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "read-sdd",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "trace-requirements",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "record-evidence",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "validate-go",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "validate-ci-security",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "manage-change-request",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "validate-terraform",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "assess-aws-cost",
+      "effect": "ask"
+    },
+    {
+      "action": "skill",
+      "resource": "validate-openapi",
+      "effect": "ask"
+    },
+    {
+      "action": "webfetch",
+      "resource": "*",
+      "effect": "ask"
+    },
+    {
+      "action": "websearch",
+      "resource": "*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling describe-auto-scaling-groups *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling describe-instance-refreshes *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling describe-scaling-activities *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling update-auto-scaling-group *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling start-instance-refresh *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling cancel-instance-refresh *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling set-instance-protection *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws elbv2 describe-target-health *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-instances *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-launch-template-versions *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws * create-*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "aws * update-*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "aws * delete-*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "aws * put-*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "sdd/**/spec.md",
+      "effect": "ask"
+    },
+    {
+      "action": "edit",
+      "resource": "sdd/**/plan.md",
+      "effect": "ask"
+    },
+    {
+      "action": "edit",
+      "resource": "sdd/03-endpoints/openapi/*",
+      "effect": "ask"
+    },
+    {
+      "action": "edit",
+      "resource": "sdd/03-endpoints/openapi/**",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "terraform apply*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws sts assume-role *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws s3api put-object *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws s3api head-object *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws s3api get-object-attributes *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling update-auto-scaling-group *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling start-instance-refresh *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling cancel-instance-refresh *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling set-instance-protection *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-instances *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-launch-template-versions *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling describe-auto-scaling-groups *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling describe-instance-refreshes *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling describe-scaling-activities *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws elbv2 describe-target-health *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws elbv2 describe-target-groups *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-instance-types *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws sts get-caller-identity *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "aws dynamodb get-item *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws dynamodb query *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "aws iam get-role *",
+      "effect": "ask"
+    }
+  ],
+  "policies": [
+    {
+      "action": "tool.use",
+      "resource": "read:*.env*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "read:*.tfstate*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "read:*.tfvars*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "read:*.pem",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "read:*.key",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "read:*/.aws/*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "read:*/.ssh/*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "edit:*.env*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "edit:*.tfstate*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "edit:*.tfvars*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "edit:*.pem",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "edit:*.key",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "edit:*/.aws/*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "edit:*/.ssh/*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:git push origin main*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:git push --force*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:git reset --hard *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:git clean *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:terraform destroy*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:terraform import*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:terraform state*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:terraform init -migrate-state*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:terraform init -reconfigure*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:docker *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:wsl *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:Remove-Item *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:rm *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws * delete-*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws ec2 terminate-instances *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws dynamodb delete-table *",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:aws iam delete-*",
+      "effect": "deny"
+    },
+    {
+      "action": "tool.use",
+      "resource": "shell:git push -f *",
+      "effect": "deny"
+    }
+  ]
+}
