@@ -83,24 +83,33 @@ caché por usuario (`GET/SET` con TTL), invalidación por prefijo. Sin cambios d
 | **Conclusión** | el endpoint **excede** el margen → requiere reapertura FinOps o alternativa (ver Gate) |
 
 
-## 4 bis. Decisión FinOps propuesta (2026-11-16)
+## 4 bis. FinOps SES — cálculo corregido (2026-11-16)
 
-El endpoint interface permanente (2 AZ × 45 d ≈ **21,60 USD**) **no cabe** en el margen de
-**6,9387 USD**. Propuesta, siguiendo el patrón D6 de I-000 (auxiliares por ventana):
+**Corrección aritmética:** `2 AZ × 0,01 USD/h × 4 h = 0,08 USD` por ventana. Cinco ventanas suman
+**0,40 USD en total**, no por ciclo.
 
-| Opción | Coste estimado | Valoración |
+| Escenario | Cálculo | Coste |
 |---|---|---|
-| A. Endpoint permanente 2 AZ × 45 d | ≈ 21,60 USD | **rechazada**: excede margen |
-| **B. Endpoint por ventana de verificación** | 0,02 USD/h × 4 h × 5 ventanas ≈ **0,40 USD** | **propuesta** |
-| C. NAT Gateway | ≈ 32 USD/45 d + datos | rechazada: coste y superficie |
+| Una ventana de 4 h | 2 × 0,01 × 4 | **0,08 USD** |
+| 5 ventanas de 4 h | 2 × 0,01 × 4 × 5 | **0,40 USD** |
+| 5 días continuos | 2 × 0,01 × 24 × 5 | **2,40 USD** |
+| **7 días continuos** | 2 × 0,01 × 24 × 7 | **3,36 USD** |
+| 45 días continuos | 2 × 0,01 × 24 × 45 | 21,60 USD |
 
-**Condición previa obligatoria:** confirmar que la SES API admite interface endpoint en
-`us-east-2`. Sin permiso de lectura `ec2:DescribeVpcEndpointServices` / `ses:GetAccount` **no puedo
-verificarlo** y no lo afirmo. Si no lo admite, la opción B es imposible y E005 queda
-`BLOCKED_E005_SES_CONNECTIVITY`.
+Margen disponible de I-000: **6,9387 USD**.
 
-**Techo solicitado:** 0,40 USD por ciclo de verificación, máximo 5 ciclos (2,00 USD) y retirada
-inmediata del endpoint al terminar cada ventana.
+**Decisión propuesta:** **ventana continua de 7 días (3,36 USD)** hasta la entrega académica.
+Motivo: la recuperación de contraseña debe funcionar cuando el usuario la necesite; un endpoint
+intermitente dejaría E005 inservible fuera de las pruebas. Cabe en el margen con 3,58 USD de
+reserva. **No se asume** operación de 45 días.
+
+**Pendiente de verificar antes de crear nada:** tarifa regional real en `us-east-2` (la de 0,01
+USD/h/AZ proviene de I-000, no de una consulta nueva), cargos de procesamiento y correo, y el
+soporte efectivo de **PrivateLink para SES API** anunciado por AWS en diciembre de 2025 — se
+verifica con `ec2:DescribeVpcEndpointServices` y `sesv2:GetAccount`, que requieren las lecturas
+propuestas. Sin esa evidencia no se crea el endpoint.
+
+**Techo solicitado:** 3,36 USD por una ventana única de 7 días, con retirada posterior autorizada.
 
 ## 5. Cambios mínimos reutilizables propuestos
 

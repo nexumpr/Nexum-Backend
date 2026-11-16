@@ -1582,3 +1582,10 @@
 - **Estados:** `PERMISSIONS_READY=NO`, `AWS_RUNTIME_READY=NO` (A9/A10 inexistentes), `SES_READY=NO` (identidad, sandbox, IAM y red sin resolver).
 - **Coste SES:** interface endpoint 2 AZ x 45 d ~ 21,60 USD frente a 6,9387 de margen de I-000 → requiere decision FinOps.
 - **Gates propuestos (6):** RFC-017, A9, A10, SES identidad/sandbox, FinOps SES endpoint y A6. Ninguno aplicado; sin recursos creados.
+
+### H08 - Pre-E005: artefacto RFC-017 y FinOps corregido (2026-11-16)
+
+- **Artefacto verificable:** `sdd/_control/H08/opencode.PROPUESTA_RFC017.json` con **185 permisos / 47 politicas**, generado deterministicamente desde el versionado. Comprobado: 0 duplicados, `aws *` nunca en allow, `terraform apply` generico sigue **DENY** y solo `<archivo>.tfplan` pasa a ASK, denies de destruccion/git/secretos intactos, 5 lecturas SES/Logs/SSM de solo lectura.
+- **FinOps corregido:** el error era 0,40 USD por ciclo; en realidad 0,40 USD es el **total** de 5 ventanas. Una ventana de 4 h = 0,08 USD. 7 dias continuos = **3,36 USD**, dentro del margen de 6,9387. Se propone ventana continua de 7 dias para que la recuperacion funcione cuando el usuario la necesite, no solo en pruebas.
+- **SES API privada:** AWS anuncio soporte de VPC endpoints para SES API (dic-2025). Sigue **sin verificar en esta cuenta**: falta `ec2:DescribeVpcEndpointServices` y `sesv2:GetAccount`, que requieren las lecturas propuestas. No se crea endpoint con una estimacion.
+- **Sin instalar:** `opencode.json` local intacto; nada aplicado. Gates pendientes: RFC-017, A9, A10, SES y FinOps.

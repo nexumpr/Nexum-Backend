@@ -40,9 +40,7 @@ CAMBIOS: list[tuple[str, str, str, str]] = [
     ("T4", "openapi.* (JSON) protegido: DENY -> ASK",
      '      "resource": "sdd/03-endpoints/**/openapi.*",\n      "effect": "deny"',
      '      "resource": "sdd/03-endpoints/**/openapi.*",\n      "effect": "ask"'),
-    ("T5", "terraform apply: DENY -> ASK",
-     '      "resource": "terraform apply*",\n      "effect": "deny"',
-     '      "resource": "terraform apply*",\n      "effect": "ask"'),
+    # T5 retirado: `terraform apply*` sigue en DENY. Solo se permite ASK sobre un plan guardado.
     ("T6", "sts get-caller-identity: ASK -> ALLOW (lectura)",
      '      "resource": "aws sts get-caller-identity*",\n      "effect": "ask"',
      '      "resource": "aws sts get-caller-identity*",\n      "effect": "allow"'),
@@ -68,6 +66,9 @@ CAMBIOS: list[tuple[str, str, str, str]] = [
 
 # Reglas permanentes nuevas (efecto, accion, recurso).
 BLOQUE_PERMISSIONS = [
+    # Apply SOLO sobre un plan guardado: nunca `terraform apply` generico.
+    ("ask", "shell", "terraform apply *.tfplan"),
+    ("ask", "shell", "terraform apply -input=false *.tfplan"),
     ("allow", "shell", "aws ec2 describe-launch-template-versions *"),
     ("allow", "shell", "aws ec2 describe-launch-templates *"),
     ("allow", "shell", "aws autoscaling describe-instance-refreshes *"),
@@ -95,6 +96,12 @@ BLOQUE_PERMISSIONS = [
     ("deny", "shell", "aws ec2 terminate-instances *"),
     ("deny", "shell", "aws dynamodb delete-table *"),
     ("deny", "shell", "aws iam delete-*"),
+    # Lecturas de diagnostico SES/Logs/SSM (sin mutacion), anadidas en el preflight.
+    ("allow", "shell", "aws ses get-account*"),
+    ("allow", "shell", "aws ses list-identities*"),
+    ("allow", "shell", "aws sesv2 get-account*"),
+    ("allow", "shell", "aws logs describe-log-groups*"),
+    ("allow", "shell", "aws ssm get-parameter*"),
 ]
 
 BLOQUE_POLICIES = [
