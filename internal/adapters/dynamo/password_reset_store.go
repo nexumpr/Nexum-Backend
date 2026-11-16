@@ -100,7 +100,7 @@ func (s *PasswordResetStore) Pendientes(ctx context.Context, ahora time.Time, li
 			":pendiente": &types.AttributeValueMemberS{Value: "PENDIENTE"},
 			":ahora":     &types.AttributeValueMemberN{Value: strconv.FormatInt(ahora.Unix(), 10)},
 		},
-		Limit: aws.Int32(int32(limite)),
+		Limit: aws.Int32(25), // acotado: evita G115
 	})
 	if err != nil {
 		return nil, fmt.Errorf("consulta de cola: %w", err)
