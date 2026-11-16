@@ -13,6 +13,7 @@ import (
 	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
 	"github.com/nexumpr/Nexum-Backend/internal/ports"
 	internalhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
+	"github.com/nexumpr/Nexum-Backend/internal/transport/http/middleware"
 )
 
 // Pruebas HTTP de E004 (`POST /api/v1/auth/logout`): middleware de autenticación, verificación
@@ -99,6 +100,77 @@ func TestE004SesionesRevocacionAfectaAlAutorizador(t *testing.T) {
 	sesiones.revocar(e004HTTPSesion)
 	if err := sesiones.AuthorizeSession(context.Background(), e004HTTPUsuario, e004HTTPSesion); !errors.Is(err, ports.ErrSessionUnauthorized) {
 		t.Fatalf("una sesion revocada debe rechazarse, obtenido %v", err)
+	}
+}
+
+// TestE004MiddlewareRechazaJWTDeSesionRevocada es la prueba decisiva del middleware: un JWT
+// criptográficamente válido cuya sesión fue revocada en el estado compartido NO llega al
+// handler protegido. No se apoya en el caso de uso de logout, que aquí no participa.
+func TestE004MiddlewareRechazaJWTDeSesionRevocada(t *testing.T) {
+	sesiones := newE004Sesiones()
+	tokens := e004TokensValidos()
+
+	invocado := false
+	protegido := middleware.AuthenticateBearerWithSession(tokens, sesiones)(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			invocado = true
+			w.WriteHeader(http.StatusNoContent)
+		}),
+	)
+
+	// 1. Sesión ACTIVE: el middleware deja pasar y el handler se ejecuta.
+	activa := httptest.NewRecorder()
+	protegido.ServeHTTP(activa, e004Peticion(http.MethodPost, "/protegido", "jwt-valido", ""))
+	if activa.Code != http.StatusNoContent || !invocado {
+		t.Fatalf("sesion activa debe alcanzar el handler: code=%d invocado=%v", activa.Code, invocado)
+	}
+
+	// 2. El otro nodo revoca la sesión en el estado compartido (equivalente a un logout ya
+	//    confirmado). El mismo JWT sigue siendo válido criptográficamente.
+	sesiones.revocar(e004HTTPSesion)
+	invocado = false
+
+	revocada := httptest.NewRecorder()
+	protegido.ServeHTTP(revocada, e004Peticion(http.MethodPost, "/protegido", "jwt-valido", ""))
+	if revocada.Code != http.StatusUnauthorized {
+		t.Fatalf("el middleware debe rechazar con 401 la sesion revocada, obtenido %d", revocada.Code)
+	}
+	if invocado {
+		t.Fatalf("el handler protegido NO debe ejecutarse con una sesion revocada")
+	}
+	if corpo := revocada.Body.String(); strings.Contains(corpo, e004HTTPSesion) || strings.Contains(corpo, "jwt-valido") {
+		t.Fatalf("la respuesta no debe revelar identificadores: %q", corpo)
+	}
+
+	// 3. Una sesión distinta del mismo usuario sigue pasando: la revocación es por sesión.
+	otra := httptest.NewRecorder()
+	protegido.ServeHTTP(otra, e004Peticion(http.MethodPost, "/protegido", "jwt-otra-sesion", ""))
+	if otra.Code != http.StatusNoContent || !invocado {
+		t.Fatalf("la segunda sesion debe seguir autorizando: code=%d invocado=%v", otra.Code, invocado)
+	}
+}
+
+// TestE004MiddlewareFallaCerrado cubre T14 en el middleware: sin poder determinar el estado,
+// no hay paso (503) y el handler no se ejecuta.
+func TestE004MiddlewareFallaCerrado(t *testing.T) {
+	sesiones := newE004Sesiones()
+	sesiones.fallo = ports.ErrSessionUnavailable
+
+	invocado := false
+	protegido := middleware.AuthenticateBearerWithSession(e004TokensValidos(), sesiones)(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			invocado = true
+			w.WriteHeader(http.StatusNoContent)
+		}),
+	)
+
+	rec := httptest.NewRecorder()
+	protegido.ServeHTTP(rec, e004Peticion(http.MethodPost, "/protegido", "jwt-valido", ""))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("estado de sesion indeterminable debe ser 503, obtenido %d", rec.Code)
+	}
+	if invocado {
+		t.Fatalf("el handler no debe ejecutarse si no se pudo verificar la sesion")
 	}
 }
 

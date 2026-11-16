@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"sync"
 	"testing"
@@ -16,6 +18,7 @@ import (
 	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
 	domainDynamo "github.com/nexumpr/Nexum-Backend/internal/domain/dynamo"
 	"github.com/nexumpr/Nexum-Backend/internal/ports"
+	"github.com/nexumpr/Nexum-Backend/internal/transport/http/middleware"
 )
 
 // Pruebas de E004 sobre los adaptadores REALES (LogoutStore, SessionStore y RefreshStore)
@@ -408,5 +411,76 @@ func TestE004LogoutConcurrenteConRefresh(t *testing.T) {
 		if err := dynamoAdapter.NewLogoutStore(m, e004Tabla).AuthorizeSession(ctx, e004Usuario, "sesion-a"); !errors.Is(err, ports.ErrSessionUnauthorized) {
 			t.Fatalf("iteracion %d: la sesion revocada no debe autorizar, obtenido %v", iteracion, err)
 		}
+	}
+}
+
+// e004Verificador implementa ports.TokenProvider con claims fijos: el JWT es válido
+// criptográficamente en todas las llamadas; lo que cambia es el estado de la sesión.
+type e004Verificador struct{ claims map[string]ports.TokenClaims }
+
+func (e004Verificador) GenerateAccessToken(context.Context, ports.TokenClaims) (string, error) {
+	return "emitido", nil
+}
+func (e004Verificador) GenerateRefreshToken(context.Context) (string, error) { return "refresh", nil }
+
+func (v e004Verificador) ValidateAccessToken(_ context.Context, token string) (*ports.TokenClaims, error) {
+	claims, ok := v.claims[token]
+	if !ok {
+		return nil, ports.ErrInvalidToken
+	}
+	copia := claims
+	return &copia, nil
+}
+
+// TestE004MiddlewareConAdaptadorRealRechazaSesionRevocada es la prueba de extremo a extremo
+// del mecanismo: adaptador DynamoDB real (sobre el doble con estado), middleware real y dos
+// instancias lógicas. El logout confirmado en el nodo A hace que el nodo B rechace el MISMO
+// JWT antes de ejecutar el handler. No depende del caso de uso en el camino de rechazo.
+func TestE004MiddlewareConAdaptadorRealRechazaSesionRevocada(t *testing.T) {
+	m := newMemoriaDynamo()
+	e004SembrarPerfil(m, e004Usuario)
+	e004SembrarSesion(t, m, e004Usuario, "sesion-a", "familia-a", e004RefreshA)
+
+	nodoA := dynamoAdapter.NewLogoutStore(m, e004Tabla)
+	nodoB := dynamoAdapter.NewLogoutStore(m, e004Tabla)
+	verificador := e004Verificador{claims: map[string]ports.TokenClaims{
+		"jwt-valido": {Subject: e004Usuario, SessionID: "sesion-a"},
+	}}
+
+	invocado := false
+	protegido := middleware.AuthenticateBearerWithSession(verificador, nodoB)(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			invocado = true
+			w.WriteHeader(http.StatusNoContent)
+		}),
+	)
+	peticion := func() *http.Request {
+		req := httptest.NewRequest(http.MethodPost, "/protegido", nil)
+		req.Header.Set("Authorization", "Bearer jwt-valido")
+		return req
+	}
+
+	// 1. Sesión ACTIVE: el nodo B deja pasar.
+	activa := httptest.NewRecorder()
+	protegido.ServeHTTP(activa, peticion())
+	if activa.Code != http.StatusNoContent || !invocado {
+		t.Fatalf("una sesion activa debe alcanzar el handler: code=%d invocado=%v", activa.Code, invocado)
+	}
+
+	// 2. El nodo A confirma el cierre con el adaptador y el caso de uso reales.
+	if err := appIdentity.NewLogoutService(nodoA).WithClock(func() time.Time { return e004Ahora }).
+		Logout(context.Background(), appIdentity.LogoutCommand{UserID: e004Usuario, SessionID: "sesion-a"}); err != nil {
+		t.Fatalf("el nodo A debe confirmar el cierre: %v", err)
+	}
+
+	// 3. El mismo JWT llega al nodo B: el middleware lo rechaza y el handler no corre.
+	invocado = false
+	revocada := httptest.NewRecorder()
+	protegido.ServeHTTP(revocada, peticion())
+	if revocada.Code != http.StatusUnauthorized {
+		t.Fatalf("el nodo B debe rechazar la sesion revocada por A, obtenido %d", revocada.Code)
+	}
+	if invocado {
+		t.Fatalf("el handler protegido NO debe ejecutarse tras la revocacion")
 	}
 }

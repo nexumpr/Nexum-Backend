@@ -1054,3 +1054,13 @@
 - **Fallo previo corregido en el mismo PR:** el run `43786436437` fallo por `staticcheck U1000` (metodo `revocar` del doble sin uso). Se sustituyo por una prueba real del autorizador (`TestE004SesionesRevocacionAfectaAlAutorizador`), sin `//nolint` ni supresiones.
 - **Perfil del commit documental:** un cambio limitado a `memoria.md` y `sdd/**` produce perfil `sdd` (`go=false`) por RFC-008, por lo que los jobs Go aparecen `skipping` justificados. El codigo no cambia entre `a31d2d6` y este commit; el artefacto de release se generara desde el CI de `main` tras el merge.
 - **Estado:** `E004_IMPLEMENTED` + `CI_GREEN`. `E004_MERGED`, `E004_DEPLOYED`, `E004_AWS_VERIFIED` y `E004_USER_ACCEPTED` siguen `NOT_RUN`.
+
+### H08-E / E004 - prueba decisiva del middleware y enmienda documental propuesta (2026-11-15)
+
+- **Pendiente cerrado (rechazo por middleware, no por caso de uso):** `TestE004MiddlewareRechazaJWTDeSesionRevocada` (`tests/unit/transport`) monta el middleware real sobre un handler protegido que registra si fue invocado. Con la sesion ACTIVE pasa; tras revocar el estado compartido el **mismo JWT** recibe 401 **y el handler no se ejecuta**; una segunda sesion del mismo usuario sigue pasando. No interviene el caso de uso de logout en el camino de rechazo.
+- **Prueba de extremo a extremo con adaptador real:** `TestE004MiddlewareConAdaptadorRealRechazaSesionRevocada` (`tests/unit/dynamo`) usa dos `LogoutStore` reales sobre la misma tabla: el nodo A confirma el cierre con el caso de uso real y el nodo B rechaza el mismo JWT en el middleware sin ejecutar el handler. Es consistencia entre instancias **logicas**, no dos nodos AWS.
+- **`TestE004MiddlewareFallaCerrado`:** estado de sesion indeterminable -> 503 y handler no ejecutado.
+- **Conteo E004:** 11 de aplicacion + 11 de adaptador + 14 HTTP = **36 funciones de prueba**.
+- **Bloqueo de entorno reproducido:** `go test ./tests/unit/dynamo` falla con `An Application Control policy has blocked this file` al ejecutar el binario autogenerado; el mismo codigo compilado de forma explicita (`go test -c`) pasa 11/11. No es defecto de codigo; la autoridad sigue siendo el CI Linux. Se registra como condicion de host, no como PASS local.
+- **Enmienda documental:** creada `sdd/_control/H08/RFC-015-E004-ENMIENDA_DOCUMENTAL.md` en estado **PROPUESTO**. Corrige dos frases (`spec.md` 4 y `plan.md` 3) que citan `SESSIONHASH#digest` en lugar de `REFRESH#<digest> SESSION`. **No se aplico**: la politica `edit` deniega ambos archivos y no se eludio. Frase solicitada: `APRUEBO_ENMIENDA_DOCUMENTAL_E004_SESSIONHASH`.
+- **Estado:** `E004_IMPLEMENTED` + CI verde en el HEAD previo. `E004_MERGED`, `E004_DEPLOYED`, `E004_AWS_VERIFIED` y `E004_USER_ACCEPTED` siguen `NOT_RUN`.
