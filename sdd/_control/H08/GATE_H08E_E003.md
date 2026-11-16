@@ -70,8 +70,24 @@ sigue requiriendo su propio Gate por PR + SHA40; no autoriza AWS mutante ni desp
 | CI del PR #61 | **13/13 `SUCCESS`** en run `43478609688` (HEAD `04799eb`): gofmt, vet, staticcheck, build, `go test`, `-race`, fuzzing, cobertura 91.4 %, govulncheck, gosec, gitleaks, Semgrep, integración, contratos, IaC y SBOM |
 | RFC-014 | **APPROVED** (`APRUEBO_RFC_014_E003_REFRESH`, 2026-11-13T18:18Z) y aplicada en YAML/JSON |
 | Validación tras el contrato | `H06_CONTRACT_PASS` · paridad 75 ops/55 rutas/102 esquemas · comparador `COMPATIBLE` (0 rupturas) |
-| Merge | **BLOQUEADO** hasta Gate de merge por PR + SHA40 |
-| AWS / despliegue | `AWS_NOT_RUN`, `E003_DEPLOYED=NOT_RUN` |
+| Merge | **MERGED** — PR #61, HEAD autorizado `a8fc634`, merge `1d0c2650daab07e20a52df518d9a69cbca51cda0` |
+| AWS / despliegue | **`E003_DEPLOYED=VERIFIED`** — LT **v4**, refresh `8eb6837d-8be9-4bad-a787-eed102987ed4` `Successful` 100 %, dos nodos `InService`/`Healthy`, ASG restaurado 2/2/2 |
+| HTTP real | **`E003_AWS_VERIFIED=VERIFIED`** — cadena A→B→C→D 200, replay 409, familia revocada 401, aislamiento 200 |
+| Aceptación del responsable | **`E003_USER_ACCEPTED=VERIFIED`** — ver §5 |
 
-**No se declara** `E003_DEPLOYED` ni `AWS_VERIFIED`; la aceptación del usuario queda pendiente
-de la prueba en Postman después del despliegue autorizado.
+## 5. Cierre documental y aceptación humana (2026-11-15)
+
+- **Aceptación registrada:** el responsable confirmó por **Postman** que
+  `POST https://d2lpmqy5w6x9es.cloudfront.net/api/v1/auth/refresh` responde **HTTP 200** con
+  su cliente real. Alcance declarado: `E003_USER_ACCEPTED=VERIFIED` **exclusivamente** para esa
+  comprobación de refresh correcto.
+- **Lo que NO acredita:** no se registran tokens, refresh tokens, correos ni credenciales; no se
+  declara verificada la rotación, el replay 409, el aislamiento entre familias ni el
+  comportamiento del rate limiting por parte del cliente. Esas comprobaciones siguen apoyadas
+  en la evidencia HTTPS del HITO F y en el CI, no en esta prueba manual.
+- **Sin cambios de runtime:** esta aceptación es documental. No se redesplegó E003, no se
+  modificó el Launch Template, el ASG, CloudFront, ALB, DynamoDB, Redis, IAM ni el bundle de
+  secretos con motivo de este cierre.
+- **Excepciones temporales de `opencode.json`:** las usadas para el despliegue (ASG, `elbv2`,
+  `ec2 describe`) proceden de una excepción temporal y su retiro se propone en `memoria.md`.
+  Este Gate no autoriza nuevas excepciones ni las mantiene vigentes.
