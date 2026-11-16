@@ -16,11 +16,15 @@ cuerpo. **AWS/HTTP público:** `NOT_RUN`. Gate: `sdd/_control/H08/GATE_H08E_E004
 - [x] Pruebas de error 400/401/409/503 pertinentes al caso, con `ErrorEnvelope` y `traceId`.
 - [x] PII y secretos ausentes en logs, respuestas y fixtures; no se persiste ni se registra el token.
 - [x] Tests unitarios reales y contrato OpenAPI: `PASS` en local (`go test ./...`).
-- [ ] Integración Dynamo **real** y HTTP **público**: `NOT_RUN` (requiere despliegue autorizado).
-- [ ] API en dos instancias **AWS**, TLS público, CI/CD e IaC: `NOT_RUN`. Las pruebas de dos
-  instancias son lógicas, sobre el mismo almacén; no se declaran dos nodos AWS verificados.
-- [ ] `go test -race` en local: `NOT_RUN — BLOCKED_TOOLCHAIN` (sin gcc en Windows); lo ejecuta CI.
-- [ ] Gate individual de release H08 y rollback aprobados antes de `terraform apply`.
+- [x] Integración Dynamo **real** y HTTP **público**: `PASS` por HTTPS el 2026-11-16
+  (`GATE_H08E_E004_DESPLIEGUE_AWS.md` §5). La lectura directa de DynamoDB quedó `NOT_RUN` por
+  permisos; la revocación se acredita funcionalmente (refresh 401 y logout 401).
+- [x] API en dos instancias **AWS**: dos EC2 en LT **v5**, `InService`/`Healthy`, ASG 2/2/2 y dos
+  targets `healthy`. TLS público operativo vía CloudFront. **No** se afirma atribución por nodo.
+- [ ] `go test -race` en local: `NOT_RUN — BLOCKED_TOOLCHAIN` (sin gcc en Windows). Lo ejecuta CI:
+  `PASS` en el run `43786668813`.
+- [x] Gates de release aprobados antes de mutar AWS: publicación S3, `terraform apply` ligado al
+  SHA-256 del plan e `instance refresh`, cada uno con su frase y su SHA.
 - [x] Dependencias del cliente Mobile no constituyen Gate del Backend.
 
 **Criterio de cierre:** ninguna casilla se marca por escribir el documento. `IMPLEMENTED_LOCAL`
