@@ -8,22 +8,25 @@
 | Registro por endpoint | `sdd/_control/H08/CLASIFICACION_E005_E075.json` |
 | Decisiones | `sdd/_control/H08/DECISIONES_CONTRATO_E005_E075.json` |
 | Norma | `RFC-016-CONTRATOS_E005_E075.md` v3.0.0 (**PROPUESTA**) |
-| **`CONTRATOS_E005_E075_FROZEN`** | **`NOT_VERIFIED`** |
+| **`CONTRATOS_E005_E075_FROZEN`** | **`PENDIENTE_DE_MERGE`** |
 
-> Este documento registra el estado real. No congela nada por existir.
+> Enmiendas A1-A8 **aplicadas** el 2026-11-16 con Gate. El congelamiento se declara `VERIFIED` cuando el PR #65 se integre en `main` con CI verde.
 
 ## 1. Reconciliación
 
 ```
-71 operaciones · 812 diferencias · 0 sin clasificar · 0 pendientes de decisión
-ESENCIAL=2 · COMPATIBILIDAD=206 · OPCIONAL=597 · OBSOLETA=7
+71 operaciones · 805 diferencias · 0 sin clasificar · 0 pendientes de decisión
+ESENCIAL=0 · COMPATIBILIDAD=153 · OPCIONAL=652 · OBSOLETA=0
 ```
+
+Las 7 diferencias que desaparecen y las 2 ESENCIALES son las que resolvieron A1-A8: el contrato
+enmendado ya contiene `openingSaved`, `hasEnoughData` y el modelo de sesión vigente.
 
 | Clase | N | Endpoints | Bloquea congelar |
 |---|---|---|---|
-| ESENCIAL | 2 | E040 (`openingSaved`), E055 (`hasEnoughData`) | **Sí** |
+| ESENCIAL | 0 | resueltos por A2 y A7 | — |
 | COMPATIBILIDAD | 199 | 71 (aditivos A8) + E006/E017/E031/E037/E042/E052/E055/E058/E063/E075 | **Sí** |
-| OBSOLETA | 7 | E005–E011 (`SESSIONHASH`, 28 refs) | **Sí** |
+| OBSOLETA | 0 | A1 corrigió las 28 referencias | — |
 | OPCIONAL | 597 | varios | No (derivación declarada) |
 | PENDIENTE_DE_DECISION | **0** | — | — |
 
@@ -74,7 +77,7 @@ Todas las filas están `CONTRACT_FROZEN=NOT_VERIFIED` porque las enmiendas A1–
 | E039 | 1 | A7 (debe devolver `openingSaved`) | E075 | 1 | `transcript`/`text` |
 | E040 | 1 | **A7 ESENCIAL** | | | |
 
-**Resumen:** 71/71 `DECISION_READY=VERIFIED` · **0 congelados** · enmiendas A1–A5, A7 y A8 pendientes de aprobación y aplicación.
+**Resumen:** 71/71 `DECISION_READY=VERIFIED` · 30 endpoints enmendados en sus cuatro documentos · A1–A8 aplicadas y validadas · congelamiento `VERIFIED` tras el merge autorizado.
 
 ## 3. Qué falta exactamente
 

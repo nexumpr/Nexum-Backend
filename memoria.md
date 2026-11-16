@@ -1563,3 +1563,12 @@
 - **Semantica de `frequency`:** ausente en CREATE = disparo unico; `null` solo en PATCH para cancelar la recurrencia; en CREATE no se admite `null`. «Ausente» y «null» quedan documentados como distintos.
 - **Invariante `validar_ida_vuelta()`:** todo campo escribible debe declarar al menos un destino de request y uno de respuesta. Resultado: **0 problemas**.
 - **Estado:** A8 = 31 incorporaciones; ESENCIAL = 2. Nada aplicado; `CONTRATOS_E005_E075_FROZEN=NOT_VERIFIED`. Sin implementacion; E001-E004, AWS y `opencode.json` intactos.
+
+### H08 - Pre-E005: enmiendas A1-A8 aplicadas (2026-11-16)
+
+- **Gates concedidos** por el Scrum Master: `APRUEBO_RFC_016_CONTRATOS_E005_E075` + A1, A2, A3, A5, A7 y A8.
+- **Aplicado:** OpenAPI JSON+YAML regenerados desde el mismo objeto (paridad 75 operaciones / 102 esquemas, 0 problemas); 30 endpoints con seccion de enmienda en `spec.md`, `plan.md`, `tasks.md` y `checklist.md`; `DECISIONES_CONTRATO` con 12 decisiones APROBADAS; A1 elimino las 28 referencias `SESSIONHASH`.
+- **Contrato:** `PageOfRecommendation.hasEnoughData`, `PageOfInsight.{enoughData,minimumSamples}`, `Goal.openingSaved`, `NotificationPreferences` granulares con `quietHours`/`timeZone`, `RecurringCreate/Payment/Patch` con `type|startDate|dueDay`, `ReminderCreate/Reminder/ReminderPatch` con `frequency`, `Onboarding(Patch)`, `UserPreferences(Patch)`, `PrivacyNotice`, `DeletionReceipt`, `Movement` y `PageOfGoal.totals`.
+- **Correcciones de CI:** 7 excepciones de compatibilidad registradas para RFC-016 (12 roturas cubiertas, 0 restantes); `ReminderPatch.frequency` anadido; `nullable` sustituido por union con `null` (OpenAPI 3.1); checksum de publicacion actualizado a `ce60c2388e2d0...`.
+- **Validacion:** `H06_CONTRACT_PASS`, `PREPARACION_CONTRATO_PASS` (12 decisiones aprobadas, 0 pendientes, SESSIONHASH=0), `CLASIFICACION_OK` (805 diferencias, ESENCIAL=0, OBSOLETA=0), paridad y publicacion OK, `go build` OK, CI **13/13 PASS**.
+- **Estado:** `CONTRATOS_E005_E075_FROZEN=PENDIENTE_DE_MERGE`. Sin implementacion; E001-E004, AWS y `opencode.json` intactos.
