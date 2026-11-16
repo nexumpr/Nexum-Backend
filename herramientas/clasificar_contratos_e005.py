@@ -68,6 +68,9 @@ OVERRIDES: dict[str, tuple[str, str]] = {
     "E058:streakReminders": ("COMPATIBILIDAD", "Preferencia granular sin equivalente en el contrato vigente."),
     "E058:quietHours": ("COMPATIBILIDAD", "Horario de silencio sin equivalente en el contrato vigente."),
     "E058:timeZone": ("COMPATIBILIDAD", "El contrato vigente no declara zona horaria del usuario."),
+    # Suficiencia de datos en insights: misma ambiguedad que E055 (items vacio no distingue causa).
+    "E052:enoughData": ("COMPATIBILIDAD", "Sin marca de suficiencia, un array vacio no distingue 'sin historial' de 'sin patrones'."),
+    "E052:minimumSamples": ("COMPATIBILIDAD", "El consumidor necesita conocer el umbral aplicado para interpretar el vacio."),
 }
 
 # Contenedores cuyo nombre o forma difieren del contrato aprobado.

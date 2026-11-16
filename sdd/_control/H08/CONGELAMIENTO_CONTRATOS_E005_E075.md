@@ -20,15 +20,15 @@
 
 ```
 71 operaciones · 812 diferencias · 0 sin clasificar
-ESENCIAL=1 · COMPATIBILIDAD=20 · OPCIONAL=784 · OBSOLETA=7
+ESENCIAL=1 · COMPATIBILIDAD=22 · OPCIONAL=782 · OBSOLETA=7
 ```
 
 - **0 diferencias sin clasificar** (requisito de cierre cumplido).
 - **1 ESENCIAL**: `hasEnoughData` en E055.
-- **20 COMPATIBILIDAD**: 5 HTTP + 1 E006 + 2 E055 + 12 E058 + ... (detalle en el JSON).
+- **22 COMPATIBILIDAD**: 5 HTTP + E006 + E052 (2) + E055 + 12 de E058 + E075 + 1 de E031.
 - **7 OBSOLETA**: referencias `SESSIONHASH` en E005–E011.
-- **784 OPCIONAL POSPUESTAS**: el contrato vigente cubre la función; cada una queda registrada
-  con motivo y puede reabrirse por Gate.
+- **782 OPCIONAL POSPUESTAS**: el contrato vigente cubre la función; cada una queda registrada
+  con motivo y puede reabrirse por Gate (revisión material por categoría en RFC-016 §17.1).
 
 ## 2. Estado individual de los 71 contratos
 
@@ -85,7 +85,7 @@ pendiente; el motivo específico se indica con `m`.
 | E049 | 0 | NOT_VERIFIED | RFC-016 pendiente |
 | E050 | 0 | NOT_VERIFIED | RFC-016 pendiente |
 | E051 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E052 | 0 | NOT_VERIFIED | RFC-016 pendiente |
+| E052 | 2 | NOT_VERIFIED | A5 `enoughData`/`minimumSamples` (suficiencia ambigua) |
 | E053 | 0 | NOT_VERIFIED | RFC-016 pendiente |
 | E054 | 0 | NOT_VERIFIED | RFC-016 pendiente |
 | E055 | 2 | NOT_VERIFIED | A2 `hasEnoughData` + contenedor `items[]` |
@@ -110,7 +110,7 @@ pendiente; el motivo específico se indica con `m`.
 | E074 | 0 | NOT_VERIFIED | RFC-016 pendiente |
 | E075 | 1 | NOT_VERIFIED | `transcript` vs `text` |
 
-**Resumen:** 71/71 `NOT_VERIFIED` · 0 congelados · 15 con diferencias materiales · 56 sin
+**Resumen:** 71/71 `NOT_VERIFIED` · 0 congelados · 16 con diferencias materiales · 55 sin
 diferencias materiales (solo opcionales pospuestas).
 
 ## 3. Qué falta exactamente para congelar

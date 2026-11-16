@@ -18,11 +18,27 @@
 
 | Cabecera | Cuándo | Notas |
 |---|---|---|
-| `Authorization: Bearer <accessToken>` | Todo salvo E001, E002, E005 | RS256, `expiresIn=900` |
+| `Authorization: Bearer <accessToken>` | **Todas salvo las 13 públicas** | RS256, `expiresIn=900` |
 | `Content-Type: application/json` | Cuerpos JSON | UTF-8 |
 | `Accept-Encoding: gzip` | Siempre | el backend comprime |
 | `Idempotency-Key` | E028, E037, E044 y toda mutación financiera | requerida por contrato |
 | `X-Request-Id` | Opcional | se devuelve en la respuesta y en `error.traceId` |
+
+### 1.1 Operaciones públicas (sin `Bearer`) — verificado en OpenAPI
+
+```
+E001 POST /auth/register              E002 POST /auth/login
+E003 POST /auth/refresh               E005 POST /auth/password/forgot
+E006 POST /auth/password/reset        E011 POST /auth/email-verification/confirm
+E015 GET  /privacy/notices/current    E022 GET  /catalogs/categories
+E023 GET  /catalogs/frequencies       E070 GET  /help/faq
+E071 GET  /education/tips             E072 GET  /health/live
+E073 GET  /health/ready
+```
+
+**E006 es pública**: el usuario que olvidó su contraseña no tiene sesión. Su `token` de
+recuperación **no es un JWT**: es un secreto de un solo uso que solo sirve en E006. E003 también es
+pública porque se invoca cuando el access token ya expiró.
 
 **Nunca** enviar `userId` en el cuerpo: el servidor lo deriva del `sub` del JWT.
 

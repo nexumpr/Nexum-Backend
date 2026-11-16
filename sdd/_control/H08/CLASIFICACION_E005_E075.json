@@ -15,8 +15,8 @@
     "diferencias": 812,
     "por_clase": {
       "ESENCIAL": 1,
-      "COMPATIBILIDAD": 20,
-      "OPCIONAL": 784,
+      "COMPATIBILIDAD": 22,
+      "OPCIONAL": 782,
       "OBSOLETA": 7
     },
     "sin_clasificar": 0
@@ -5545,18 +5545,18 @@
         {
           "campo": "minimumSamples",
           "tipo": "RESPONSE",
-          "clase": "OPCIONAL",
-          "necesidad_android": "Refinamiento de presentacion no requerido por el contrato aprobado.",
-          "decision": "POSPUESTA",
-          "motivo": "El contrato vigente cubre la funcion; el campo puede anadirse por Gate."
+          "clase": "COMPATIBILIDAD",
+          "necesidad_android": "Ver motivo.",
+          "decision": "DECIDIR EN RFC-016",
+          "motivo": "El consumidor necesita conocer el umbral aplicado para interpretar el vacio."
         },
         {
           "campo": "enoughData",
           "tipo": "RESPONSE",
-          "clase": "OPCIONAL",
-          "necesidad_android": "Refinamiento de presentacion no requerido por el contrato aprobado.",
-          "decision": "POSPUESTA",
-          "motivo": "El contrato vigente cubre la funcion; el campo puede anadirse por Gate."
+          "clase": "COMPATIBILIDAD",
+          "necesidad_android": "Ver motivo.",
+          "decision": "DECIDIR EN RFC-016",
+          "motivo": "Sin marca de suficiencia, un array vacio no distingue 'sin historial' de 'sin patrones'."
         },
         {
           "campo": "title",
@@ -5617,12 +5617,13 @@
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 0,
-        "OPCIONAL": 15,
+        "COMPATIBILIDAD": 2,
+        "OPCIONAL": 13,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
+        "RFC-016 no aprobada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
