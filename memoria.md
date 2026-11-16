@@ -1484,3 +1484,15 @@
 - **Bloqueo E005:** `BLOCKER_E005_MAIL_PROVIDER` (`sdd/_control/H08/BLOQUEO_E005_CORREO.md`). No existe adaptador de correo en el arbol Go y la red no tiene salida a Internet (NAT 0, sin IPv4 publicas, egress solo a S3/DynamoDB). Sin proveedor autorizado, E005 no puede entregarse con `202` ficticio.
 - **Pruebas:** 42 nuevas en `herramientas/tests` (28 de contratos + 14 de permisos), incluidos escenarios PRE y POST enmienda. Sin AWS mutante, sin Terraform, sin despliegue.
 
+### H08 - Pre-E005: cierre contractual E005-E075 (2026-11-16)
+
+- **Clasificacion completa:** `herramientas/clasificar_contratos_e005.py` clasifica **812 diferencias** de los 71 endpoints con **0 sin clasificar**: 1 ESENCIAL (`hasEnoughData` de E055), 20 COMPATIBILIDAD (5 HTTP + `token`/`resetToken` + `text`/`transcript` + 12 de E058 + contenedor de E055), 784 OPCIONAL POSPUESTAS y 7 OBSOLETA (`SESSIONHASH`). Registro por endpoint en `sdd/_control/H08/CLASIFICACION_E005_E075.json`.
+- **Decision tecnica del responsable registrada:** proveedor de correo **Amazon SES**. E005 mantiene `202 Accepted {status, requestId}`; `locale` y `message`/`retryAfterSeconds` quedan pospuestos. Se separa `CONTRACT_READY` (si) de `AWS_READY` (no: identidad, sandbox, `ses:SendEmail`, conectividad y coste sin verificar).
+- **ML:** `sdd/_control/H08/ML_E055_CONTRATO_Y_DISENO.md` define K-Means (features, ventana 90 d, minimo 12 movimientos y 2 categorias, silueta >= 0,35, semilla 20261116, artefacto JSON en lugar de pickle, inferencia Go sin Python en produccion, explicabilidad determinista y prohibicion de cifras inventadas). `ML_DESIGNED=PENDIENTE_APROBACION`, `ML_IMPLEMENTED=NOT_RUN`, `ML_DEPLOYED=NOT_RUN`.
+- **E055:** se conserva `items[]` + `nextCursor` y se propone anadir `hasEnoughData` (ESENCIAL) por ser el unico campo que distingue «sin historial» de «sin patrones». `items[].modelVersion` ya existia en el contrato.
+- **E075:** se conserva `text` (la auditoria usa `transcript`); el reconocimiento de voz ocurre en Android y no requiere Amazon Transcribe; la creacion de movimientos no se hace en E075 sino con E028 tras confirmar.
+- **E058:** 12 diferencias de COMPATIBILIDAD por cambio de forma (3 booleanos frente a preferencias granulares + `quietHours`); requiere Gate propio.
+- **Documentos nuevos:** `RFC-016` reescrita completa (autoridad, metodo, HTTP, SES, E006, E055/ML, E075, E058, dinero, persistencia, DynamoDB/Redis, Android, enmiendas A1-A4, criterio de congelacion, Gates, riesgos), `CONTRATO_INTEGRACION_ANDROID.md` y `CONGELAMIENTO_CONTRATOS_E005_E075.md`.
+- **Estado del congelamiento:** `CONTRATOS_E005_E075_FROZEN=NOT_VERIFIED` con **71/71 NOT_VERIFIED**, 15 con diferencias materiales y 56 solo con opcionales pospuestas. Motivo unico: RFC-016 y enmiendas A1-A3 pendientes de aprobacion. No se aplico ninguna enmienda; E001-E004 intactos; sin AWS, Terraform ni despliegue.
+- **Pruebas:** 7 nuevas del clasificador (total 49 en `herramientas/tests`), incluida la garantia de 0 sin clasificar y de que ninguna operacion se declara congelada.
+
