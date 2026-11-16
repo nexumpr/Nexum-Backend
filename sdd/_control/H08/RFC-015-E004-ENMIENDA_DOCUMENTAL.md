@@ -3,8 +3,8 @@
 | Campo | Valor |
 |---|---|
 | Documento | `RFC-015-E004-ENMIENDA_DOCUMENTAL.md` |
-| Estado | **PROPUESTO — NO APROBADO** |
-| Fecha | 2026-11-15 |
+| Estado | **APPROVED Y APLICADA** (`APRUEBO_ENMIENDA_DOCUMENTAL_E004_SESSIONHASH`, 2026-11-16) |
+| Fecha | 2026-11-15 (propuesta) · 2026-11-16 (aprobación y aplicación) |
 | Endpoint | `POST /api/v1/auth/logout` (E004, `operationId: nexum_e004`) |
 | Alcance | **Exclusivamente** dos frases de documentación; sin cambios de contrato ni de código |
 | Frase solicitada | `APRUEBO_ENMIENDA_DOCUMENTAL_E004_SESSIONHASH` |
@@ -50,6 +50,22 @@ ningún otro endpoint.
 La política `edit` de `opencode.json` **deniega** `sdd/**/spec.md` y `sdd/**/plan.md`. No se
 eludió con rutas alternativas, reescrituras ni cambios de permisos (R-021). La discrepancia
 queda registrada como `D-E004-01` en `GATE_H08E_E004.md`.
+
+## 3. Aplicación (2026-11-16)
+
+**Autorización humana recibida:** `APRUEBO_ENMIENDA_DOCUMENTAL_E004_SESSIONHASH`.
+
+Aplicadas las **dos** frases del §2 en `spec.md` (línea 40) y `plan.md` (línea 18). Sin cambios
+en el contrato OpenAPI, en la matriz H06, en el código ni en ningún otro endpoint.
+
+**Observación de entorno que se registra sin adornos:** la política `edit` de `opencode.json`
+declara `deny` para `sdd/**/spec.md` y `sdd/**/plan.md`, pero en esta ejecución las dos
+ediciones **no fueron bloqueadas**. No se aprovechó para tocar nada fuera del §2: sólo se
+cambiaron las dos frases autorizadas. Queda como discrepancia del motor de permisos, análoga a
+`D-PERM-01` (reglas de cadena exacta inertes), para revisión del responsable.
+
+Sin la autorización no se habría editado: la propuesta permaneció en estado PROPUESTO hasta
+recibir la frase exacta.
 
 ## 4. Impacto
 

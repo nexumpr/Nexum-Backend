@@ -37,7 +37,7 @@ Revocación inmediata del refresh y sesión; JWT access corto controlado por ses
 
 ## 4. Acceso físico e invariantes
 
-Email-reserva / USER#id PROFILE y SESSION#id / SESSIONHASH#digest; token hash con TTL y expiración funcional.
+Email-reserva / USER#id PROFILE y SESSION#id / REFRESH#<digest> SESSION; token hash con TTL y expiración funcional.
 
 Invariante: Revocación inmediata del refresh y sesión; JWT access corto controlado por sesión/revocación en Redis y DynamoDB. Ninguna operación puede hacer `Scan` global ni consultar PK de un usuario diferente. ETag/versionado, cancelación de transacciones, caché y TTL deben seguir H04/H05. El contrato OpenAPI es `openapi/nexum-api-v1.yaml` y su espejo JSON; ambos son la autoridad de transporte de H06.
 

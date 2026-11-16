@@ -67,7 +67,7 @@ E004 (`POST /api/v1/auth/logout`), sus pruebas, la documentación de evidencia y
 
 | # | Discrepancia | Estado |
 |---|---|---|
-| D-E004-01 | `spec.md` §4 y `plan.md` §3 citan `SESSIONHASH#digest`; la implementación real de E002/E003 usa `REFRESH#<digest>/SESSION` | **Registrada**, no editada: `edit sdd/**/spec.md` y `sdd/**/plan.md` están denegados por política. Requiere enmienda redactada por el responsable |
+| D-E004-01 | `spec.md` §4 y `plan.md` §3 citan `SESSIONHASH#digest`; la implementación real de E002/E003 usa `REFRESH#<digest>/SESSION` | **RESUELTA**: RFC-015 **aprobada y aplicada** (2026-11-16) con `APRUEBO_ENMIENDA_DOCUMENTAL_E004_SESSIONHASH`; sólo las dos frases autorizadas |
 | D-E004-02 | El PDF del prototipo encabeza la respuesta como HTTP 201 | **No aplicado**: el contrato OpenAPI y la instrucción humana fijan **204 sin cuerpo**; se trata como error editorial del PDF |
 | D-E004-03 | El SDD menciona `allDevices` y `refreshToken` en el cuerpo | **No implementado**: `allDevices` es opcional y no se habilita; el `refreshToken` no es necesario porque la sesión se deduce del `sid` |
 
