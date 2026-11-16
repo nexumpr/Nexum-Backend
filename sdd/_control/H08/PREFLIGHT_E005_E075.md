@@ -158,3 +158,8 @@ si se rechaza, E005 queda `AWS_READY=false` aunque el código esté terminado.
 | Sobrecoste por endpoint SES | decidir Gate 5 antes de desplegar |
 | E006 sin revocación real | A6 aprobado antes de implementar E006 |
 | Edición de SDD ambigua | RFC-017 convierte el `deny` en `ask` y hace visible la autorización |
+
+**Actualización 2026-11-16:** candidato reconstruido desde la configuración **local**
+(161/43) → **184/47**, 0 duplicados. `aws ssm get-parameter*` **retirado** (admitía
+`--with-decryption`): sin regla, cae en `aws *` DENY y exige excepción por operación. Comprobado
+que `terraform apply` genérico y `-auto-approve` siguen DENY y solo `<archivo>.tfplan` pasa a ASK.

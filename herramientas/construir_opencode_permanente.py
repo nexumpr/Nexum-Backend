@@ -101,7 +101,7 @@ BLOQUE_PERMISSIONS = [
     ("allow", "shell", "aws ses list-identities*"),
     ("allow", "shell", "aws sesv2 get-account*"),
     ("allow", "shell", "aws logs describe-log-groups*"),
-    ("allow", "shell", "aws ssm get-parameter*"),
+    # SSM retirado: `get-parameter` admite --with-decryption. Se exige excepcion por operacion.
 ]
 
 BLOQUE_POLICIES = [
@@ -132,6 +132,10 @@ class ErrorConstruccion(Exception):
     pass
 
 
+# Variantes con espacio que duplican una regla mas general ya existente.
+REDUNDANTES = {"aws ec2 describe-instances *", "aws autoscaling describe-auto-scaling-groups *"}
+
+
 def entrada(accion: str, recurso: str, efecto: str) -> str:
     return (
         "    {\n"
@@ -150,18 +154,27 @@ def construir(texto: str) -> str:
             raise ErrorConstruccion(f"ANCLA_NO_UNICA ({n}) {cid} {descripcion}")
         texto = texto.replace(viejo, nuevo, 1)
 
-    ancla = '    }\n  ],\n  "policies": [\n'
-    if texto.count(ancla) != 1:
-        raise ErrorConstruccion("ANCLA_PERMISSIONS_NO_UNICA")
-    bloque = ",\n".join(entrada(a, r, e) for e, a, r in BLOQUE_PERMISSIONS)
-    texto = texto.replace(ancla, '    },\n' + bloque + '\n  ],\n  "policies": [\n', 1)
+    datos = __import__("json").loads(texto)
+    permisos = [e for e in datos.get("permissions", []) if e.get("resource") not in REDUNDANTES]
+    politicas = datos.get("policies", [])
 
-    fin = "\n  ]\n}"
-    if texto.count(fin) != 1:
-        raise ErrorConstruccion("ANCLA_POLICIES_NO_UNICA")
-    bloque_pol = ",\n".join(entrada(a, r, e) for e, a, r in BLOQUE_POLICIES + BLOQUE_POLICIES_ALLOW)
-    texto = texto.replace(fin, ",\n" + bloque_pol + fin, 1)
-    return texto
+    def fusionar(lista, nuevas, mantener_ultima=True):
+        indice = {(e["action"], e["resource"]): i for i, e in enumerate(lista)}
+        for efecto, accion, recurso in nuevas:
+            clave = (accion, recurso)
+            entrada = {"action": accion, "resource": recurso, "effect": efecto}
+            if clave in indice:
+                lista[indice[clave]] = entrada
+            else:
+                indice[clave] = len(lista)
+                lista.append(entrada)
+        return lista
+
+    permisos = fusionar(permisos, BLOQUE_PERMISSIONS)
+    politicas = fusionar(politicas, BLOQUE_POLICIES + BLOQUE_POLICIES_ALLOW, mantener_ultima=True)
+    datos["permissions"] = permisos
+    datos["policies"] = politicas
+    return __import__("json").dumps(datos, ensure_ascii=False, indent=2) + "\n"
 
 
 def validar(texto: str) -> dict:

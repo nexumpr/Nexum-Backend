@@ -211,7 +211,7 @@ la decisión central de esta RFC. Las 10 `policy ... allow` de la configuración
 
 El candidato **existe como archivo**, no como promesa:
 
-`sdd/_control/H08/opencode.PROPUESTA_RFC017.json` — **185 permissions / 47 policies**, generado de
+`sdd/_control/H08/opencode.PROPUESTA_RFC017.json` — **184 permissions / 47 policies**, generado de
 forma determinista desde el `opencode.json` versionado con
 `herramientas/construir_opencode_permanente.py`.
 
@@ -232,3 +232,9 @@ Comprobaciones programáticas ejecutadas sobre ese archivo:
 | Datos de usuario y secretos | `dynamodb get-item|query` en **ASK**; secretos en **DENY** |
 
 **Apply seguro:** `terraform apply plan.tfplan` → ASK · `terraform apply -auto-approve` → **DENY**.
+
+**Revisión 2026-11-16 (base local):** el candidato parte del `opencode.json` **local** del
+usuario (161/43), no del versionado. Se retiró `aws ssm get-parameter*` (permitía
+`--with-decryption`) y las dos variantes redundantes con espacio. Resultado: **184 permisos / 47
+políticas**, 0 duplicados. SSM queda sin regla: cualquier lectura de parámetros exige excepción
+por operación.
