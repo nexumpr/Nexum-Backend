@@ -70,10 +70,16 @@ recibir la frase exacta.
 **Verificación de la aplicación (2026-11-16):** `spec.md` línea 40 y `plan.md` línea 18 contienen
 ya `REFRESH#<digest> SESSION`, coherente con DynamoDB; no se volvieron a tocar.
 
-**Residuo detectado, fuera del alcance autorizado:** `plan.md` §2 paso 3 (línea 9) conserva otra
-mención a `SESSIONHASH#digest`. RFC-015 autorizó **dos** frases, no tres, por lo que **no se
-editó**. Requiere una extensión mínima (`APRUEBO_ENMIENDA_DOCUMENTAL_E004_PLAN_PASO3`) para
-cerrarse; queda registrado como `D-E004-04` en `GATE_H08E_E004.md`.
+**Residuo detectado y RESUELTO con extensión autorizada (2026-11-16):** `plan.md` §2 paso 3
+(línea 9) conservaba otra mención a `SESSIONHASH#digest`, fuera de las dos frases originales.
+Se autorizó su corrección con `APRUEBO_ENMIENDA_DOCUMENTAL_E004_PLAN_PASO3` y quedó aplicada:
+`plan.md` líneas 9 y 18 citan ya `REFRESH#<digest> SESSION`. E004 no contiene ninguna otra
+referencia (`0` ocurrencias).
+
+**Hallazgo sistémico registrado (fuera de este RFC):** la misma frase de plantilla aparece en
+**otros siete endpoints** —E003 (3), E005, E006, E007, E008, E009, E010 y E011 (4 cada uno)—,
+todas en `plan.md` líneas 9 y 18, `spec.md` y `tasks.md`. No se tocan aquí: son specs
+`APPROVED`, exigen RFC propio y quedan fuera del alcance de E004.
 
 ## 4. Impacto
 

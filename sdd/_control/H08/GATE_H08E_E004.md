@@ -102,5 +102,7 @@ almacén, no dos máquinas en AWS.
 
 Detalle completo en `sdd/_control/H08/GATE_H08E_E004_DESPLIEGUE_AWS.md`.
 
-**Residuos:** `D-E004-04` — `plan.md` §2 paso 3 conserva `SESSIONHASH#digest`, fuera de las dos
-frases autorizadas por RFC-015. Pendiente de extensión mínima.
+**Residuos:** ninguno. `D-E004-04` (`plan.md` §2 paso 3 citaba `SESSIONHASH#digest`) quedó
+**RESUELTO** el 2026-11-16 con `APRUEBO_ENMIENDA_DOCUMENTAL_E004_PLAN_PASO3`; E004 no contiene ya
+ninguna ocurrencia de ese identificador. La misma frase de plantilla persiste en otros siete
+endpoints (E003, E005–E011), fuera del alcance de E004 y pendiente de RFC propio.

@@ -108,7 +108,8 @@ de aceptación; la definitiva es la de **401**.
 
 ## 7. Residuos documentales
 
-`D-E004-04`: `plan.md` §2 paso 3 (línea 9) conserva la mención `SESSIONHASH#digest`. RFC-015
-autorizó **dos** frases concretas (`spec.md` línea 40 y `plan.md` línea 18), que ya están
-corregidas; esta tercera queda **fuera del alcance autorizado** y no se editó. Requiere una
-extensión mínima de RFC-015 para cerrarse.
+`D-E004-04` — **RESUELTO** (2026-11-16). `plan.md` §2 paso 3 (línea 9) citaba
+`SESSIONHASH#digest`, fuera de las dos frases que autorizó RFC-015. Con
+`APRUEBO_ENMIENDA_DOCUMENTAL_E004_PLAN_PASO3` se corrigió esa única línea y E004 queda con **0
+ocurrencias**. La misma frase de plantilla persiste en E003 y E005–E011: son specs `APPROVED`,
+exigen RFC propio y no se tocan desde un cierre documental de E004.
