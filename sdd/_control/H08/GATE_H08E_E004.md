@@ -86,3 +86,21 @@ E004 (`POST /api/v1/auth/logout`), sus pruebas, la documentación de evidencia y
 **No se declara** `E004_DEPLOYED` ni `AWS_VERIFIED`; tampoco se declaran verificados dos nodos
 AWS: la prueba de revocación entre instancias usa dos objetos independientes sobre el mismo
 almacén, no dos máquinas en AWS.
+
+## 6. Cierre real (2026-11-16)
+
+| Criterio | Estado |
+|---|---|
+| Implementación local | **VERIFIED** — 36 pruebas; `-race` y cobertura 91,4 % en CI |
+| Contrato OpenAPI | **SIN CAMBIOS** — `H06_CONTRACT_PASS`, paridad 75/55/102, comparador `COMPATIBLE` |
+| Merge técnico | **VERIFIED** — PR #63, merge `1e03d5cd12a77d80e4f0f478ed22c885a7522683` |
+| Publicación S3 | **VERIFIED** — `GATE_H08E_E004_PUBLICACION_S3.md` |
+| `terraform apply` | **VERIFIED** — plan `5FC9634F…FD735`, LT **v5**, IAM **10 objetos** |
+| Rollout | **VERIFIED** — `d6708f22-…` `Successful` 100 %, dos nodos v5, ASG 2/2/2 |
+| HTTP real | **VERIFIED** — 204 sin cuerpo, 401 en refresh revocado y en JWT revocado, 409 en replay |
+| Aceptación del responsable | **VERIFIED** (Postman: 200 → 204 → refresh 401) |
+
+Detalle completo en `sdd/_control/H08/GATE_H08E_E004_DESPLIEGUE_AWS.md`.
+
+**Residuos:** `D-E004-04` — `plan.md` §2 paso 3 conserva `SESSIONHASH#digest`, fuera de las dos
+frases autorizadas por RFC-015. Pendiente de extensión mínima.

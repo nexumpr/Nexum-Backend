@@ -26,8 +26,8 @@
   _Negativas de Bearer, sujeto ajeno, sesión ajena, cuerpo no permitido, dependencia caída y concurrencia logout↔refresh (25 iteraciones). Carga paginada no aplica._
 - [x] `E004-T11` CI + seguridad + revisión de contratos + rollback y trazas saneadas.
   _CI del PR #63: run `43786668813`, HEAD `a31d2d6`, **13/13 `pass`**, con `go test -race` ejecutado en Linux (`PASS`) y cobertura de dominio 91.4 %. En local: gofmt, build, vet, `go test ./...`, validación H06, paridad I-150 y comparador `COMPATIBLE`. Rollback de la operación: basta revocar/no revocar; no hay migración de esquema._
-- [ ] `E004-T12` Solicitar autorización humana de release; desplegar desde IaC/CI, probar en dos nodos y registrar evidencia real.
-  _**BLOQUEADO**: exige Gate de merge y, después, Gates de publicación S3, `terraform apply` del LT/IAM y `instance refresh`. `AWS_NOT_RUN`._
+- [x] `E004-T12` Solicitar autorización humana de release; desplegar desde IaC/CI, probar en dos nodos y registrar evidencia real.
+  _**COMPLETADA**: release `v0.11.0+1e03d5cd12a7` publicado en S3; `terraform apply` del plan `5FC9634F…FD735` → LT **v5** e IAM con 10 objetos; instance refresh `d6708f22-…` `Successful` 100 %; dos EC2 `InService`/`Healthy` en v5, ASG 2/2/2 y dos targets `healthy`. HTTPS real y aceptación del responsable en Postman (200 → 204 → refresh 401). Ver `GATE_H08E_E004_DESPLIEGUE_AWS.md`._
 
 ## Casos concretos
 
@@ -40,6 +40,6 @@
 - [x] `E004-CT04` Pérdida temporal de DynamoDB/Redis -> fallo controlado 503; jamás confirmar escritura parcial.
   _`TestE004HTTPDependenciaIndisponible` y `TestE004PersistenciaNoDisponible`; además `TestE004HTTPSinAutorizadorFallaCerrado`._
 - [x] `E004-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
-  _Dos instancias **lógicas** independientes sobre el mismo almacén (`TestE004RevocacionObservableEnDosInstancias`, `TestE004HTTPRevocacionVisibleEntreInstancias`). Dos nodos **AWS** reales: `NOT_RUN`, no se declara verificado._
+  _Dos instancias **lógicas** independientes sobre el mismo almacén (`TestE004RevocacionObservableEnDosInstancias`, `TestE004HTTPRevocacionVisibleEntreInstancias`). En AWS: **dos EC2 reales en LT v5** e `InService`/`Healthy`, con la sesión en DynamoDB compartido; **no** se declara prueba cruzada instrumentada porque CloudFront/ALB no exponen qué nodo atendió cada petición._
 - [x] `E004-CT06` Revocación/rotación en nodo A persiste y es observable inmediatamente en nodo B; token reutilizado rechazado.
   _Cubierto por las pruebas anteriores más `TestE004ReplayConserva409` (replay sigue siendo 409) y `TestE004RotacionPreviaNoInvalidaAccessToken`._

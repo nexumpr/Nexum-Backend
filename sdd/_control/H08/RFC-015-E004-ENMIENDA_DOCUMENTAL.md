@@ -67,6 +67,14 @@ cambiaron las dos frases autorizadas. Queda como discrepancia del motor de permi
 Sin la autorización no se habría editado: la propuesta permaneció en estado PROPUESTO hasta
 recibir la frase exacta.
 
+**Verificación de la aplicación (2026-11-16):** `spec.md` línea 40 y `plan.md` línea 18 contienen
+ya `REFRESH#<digest> SESSION`, coherente con DynamoDB; no se volvieron a tocar.
+
+**Residuo detectado, fuera del alcance autorizado:** `plan.md` §2 paso 3 (línea 9) conserva otra
+mención a `SESSIONHASH#digest`. RFC-015 autorizó **dos** frases, no tres, por lo que **no se
+editó**. Requiere una extensión mínima (`APRUEBO_ENMIENDA_DOCUMENTAL_E004_PLAN_PASO3`) para
+cerrarse; queda registrado como `D-E004-04` en `GATE_H08E_E004.md`.
+
 ## 4. Impacto
 
 - **Contrato:** nulo. El OpenAPI no menciona nombres de ítems.
