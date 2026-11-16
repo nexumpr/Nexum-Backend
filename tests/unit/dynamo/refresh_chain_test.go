@@ -72,8 +72,22 @@ func (m *memoriaDynamo) TransactWriteItems(_ context.Context, params *dynamodb.T
 	defer m.mu.Unlock()
 
 	// Fase 1: evaluar TODAS las condiciones antes de escribir nada (atomicidad).
-	for _, item := range params.TransactItems {
-		if err := m.comprobar(item); err != nil {
+	for indice := range params.TransactItems {
+		if err := m.comprobar(params.TransactItems[indice]); err != nil {
+			// DynamoDB devuelve una razón por ítem, en el mismo orden. El doble lo replica:
+			// sin esto, un fallo en el localizador se confundiría con un fallo en la sesión.
+			var cancelada *types.TransactionCanceledException
+			if errors.As(err, &cancelada) {
+				razones := make([]types.CancellationReason, len(params.TransactItems))
+				for i := range razones {
+					razones[i] = types.CancellationReason{Code: aws.String("None")}
+				}
+				razones[indice] = types.CancellationReason{Code: aws.String("ConditionalCheckFailed")}
+				return nil, &types.TransactionCanceledException{
+					Message:             aws.String("Transaction cancelled"),
+					CancellationReasons: razones,
+				}
+			}
 			return nil, err
 		}
 	}

@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -21,7 +22,20 @@ const (
 )
 
 // AuthenticateBearer crea un middleware HTTP que verifica tokens Bearer JWT RS256 (A-050 §2.2).
-func AuthenticateBearer(tokenProvider ports.TokenProvider) Middleware {
+//
+// Cuando se proporciona un `ports.SessionAuthorizer`, después de validar la firma y la
+// expiración se comprueba el estado autoritativo de la sesión (E004): una sesión revocada deja
+// de autorizar en el acto, en cualquier instancia. Sin autorizador el comportamiento es el
+// heredado (sólo criptografía), de modo que los llamadores existentes siguen compilando.
+//
+// Política de fallo: si el estado de la sesión no puede determinarse, la respuesta es 503. Un
+// error de dependencia nunca se degrada a "sesión válida".
+func AuthenticateBearer(tokenProvider ports.TokenProvider, authorizers ...ports.SessionAuthorizer) Middleware {
+	var authorizer ports.SessionAuthorizer
+	if len(authorizers) > 0 {
+		authorizer = authorizers[0]
+	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
@@ -54,7 +68,7 @@ func AuthenticateBearer(tokenProvider ports.TokenProvider) Middleware {
 			claims, err := tokenProvider.ValidateAccessToken(r.Context(), tokenStr)
 			if err != nil {
 				code := "INVALID_TOKEN"
-				if err == ports.ErrTokenExpired {
+				if errors.Is(err, ports.ErrTokenExpired) {
 					code = "TOKEN_EXPIRED"
 				}
 				_ = httputil.WriteErrorEnvelope(
@@ -67,6 +81,46 @@ func AuthenticateBearer(tokenProvider ports.TokenProvider) Middleware {
 				)
 				return
 			}
+			// Un JWT verificado debe identificar sujeto y sesión: sin ambos no hay recurso al
+			// que aplicar autorización por propietario (R-031).
+			if claims == nil || strings.TrimSpace(claims.Subject) == "" || strings.TrimSpace(claims.SessionID) == "" {
+				_ = httputil.WriteErrorEnvelope(
+					w,
+					http.StatusUnauthorized,
+					"INVALID_TOKEN",
+					"credenciales invalidas o token expirado",
+					r.Header.Get("X-Trace-ID"),
+					nil,
+				)
+				return
+			}
+
+			if authorizer != nil {
+				if errSesion := authorizer.AuthorizeSession(r.Context(), claims.Subject, claims.SessionID); errSesion != nil {
+					if errors.Is(errSesion, ports.ErrSessionUnauthorized) {
+						_ = httputil.WriteErrorEnvelope(
+							w,
+							http.StatusUnauthorized,
+							"UNAUTHORIZED",
+							"sesion no valida",
+							r.Header.Get("X-Trace-ID"),
+							nil,
+						)
+						return
+					}
+					// Incluye ErrSessionUnavailable y cualquier error no clasificado: se falla
+					// cerrado con 503 y no se revela el motivo.
+					_ = httputil.WriteErrorEnvelope(
+						w,
+						http.StatusServiceUnavailable,
+						"DEPENDENCY_UNAVAILABLE",
+						"servicio no disponible",
+						r.Header.Get("X-Trace-ID"),
+						nil,
+					)
+					return
+				}
+			}
 
 			// Inyectar claims verificados en el contexto (A-050 §2.6)
 			ctx := context.WithValue(r.Context(), UserIDKey, claims.Subject)
@@ -76,6 +130,29 @@ func AuthenticateBearer(tokenProvider ports.TokenProvider) Middleware {
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// AuthenticateBearerWithSession exige un autorizador de sesión (E004).
+//
+// Es la forma obligatoria para rutas protegidas de producción: si el autorizador falta, la
+// ruta responde 503 en lugar de autorizar sin comprobar revocación. Nunca degrada a la
+// verificación criptográfica sola.
+func AuthenticateBearerWithSession(tokenProvider ports.TokenProvider, authorizer ports.SessionAuthorizer) Middleware {
+	if authorizer == nil {
+		return func(http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_ = httputil.WriteErrorEnvelope(
+					w,
+					http.StatusServiceUnavailable,
+					"DEPENDENCY_UNAVAILABLE",
+					"servicio no disponible",
+					r.Header.Get("X-Trace-ID"),
+					nil,
+				)
+			})
+		}
+	}
+	return AuthenticateBearer(tokenProvider, authorizer)
 }
 
 // UserIDFromContext extrae el userId autenticado de forma segura del contexto.
