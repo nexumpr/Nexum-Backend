@@ -15,18 +15,20 @@
 ## 1. Reconciliación
 
 ```
-71 operaciones · 812 diferencias · 0 sin clasificar
-ESENCIAL=2 · COMPATIBILIDAD=22 · OPCIONAL=781 · OBSOLETA=7
-Opcionales: 462 confirmadas por derivación declarada · 319 pendientes de decisión (68 endpoints)
+71 operaciones · 812 diferencias · 0 sin clasificar · 0 pendientes de decisión
+ESENCIAL=9 · COMPATIBILIDAD=199 · OPCIONAL=597 · OBSOLETA=7
 ```
 
-| Clase | N | Bloquea congelar |
-|---|---|---|
-| ESENCIAL | 2 — E040 `openingSaved`, E055 `hasEnoughData` | **Sí** |
-| COMPATIBILIDAD | 22 — E006, E017, E031, E037, E042, E052×2, E055, E058×12, E063, E075 | **Sí** |
-| OBSOLETA | 7 — `SESSIONHASH` en E005–E011 (28 refs) | **Sí** |
-| OPCIONAL confirmada | 462 | No (derivación) |
-| OPCIONAL pendiente | 319 | No bloquea; se cierra en el Gate del endpoint |
+| Clase | N | Endpoints | Bloquea congelar |
+|---|---|---|---|
+| ESENCIAL | 9 | E010, E011, E040, E055, E059, E065, E066 | **Sí** |
+| COMPATIBILIDAD | 199 | 71 (aditivos A8) + E006/E017/E031/E037/E042/E052/E055/E058/E063/E075 | **Sí** |
+| OBSOLETA | 7 | E005–E011 (`SESSIONHASH`, 28 refs) | **Sí** |
+| OPCIONAL | 597 | varios | No (derivación declarada) |
+| PENDIENTE_DE_DECISION | **0** | — | — |
+
+**`DECISION_READY = VERIFIED` en los 71**: toda diferencia tiene decisión adoptada y motivada.
+**`CONTRACT_FROZEN = NOT_VERIFIED`**: faltan las enmiendas aprobadas y aplicadas.
 
 ## 2. Estado individual de los 71 contratos
 
@@ -72,7 +74,7 @@ Todas las filas están `CONTRACT_FROZEN=NOT_VERIFIED` porque las enmiendas A1–
 | E039 | 1 | A7 (debe devolver `openingSaved`) | E075 | 1 | `transcript`/`text` |
 | E040 | 1 | **A7 ESENCIAL** | | | |
 
-**Resumen:** 71/71 `NOT_VERIFIED` · **0 congelados** · **18** con diferencias materiales · 53 sin ellas.
+**Resumen:** 71/71 `DECISION_READY=VERIFIED` · **0 congelados** · enmiendas A1–A5, A7 y A8 pendientes de aprobación y aplicación.
 
 ## 3. Qué falta exactamente
 
@@ -84,9 +86,11 @@ Todas las filas están `CONTRACT_FROZEN=NOT_VERIFIED` porque las enmiendas A1–
 | 4 | A3 contrato E058 (12 campos) | `APRUEBO_ENMIENDA_A3_E058` |
 | 5 | A5 `enoughData`/`minimumSamples` (E052) | `APRUEBO_ENMIENDA_A5_E052` |
 | 6 | A7 `openingSaved` (E040/E039) | `APRUEBO_ENMIENDA_A7_E040` |
-| 7 | A4 registrar las 5 decisiones HTTP | incluido en (1) |
-| 8 | A6 época de revocación (código compartido) | `APRUEBO_RFC_A6_EPOCA_SESION` (no bloquea congelar E006, sí implementarlo) |
-| 9 | CI documental verde tras aplicar | automático |
+| 7 | **A8 aditivos E005–E075 (199 campos)** | `APRUEBO_ENMIENDA_A8_ADITIVOS` |
+| 8 | A4 registrar las 5 decisiones HTTP | incluido en (1) |
+| 9 | A6 época de revocación (código compartido) | `APRUEBO_RFC_A6_EPOCA_SESION` |
+| 10 | A9 secreto de sellado · A10 IAM `QUEUE#*`/`RESET#*` | Gates propios (no bloquean congelar) |
+| 11 | CI documental verde tras aplicar | automático |
 
 ## 4. Dependencias externas (no bloquean congelar)
 

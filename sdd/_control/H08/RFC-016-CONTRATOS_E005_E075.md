@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | `sdd/_control/H08/RFC-016-CONTRATOS_E005_E075.md` |
-| Versión | **3.0.0 — normativa única** (sustituye a v1 y v2) |
+| Versión | **4.0.0 — normativa única** (sustituye a v1, v2 y v3) |
 | Estado | **PROPUESTO — NO APROBADO — NO APLICADO** |
 | Fecha | 2026-11-16 |
 | Baseline | `main` `8bc2548` · rama `chore/pre-e005-contratos-permisos` · PR #65 |
@@ -350,3 +350,159 @@ Estados separados y no intercambiables: `CONTRACT_FROZEN` · `AWS_READY` · `IMP
 | A6 no aprobado | E006 queda con la alternativa de 30 sesiones y se declara el límite |
 | 319 opcionales pendientes | Registrados por endpoint; se cierran en su Gate |
 | Cambio silencioso futuro | `DECISIONES_CONTRATO_*.json` + CI |
+
+---
+
+# 17. Versión 4.0.0 — decisiones finales y correcciones de E005/E006
+
+> **Sustituye a §2 (cifras), §4.3–§4.4 (E005) y §5 (E006).** El resto de v3 sigue vigente.
+> **`PENDIENTE_DE_DECISION = 0`**: no queda ninguna diferencia sin decisión adoptada.
+
+## 17.1 Cifras finales (sustituyen a §2)
+
+```
+71 operaciones · 812 diferencias · 0 sin clasificar · 0 pendientes de decisión
+ESENCIAL=9 · COMPATIBILIDAD=199 · OPCIONAL=597 (todas POSPUESTA_CONFIRMADA con motivo) · OBSOLETA=7
+```
+
+**ESENCIAL (9)** — sin el dato, el flujo es imposible:
+
+| Endpoint | Campo | Por qué |
+|---|---|---|
+| E010 | `email` | E010 es pública y debe identificar la cuenta a verificar |
+| E011 | `verificationToken` | E011 es pública y solo recibe el token |
+| E040 | `openingSaved` | E039 lo acepta y nadie lo devuelve; `contributedNet` no es calculable |
+| E055 | `hasEnoughData` | sin él, `items: []` no distingue «sin historial» de «sin patrones» |
+| E059 | `deviceId` (request y response) | deduplicación del registro push |
+| E059 | `deviceRegistrationId` | identificador que E060 debe eliminar |
+| E065, E066 | `relatedEntityId` | sin vínculo, el recordatorio es inutilizable |
+
+**COMPATIBILIDAD (199)**: ampliación **aditiva** agrupada en **A8** (§17.6). Cada entrada tiene su
+motivo concreto en `CLASIFICACION_E005_E075.json`; ninguna se justifica con «es de presentación».
+
+**OPCIONAL (597)**: todas con derivación declarada (equivalencia de nombre, cálculo aritmético o
+composición desde un endpoint atómico concreto).
+
+## 17.2 E005 — correcciones de diseño
+
+**A. Sin `ConditionCheck` sobre un PROFILE inexistente.** La transacción de admisión pasa a
+**2 acciones sobre 2 ítems** y es idéntica para cuenta existente e inexistente:
+
+| # | Acción | Ítem | Nota |
+|---|---|---|---|
+| 1 | `Put` | `RESET#<sha256(token)>` / `RESET` `{userId|null, expiresAt, used:false}` | cuenta inexistente ⇒ `userId=null` |
+| 2 | `Put` | `QUEUE#PWRESET` / `<dueAt ISO>#<ulid>` `{userId|null, destinatario|null, tokenCifrado|null, estado:"PENDIENTE", intentos:0, fence:0}` | misma forma en ambos casos |
+
+El perfil se lee **antes** con `ConsistentRead`; si no existe, la transacción se ejecuta igual sin
+`destinatario` ni `tokenCifrado`. No se crea ningún perfil falso. **No hay condición que pueda
+fallar solo para correos inexistentes.**
+
+**B. Descubrimiento de trabajos sin `Scan`.** Los ítems viven en la partición
+`QUEUE#PWRESET` con `SK = <dueAt>#<ulid>`. El worker consulta:
+
+```
+Query TABLE
+  KeyConditionExpression: PK = :q AND SK <= :now
+  Limit: 25
+  ExclusiveStartKey: paginación
+```
+`SK <= :now` es un rango ordenado por fecha ISO-8601: devuelve exactamente los vencidos, sin `Scan`
+y sin conocer claves de usuario. La ventana está acotada por `Limit` y por el cursor.
+
+> **Dependencia real:** el rol runtime tiene `LeadingKeys` limitado a `USER#*`, `REFRESH#*` y
+> `SESSION#*`. Se necesita ampliar a `QUEUE#*` y `RESET#*` → **A10 (IAM)**, con Gate propio.
+> Sin A10 el worker no puede leer la cola: se declara explícitamente, no se asume.
+
+**C. Identidad única del token.** Un solo ítem para ambos endpoints:
+
+| Fase | Operación |
+|---|---|
+| Emisión (E005) | `PutItem RESET#<sha256(T)>` con `userId`, `expiresAt`, `used=false` |
+| Consulta (E006) | `GetItem RESET#<sha256(T)>` → `userId` (público, sin sesión, sin `Scan`) |
+| Validación | `expiresAt > now` **explícita** + `used=false` + hash coincidente por construcción |
+| Consumo | `UpdateItem` condicional `SET used=true` (acción 2 de la transacción de E006) |
+| Expiración | TTL del ítem **y** comprobación funcional de `expiresAt` (el TTL no sustituye la validación) |
+| Reintentos | reenvían el **mismo** token; no se emite uno nuevo |
+| Revocación | `DeleteItem` del ítem en el borrado de cuenta |
+
+Se elimina `PWRESET#<hmacEmail>`: **una sola identidad** (`RESET#<sha256(T)>`) compartida por E005 y
+E006. Requiere `RESET#*` en A10.
+
+**D. Expiración frente a backoff.** Antes de enviar, el worker comprueba `expiresAt > now`. Si el
+backoff supera la vigencia, el trabajo pasa a `EXPIRADO` **sin enviar** y se borra `tokenCifrado`.
+Nunca se emite un enlace ya caducado. El backoff se trunca en `expiresAt`.
+
+**E. Clave de cifrado: no existe hoy.** El bundle RFC-004 contiene `APP_ENV`, `AWS_REGION`,
+`DYNAMODB_TABLE`, `REDIS_ADDR`, `REDIS_PASSWORD`, `REDIS_TLS`, `REDIS_USER`, `JWT_PRIVATE_KEY_PEM_B64`,
+`JWT_KEY_ID` y `LOGIN_RATE_LIMIT_HMAC_KEY_B64`. **`PASSWORD_RESET_SEAL_KEY_B64` no está** → alta
+como **A9**: 32 bytes CSPRNG, custodia por el procedimiento RFC-004 (escritura condicional al
+bundle, SSE, versión), rotación documentada (re-cifrado o descarte de trabajos pendientes), acceso
+solo al rol runtime. Sin A9 el worker **no puede descifrar**: se declara como bloqueo.
+
+**F. Lease + fencing.** El liderazgo Redis **no** sustituye la reclamación atómica:
+
+| Caso | Comportamiento |
+|---|---|
+| Dos workers | solo el líder reclama; si ambos intentan, la condición `estado=:pendiente` deja uno fuera |
+| Caída del líder | el lease expira en ≤ 15 s; el otro nodo toma el liderazgo |
+| Expiración del lease de un trabajo | el ítem vuelve a `:pendiente`; al reclamarlo se **incrementa `fence`** |
+| Worker anterior que sigue vivo | su `Update` final lleva condición `owner=:me AND fence=:f`; si perdió el lease, **falla** y no corrompe el estado |
+| Fallo de DynamoDB | el trabajo no se marca; queda `:pendiente` y se reintenta |
+| SES acepta y la EC2 se reinicia | el ítem sigue `:enviando`; al expirar el lease se reenvía el **mismo** enlace (at-least-once) |
+
+**G. Sin infraestructura nueva.** No se añade NAT, SQS, Lambda ni instancias. Las dos únicas
+dependencias son **A9** (secreto) y **A10** (IAM), ambas con Gate.
+
+## 17.3 E006 — contrato y transacción definitivos
+
+```
+POST /api/v1/auth/password/reset    (pública)
+403 → n/a · Request { token, newPassword } · Response 200 Accepted { status, requestId }
+```
+
+Secuencia: `GetItem RESET#<sha256(token)>` (→ `userId`, `expiresAt`, `used`) y después:
+
+| # | Acción | Ítem | Expresión |
+|---|---|---|---|
+| 1 | `Update` | `USER#<id>` / `PROFILE` | `SET passwordHash=:h, passwordChangedAt=:t, sessionEpoch=if_not_exists(sessionEpoch,:zero)+:one ADD version :one` · condición `attribute_exists(PK) AND version=:v` |
+| 2 | `Update` | `RESET#<sha256(token)>` / `RESET` | `SET used=:true, usedAt=:t` · condición `attribute_not_exists(used) OR used=:false AND expiresAt > :now` |
+
+Dos ítems distintos, una acción por ítem: **válido** para `TransactWriteItems`.
+
+**A6 — diseño completo (cambio compartido, no se ejecuta ahora):**
+
+| Componente | Cambio |
+|---|---|
+| E002 login | persistir `sessionEpoch` en el ítem de sesión y emitir claim `epo` en el JWT |
+| E003 refresh | propagar `epo` de la sesión al nuevo access token |
+| Middleware | tras validar la firma, `GetItem PROFILE` (`ConsistentRead`) y comparar `epo` con `sessionEpoch`; desalineado ⇒ `401` |
+| E006 | ya incrementa la época en su transacción; añade `DEL` de la caché de época si se usa |
+| Compatibilidad | JWT o sesión sin `epo` ⇒ `0`; perfil sin `sessionEpoch` ⇒ `0`; tras el primer cambio, `1` invalida todo lo anterior |
+| Coste | una lectura extra por petición autenticada; alternativa con caché Redis TTL 30 s + `DEL` en E006, con ventana declarada |
+
+**Revocación real, sin límite artificial:** no se adopta la variante de «30 sesiones». La época
+invalida **todas** las sesiones anteriores sea cual sea su número. Casos cubiertos: 1, 100 y >100
+sesiones; reset concurrente; token usado/expirado; sesión antigua tras el cambio; login nuevo;
+refresh posterior (rechazado); logout posterior (idempotente).
+
+## 17.4 Enmiendas definitivas
+
+| # | Alcance | Archivos | Bloquea congelar |
+|---|---|---|---|
+| A1 | Persistencia E005–E011 (28 refs) | 7 specs × 4 docs | Sí |
+| A2 | E055 `hasEnoughData` | OpenAPI + specs E055 | Sí |
+| A3 | E057/E058 preferencias (§8) | OpenAPI + specs | Sí |
+| A4 | 5 decisiones HTTP (registro) | `DECISIONES_CONTRATO_*.json` | Sí |
+| A5 | E052 `enoughData`+`minimumSamples` | OpenAPI + specs E052 | Sí |
+| A7 | E039/E040 `openingSaved` | OpenAPI + specs | Sí |
+| **A8** | **aditivos E005–E075 (199 campos)** | OpenAPI + specs afectadas | Sí |
+| **A9** | **secreto `PASSWORD_RESET_SEAL_KEY_B64`** | bundle RFC-004 | No (despliegue E005) |
+| **A10** | **IAM `QUEUE#*` y `RESET#*`** | módulo IAM (I-060) | No (despliegue E005) |
+| A6 | época de revocación (código) | E002/E003/middleware/E006 | No (implementación E006) |
+
+## 17.5 Estado de los contratos
+
+`DECISION_READY = VERIFIED` para los 71 (todas las diferencias tienen decisión).
+`CONTRACT_FROZEN = NOT_VERIFIED` mientras A1–A5, A7 y A8 no estén **aprobadas y aplicadas**.
+`AWS_READY = NOT_READY` (SES sin remitente, sin preflight y con coste de endpoint sin aprobar).
+`IMPLEMENTED / MERGED / DEPLOYED / AWS_VERIFIED / USER_ACCEPTED = NOT_RUN`.

@@ -116,11 +116,17 @@ class Clasificacion(unittest.TestCase):
             r = c.clasificar(arbol.raiz)
             clases = {(d["campo"], d["clase"]) for d in r["operaciones"][0]["diferencias"]}
             self.assertIn(("persistencia", "OBSOLETA"), clases)
-            # `locale` y `accepted` no son materiales: opcionales pospuestos.
-            self.assertIn(("locale", "OPCIONAL"), clases)
+            # `locale` es material (idioma del correo): COMPATIBILIDAD, no opcional.
+            self.assertIn(("locale", "COMPATIBILIDAD"), clases)
+            # `accepted` si es derivable del contrato: opcional confirmada.
             self.assertIn(("accepted", "OPCIONAL"), clases)
         finally:
             arbol.cerrar()
+
+    def test_cero_pendientes_de_decision(self):
+        r = c.clasificar(RAIZ)
+        self.assertEqual(r["resumen"]["por_decision"]["PENDIENTE_DE_DECISION"], 0)
+        self.assertEqual(r["resumen"]["operaciones_con_pendientes"], 0)
 
     def test_renombrado_es_compatibilidad(self):
         datos = api()

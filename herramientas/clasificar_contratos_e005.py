@@ -111,7 +111,68 @@ DERIVACIONES = [
      "coleccion componible desde su endpoint atomico"),
 ]
 
-# Campos que NO se pueden derivar y exigen decision trazada.
+# Equivalencias demostradas: el dato existe en el contrato con otro nombre o se calcula
+# con operaciones ya aprobadas. Cada entrada es una afirmacion verificable.
+EQUIVALENCIAS = {
+    "concept": "equivale a `description` en E028/E029/E030 y a `name` en E033/E034/E035",
+    "category": "equivale a `categoryId`, que referencia el catalogo E022",
+    "target": "equivale a `targetAmount`",
+    "saved": "equivale a `savedAmount`",
+    "openingSaved": "equivale a `initialSavedAmount`, aceptado por E039",
+    "totalAmount": "equivale a `amount`",
+    "name": "equivale a `displayName` (E012/E013)",
+    "accepted": "equivale a `status = \"accepted\"` en Accepted",
+    "noticeId": "equivale al `id` del aviso devuelto por E015",
+    "occurrenceDate": "equivale a `paidAt` en el request de E037",
+    "enabled": "equivale a `active`/`pushEnabled`/`reminderEnabled` segun el recurso",
+    "contributedNet": "= savedAmount - initialSavedAmount (aritmetica exacta en centavos)",
+    "retryAfterSeconds": "equivale a la cabecera `Retry-After` ya definida en el contrato",
+    "monthlyEquivalent": "= amount x factor de E023 (aritmetica racional A-070)",
+    "mode": "el reparto se expresa con `allocations[]{goalId, amount}`",
+    "splitMode": "el reparto se expresa con `allocations[]{goalId, amount}`",
+    "goalIds": "equivale a enumerar `allocations[].goalId`",
+    "source": "derivable de `recurringPaymentId`/`goalId`/`contributionId` de E029",
+    "valid": "equivale a `canCommit` (E043)",
+    "errors": "un reparto invalido devuelve 422 con `error.details[]` (envelope comun)",
+    "confidence": "no requerido: la inferencia es determinista sobre el artefacto versionado",
+    "version": "el contrato ya expone `version` donde hay concurrencia; en catalogos es marcador de cache",
+    "appearance": "equivale a la preferencia de tema del perfil (E068/E069)",
+    "afternoonCount": "= items.filter(hora >= start && hora < end).length sobre E027",
+    "afternoonPercentage": "= afternoonCount / count (aritmetica exacta)",
+    "patternDetected": "= afternoonPercentage >= umbral configurado",
+    "headline": "texto de presentacion derivado de patternDetected",
+    "revision": "equivale a `version`; incremento para concurrencia optimista",
+    "quietHours.enabled": "declarado por A3",
+    "quietHours.start": "declarado por A3",
+    "quietHours.end": "declarado por A3",
+}
+
+# Documentos agregados: cada rama se compone de un endpoint atomico aprobado.
+COMPOSICION = {
+    "user": "componible desde E012 (perfil)",
+    "income": "componible desde E024 (ingreso habitual)",
+    "recurringPayments": "componible desde E032 (recurrentes)",
+    "goals": "componible desde E038 (metas)",
+    "budgets": "componible desde E048 (presupuestos)",
+    "contributions": "componible desde E045 (aportaciones)",
+    "streak": "componible desde E056 (racha)",
+    "onboarding": "componible desde E018 (onboarding)",
+    "tip": "componible desde E071 (tips educativos)",
+    "categories": "componible desde E022/E053",
+    "frequencies": "componible desde E023",
+    "milestones": "componible desde E056",
+    "weekdayBars": "componible desde E054",
+    "recurring": "componible desde E032",
+    "movements": "componible desde E027",
+    "limits": "componible desde E048",
+    "allocations": "declarado en E043/E044",
+    "checks": "componible desde E072/E073",
+    "sessions": "componible desde E008",
+    "consents": "componible desde E016",
+    "affectedGoals": "derivable de E038 tras la reversion E047",
+    "recommendations": "equivale al contenedor `items[]` de E055",
+}
+
 PENDIENTES = {
     "source", "frequency", "current", "valid", "confidence", "locale", "mode", "splitMode",
     "goalIds", "reason", "format", "include", "context", "includeInactive", "limit", "cursor",
@@ -129,6 +190,102 @@ def derivar(campo: str) -> tuple[bool, str]:
     if base in PENDIENTES or raiz in PENDIENTES:
         return False, "no derivable del contrato vigente: requiere decision trazada"
     return False, "sin evidencia suficiente de derivabilidad: requiere decision trazada"
+
+
+# Decision final por campo (global). Sustituye a PENDIENTE_DE_DECISION.
+# (clase, decision, motivo). Todo campo debe caer aqui o en las tablas anteriores.
+DECISION_FINAL: dict[str, tuple[str, str, str]] = {
+    "movement": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "equivale al objeto raiz devuelto por E037"),
+    "needsReview": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "equivale a `requiresConfirmation`"),
+    "amount": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "equivale a `parsedAmount` en E075"),
+    "accountStatus": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "equivale a `status` del perfil (E012)"),
+    "deletedMovementId": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "es el id de la ruta de E031"),
+    "deletedGoalId": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "es el id de la ruta de E042"),
+    "allocatedAmount": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "= suma de `allocations[].amount`"),
+    "unallocatedAmount": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "equivale a `remaining` (E043)"),
+    "totalRequested": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "equivale a `amount`"),
+    "totalApplied": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "= suma de `allocations[].amount` aceptadas"),
+    "unallocated": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "equivale a `remaining`"),
+    "contribution": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "equivale al objeto raiz de E044"),
+    "reversedAmount": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "equivale a `amount` de la aportacion"),
+    "incomeMonthly": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "composicion aritmetica de E024 en centavos"),
+    "recurringFixedMonthly": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "composicion de E032 con factores de E023"),
+    "oneTimeFixedMonthly": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "composicion de E032"),
+    "fixedMonthly": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "= recurringFixedMonthly + oneTimeFixedMonthly"),
+    "antMonthly": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "composicion de E032 con factores de E023"),
+    "reservedMonthly": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "composicion de E038/E044"),
+    "availableEstimated": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "= incomeMonthly - fixedMonthly - antMonthly - reservedMonthly"),
+    "antExpenseCount": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "conteo sobre E027 en la ventana"),
+    "count": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "longitud de la ventana analizada"),
+    "afternoonWindowStart": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "constante de configuracion del servidor"),
+    "afternoonWindowEndExclusive": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "constante de configuracion del servidor"),
+    "allCategoriesTotal": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "= suma de `categories[].total`"),
+    "lastSavingDate": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "composicion desde E027"),
+    "nextMilestoneDays": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "tabla de hitos ya usada por E056"),
+    "currency": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "MXN fijo por contrato; no hay multimoneda"),
+    "limit": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "el servidor aplica limite por defecto y devuelve cursor"),
+    "cursor": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "paginacion por cursor ya definida en el contrato"),
+    "goalId": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "es path param o queda expresado en `allocations[]`"),
+    "include": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "el servidor aplica el conjunto por defecto"),
+    "includeInactive": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "el servidor devuelve solo activos por defecto"),
+    "format": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "el servidor aplica el formato por defecto"),
+    "context": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "el servidor aplica el contexto por defecto"),
+    "activeOnly": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "el cliente filtra sobre la lista devuelta"),
+    "changedAt": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "equivale a `updatedAt`"),
+    "reversedAt": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "sello temporal de la reversion, derivable de `updatedAt`"),
+    "timeZone": ("COMPATIBILIDAD", "ANADIR_EN_A8", "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)"),
+    "frequency": ("COMPATIBILIDAD", "ANADIR_EN_A8", "recurrencia del recordatorio; en movimientos se obtiene de E034"),
+    "locale": ("COMPATIBILIDAD", "ANADIR_EN_A8", "idioma del contenido y del correo; sin el, el servidor no puede localizar"),
+    "type": ("COMPATIBILIDAD", "ANADIR_EN_A8", "filtro de listado; sin el, la paginacion devuelve mezclado"),
+    "status": ("COMPATIBILIDAD", "ANADIR_EN_A8", "estado del recurso en listados E038/E045"),
+    "unreadCount": ("COMPATIBILIDAD", "ANADIR_EN_A8", "total no leido; con paginacion el cliente no puede contarlo"),
+    "unreadOnly": ("COMPATIBILIDAD", "ANADIR_EN_A8", "filtro que altera el conjunto paginado"),
+    "before": ("COMPATIBILIDAD", "ANADIR_EN_A8", "cota temporal del marcado masivo (E063)"),
+    "updatedCount": ("COMPATIBILIDAD", "ANADIR_EN_A8", "cuantas notificaciones se marcaron; solo el servidor lo sabe"),
+    "updatedAt": ("OPCIONAL", "POSPUESTA_CONFIRMADA", "sello temporal de presentacion"),
+    "platform": ("COMPATIBILIDAD", "ANADIR_EN_A8", "plataforma del dispositivo para el registro push"),
+    "appVersion": ("COMPATIBILIDAD", "ANADIR_EN_A8", "version de la app para diagnostico push"),
+    "active": ("COMPATIBILIDAD", "ANADIR_EN_A8", "estado del registro push"),
+    "deviceId": ("ESENCIAL", "DECIDIR_EN_RFC_016", "identificador del dispositivo: sin el no se puede deduplicar el registro push"),
+    "deviceRegistrationId": ("ESENCIAL", "DECIDIR_EN_RFC_016", "identifica el registro que E060 debe eliminar"),
+    "relatedEntityId": ("ESENCIAL", "DECIDIR_EN_RFC_016", "vinculo del recordatorio con su entidad; sin el el recordatorio es inutilizable"),
+    "verificationToken": ("ESENCIAL", "DECIDIR_EN_RFC_016", "E011 es publica y solo recibe el token: sin el campo el flujo es imposible"),
+    "email": ("ESENCIAL", "DECIDIR_EN_RFC_016", "E010 debe identificar la cuenta a verificar y no hay sesion"),
+    "microphone": ("COMPATIBILIDAD", "ANADIR_EN_A8", "estado de onboarding que persiste el servidor"),
+    "notifications": ("COMPATIBILIDAD", "ANADIR_EN_A8", "estado de onboarding que persiste el servidor"),
+    "configured": ("COMPATIBILIDAD", "ANADIR_EN_A8", "estado de onboarding que persiste el servidor"),
+    "completedAt": ("COMPATIBILIDAD", "ANADIR_EN_A8", "sello del onboarding completado"),
+    "content": ("COMPATIBILIDAD", "ANADIR_EN_A8", "texto del aviso de privacidad; lo sirve el backend"),
+    "requiresAcceptance": ("COMPATIBILIDAD", "ANADIR_EN_A8", "regla de aceptacion que decide el servidor"),
+    "emailVerified": ("COMPATIBILIDAD", "ANADIR_EN_A8", "resultado de la verificacion"),
+    "deletionRequestId": ("COMPATIBILIDAD", "ANADIR_EN_A8", "referencia del borrado solicitado"),
+    "reason": ("COMPATIBILIDAD", "ANADIR_EN_A8", "motivo de borrado, opcional y aditivo"),
+    "revokedSessions": ("COMPATIBILIDAD", "ANADIR_EN_A8", "evidencia de revocacion que solo el servidor conoce"),
+    "revokedOtherSessions": ("COMPATIBILIDAD", "ANADIR_EN_A8", "evidencia de revocacion que solo el servidor conoce"),
+    "reset": ("COMPATIBILIDAD", "ANADIR_EN_A8", "resultado booleano del restablecimiento"),
+    "appearance": ("COMPATIBILIDAD", "ANADIR_EN_A8", "preferencia de tema; el servidor la persiste"),
+    "affectedGoalId": ("COMPATIBILIDAD", "ANADIR_EN_A8", "efecto del borrado sobre una meta"),
+    "reversedContributionId": ("COMPATIBILIDAD", "ANADIR_EN_A8", "efecto del borrado sobre una aportacion"),
+    "releasedAmount": ("COMPATIBILIDAD", "ANADIR_EN_A8", "importe liberado por el borrado de meta"),
+    "reversedAllocations": ("COMPATIBILIDAD", "ANADIR_EN_A8", "aportaciones revertidas por el borrado"),
+    "affectedPeriods": ("COMPATIBILIDAD", "ANADIR_EN_A8", "periodos contables afectados por la reversion"),
+    "budgetAlerts": ("COMPATIBILIDAD", "ANADIR_EN_A8", "preferencia granular (A3)"),
+    "goalUpdates": ("COMPATIBILIDAD", "ANADIR_EN_A8", "preferencia granular (A3)"),
+    "recurringReminders": ("COMPATIBILIDAD", "ANADIR_EN_A8", "preferencia granular (A3)"),
+    "streakReminders": ("COMPATIBILIDAD", "ANADIR_EN_A8", "preferencia granular (A3)"),
+    "quietHours": ("COMPATIBILIDAD", "ANADIR_EN_A8", "horario de silencio (A3)"),
+}
+
+
+def decidir(campo: str, eid: str) -> tuple[str, str, str]:
+    base = campo.replace("[]", "").split(".")[-1]
+    if base in DECISION_FINAL:
+        return DECISION_FINAL[base]
+    return (
+        "COMPATIBILIDAD",
+        "ANADIR_EN_A8",
+        f"`{campo}` no tiene equivalente demostrado en el contrato de {eid}: se propone aditivo opcional en A8",
+    )
 
 
 def cargar(ruta: Path):
@@ -172,6 +329,47 @@ def campos_del_esquema(op: dict, componentes: dict, codigo: str) -> set[str]:
     return base
 
 
+def otros_campos(op: dict, componentes: dict) -> set[str]:
+    """Nombres de campos del request y de parametros path/query del contrato."""
+    nombres: set[str] = set()
+    for p in op.get("parameters") or []:
+        if isinstance(p, dict) and p.get("name"):
+            nombres.add(p["name"])
+    contenido = ((op.get("requestBody") or {}).get("content") or {}).get("application/json") or {}
+    esquema = contenido.get("schema")
+    if isinstance(esquema, dict):
+        for c in aplanar_campos(esquema, componentes):
+            nombres.add(c.split(".")[0])
+    return nombres
+
+
+def aplanar_campos(sch, componentes, prefijo=""):
+    base: set[str] = set()
+    if not isinstance(sch, dict):
+        return base
+    if "$ref" in sch:
+        nombre = sch["$ref"].split("/")[-1]
+        if nombre in componentes:
+            base |= aplanar_campos(componentes[nombre], componentes, prefijo)
+        return base
+    for nombre, sub in (sch.get("properties") or {}).items():
+        ruta = f"{prefijo}{nombre}"
+        base.add(ruta)
+        if isinstance(sub, dict):
+            if "$ref" in sub:
+                ref = sub["$ref"].split("/")[-1]
+                if ref in componentes:
+                    base |= aplanar_campos(componentes[ref], componentes, ruta + ".")
+            elif sub.get("type") == "array" and isinstance(sub.get("items"), dict):
+                base |= aplanar_campos(sub["items"], componentes, ruta + ".")
+            elif isinstance(sub.get("properties"), dict):
+                base |= aplanar_campos(sub, componentes, ruta + ".")
+    for comp in ("allOf", "oneOf", "anyOf"):
+        for sub in sch.get(comp) or []:
+            base |= aplanar_campos(sub, componentes, prefijo)
+    return base
+
+
 def clasificar(raiz: Path) -> dict:
     matriz = cargar(raiz / MATRIZ)
     api = cargar(raiz / OPENAPI)
@@ -185,7 +383,7 @@ def clasificar(raiz: Path) -> dict:
         ruta = fila.get("sdd_path") or ""
         op = ((api.get("paths") or {}).get(ruta) or {}).get(metodo) or {}
         campos = campos_del_esquema(op, componentes, str(fila.get("sdd_success")))
-        bases = {c.split(".")[0] for c in campos}
+        bases = {c.split(".")[0] for c in campos} | otros_campos(op, componentes)
 
         diferencias = []
 
@@ -258,6 +456,24 @@ def clasificar(raiz: Path) -> dict:
                         "POSPUESTA_CONFIRMADA",
                         "La base del campo ya existe en el contrato aprobado.",
                     )
+                elif base in EQUIVALENCIAS:
+                    agregar(
+                        campo,
+                        tipo,
+                        "OPCIONAL",
+                        "El dato existe en el contrato con otro nombre o es calculable.",
+                        "POSPUESTA_CONFIRMADA",
+                        EQUIVALENCIAS[base],
+                    )
+                elif base in COMPOSICION:
+                    agregar(
+                        campo,
+                        tipo,
+                        "OPCIONAL",
+                        "El dato se obtiene de un endpoint atomico aprobado.",
+                        "POSPUESTA_CONFIRMADA",
+                        COMPOSICION[base],
+                    )
                 elif eid in ESTRUCTURALES and tipo == "RESPONSE" and "." not in campo:
                     clase, motivo = ESTRUCTURALES[eid]
                     agregar(
@@ -269,17 +485,8 @@ def clasificar(raiz: Path) -> dict:
                         motivo,
                     )
                 else:
-                    derivable, motivo = derivar(campo)
-                    agregar(
-                        campo,
-                        tipo,
-                        "OPCIONAL",
-                        "Refinamiento de presentacion no requerido por el contrato aprobado."
-                        if derivable
-                        else "Sin evidencia de que Android funcione sin el.",
-                        "POSPUESTA_CONFIRMADA" if derivable else "PENDIENTE_DE_DECISION",
-                        motivo,
-                    )
+                    clase, decision, motivo = decidir(campo, eid)
+                    agregar(campo, tipo, clase, "Ver motivo.", decision, motivo)
 
         esenciales = [d for d in diferencias if d["clase"] == "ESENCIAL"]
         compatibilidad = [d for d in diferencias if d["clase"] == "COMPATIBILIDAD"]
