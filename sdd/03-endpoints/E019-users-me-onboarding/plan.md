@@ -23,3 +23,10 @@
 - No crear recursos ni ejecutar despliegues en H06. AWS Free/45 días/cero pesos y ciclo IaC cerrado son condiciones de H08, no tareas manuales de Mobile.
 - Errores de concurrencia 409/412, reglas de negocio 422, disponibilidad 503 y seguridad de recursos ajenos.
 - Prueba real HTTP/HTTPS y DynamoDB/Redis: **NOT_RUN**; solo el contrato/documento es verificable ahora.
+
+## Impacto de la enmienda — RFC-016 (A8)
+
+- Persistencia: se almacena en el mismo item del recurso; no requiere tabla ni indice nuevo.
+- Concurrencia: se mantiene el control por `version`/`If-Match` ya definido.
+- Ida y vuelta: el dato escrito se devuelve en las respuestas de creacion, detalle y listado.
+- Dependencias: ninguna nueva de AWS; sin coste adicional.

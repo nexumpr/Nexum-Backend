@@ -12,64 +12,32 @@
   },
   "resumen": {
     "operaciones": 71,
-    "diferencias": 812,
+    "diferencias": 805,
     "por_clase": {
-      "ESENCIAL": 2,
-      "COMPATIBILIDAD": 206,
-      "OPCIONAL": 597,
-      "OBSOLETA": 7
+      "ESENCIAL": 0,
+      "COMPATIBILIDAD": 153,
+      "OPCIONAL": 652,
+      "OBSOLETA": 0
     },
     "sin_clasificar": 0,
     "problemas": [],
     "por_decision": {
-      "POSPUESTA_CONFIRMADA": 597,
+      "POSPUESTA_CONFIRMADA": 652,
       "PENDIENTE_DE_DECISION": 0
     },
     "operaciones_con_pendientes": 0,
     "por_instrumento": {
-      "A2": 0,
-      "A3": 26,
+      "A2": 1,
+      "A3": 12,
       "A5": 2,
-      "A7": 0,
-      "A8": 40,
+      "A7": 1,
+      "A8": 0,
       "A1": 0,
       "CONSERVAR": 33,
       "CALCULAR": 66,
-      "DESCARTAR": 34
+      "DESCARTAR": 33
     },
-    "a8": [
-      "E014:deletionRequestId",
-      "E015:content",
-      "E015:requiresAcceptance",
-      "E018:completedAt",
-      "E018:configured",
-      "E018:microphone",
-      "E018:notifications",
-      "E019:completedAt",
-      "E019:configured",
-      "E019:microphone",
-      "E019:notifications",
-      "E029:contributionId",
-      "E029:recurringPaymentId",
-      "E032:type",
-      "E033:dueDay",
-      "E033:startDate",
-      "E033:type",
-      "E034:startDate",
-      "E035:dueDay",
-      "E035:startDate",
-      "E035:type",
-      "E038:totals.activeCount",
-      "E038:totals.saved",
-      "E045:status",
-      "E061:type",
-      "E061:unreadCount",
-      "E062:unreadCount",
-      "E065:frequency",
-      "E066:frequency",
-      "E068:timeZone",
-      "E069:timeZone"
-    ]
+    "a8": []
   },
   "operaciones": [
     {
@@ -78,14 +46,6 @@
       "operationId": "nexum_e005",
       "seguridad": "public",
       "diferencias": [
-        {
-          "campo": "persistencia",
-          "tipo": "PERSISTENCIA",
-          "clase": "OBSOLETA",
-          "necesidad_android": "Ninguna: es referencia documental al modelo anterior.",
-          "decision": "SUSTITUIR por USER#id/SESSION#id y REFRESH#digest/SESSION",
-          "motivo": "4 referencias a SESSIONHASH contradicen el modelo verificado en E003/E004."
-        },
         {
           "campo": "locale",
           "tipo": "REQUEST",
@@ -127,12 +87,11 @@
         "ESENCIAL": 0,
         "COMPATIBILIDAD": 2,
         "OPCIONAL": 2,
-        "OBSOLETA": 1
+        "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
         "RFC-016 no aprobada",
-        "Enmienda de persistencia no aplicada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -142,14 +101,6 @@
       "operationId": "nexum_e006",
       "seguridad": "public",
       "diferencias": [
-        {
-          "campo": "persistencia",
-          "tipo": "PERSISTENCIA",
-          "clase": "OBSOLETA",
-          "necesidad_android": "Ninguna: es referencia documental al modelo anterior.",
-          "decision": "SUSTITUIR por USER#id/SESSION#id y REFRESH#digest/SESSION",
-          "motivo": "4 referencias a SESSIONHASH contradicen el modelo verificado en E003/E004."
-        },
         {
           "campo": "resetToken",
           "tipo": "REQUEST",
@@ -185,12 +136,11 @@
         "ESENCIAL": 0,
         "COMPATIBILIDAD": 3,
         "OPCIONAL": 0,
-        "OBSOLETA": 1
+        "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
         "RFC-016 no aprobada",
-        "Enmienda de persistencia no aplicada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -200,14 +150,6 @@
       "operationId": "nexum_e007",
       "seguridad": "bearer",
       "diferencias": [
-        {
-          "campo": "persistencia",
-          "tipo": "PERSISTENCIA",
-          "clase": "OBSOLETA",
-          "necesidad_android": "Ninguna: es referencia documental al modelo anterior.",
-          "decision": "SUSTITUIR por USER#id/SESSION#id y REFRESH#digest/SESSION",
-          "motivo": "4 referencias a SESSIONHASH contradicen el modelo verificado en E003/E004."
-        },
         {
           "campo": "changedAt",
           "tipo": "RESPONSE",
@@ -231,12 +173,11 @@
         "ESENCIAL": 0,
         "COMPATIBILIDAD": 1,
         "OPCIONAL": 1,
-        "OBSOLETA": 1
+        "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
         "RFC-016 no aprobada",
-        "Enmienda de persistencia no aplicada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -246,14 +187,6 @@
       "operationId": "nexum_e008",
       "seguridad": "bearer",
       "diferencias": [
-        {
-          "campo": "persistencia",
-          "tipo": "PERSISTENCIA",
-          "clase": "OBSOLETA",
-          "necesidad_android": "Ninguna: es referencia documental al modelo anterior.",
-          "decision": "SUSTITUIR por USER#id/SESSION#id y REFRESH#digest/SESSION",
-          "motivo": "4 referencias a SESSIONHASH contradicen el modelo verificado en E003/E004."
-        },
         {
           "campo": "limit",
           "tipo": "REQUEST",
@@ -331,11 +264,10 @@
         "ESENCIAL": 0,
         "COMPATIBILIDAD": 0,
         "OPCIONAL": 9,
-        "OBSOLETA": 1
+        "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
-        "Enmienda de persistencia no aplicada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -345,14 +277,6 @@
       "operationId": "nexum_e009",
       "seguridad": "bearer",
       "diferencias": [
-        {
-          "campo": "persistencia",
-          "tipo": "PERSISTENCIA",
-          "clase": "OBSOLETA",
-          "necesidad_android": "Ninguna: es referencia documental al modelo anterior.",
-          "decision": "SUSTITUIR por USER#id/SESSION#id y REFRESH#digest/SESSION",
-          "motivo": "4 referencias a SESSIONHASH contradicen el modelo verificado en E003/E004."
-        },
         {
           "campo": "sessionId",
           "tipo": "REQUEST",
@@ -366,11 +290,10 @@
         "ESENCIAL": 0,
         "COMPATIBILIDAD": 0,
         "OPCIONAL": 1,
-        "OBSOLETA": 1
+        "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
-        "Enmienda de persistencia no aplicada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -380,14 +303,6 @@
       "operationId": "nexum_e010",
       "seguridad": "bearer",
       "diferencias": [
-        {
-          "campo": "persistencia",
-          "tipo": "PERSISTENCIA",
-          "clase": "OBSOLETA",
-          "necesidad_android": "Ninguna: es referencia documental al modelo anterior.",
-          "decision": "SUSTITUIR por USER#id/SESSION#id y REFRESH#digest/SESSION",
-          "motivo": "4 referencias a SESSIONHASH contradicen el modelo verificado en E003/E004."
-        },
         {
           "campo": "email",
           "tipo": "REQUEST",
@@ -429,12 +344,11 @@
         "ESENCIAL": 0,
         "COMPATIBILIDAD": 2,
         "OPCIONAL": 2,
-        "OBSOLETA": 1
+        "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
         "RFC-016 no aprobada",
-        "Enmienda de persistencia no aplicada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -444,14 +358,6 @@
       "operationId": "nexum_e011",
       "seguridad": "public",
       "diferencias": [
-        {
-          "campo": "persistencia",
-          "tipo": "PERSISTENCIA",
-          "clase": "OBSOLETA",
-          "necesidad_android": "Ninguna: es referencia documental al modelo anterior.",
-          "decision": "SUSTITUIR por USER#id/SESSION#id y REFRESH#digest/SESSION",
-          "motivo": "4 referencias a SESSIONHASH contradicen el modelo verificado en E003/E004."
-        },
         {
           "campo": "verificationToken",
           "tipo": "REQUEST",
@@ -487,12 +393,11 @@
         "ESENCIAL": 0,
         "COMPATIBILIDAD": 3,
         "OPCIONAL": 0,
-        "OBSOLETA": 1
+        "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
         "RFC-016 no aprobada",
-        "Enmienda de persistencia no aplicada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -589,12 +494,10 @@
         {
           "campo": "deletionRequestId",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "referencia del borrado solicitado",
-          "instrumento": "A8",
-          "motivo_instrumento": "el cliente necesita referenciar el borrado solicitado"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "message",
@@ -609,8 +512,8 @@
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 2,
-        "OPCIONAL": 0,
+        "COMPATIBILIDAD": 1,
+        "OPCIONAL": 1,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
@@ -656,12 +559,10 @@
         {
           "campo": "content",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "texto del aviso de privacidad; lo sirve el backend",
-          "instrumento": "A8",
-          "motivo_instrumento": "texto del aviso de privacidad que solo el backend puede servir"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "locale",
@@ -676,18 +577,16 @@
         {
           "campo": "requiresAcceptance",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "regla de aceptacion que decide el servidor",
-          "instrumento": "A8",
-          "motivo_instrumento": "regla de aceptacion decidida por el servidor"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         }
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 5,
-        "OPCIONAL": 1,
+        "COMPATIBILIDAD": 3,
+        "OPCIONAL": 3,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
@@ -842,53 +741,44 @@
         {
           "campo": "microphone",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor",
-          "instrumento": "A8",
-          "motivo_instrumento": "estado de onboarding persistido por el servidor"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "notifications",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor",
-          "instrumento": "A8",
-          "motivo_instrumento": "estado de onboarding persistido por el servidor"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "configured",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor",
-          "instrumento": "A8",
-          "motivo_instrumento": "estado de onboarding persistido por el servidor"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "completedAt",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "sello del onboarding completado",
-          "instrumento": "A8",
-          "motivo_instrumento": "sello del onboarding completado"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         }
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 4,
-        "OPCIONAL": 0,
+        "COMPATIBILIDAD": 0,
+        "OPCIONAL": 4,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
-        "RFC-016 no aprobada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -901,72 +791,58 @@
         {
           "campo": "microphone",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor",
-          "instrumento": "A8",
-          "motivo_instrumento": "estado de onboarding persistido por el servidor"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "notifications",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor",
-          "instrumento": "A8",
-          "motivo_instrumento": "estado de onboarding persistido por el servidor"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "configured",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor",
-          "instrumento": "A8",
-          "motivo_instrumento": "estado de onboarding persistido por el servidor"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "microphone",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor",
-          "instrumento": "A8",
-          "motivo_instrumento": "estado de onboarding persistido por el servidor"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "notifications",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor",
-          "instrumento": "A8",
-          "motivo_instrumento": "estado de onboarding persistido por el servidor"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "configured",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "estado de onboarding que persiste el servidor",
-          "instrumento": "A8",
-          "motivo_instrumento": "estado de onboarding persistido por el servidor"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "completedAt",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "sello del onboarding completado",
-          "instrumento": "A8",
-          "motivo_instrumento": "sello del onboarding completado"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "updatedAt",
@@ -979,13 +855,12 @@
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 7,
-        "OPCIONAL": 1,
+        "COMPATIBILIDAD": 0,
+        "OPCIONAL": 8,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
-        "RFC-016 no aprobada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -2906,12 +2781,10 @@
         {
           "campo": "recurringPaymentId",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`recurringPaymentId` no tiene equivalente demostrado en el contrato de E029: se propone aditivo opcional en A8",
-          "instrumento": "A8",
-          "motivo_instrumento": "referencia para navegar al recurrente"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "goalId",
@@ -2924,18 +2797,16 @@
         {
           "campo": "contributionId",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`contributionId` no tiene equivalente demostrado en el contrato de E029: se propone aditivo opcional en A8",
-          "instrumento": "A8",
-          "motivo_instrumento": "referencia para navegar a la aportacion"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         }
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 3,
-        "OPCIONAL": 4,
+        "COMPATIBILIDAD": 1,
+        "OPCIONAL": 6,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
@@ -3214,12 +3085,10 @@
         {
           "campo": "type",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
-          "instrumento": "A8",
-          "motivo_instrumento": "filtro por tipo sobre la lista paginada de recurrentes"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "limit",
@@ -3328,13 +3197,12 @@
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 1,
-        "OPCIONAL": 13,
+        "COMPATIBILIDAD": 0,
+        "OPCIONAL": 14,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
-        "RFC-016 no aprobada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -3363,32 +3231,26 @@
         {
           "campo": "type",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
-          "instrumento": "A8",
-          "motivo_instrumento": "sin tipo, el recurrente no puede clasificarse"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "startDate",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`startDate` no tiene equivalente demostrado en el contrato de E033: se propone aditivo opcional en A8",
-          "instrumento": "A8",
-          "motivo_instrumento": "inicio de la serie recurrente"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "dueDay",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`dueDay` no tiene equivalente demostrado en el contrato de E033: se propone aditivo opcional en A8",
-          "instrumento": "A8",
-          "motivo_instrumento": "dia de vencimiento del recurrente"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "concept",
@@ -3409,12 +3271,10 @@
         {
           "campo": "type",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
-          "instrumento": "A8",
-          "motivo_instrumento": "sin tipo, el recurrente no puede clasificarse"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "monthlyEquivalent",
@@ -3427,23 +3287,20 @@
         {
           "campo": "startDate",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`startDate` no tiene equivalente demostrado en el contrato de E033: se propone aditivo opcional en A8",
-          "instrumento": "A8",
-          "motivo_instrumento": "inicio de la serie recurrente"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         }
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 5,
-        "OPCIONAL": 5,
+        "COMPATIBILIDAD": 0,
+        "OPCIONAL": 10,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
-        "RFC-016 no aprobada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -3480,12 +3337,10 @@
         {
           "campo": "type",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
-          "instrumento": "DESCARTAR",
-          "motivo_instrumento": "filtro de cliente; el listado devuelve todo"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "monthlyEquivalent",
@@ -3498,23 +3353,20 @@
         {
           "campo": "startDate",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`startDate` no tiene equivalente demostrado en el contrato de E034: se propone aditivo opcional en A8",
-          "instrumento": "A8",
-          "motivo_instrumento": "inicio de la serie recurrente no expuesto por el contrato"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         }
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 2,
-        "OPCIONAL": 4,
+        "COMPATIBILIDAD": 0,
+        "OPCIONAL": 6,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
-        "RFC-016 no aprobada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -3559,32 +3411,26 @@
         {
           "campo": "type",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
-          "instrumento": "A8",
-          "motivo_instrumento": "permite cambiar el tipo del recurrente"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "startDate",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`startDate` no tiene equivalente demostrado en el contrato de E035: se propone aditivo opcional en A8",
-          "instrumento": "A8",
-          "motivo_instrumento": "permite cambiar el inicio"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "dueDay",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`dueDay` no tiene equivalente demostrado en el contrato de E035: se propone aditivo opcional en A8",
-          "instrumento": "A8",
-          "motivo_instrumento": "permite cambiar el dia de vencimiento"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "concept",
@@ -3605,12 +3451,10 @@
         {
           "campo": "type",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
-          "instrumento": "A8",
-          "motivo_instrumento": "permite cambiar el tipo del recurrente"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "monthlyEquivalent",
@@ -3631,13 +3475,12 @@
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 4,
-        "OPCIONAL": 8,
+        "COMPATIBILIDAD": 0,
+        "OPCIONAL": 12,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
-        "RFC-016 no aprobada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -3927,33 +3770,28 @@
         {
           "campo": "totals.saved",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`totals.saved` no tiene equivalente demostrado en el contrato de E038: se propone aditivo opcional en A8",
-          "instrumento": "A8",
-          "motivo_instrumento": "contadores globales: con paginacion el cliente no puede sumarlos"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "totals.activeCount",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`totals.activeCount` no tiene equivalente demostrado en el contrato de E038: se propone aditivo opcional en A8",
-          "instrumento": "A8",
-          "motivo_instrumento": "contadores globales: con paginacion el cliente no puede sumarlos"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         }
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 2,
-        "OPCIONAL": 15,
+        "COMPATIBILIDAD": 0,
+        "OPCIONAL": 17,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
-        "RFC-016 no aprobada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -3975,9 +3813,9 @@
           "campo": "openingSaved",
           "tipo": "REQUEST",
           "clase": "OPCIONAL",
-          "necesidad_android": "El dato existe en el contrato con otro nombre o es calculable.",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
           "decision": "POSPUESTA_CONFIRMADA",
-          "motivo": "equivale a `initialSavedAmount`, aceptado por E039"
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "emoji",
@@ -4001,9 +3839,9 @@
           "campo": "openingSaved",
           "tipo": "RESPONSE",
           "clase": "OPCIONAL",
-          "necesidad_android": "El dato existe en el contrato con otro nombre o es calculable.",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
           "decision": "POSPUESTA_CONFIRMADA",
-          "motivo": "equivale a `initialSavedAmount`, aceptado por E039"
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "saved",
@@ -4101,10 +3939,12 @@
         {
           "campo": "openingSaved",
           "tipo": "RESPONSE",
-          "clase": "ESENCIAL",
+          "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "E039 acepta initialSavedAmount pero ni E039 ni E040 lo devuelven: sin el, Android no puede mostrar saldo inicial ni separar aportaciones de saldo inicial, y contributedNet no es calculable."
+          "motivo": "incorporado por A7 (2026-11-16): el contrato ya expone openingSaved en Goal",
+          "instrumento": "A7",
+          "motivo_instrumento": "= initialSavedAmount; expuesto con A7"
         },
         {
           "campo": "contributedNet",
@@ -4164,8 +4004,8 @@
         }
       ],
       "resumen": {
-        "ESENCIAL": 1,
-        "COMPATIBILIDAD": 4,
+        "ESENCIAL": 0,
+        "COMPATIBILIDAD": 5,
         "OPCIONAL": 4,
         "OBSOLETA": 0
       },
@@ -4201,9 +4041,9 @@
           "campo": "openingSaved",
           "tipo": "REQUEST",
           "clase": "OPCIONAL",
-          "necesidad_android": "El dato existe en el contrato con otro nombre o es calculable.",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
           "decision": "POSPUESTA_CONFIRMADA",
-          "motivo": "equivale a `initialSavedAmount`, aceptado por E039"
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "emoji",
@@ -4227,9 +4067,9 @@
           "campo": "openingSaved",
           "tipo": "RESPONSE",
           "clase": "OPCIONAL",
-          "necesidad_android": "El dato existe en el contrato con otro nombre o es calculable.",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
           "decision": "POSPUESTA_CONFIRMADA",
-          "motivo": "equivale a `initialSavedAmount`, aceptado por E039"
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "contributedNet",
@@ -4755,12 +4595,10 @@
         {
           "campo": "status",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "estado del recurso en listados E038/E045",
-          "instrumento": "A8",
-          "motivo_instrumento": "filtro por estado sobre la lista paginada de aportaciones"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "limit",
@@ -4901,13 +4739,12 @@
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 1,
-        "OPCIONAL": 20,
+        "COMPATIBILIDAD": 0,
+        "OPCIONAL": 21,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
-        "RFC-016 no aprobada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -6246,15 +6083,17 @@
         {
           "campo": "hasEnoughData",
           "tipo": "RESPONSE",
-          "clase": "ESENCIAL",
+          "clase": "COMPATIBILIDAD",
           "necesidad_android": "Ver motivo.",
           "decision": "DECIDIR EN RFC-016",
-          "motivo": "El contrato no distingue 'sin historial suficiente' de 'sin patrones': items[] vacio es ambiguo. El diseno ML (RFC-016 6) exige un estado explicito de datos insuficientes."
+          "motivo": "incorporado por A2 (2026-11-16); el contrato ya expone hasEnoughData",
+          "instrumento": "A2",
+          "motivo_instrumento": "contrato ML de E055 (A2)"
         }
       ],
       "resumen": {
-        "ESENCIAL": 1,
-        "COMPATIBILIDAD": 0,
+        "ESENCIAL": 0,
+        "COMPATIBILIDAD": 1,
         "OPCIONAL": 10,
         "OBSOLETA": 0
       },
@@ -6370,82 +6209,66 @@
         {
           "campo": "budgetAlerts",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "preferencia granular (A3)",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "goalUpdates",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "preferencia granular (A3)",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "recurringReminders",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "preferencia granular (A3)",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "streakReminders",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "preferencia granular (A3)",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "quietHours.enabled",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.enabled` no tiene equivalente demostrado en el contrato de E057: se propone aditivo opcional en A8",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "quietHours.start",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.start` no tiene equivalente demostrado en el contrato de E057: se propone aditivo opcional en A8",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "quietHours.end",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.end` no tiene equivalente demostrado en el contrato de E057: se propone aditivo opcional en A8",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "timeZone",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "updatedAt",
@@ -6458,13 +6281,12 @@
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 8,
-        "OPCIONAL": 2,
+        "COMPATIBILIDAD": 0,
+        "OPCIONAL": 10,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
-        "RFC-016 no aprobada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -6527,32 +6349,26 @@
         {
           "campo": "quietHours.enabled",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.enabled` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "quietHours.start",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.start` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "quietHours.end",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.end` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "enabled",
@@ -6635,38 +6451,32 @@
         {
           "campo": "quietHours.enabled",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.enabled` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "quietHours.start",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.start` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "quietHours.end",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "`quietHours.end` no tiene equivalente demostrado en el contrato de E058: se propone aditivo opcional en A8",
-          "instrumento": "A3",
-          "motivo_instrumento": "contrato de preferencias de notificacion (A3)"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         }
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 18,
-        "OPCIONAL": 1,
+        "COMPATIBILIDAD": 12,
+        "OPCIONAL": 7,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
@@ -6819,12 +6629,10 @@
         {
           "campo": "type",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "filtro de listado; sin el, la paginacion devuelve mezclado",
-          "instrumento": "A8",
-          "motivo_instrumento": "filtro por tipo sobre la lista paginada de notificaciones"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "limit",
@@ -6909,18 +6717,16 @@
         {
           "campo": "unreadCount",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "total no leido; con paginacion el cliente no puede contarlo",
-          "instrumento": "A8",
-          "motivo_instrumento": "total no leido no calculable con paginacion"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         }
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 3,
-        "OPCIONAL": 10,
+        "COMPATIBILIDAD": 1,
+        "OPCIONAL": 12,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
@@ -6956,18 +6762,16 @@
         {
           "campo": "unreadCount",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "total no leido; con paginacion el cliente no puede contarlo",
-          "instrumento": "A8",
-          "motivo_instrumento": "total no leido no calculable con paginacion"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         }
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 2,
-        "OPCIONAL": 1,
+        "COMPATIBILIDAD": 1,
+        "OPCIONAL": 2,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
@@ -7199,12 +7003,10 @@
         {
           "campo": "frequency",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034",
-          "instrumento": "A8",
-          "motivo_instrumento": "recurrencia del recordatorio o del recurrente"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "timeZone",
@@ -7257,12 +7059,10 @@
         {
           "campo": "frequency",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034",
-          "instrumento": "A8",
-          "motivo_instrumento": "recurrencia del recordatorio o del recurrente"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "timeZone",
@@ -7295,8 +7095,8 @@
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 11,
-        "OPCIONAL": 2,
+        "COMPATIBILIDAD": 9,
+        "OPCIONAL": 4,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
@@ -7332,12 +7132,10 @@
         {
           "campo": "frequency",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034",
-          "instrumento": "A8",
-          "motivo_instrumento": "recurrencia del recordatorio o del recurrente"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "timeZone",
@@ -7370,12 +7168,10 @@
         {
           "campo": "frequency",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "recurrencia del recordatorio; en movimientos se obtiene de E034",
-          "instrumento": "A8",
-          "motivo_instrumento": "recurrencia del recordatorio o del recurrente"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "timeZone",
@@ -7406,8 +7202,8 @@
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 6,
-        "OPCIONAL": 4,
+        "COMPATIBILIDAD": 4,
+        "OPCIONAL": 6,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
@@ -7467,12 +7263,10 @@
         {
           "campo": "timeZone",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
-          "instrumento": "A8",
-          "motivo_instrumento": "el perfil no declara zona horaria"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "updatedAt",
@@ -7485,13 +7279,12 @@
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 1,
-        "OPCIONAL": 3,
+        "COMPATIBILIDAD": 0,
+        "OPCIONAL": 4,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
-        "RFC-016 no aprobada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },
@@ -7512,12 +7305,10 @@
         {
           "campo": "timeZone",
           "tipo": "REQUEST",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
-          "instrumento": "A8",
-          "motivo_instrumento": "el perfil no declara zona horaria"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "appearance",
@@ -7538,12 +7329,10 @@
         {
           "campo": "timeZone",
           "tipo": "RESPONSE",
-          "clase": "COMPATIBILIDAD",
-          "necesidad_android": "Ver motivo.",
-          "decision": "ANADIR_EN_A8",
-          "motivo": "zona horaria del usuario: requerida para recordatorios y preferencias (A3 la declara en E058)",
-          "instrumento": "A8",
-          "motivo_instrumento": "el perfil no declara zona horaria"
+          "clase": "OPCIONAL",
+          "necesidad_android": "El contrato ya expone la misma base: el candidato es refinamiento.",
+          "decision": "POSPUESTA_CONFIRMADA",
+          "motivo": "La base del campo ya existe en el contrato aprobado."
         },
         {
           "campo": "updatedAt",
@@ -7556,13 +7345,12 @@
       ],
       "resumen": {
         "ESENCIAL": 0,
-        "COMPATIBILIDAD": 2,
-        "OPCIONAL": 4,
+        "COMPATIBILIDAD": 0,
+        "OPCIONAL": 6,
         "OBSOLETA": 0
       },
       "contract_frozen": "NOT_VERIFIED",
       "motivos_no_congelado": [
-        "RFC-016 no aprobada",
         "Aprobacion humana de la clasificacion pendiente"
       ]
     },

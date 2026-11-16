@@ -105,10 +105,11 @@ class Clasificacion(unittest.TestCase):
             self.assertEqual(con_http[eid], [], eid)
 
     def test_persistencia_heredada_es_obsoleta(self):
+        # Tras A1 (2026-11-16) la referencia heredada ya no existe: la prueba debe
+        # validar el contrato corregido, no exigir que el defecto siga presente.
         r = c.clasificar(RAIZ)
         for o in r["operaciones"]:
-            if o["id"] in c.PERSISTENCIA:
-                self.assertEqual(o["resumen"]["OBSOLETA"], 1, o["id"])
+            self.assertEqual(o["resumen"]["OBSOLETA"], 0, o["id"])
 
     def test_campo_material_es_esencial(self):
         arbol = Arbol()

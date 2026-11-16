@@ -56,14 +56,12 @@ RENOMBRADOS = {
 # la necesidad esta demostrada por un diseno aprobado (no por la maqueta).
 OVERRIDES: dict[str, tuple[str, str]] = {
     "E040:openingSaved": (
-        "ESENCIAL",
-        "E039 acepta initialSavedAmount pero ni E039 ni E040 lo devuelven: sin el, Android no puede mostrar "
-        "saldo inicial ni separar aportaciones de saldo inicial, y contributedNet no es calculable.",
+        "COMPATIBILIDAD",
+        "incorporado por A7 (2026-11-16): el contrato ya expone openingSaved en Goal",
     ),
     "E055:hasEnoughData": (
-        "ESENCIAL",
-        "El contrato no distingue 'sin historial suficiente' de 'sin patrones': items[] vacio es ambiguo. "
-        "El diseno ML (RFC-016 6) exige un estado explicito de datos insuficientes.",
+        "COMPATIBILIDAD",
+        "incorporado por A2 (2026-11-16); el contrato ya expone hasEnoughData",
     ),
     # Preferencias de notificacion: la maqueta pide granularidad que 3 booleanos no expresan.
     "E058:enabled": ("COMPATIBILIDAD", "Sustituye al conjunto pushEnabled/emailEnabled/reminderEnabled del SDD."),
@@ -484,8 +482,8 @@ def instrumento(campo: str, eid: str) -> tuple[str, str]:
         return ("A3", "contrato de preferencias de notificacion (A3)")
     if eid == "E052" and base in ("enoughData", "minimumSamples"):
         return ("A5", "suficiencia de datos en insights (A5)")
-    if eid == "E055" and raiz == "recommendations":
-        return ("A2", "el contenedor items[] se conserva (A2)")
+    if eid == "E055" and raiz in ("recommendations", "hasEnoughData"):
+        return ("A2", "contrato ML de E055 (A2)")
     if f"{eid}:{raiz}" in DEPURACION_EID:
         return DEPURACION_EID[f"{eid}:{raiz}"]
     if f"{eid}:{base}" in DEPURACION_EID:

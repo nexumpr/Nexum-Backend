@@ -6,7 +6,7 @@
 - [ ] `E006-T02` Implementar request/response DTO estrictos `PasswordResetRequest` / `Accepted`; rechazo de campos desconocidos.
 - [ ] `E006-T03` Implementar autorización por sujeto JWT y propiedad; públicas solo según allowlist aprobada.
 - [ ] `E006-T04` Implementar caso de uso y invariantes: Token hash de un uso, vigencia corta y revocación de todas las sesiones; no aceptar reutilización.
-- [ ] `E006-T05` Implementar adaptador DynamoDB y patrón: Email-reserva / USER#id PROFILE y SESSION#id / SESSIONHASH#digest; token hash con TTL y expiración funcional.
+- [ ] `E006-T05` Implementar adaptador DynamoDB y patrón: Email-reserva / USER#id PROFILE y SESSION#id / REFRESH#<digest>/SESSION; token hash con TTL y expiración funcional.
 - [ ] `E006-T06` Integrar Redis y consistencia multiinstancia sin confiar en caché para privilegios.
 - [ ] `E006-T07` Implementar códigos y errores definidos, ETag e idempotencia según operación.
 - [ ] `E006-T08` Crear unit tests de reglas y validaciones; fixture sin PII/credenciales reales.
@@ -23,3 +23,10 @@
 - [ ] `E006-CT04` Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
 - [ ] `E006-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E006-CT06` Revocación/rotación en nodo A persiste y es observable inmediatamente en nodo B; token reutilizado rechazado.
+
+## Tareas de la enmienda (A1) — PENDIENTES DE EJECUCION
+
+- [ ] Implementar referencias de persistencia corregidas a `USER#<userId>/SESSION#<sessionId>` y `REFRESH#<sha256(refreshToken)>/SESSION`; sin cambio de tabla ni de codigo.
+- [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
+- [ ] Cubrir con prueba positiva y negativa.
+- [ ] Verificar por HTTP real tras el despliegue autorizado.

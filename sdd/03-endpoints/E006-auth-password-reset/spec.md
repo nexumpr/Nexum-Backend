@@ -61,7 +61,7 @@ Token hash de un uso, vigencia corta y revocación de todas las sesiones; no ace
 
 ## 4. Acceso físico e invariantes
 
-Email-reserva / USER#id PROFILE y SESSION#id / SESSIONHASH#digest; token hash con TTL y expiración funcional.
+Email-reserva / USER#id PROFILE y SESSION#id / REFRESH#<digest>/SESSION; token hash con TTL y expiración funcional.
 
 Invariante: Token hash de un uso, vigencia corta y revocación de todas las sesiones; no aceptar reutilización. Ninguna operación puede hacer `Scan` global ni consultar PK de un usuario diferente. ETag/versionado, cancelación de transacciones, caché y TTL deben seguir H04/H05. El contrato OpenAPI es `openapi/nexum-api-v1.yaml` y su espejo JSON; ambos son la autoridad de transporte de H06.
 
@@ -80,3 +80,11 @@ Invariante: Token hash de un uso, vigencia corta y revocación de todas las sesi
 - Dependencias: H04 A-030/A-040/A-050/A-060/A-070/A-080; H05 I-040/I-050/I-150; seguridad GOV-06/07/11/15/16.
 - **Contrato diseñado:** documentado en H06. **Pruebas HTTP/Dynamo/Redis y despliegue:** NOT_RUN; solo H08+, no afirmar `PASS`.
 - **Responsabilidad:** Backend independiente del equipo móvil. La API cumple contrato sin solicitar aprobación de Android.
+
+## Enmienda aprobada — RFC-016 (A1, 2026-11-16)
+
+Gate: `APRUEBO_RFC_016_CONTRATOS_E005_E075` y `APRUEBO_ENMIENDA_A1`.
+
+- Contrato tras la enmienda: referencias de persistencia corregidas a `USER#<userId>/SESSION#<sessionId>` y `REFRESH#<sha256(refreshToken)>/SESSION`; sin cambio de tabla ni de codigo.
+- Compatibilidad: cambio aditivo; ningun cliente existente (E001-E004) se ve afectado.
+- Autoridad: el OpenAPI actualizado es la fuente de transporte.
