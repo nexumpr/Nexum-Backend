@@ -153,9 +153,11 @@ class ConstructorPermanente(unittest.TestCase):
     def test_ancla_duplicada_falla(self):
         import construir_opencode_permanente as cp
 
-        texto = self._base()
+        # Base sintetica con el ancla T1 repetida: el generador debe fallar, no elegir una.
+        ancla = '      "resource": "sdd/**/spec.md",\n      "effect": "deny"'
+        base = '{"permissions": [\n' + ancla + ",\n" + ancla + '\n], "policies": []}'
         with self.assertRaises(cp.ErrorConstruccion):
-            cp.construir(texto + texto)
+            cp.construir(base)
 
     def test_resultado_es_json_valido_y_conserva_denegaciones(self):
         import construir_opencode_permanente as cp
