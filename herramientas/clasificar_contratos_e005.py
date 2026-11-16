@@ -55,6 +55,11 @@ RENOMBRADOS = {
 # Campos ESENCIALES: solo cuando el contrato vigente NO puede expresar la funcion y
 # la necesidad esta demostrada por un diseno aprobado (no por la maqueta).
 OVERRIDES: dict[str, tuple[str, str]] = {
+    "E040:openingSaved": (
+        "ESENCIAL",
+        "E039 acepta initialSavedAmount pero ni E039 ni E040 lo devuelven: sin el, Android no puede mostrar "
+        "saldo inicial ni separar aportaciones de saldo inicial, y contributedNet no es calculable.",
+    ),
     "E055:hasEnoughData": (
         "ESENCIAL",
         "El contrato no distingue 'sin historial suficiente' de 'sin patrones': items[] vacio es ambiguo. "
@@ -82,6 +87,48 @@ ESTRUCTURALES = {
     "E074": ("OPCIONAL", "Datos de demostracion: no afecta al contrato de produccion."),
     "E020": ("OPCIONAL", "Forma del documento de exportacion: decision de producto."),
 }
+
+
+# Derivacion: si el dato puede obtenerse del propio contrato o por composicion, el
+# candidato queda OPCIONAL_CONFIRMADO; si no, OPCIONAL_PENDIENTE_DE_DECISION.
+DERIVACIONES = [
+    (("summary", "totals", "financialSummary", "streak", "tip", "recurringPreview", "topCategories"),
+     "agregado componible desde endpoints atomicos (E026/E051/E056)"),
+    (("percentage", "shareOfTotal", "percentageOfTop", "relativePercentage", "progressPercentage", "percentageOfTotal"),
+     "calculable con importes ya presentes en el contrato"),
+    (("remaining", "completed", "isNegative", "canCommit"),
+     "derivable de importes del propio contrato"),
+    (("createdAt", "updatedAt", "calculatedAt", "checkedAt", "verifiedAt", "acceptedAt", "readAt",
+      "lastSeenAt", "occurredAt", "paidAt", "startDate", "nextDueDate", "lastPaidAt", "dueDay",
+      "windowDays", "from", "to", "period", "asOf", "endDate", "triggerAt", "nextTriggerAt"),
+     "valor temporal de presentacion; no altera la logica del contrato"),
+    (("emoji", "title", "text", "message", "pigMessage", "headline", "userGreeting", "disclaimer",
+      "label", "question", "answer", "body", "topic", "sourceLabel", "order"),
+     "contenido de presentacion; no altera la logica del contrato"),
+    (("weekdayBars", "milestones", "categories", "recommendations", "limits", "allocations",
+      "sessions", "recurring", "movements", "goals", "budgets", "consents", "frequencies",
+      "contributions", "affectedGoals", "errors", "checks"),
+     "coleccion componible desde su endpoint atomico"),
+]
+
+# Campos que NO se pueden derivar y exigen decision trazada.
+PENDIENTES = {
+    "source", "frequency", "current", "valid", "confidence", "locale", "mode", "splitMode",
+    "goalIds", "reason", "format", "include", "context", "includeInactive", "limit", "cursor",
+    "unreadOnly", "activeOnly", "before", "occurrenceDate", "deviceName", "platform",
+    "appVersion", "timeZone", "enabled", "revision",
+}
+
+
+def derivar(campo: str) -> tuple[bool, str]:
+    base = campo.replace("[]", "").split(".")[-1]
+    raiz = campo.replace("[]", "").split(".")[0]
+    for claves, motivo in DERIVACIONES:
+        if raiz in claves or base in claves:
+            return True, motivo
+    if base in PENDIENTES or raiz in PENDIENTES:
+        return False, "no derivable del contrato vigente: requiere decision trazada"
+    return False, "sin evidencia suficiente de derivabilidad: requiere decision trazada"
 
 
 def cargar(ruta: Path):
@@ -208,20 +255,30 @@ def clasificar(raiz: Path) -> dict:
                         tipo,
                         "OPCIONAL",
                         "El contrato ya expone la misma base: el candidato es refinamiento.",
-                        "POSPUESTA",
+                        "POSPUESTA_CONFIRMADA",
                         "La base del campo ya existe en el contrato aprobado.",
                     )
                 elif eid in ESTRUCTURALES and tipo == "RESPONSE" and "." not in campo:
                     clase, motivo = ESTRUCTURALES[eid]
-                    agregar(campo, tipo, clase, "Ver motivo.", "DECIDIR EN RFC-016", motivo)
+                    agregar(
+                        campo,
+                        tipo,
+                        clase,
+                        "Ver motivo.",
+                        "POSPUESTA_CONFIRMADA" if clase == "OPCIONAL" else "DECIDIR EN RFC-016",
+                        motivo,
+                    )
                 else:
+                    derivable, motivo = derivar(campo)
                     agregar(
                         campo,
                         tipo,
                         "OPCIONAL",
-                        "Refinamiento de presentacion no requerido por el contrato aprobado.",
-                        "POSPUESTA",
-                        "El contrato vigente cubre la funcion; el campo puede anadirse por Gate.",
+                        "Refinamiento de presentacion no requerido por el contrato aprobado."
+                        if derivable
+                        else "Sin evidencia de que Android funcione sin el.",
+                        "POSPUESTA_CONFIRMADA" if derivable else "PENDIENTE_DE_DECISION",
+                        motivo,
                     )
 
         esenciales = [d for d in diferencias if d["clase"] == "ESENCIAL"]
@@ -268,6 +325,17 @@ def clasificar(raiz: Path) -> dict:
             "diferencias": total,
             "por_clase": resumen_clases,
             "sin_clasificar": sin_clasificar,
+            "por_decision": {
+                "POSPUESTA_CONFIRMADA": sum(
+                    1 for o in operaciones for d in o["diferencias"] if d["decision"] == "POSPUESTA_CONFIRMADA"
+                ),
+                "PENDIENTE_DE_DECISION": sum(
+                    1 for o in operaciones for d in o["diferencias"] if d["decision"] == "PENDIENTE_DE_DECISION"
+                ),
+            },
+            "operaciones_con_pendientes": sum(
+                1 for o in operaciones if any(d["decision"] == "PENDIENTE_DE_DECISION" for d in o["diferencias"])
+            ),
         },
         "operaciones": operaciones,
     }

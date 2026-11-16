@@ -1,474 +1,352 @@
-# RFC-016 — Cierre contractual E005–E075 (SDD V6.0.2)
+# RFC-016 — Cierre contractual E005–E075 (versión normativa v3)
 
 | Campo | Valor |
 |---|---|
 | Documento | `sdd/_control/H08/RFC-016-CONTRATOS_E005_E075.md` |
+| Versión | **3.0.0 — normativa única** (sustituye a v1 y v2) |
 | Estado | **PROPUESTO — NO APROBADO — NO APLICADO** |
 | Fecha | 2026-11-16 |
 | Baseline | `main` `8bc2548` · rama `chore/pre-e005-contratos-permisos` · PR #65 |
-| Alcance | Reconciliación transversal de los 71 contratos E005–E075 |
-| Autoriza | **Nada por sí mismo.** No aplica enmiendas, no habilita implementación |
+| Autoridad de transporte | OpenAPI 3.1 aprobado (H06) |
 | Aprobación | `APRUEBO_RFC_016_CONTRATOS_E005_E075` |
 
----
+## 0. Registro de cambios y precedencia
 
-## 1. Autoridad y regla de decisión
+| Versión | Cambio | Estado |
+|---|---|---|
+| 1.0.0 | Clasificación inicial ESENCIAL/COMPATIBILIDAD/OPCIONAL/OBSOLETA | sustituida |
+| 2.0.0 | §17 con correcciones A–G (revisión material, públicas, outbox, época, 3 estados, E058 exacto) | sustituida |
+| **3.0.0** | **Norma única.** Incorpora: worker de outbox con líder y leasing (E005), transacción válida de dos acciones (E006), `E040.openingSaved` como ESENCIAL, modelo de tres estados de los opcionales, consolidación sin duplicidad | **vigente** |
 
-1. **OpenAPI 3.1 aprobado (H06) es la autoridad de transporte.** El YAML y su espejo JSON
-   mandan sobre cualquier otra fuente.
-2. **La auditoría V6.0.2 establece necesidades funcionales del producto**, no contrato.
-3. Cuando discrepan, se decide y se registra; **nunca** se sustituye un contrato aprobado en
-   silencio.
-4. La app Android **no está publicada**: puede adaptarse al contrato aprobado. Por tanto
-   «compatibilidad con Android» significa *no romper lo ya implementado* (E001–E004) y *no
-   imponer al cliente una forma que el contrato ya resuelve de otro modo*.
+**Esta versión es la única norma.** v1 y v2 quedan como historia en el registro Git; no deben
+citarse como vigentes. Cualquier contradicción con ellas se resuelve aquí.
 
-## 2. Método y resultado
+## 1. Regla de decisión
 
-Herramientas versionadas y deterministas (sin AWS, sin red):
+1. El **OpenAPI aprobado** manda sobre la forma del transporte.
+2. La **auditoría V6.0.2** aporta necesidades funcionales, no contrato.
+3. La app Android **no está publicada**: puede adaptarse al contrato; lo que no puede es quedarse
+   sin un dato que **solo el servidor** puede producir.
+4. Toda diferencia se clasifica. **Clasificar ≠ resolver.** `OPCIONAL` significa pospuesto y
+   registrado, nunca «no hace falta».
 
-| Herramienta | Función |
-|---|---|
-| `herramientas/verificar_preparacion_e005.py` | integridad matriz↔OpenAPI, detección, decisiones, deuda documental |
-| `herramientas/clasificar_contratos_e005.py` | clasifica **todas** las diferencias y emite `CLASIFICACION_E005_E075.json` |
-| `sdd/_control/H08/DECISIONES_CONTRATO_E005_E075.json` | valor vigente/objetivo por diferencia; detecta cambios sin Gate |
-
-Resultado real:
+## 2. Resultado de la reconciliación (verificado)
 
 ```
 71 operaciones · 812 diferencias · 0 sin clasificar
-ESENCIAL=1 · COMPATIBILIDAD=20 · OPCIONAL=784 · OBSOLETA=7
+ESENCIAL=2 · COMPATIBILIDAD=22 · OPCIONAL=781 · OBSOLETA=7
+Opcionales: 462 POSPUESTA_CONFIRMADA (derivación declarada) · 319 PENDIENTE_DE_DECISION
 ```
 
-**Ninguna diferencia queda sin clasificar.** `OPCIONAL` **no** significa resuelto: significa
-**POSPUESTO y registrado**, reversible por Gate. Las 784 opcionales no bloquean la congelación;
-las 21 esenciales/compatibilidad **sí**.
+Registro por endpoint: `sdd/_control/H08/CLASIFICACION_E005_E075.json`
+(generado por `herramientas/clasificar_contratos_e005.py`, determinista).
 
-Distribución de las diferencias materiales:
-
-| Endpoint | ESENCIAL | COMPATIBILIDAD | Motivo |
+| Clase | N | Endpoints | Bloquea congelar |
 |---|---|---|---|
-| E017 | 0 | 1 | HTTP `201` vs `200` |
-| E031 | 0 | 1 | HTTP `204` vs `200` |
-| E037 | 0 | 1 | HTTP `200` vs `201` |
-| E042 | 0 | 1 | HTTP `204` vs `200` |
-| E063 | 0 | 1 | HTTP `202` vs `200` |
-| E006 | 0 | 1 | `resetToken` vs `token` |
-| E055 | **1** | 1 | `hasEnoughData` (ESENCIAL) + `recommendations[]` vs `items[]` |
-| E058 | 0 | 12 | preferencias granulares vs 3 booleanos |
-| E075 | 0 | 1 | `transcript` vs `text` |
-| Otros (62) | 0 | 0 | solo opcionales pospuestos |
+| ESENCIAL | 2 | E040 (`openingSaved`), E055 (`hasEnoughData`) | **Sí** |
+| COMPATIBILIDAD | 22 | E006, E017, E031, E037, E042, E052×2, E055, E058×12, E063, E075 | **Sí** |
+| OBSOLETA | 7 | E005–E011 (`SESSIONHASH`, 28 refs) | **Sí** (enmienda editorial) |
+| OPCIONAL confirmada | 462 | varios | No (derivación declarada) |
+| OPCIONAL pendiente | 319 | 68 endpoints | **No**, pero debe cerrarse en el Gate de cada endpoint |
 
-## 3. Códigos de éxito — decisión propuesta
+### 2.1 Nuevo hallazgo ESENCIAL: E040 `openingSaved`
+
+Verificado en OpenAPI: `GET /goals/{goalId}` devuelve
+`{id, name, targetAmount, savedAmount, currency, targetDate, status, version}` y nada más.
+`POST /goals` **acepta** `initialSavedAmount`, pero **ni E039 ni E040 lo devuelven**.
+
+Consecuencia: Android no puede mostrar el saldo inicial de la meta ni separar «aportado» de
+«saldo inicial»; `contributedNet = savedAmount − openingSaved` es **incalculable** por el cliente.
+**No es presentación: es un dato que solo el servidor tiene.** → **ESENCIAL**, enmienda **A7**.
+
+### 2.2 Modelo de tres estados de los opcionales
+
+Cada candidato opcional lleva `decision` y `motivo`:
+
+- `POSPUESTA_CONFIRMADA`: existe **derivación declarada** (composición desde un endpoint atómico,
+  cálculo con importes del propio contrato, o dato de presentación que no altera la lógica).
+- `PENDIENTE_DE_DECISION`: **no se demuestra** que Android funcione sin él. No se declara opcional
+  confirmado; queda como decisión abierta del Gate de ese endpoint.
+
+Los 319 pendientes **no bloquean la congelación** (no son esenciales ni incompatibilidad), pero
+**sí** deben cerrarse endpoint por endpoint antes de implementarlo. Lista por operación en el JSON.
+
+## 3. Códigos de éxito — decisión: conservar
 
 | ID | Operación | Vigente | Decisión | Motivo |
 |---|---|---|---|---|
-| E017 | `POST /users/me/consents` | `201` | **Conservar 201** | crea un consentimiento: recurso nuevo |
-| E031 | `DELETE /movements/{id}` | `204` | **Conservar 204** | borrado idempotente sin cuerpo |
-| E037 | `POST /recurring-payments/{id}/payments` | `200` | **Conservar 200** | ya devuelve el movimiento creado con `id`; `201` sería correcto pero el cambio no aporta y rompe al cliente |
-| E042 | `DELETE /goals/{id}` | `204` | **Conservar 204** | borrado idempotente sin cuerpo |
-| E063 | `POST /notifications/read-all` | `202` | **Conservar 202** | no se ha demostrado procesamiento síncrono; si se demuestra, `200` |
+| E017 | `POST /users/me/consents` | `201` | Conservar | crea recurso |
+| E031 | `DELETE /movements/{id}` | `204` | Conservar | borrado idempotente |
+| E037 | `POST /recurring-payments/{id}/payments` | `200` | Conservar | ya devuelve el movimiento con `id` |
+| E042 | `DELETE /goals/{id}` | `204` | Conservar | borrado idempotente |
+| E063 | `POST /notifications/read-all` | `202` | Conservar | no se demostró sincronía |
 
-Ninguna de estas cinco requiere enmienda: **la decisión es conservar el contrato vigente**.
-Se registran como `COMPATIBILIDAD` porque un cambio futuro sería una ruptura.
+**Sin cambio de contrato** (A4 solo registra la decisión).
 
-## 4. E005 — `POST /api/v1/auth/password/forgot` (SES)
+## 4. E005 — `POST /auth/password/forgot`
 
-### 4.1 Contrato (definitivo)
+### 4.1 Contrato
 
 ```
-Request  EmailRequest { email: string (requerido, format email, maxLength 254) }
-Response 202 Accepted { status: "accepted", requestId: uuid }
-Errores  400 409 422 429 500 503 (envelope común con traceId)
+Request  EmailRequest { email }                        (público, sin Bearer)
+Response 202 Accepted { status: "accepted", requestId }
+Errores  400 409 422 429 500 503
 ```
 
-**No se añade `locale` ni se sustituye `Accepted`.** `locale` queda **POSPUESTO** (el idioma puede
-derivarse del perfil); `message`/`retryAfterSeconds` quedan **POSPUESTOS**. Cambiar la respuesta
-rompería el patrón `requestId` y la no-enumeración.
+### 4.2 Qué garantiza el 202 — semántica exacta
 
-### 4.2 Semántica exacta de `202`
+> **`202` = «solicitud aceptada y trabajo persistido de forma durable».**
+> Garantiza que el envío **se intentará**, no que el correo se haya entregado ni que SES lo haya
+> aceptado. El mensaje al usuario nunca dice «enviado».
 
-`202` significa **«la solicitud fue aceptada para su procesamiento»**, **no** «el correo fue
-entregado». El mensaje al usuario debe decir «si el correo existe, recibirás instrucciones»,
-nunca «correo enviado». Prohibido registrar o exponer el resultado del envío al cliente.
+Si no se puede persistir el trabajo → **no hay `202`**: se devuelve `503` genérico.
 
-### 4.3 Reglas de comportamiento
+### 4.3 Transacción de admisión (antes de responder)
 
-| Aspecto | Regla |
-|---|---|
-| No enumeración | Misma respuesta, mismo tiempo y mismo código exista o no la cuenta |
-| Token | 32 bytes CSPRNG, `base64url`; se persiste **solo** su SHA-256 con TTL |
-| Uso único | consumo con escritura condicional (`attribute_not_exists`); segundo uso ⇒ `409` genérico |
-| Expiración | 30 minutos (TTL físico `expiresAt` + comprobación funcional) |
-| Rate limit | Redis distribuido: 3/hora por correo (HMAC) y 10/hora por IP; fail-closed en este endpoint |
-| Idempotencia | no aplica `Idempotency-Key` (no crea recurso); el reenvío reutiliza el token vigente o lo rota sin filtrar estado |
-| Fallo DynamoDB | `503` genérico, sin detalle interno |
-| Fallo SES | se registra métrica y **se responde igualmente `202`** (no se filtra), con reintento acotado |
-| Cuenta eliminada | misma respuesta; no se envía nada |
-| Enlace | `BASE_URL` + token de un uso; sin correo ni `userId` en la URL |
+`TransactWriteItems` de **3 acciones** sobre ítems distintos:
 
-### 4.4 Infraestructura SES — requisitos (no ejecutados)
-
-| Requisito | Estado | Bloquea contrato | Bloquea despliegue |
+| # | Acción | Ítem | Condición |
 |---|---|---|---|
-| Identidad SES verificada (dominio o correo) | **PENDIENTE** | No | **Sí** |
-| Salida del sandbox de SES (producción) | **PENDIENTE** (aprobación de AWS) | No | **Sí** |
-| Permiso IAM `ses:SendEmail` acotado a la identidad | **NO EXISTE** (I-060) | No | **Sí** |
-| Conectividad desde subred privada a la API SES | **NO DEMOSTRADA** | No | **Sí** |
-| Coste dentro de créditos | **NO VERIFICADO** | No | **Sí** |
-| Procedimiento de recuperación (rebote, queja) | Documentado en el Gate de implementación | No | No |
+| 1 | Put | `USER#<id>` / `PWRESET#<hmacEmail>` `{tokenHash, expiresAt, used:false, version:0}` | `attribute_not_exists(PK)` o versión anterior |
+| 2 | Put | `USER#<id>` / `OUTBOX#<ulid>` `{tipo, estado:"PENDIENTE", intentos:0, proximoIntento, tokenCifrado, expiresAt}` | — |
+| 3 | ConditionCheck | `USER#<id>` / `PROFILE` | existe y `status = ACTIVE` |
 
-**`CONTRACT_READY` sí · `AWS_READY` no.** El contrato puede congelarse; el endpoint no puede
-declararse publicado hasta cerrar la tabla anterior. **No se asume** que exista VPC endpoint de
-SES ni que AWS haya aprobado producción: ambas cosas se verifican en su Gate con evidencia.
+Cuenta inexistente: se ejecutan las **mismas tres acciones** con `destinatario = null` (sin
+`tokenCifrado`), de modo que coste, forma y número de acciones son idénticos.
 
-## 5. E006 — `POST /api/v1/auth/password/reset`
+### 4.4 Worker: procesamiento independiente de nuevas peticiones
+
+**Componente:** goroutine dentro del **binario Go existente** (`cmd/server`), arrancada con el
+servidor y detenida con el contexto de apagado. **Sin recursos AWS nuevos.**
+
+| Aspecto | Diseño |
+|---|---|
+| **Coordinación entre 2 nodos** | Líder único por *lease* en Redis: `SET nexum:v1:<env>:worker:pwreset:leader <inst> NX PX 15000`; renovación cada 5 s. Solo el líder reclama y envía |
+| **Reclamación atómica** | `UpdateItem` sobre el ítem de outbox con `ConditionExpression: estado = :pendiente AND proximoIntento <= :now` → `SET estado=:enviando, owner=:inst, leaseUntil=:now+30s` |
+| **Recuperación tras caída** | Barrido: ítems `estado = :enviando AND leaseUntil < :now` → vuelven a `:pendiente` (o `:requiere_revision` tras 3 ciclos). Funciona al reiniciar EC2: el estado vive en DynamoDB, no en memoria |
+| **Backoff** | 30 s, 2 min, 10 min, 1 h, 6 h; **máximo 6 intentos** → `estado=:fallido` |
+| **Expiración** | al superar `expiresAt` (TTL del token, 30 min) → `estado=:expirado` y se elimina el cifrado |
+| **Apagado controlado** | `Shutdown` cancela el contexto, espera el envío en curso ≤ 5 s y devuelve el ítem a `:pendiente` si no terminó |
+| **Redis caído** | no hay líder ⇒ **no se envía** (fail-safe); los ítems esperan. La admisión sigue respondiendo `202` (el trabajo está persistido). Se documenta la degradación |
+
+### 4.5 Token: cómo se envía si solo se persiste el hash
+
+Excepción explícita y acotada al principio «solo hashes»:
+
+| Aspecto | Decisión |
+|---|---|
+| Cifrado | **AES-256-GCM** con clave de 32 bytes `PASSWORD_RESET_SEAL_KEY_B64` en el bundle RFC-004 existente (sin KMS ni secreto nuevo) |
+| AAD | `<userId>|<outboxId>`: impide trasplantar el cifrado a otro ítem |
+| Campo | `tokenCifrado` en el ítem de outbox, **nunca** en el ítem `PWRESET#` (que solo guarda `tokenHash`) |
+| Ciclo de vida | se crea en la admisión y se **elimina** (`REMOVE tokenCifrado`) al pasar a `ENVIADO`, `EXPIRADO` o `FALLIDO` |
+| TTL | el ítem de outbox expira con el token (30 min); DynamoDB lo purga |
+| Acceso | solo el worker lo descifra, en memoria, y lo entrega al SDK de SES |
+| Logs | prohibido registrar el token, el cifrado o la clave; el redactor de A-090 cubre `token`, `tokenCifrado`, `password` |
+| Memoria | el buffer se sobrescribe tras el envío (`zeroize` best-effort) |
+
+**Alternativa descartada:** rotar el token en cada reintento. Rompería el enlace ya entregado si el
+proceso cayó después de que SES aceptó el mensaje.
+
+### 4.6 Semántica de entrega y duplicados
+
+**No es exactly-once.** Si el proceso muere después de que SES aceptó y antes de marcar `ENVIADO`:
+
+- el ítem vuelve a `:pendiente` por expiración de lease;
+- el reintento reenvía **el mismo enlace** (mismo token, por eso se cifra);
+- el usuario puede recibir **dos correos idénticos**; el enlace es de un solo uso y sigue válido;
+- el segundo uso devuelve el error genérico sin revelar estado.
+
+Se documenta como **at-least-once**; no se promete unicidad de entrega.
+
+### 4.7 No enumeración
+
+| Escenario | Respuesta | Nota |
+|---|---|---|
+| Correo existente | `202` | trabajo persistido y enviado |
+| Correo inexistente | `202` | mismas 3 acciones, sin envío |
+| Fallo de SES | `202` | el trabajo queda `PENDIENTE`; **no** cambia la respuesta |
+| Fallo de DynamoDB | `503` | no hay trabajo persistido; no se puede aceptar |
+| Rate limit | `429` | mismo límite por IP y por correo, exista o no |
+| Cuenta eliminada | `202` | mismas acciones, sin envío |
+
+**Mitigaciones temporales (no promesas):** suelo de latencia con espera acotada (≤ 250 ms) + jitter,
+y prueba estadística de comparación de distribuciones (α = 0,01; p50/p95 sobre 200 muestras por
+rama). No se afirma que los tiempos sean indistinguibles.
+
+## 5. E006 — `POST /auth/password/reset`
+
+### 5.1 Contrato
 
 ```
-Request  PasswordResetRequest { token: string, newPassword: string (12..128) }
+Request  PasswordResetRequest { token, newPassword }   (público, sin Bearer)
 Response 200 Accepted { status, requestId }
 ```
 
-| Elemento | Decisión |
+### 5.2 Transacción válida (corregida)
+
+DynamoDB **no permite dos acciones sobre el mismo ítem** en `TransactWriteItems`. La versión
+anterior de este documento proponía varias acciones sobre `PROFILE`: era inválida. Diseño correcto,
+**2 acciones sobre 2 ítems distintos**:
+
+| # | Acción | Ítem | Expresión |
+|---|---|---|---|
+| 1 | `Update` | `USER#<id>` / `PROFILE` | `SET passwordHash=:h, passwordChangedAt=:t, sessionEpoch = if_not_exists(sessionEpoch, :zero) + :one ADD version :one` · condición `attribute_exists(PK) AND version = :v` (o `attribute_not_exists(#version)` si es legado) |
+| 2 | `Update` | `USER#<id>` / `RESET#<sha256(token)>` | `SET used=:true, usedAt=:t` · condición `attribute_not_exists(used) OR used = :false` |
+
+Un solo `Update` sobre `PROFILE` cambia hash, `passwordChangedAt`, `sessionEpoch` y `version`.
+Condición de carrera: dos resets simultáneos → uno gana; el otro falla por `version` o por token
+consumido → `409` genérico.
+
+### 5.3 Compatibilidad con sesiones y JWT anteriores a la época
+
+| Caso | Tratamiento |
 |---|---|
-| `token` vs `resetToken` | **Conservar `token`**. Renombrar rompe el contrato (`COMPATIBILIDAD`) |
-| Respuesta | **Conservar `Accepted`**. `revokedSessions` queda **POSPUESTO** |
-| Validación | token vigente, no usado, hash coincidente; `400` genérico si no |
-| Uso único | consumo condicional atómico |
-| Revocación | **se revocan todas las sesiones e identificadores `REFRESH#` del usuario** (R-033) en la misma transacción |
-| Concurrencia | dos reset simultáneos: uno gana; el otro `409` sin filtrar |
-| Reutilización | el mismo token no puede restablecer dos veces |
+| PROFILE sin `sessionEpoch` (legado) | se lee como `0` |
+| Sesión sin `sessionEpoch` | se trata como `0` |
+| Tras el primer cambio de contraseña | `sessionEpoch = 1` ⇒ toda sesión con época `0` queda inválida |
+| Sesiones nuevas | deben persistir la época vigente al emitirse |
+| JWT ya emitidos | se validan por `sub`/`sid`; la época se comprueba contra PROFILE, no contra el token |
 
-## 6. E055 — Recomendaciones con K-Means
+### 5.4 Casos verificados en el diseño
 
-Diseño completo en **`sdd/_control/H08/ML_E055_CONTRATO_Y_DISENO.md`**.
-
-Decisión contractual propuesta:
-
-| Elemento | Decisión |
+| Caso | Resultado esperado |
 |---|---|
-| `items[]` + `nextCursor` | **Conservar** (paginación ya aprobada) |
-| `recommendations[]` | **Rechazado** (renombrar el contenedor rompe el cliente) |
-| `hasEnoughData` (boolean, requerido) | **Añadir** — único campo ESENCIAL del cierre |
-| `items[].modelVersion` | **Ya existe**: acredita versión real del modelo |
-| `items[].category`, `items[].evidence`, `items[].confidence` | **POSPUESTOS** |
+| 1 sesión | revocada por época |
+| 100 sesiones | revocada (no se recorren) |
+| >100 sesiones | revocada: el mecanismo es O(1), no hay límite |
+| Reset concurrente | 1 gana, otro `409` |
+| Token usado | `409` genérico |
+| Token expirado | `400` genérico |
+| Sesión antigua tras el cambio | rechazada |
+| Login nuevo tras el cambio | válido con la época nueva |
 
-K-Means **agrupa patrones**; la recomendación se redacta en una capa determinista sobre
-centroides y estadísticas verificables. Prohibido inventar porcentajes o ahorros.
+### 5.5 A6 — cambio compartido
 
-`E052` (insights) mantiene su responsabilidad: describe ventanas y suficiencia de datos; **no**
-absorbe el contrato ML ni se convierte en recomendaciones.
+Para que la época **surtа efecto** hay que tocar código de E002, E003 y el middleware de sesiones.
+**No se modifica ahora.** A6 describe el cambio exacto y exige **RFC + Gate propios** durante la
+implementación de E006. **Congelar el contrato de E006 no equivale a haber implementado A6.**
 
-## 7. E075 — Voz
+**Alternativa si A6 se rechaza:** revocar hasta 30 sesiones en una transacción (30 acciones) y
+documentar el límite; el resto se revoca en la limpieza perezosa. Menos robusta, explícita.
 
-```
-Request  { text: string, locale: string }
-Response 200 { intent, requiresConfirmation, parsedAmount, currency }
-```
+## 6. E052 — Insights
 
-| Elemento | Decisión |
-|---|---|
-| `transcript` vs `text` | **Conservar `text`** (`COMPATIBILIDAD`) |
-| Reconocimiento | **en Android**, con sus permisos y APIs. No requiere Amazon Transcribe |
-| `confidence` del reconocimiento | No viaja al backend; queda **POSPUESTO** |
-| Confirmación | `requiresConfirmation=true` siempre que `parsedAmount` exista; el cliente confirma antes de crear |
-| Creación de movimientos | **no** se hace en E075: tras confirmar, el cliente llama a E028 |
-| Idioma | `locale` opcional; por defecto el del perfil |
-| Errores | `400` si `text` vacío o > 512 caracteres; `422` si no se reconoce intención |
+Sin `enoughData`/`minimumSamples`, `items: []` es ambiguo (sin historial vs sin patrones).
+`items[].explanation`, `evidenceCount` y `modelVersion` **ya existen**. Enmienda **A5**:
+añadir `enoughData` (boolean, requerido) y `minimumSamples` (integer, requerido) en la raíz.
+
+## 7. E055 — Recomendaciones (K-Means)
+
+Contrato vigente: `items[]{id,title,reason,disclaimer,modelVersion}` + `nextCursor`.
+Enmienda **A2**: añadir `hasEnoughData` (boolean, requerido). **`recommendations[]` se rechaza**
+(renombrar rompe el cliente).
+
+| Estado | `hasEnoughData` | `items` |
+|---|---|---|
+| Historial insuficiente | `false` | `[]` |
+| Sin patrones | `true` | `[]` |
+| Con recomendaciones | `true` | `items.length > 0` |
+
+Diseño completo: `sdd/_control/H08/ML_E055_CONTRATO_Y_DISENO.md` (K-Means, features, semilla,
+artefacto JSON, inferencia Go, explicabilidad determinista, prohibición de cifras inventadas).
 
 ## 8. E058 — Preferencias de notificación
 
-El contrato vigente son **3 booleanos** (`pushEnabled`, `emailEnabled`, `reminderEnabled`) +
-`version`. La auditoría pide `enabled`, `budgetAlerts`, `goalUpdates`, `recurringReminders`,
-`streakReminders`, `quietHours`.
-
-**Doce diferencias de COMPATIBILIDAD**: es un cambio de forma, no un campo suelto. Decisión
-propuesta: **adoptar la forma granular** solo con Gate, porque tres booleanos no pueden expresar
-la pantalla; mientras tanto el contrato vigente se mantiene y el endpoint **no se congela**.
-
-## 9. Dinero (transversal, no negociable)
-
-Válido para E028, E031, E033, E037, E039–E047, E049–E051, E074:
-
-- Importes **siempre string decimal** en el contrato y **enteros de centavos** en Go. Cero `float`.
-- Moneda explícita `MXN`; redondeo **HALF_UP** a centavos, documentado por operación.
-- `Idempotency-Key` obligatoria en mutaciones financieras (E028, E044, E037…).
-- Escrituras con `TransactWriteItems` + condición de versión; sin descuentos dobles.
-- Reversión que netea exactamente; nunca parcial silenciosa.
-- Límite duro: **100 acciones por transacción DynamoDB**; el contrato de reparto debe acotar N metas.
-- Aislamiento por usuario en `PK`; `Scan` prohibido.
-
-## 10. Persistencia — 28 referencias obsoletas
-
-Modelo vigente verificado en producción (E003/E004):
-
 ```
-USER#<userId> / SESSION#<sessionId>
-REFRESH#<sha256(refreshToken)> / SESSION
+PUT /notification-preferences   (Bearer)
+{
+ "pushEnabled":bool*, "emailEnabled":bool*, "reminderEnabled":bool*,
+ "budgetAlerts":bool=true, "goalUpdates":bool=true, "recurringReminders":bool=true,
+ "streakReminders":bool=false,
+ "quietHours":{"enabled":bool,"start":"HH:MM","end":"HH:MM"} | ausente,
+ "timeZone":"America/Mexico_City" (IANA), "version":int (opcional)
+}
+200 → mismo objeto + version + updatedAt
 ```
+`start != end`; `HH:MM` válido; `timeZone` IANA; `version` desalineada ⇒ `409`.
+`GET` devuelve los defectos con `version: 0` en lugar de `404`. Enmienda **A3**.
+`E019`/`E021` **leen** estas preferencias, no las duplican.
 
-Se sustituye la referencia documental `SESSIONHASH#digest` en `spec.md`/`plan.md`/`tasks.md`/
-`checklist.md` de **E005–E011** mediante **una sola enmienda transversal**. No cambia tabla,
-índice ni código, y **no toca E003/E004**.
+## 9. E075 — Voz
 
-## 11. DynamoDB y Redis — factibilidad
+`{text, locale}` → `{intent, requiresConfirmation, parsedAmount, currency}`.
+`transcript` se rechaza. Reconocimiento en Android. **E075 no crea movimientos**: tras confirmar,
+el cliente llama a E028. `text` vacío o > 512 ⇒ `400`; intención no reconocida ⇒ `422`.
 
-| Patrón | Implementación | Índice nuevo |
+## 10. E043 / E044 / E047 — reparto y reversión (verificado)
+
+| Necesidad | Contrato vigente | ¿Falta? |
 |---|---|---|
-| Movimientos por fecha | `Query` sobre `USER#<id>` con prefijo `MOV#` | No |
-| Movimientos por tipo/fecha | `GSI1` (`GSI1PK`/`GSI1SK`) ya desplegado | No |
-| Sesiones y refresh | `Query` por prefijo + `GetItem` | No |
-| Preferencias, onboarding, consentimientos | `GetItem`/`PutItem` por clave compuesta | No |
-| Aportaciones y metas | `TransactWriteItems` + condición de versión | No |
-| Paginación | `ExclusiveStartKey` sobre `SK` | No |
-| Dashboard / bootstrap / export | agregación en aplicación + caché Redis 30 s | No |
+| Importe solicitado | `amount` | No |
+| Reparto | `allocations[]{goalId, amount}` | No |
+| Sin asignar (preview) | `remaining` (E043) | No |
+| Aplicado | `amount` + `allocations[]`; si no cabe, `422` (sin aplicación parcial) | No |
+| Id de aportación | `id` (E044/E047) | No |
+| Reversión | `status: active\|reversed` + `version` + recarga de E038/E040 | No |
+| Idempotencia | `Idempotency-Key` obligatoria en E044/E047 | No |
+| Concurrencia | `version` + condición | No |
 
-**No se propone ningún índice nuevo**: no hay patrón demostrado que lo exija. `GSI2` sigue
-desactivado. Si un patrón futuro lo requiriera, se demostraría con la matriz de accesos antes de
-proponerlo (I-040).
+`mode`, `splitMode`, `goalIds[]` son formas de entrada alternativas: el cliente puede expresar el
+mismo reparto con `allocations[]`. **`OPCIONAL` con motivo, no por omisión.**
 
-## 12. Integración Android
+## 11. Dinero (transversal)
 
-Contrato operativo en `sdd/_control/H08/CONTRATO_INTEGRACION_ANDROID.md`. Resumen:
+String decimal en el contrato, **enteros de centavos** en Go; `MXN`; redondeo HALF_UP documentado;
+`Idempotency-Key` en mutaciones; `TransactWriteItems` + versión; reversión que netea; 100 acciones
+máximo por transacción; `Scan` prohibido; aislamiento por `PK`.
 
-- Base: `https://d2lpmqy5w6x9es.cloudfront.net/api/v1/` (sin cambios).
-- `Authorization: Bearer <accessToken>` en todo salvo E001, E002 y E005.
-- `Idempotency-Key` en mutaciones financieras.
-- Errores: envelope único con `error.code` (máquina) y `error.message` (humano) + `traceId`.
-- Sesión: `401` ⇒ refresh (E003); refresh fallido ⇒ login. `429` respeta `Retry-After`.
-- Fechas ISO-8601 UTC; importes string decimal; cursores opacos (`X-Cursor-Next`/`nextCursor`).
+## 12. Persistencia — A1
 
-## 13. Enmiendas exactas que se aplicarían al aprobar
+`SESSIONHASH#digest` → `USER#<id>/SESSION#<id>` + `REFRESH#<sha256>/SESSION` en **E005–E011**
+(28 referencias, 4 por spec). Enmienda editorial, sin cambio de tabla ni código. No toca E003/E004.
 
-| # | Archivo(s) | Cambio | Endpoints | Clase |
-|---|---|---|---|---|
-| A1 | `E005`–`E011` `spec.md`/`plan.md`/`tasks.md`/`checklist.md` | `SESSIONHASH#digest` → modelo real | 7 | OBSOLETA |
-| A2 | OpenAPI YAML+JSON, `spec.md`/`plan.md` de E055 | añadir `hasEnoughData` (boolean, requerido) | E055 | ESENCIAL |
-| A3 | `spec.md`/`plan.md` de E058 + OpenAPI | preferencias granulares + `quietHours` | E058 | COMPATIBILIDAD |
-| A4 | `DECISIONES_CONTRATO_E005_E075.json` | cerrar las 5 HTTP como «conservar» | 5 | COMPATIBILIDAD |
+Factibilidad verificada sin índices nuevos: `Query` por prefijo, `GSI1` existente, `GetItem` por
+clave, `TransactWriteItems` con versión, TTL `expiresAt`.
 
-**Nada más se modifica.** E001–E004 intactos; sin cambios de código, Terraform ni AWS.
+## 13. Enmiendas
 
-## 14. Criterio de congelación
+| # | Alcance | Archivos | Aplicada |
+|---|---|---|---|
+| A1 | Persistencia E005–E011 | 7× `spec.md`/`plan.md`/`tasks.md`/`checklist.md` | **NO** |
+| A2 | `hasEnoughData` E055 | OpenAPI YAML+JSON, specs E055 | **NO** |
+| A3 | Contrato E058 (§8) | OpenAPI YAML+JSON, specs E058/E057 | **NO** |
+| A4 | Registrar 5 decisiones HTTP | `DECISIONES_CONTRATO_*.json` | **NO** |
+| A5 | `enoughData`+`minimumSamples` E052 | OpenAPI YAML+JSON, specs E052 | **NO** |
+| A6 | Época de revocación (código E002/E003/middleware/E006) | código Go | **NO** — RFC y Gate propios |
+| A7 | `openingSaved` E040 (+E039) | OpenAPI YAML+JSON, specs E039/E040 | **NO** |
 
-Un endpoint es `CONTRACT_FROZEN=VERIFIED` solo si: contrato completo (request, response, errores,
-seguridad, validaciones), reglas de negocio y persistencia factibles documentadas, concurrencia e
-idempotencia definidas, compatibilidad Android resuelta, pruebas de aceptación escritas, **cero
-diferencias ESENCIAL/COMPATIBILIDAD pendientes**, enmiendas aplicadas y CI documental verde.
+## 14. Gates
 
-Separación de estados obligatoria: `CONTRACT_FROZEN` ≠ `IMPLEMENTED` ≠ `MERGED` ≠ `DEPLOYED` ≠
-`AWS_VERIFIED` ≠ `USER_ACCEPTED`.
-
-## 15. Gates
-
-| Gate | Alcance | Estado |
+| Gate | Autoriza | Estado |
 |---|---|---|
-| `APRUEBO_RFC_016_CONTRATOS_E005_E075` | Clasificación + decisiones + A1–A4 | **PENDIENTE** |
-| `APRUEBO_ENMIENDA_A1_PERSISTENCIA` | Aplicar A1 (7 specs) | **PENDIENTE** |
-| `APRUEBO_ENMIENDA_A2_E055` | Aplicar A2 | **PENDIENTE** |
-| `APRUEBO_ENMIENDA_A3_E058` | Aplicar A3 | **PENDIENTE** |
-| `APRUEBO_MERGE_PR_65_SHA_<SHA40>` | Merge del PR | **PENDIENTE** |
-| Gates AWS SES / ML | Identidad, sandbox, IAM, conectividad | **PENDIENTE** (no bloquean congelar) |
+| `APRUEBO_RFC_016_CONTRATOS_E005_E075` | clasificación, decisiones y alcance de A1–A7 | **PENDIENTE** |
+| `APRUEBO_ENMIENDA_A1_PERSISTENCIA` | editar 7 specs | **PENDIENTE** |
+| `APRUEBO_ENMIENDA_A2_E055` | editar E055 + OpenAPI | **PENDIENTE** |
+| `APRUEBO_ENMIENDA_A3_E058` | editar E058/E057 + OpenAPI | **PENDIENTE** |
+| `APRUEBO_ENMIENDA_A5_E052` | editar E052 + OpenAPI | **PENDIENTE** |
+| `APRUEBO_ENMIENDA_A7_E040` | editar E039/E040 + OpenAPI | **PENDIENTE** |
+| `APRUEBO_RFC_A6_EPOCA_SESION` | modificar código compartido | **PENDIENTE** |
+| `APRUEBO_MERGE_PR_65_SHA_<SHA40>` | merge | **PENDIENTE** |
+
+A4 no edita contrato: se aplica con la aprobación de esta RFC.
+
+## 15. Criterio de congelación
+
+`CONTRACT_FROZEN=VERIFIED` por endpoint exige: contrato completo, seguridad, validaciones, reglas,
+persistencia factible, concurrencia e idempotencia, dependencias, errores, pruebas de aceptación,
+**cero ESENCIAL/COMPATIBILIDAD pendientes**, enmiendas aplicadas y CI documental verde.
+Los `PENDIENTE_DE_DECISION` opcionales deben cerrarse en el Gate de ese endpoint.
+
+Estados separados y no intercambiables: `CONTRACT_FROZEN` · `AWS_READY` · `IMPLEMENTED` ·
+`MERGED` · `DEPLOYED` · `AWS_VERIFIED` · `USER_ACCEPTED`.
 
 ## 16. Riesgos
 
 | Riesgo | Control |
 |---|---|
-| Clasificar 784 campos como opcionales y perder necesidad real | Registrados con motivo; cualquier cliente puede reabrir con RFC; el Gate por endpoint revisa su lista |
-| Romper E001–E004 | No se tocan; `comparar_contrato_api.py` en CI |
-| Congelar sin evidencia | `CONTRACT_FROZEN=NOT_VERIFIED` mientras falte una aprobación |
-| SES no disponible | `CONTRACT_READY` separado de `AWS_READY` |
-| ML tratado como caja negra | Artefacto JSON auditable + explicación determinista + prohibición de cifras inventadas |
-| Cambios silenciosos futuros | Baseline reproducible + `DECISIONES_CONTRATO_*.json` + CI |
-
----
-
-# 17. Correcciones de revisión 2 (2026-11-16)
-
-> **Precedencia:** esta sección sustituye a lo que contradiga en §4–§8 y §13. El cuerpo anterior se
-> conserva para trazabilidad; no se reescribe la historia.
-
-## 17.1 (A) Revisión material de los 784 campos pospuestos
-
-La clasificación automática agrupó como OPCIONAL todo candidato cuya base no apareciera en el
-schema. Ese criterio **no basta**: se revisaron las siete categorías de riesgo con el contrato real
-delante. Resultado de la revisión:
-
-| Categoría | Evidencia verificada | Conclusión |
-|---|---|---|
-| **Dinero** (E028, E031, E037, E039–E047, E049–E051) | El contrato ya devuelve importe (`amount`), moneda, `allocations[]`, `remaining` (E043), `status` y `version`. Los campos extra son agregados o sumas derivables | OPCIONAL confirmado; invariantes de dinero viven en el servidor (§9), no en campos nuevos |
-| **Autenticación** (E005–E011) | E006/E011 son públicas; el token de recuperación no es JWT; las sesiones se modelan con `USER#/SESSION#` y `REFRESH#` | Solo OBSOLETA (persistencia); ningún campo nuevo ESENCIAL salvo `hasEnoughData` en ML |
-| **Estados funcionales** (E014, E017, E042, E047, E063) | El contrato ya expone `status` (`active`/`reversed`), códigos HTTP y `version` | OPCIONAL; la reversión se acredita con `status` + recarga de E038 |
-| **Relaciones entre recursos** (E029, E037, E040) | SDD devuelve el recurso creado con `id`; las referencias cruzadas se resuelven consultando el recurso | OPCIONAL |
-| **Flujos que dependen de otros endpoints** (E020, E021, E043, E051, E074) | Son agregados componibles desde endpoints atómicos ya aprobados | OPCIONAL; sin campo nuevo |
-| **ML** (E052, E055) | **Gap real**: ni `items: []` ni `hasEnoughData` distinguen «sin historial» de «sin patrones» | **E055 `hasEnoughData` → ESENCIAL**; `E052 enoughData/minimumSamples` → COMPATIBILIDAD (misma ambigüedad, resolver en su Gate) |
-| **Notificaciones** (E057, E058) | 3 booleanos no expresan la pantalla: faltan alertas por presupuesto/meta, recordatorios y horario de silencio | **12 campos de E058 → COMPATIBILIDAD** (§17.6) |
-| **Voz** (E075) | Reconocimiento en Android; `text` cubre la entrada | `transcript` → COMPATIBILIDAD (renombrado) |
-
-**Reclasificaciones efectuadas en esta revisión:** `E052:enoughData` y `E052:minimumSamples` pasan
-de OPCIONAL a **COMPATIBILIDAD**. El resto se mantiene, ahora con evidencia explícita por categoría.
-Sigue habiendo **0 diferencias sin clasificar**.
-
-> `OPCIONAL` sigue significando **POSPUESTO y registrado**, nunca «resuelto». Cada endpoint puede
-> reabrir su lista en su Gate de implementación con RFC mínima.
-
-## 17.2 (B) Operaciones públicas — corrección del contrato de integración
-
-**Verificado en OpenAPI: 13 operaciones tienen `security: []`.** La guía anterior decía «todo salvo
-E001, E002 y E005», lo que era incorrecto. Lista real:
-
-```
-E001 POST /auth/register              E002 POST /auth/login
-E003 POST /auth/refresh               E005 POST /auth/password/forgot
-E006 POST /auth/password/reset        E011 POST /auth/email-verification/confirm
-E015 GET  /privacy/notices/current    E022 GET  /catalogs/categories
-E023 GET  /catalogs/frequencies       E070 GET  /help/faq
-E071 GET  /education/tips             E072 GET  /health/live
-E073 GET  /health/ready
-```
-
-**E006 es pública y no exige `Bearer`**: el usuario que olvidó su contraseña no tiene sesión. El
-`token` de recuperación es un **secreto de un solo uso** (32 bytes CSPRNG, `base64url`), **no** un
-JWT: no lleva claims, no se valida con la clave RS256 y no sirve para autenticar ninguna otra
-operación. E003 (refresh) también es pública porque se usa precisamente cuando el access token
-expiró.
-
-## 17.3 (C) E005 — aceptación durable del trabajo
-
-**Problema:** `202` no puede prometer entrega, y un fallo de SES no debe perder el trabajo aceptado.
-
-**Solución adoptada (sin SQS ni Lambda):** el alta del token y la del **trabajo durable** ocurren
-en **una sola `TransactWriteItems`** sobre DynamoDB antes de responder:
-
-```
-Acción 1: PutItem  USER#<id> / PWRESET#<hmac>   {tokenHash, expiresAt, used:false, version}
-Acción 2: PutItem  USER#<id> / OUTBOX#<ulid>   {tipo:"PASSWORD_RESET", estado:"PENDIENTE",
-                                                intentos:0, proximoIntento, expiraEn}
-Acción 3: ConditionCheck USER#<id> / PROFILE   (existe y ACTIVE)   [solo cuentas reales]
-```
-
-Reglas:
-
-1. **`202` se emite solo si la transacción confirmó**: en ese instante el trabajo está persistido y
-   es recuperable. `202` = «aceptado y persistido», **nunca** «correo enviado».
-2. Tras el commit se intenta el envío con SES. El resultado **no** altera la respuesta (evita
-   enumeración por código): éxito ⇒ `estado=ENVIADO`; fallo ⇒ queda `PENDIENTE` con `intentos+1`.
-3. **Reintento sin infraestructura nueva:** cada petición a E005 procesa hasta **5** trabajos
-   `PENDIENTES` vencidos de *ese mismo usuario* (barrido acotado, con backoff exponencial y tope de
-   6 intentos). Sin scheduler dedicado; la limitación se documenta y el runbook permite forzar el
-   barrido.
-4. **Cuenta inexistente:** se ejecuta igualmente la transacción (token señuelo y outbox con
-   `destinatario=null`), de modo que el coste de escritura y el número de acciones son idénticos.
-   No se envía nada.
-5. **No enumeración (mitigaciones, no promesas):** misma respuesta, mismo cuerpo, mismo código y
-   misma *forma* de trabajo; **suelo de latencia** igualando el p95 del camino con envío mediante
-   espera acotada (≤ 250 ms) más jitter; límites por IP y por correo (HMAC) que encarecen el
-   muestreo. **No se afirma latencia idéntica**: las pruebas exigen una **prueba estadística**
-   (comparación de distribuciones de tiempo con y sin cuenta, α=0,01, sin diferencia significativa
-   en p50/p95 sobre 200 muestras por rama).
-6. **Fallo total de DynamoDB** ⇒ `503` genérico (no hay trabajo persistido, no se puede aceptar).
-7. Si el `TransactWriteItems` supera el límite de acciones (no ocurre: 3 acciones fijas) el endpoint
-   responde `503` y no `202`.
-
-Con esto, **toda respuesta `202` implica trabajo durable**: no se pierde una solicitud aceptada.
-
-## 17.4 (D) E006 — revocación de sesiones por encima del límite transaccional
-
-**Límite real:** `TransactWriteItems` admite **100 acciones**. Un usuario con 120 sesiones no cabe.
-
-**Mecanismo adoptado — época de revocación (O(1)):**
-
-1. `USER#<id> / PROFILE` guarda `sessionEpoch` (entero) y `passwordChangedAt`.
-2. E006, en una transacción de **3 acciones**, (a) consume el token de recuperación con condición de
-   uso único, (b) actualiza el hash de contraseña y `passwordChangedAt`, y (c) incrementa
-   `sessionEpoch` con `version` como condición de concurrencia.
-3. La validación de sesión (middleware y E003) rechaza toda sesión cuyo `createdAt` sea anterior a
-   `passwordChangedAt` **o** cuyo `sessionEpoch` guardado sea menor que el vigente. No hace falta
-   recorrer ni marcar N sesiones.
-4. Limpieza perezosa: las sesiones antiguas se marcan `REVOKED` cuando alguien intenta usarlas.
-
-**Consecuencia de gobierno:** el punto 3 toca código **compartido con E003/E004**. **No se modifica
-ahora**: se registra como dependencia obligatoria de E006 y exigirá su propia RFC + Gate antes de
-tocar código productivo (`R-002`, `A-110`). Mientras no se implemente, E006 **no puede declararse
-`CONTRACT_FROZEN` con revocación garantizada** si el usuario supera 30 sesiones.
-
-## 17.5 (E) E055 — tres estados sin ambigüedad
-
-| Estado | `hasEnoughData` | `items` | Significado para Android |
-|---|---|---|---|
-| `INSUFFICIENT_DATA` | `false` | `[]` | No hay historial mínimo: mensaje de «registra más movimientos» |
-| `NO_PATTERNS` | `true` | `[]` | Hay historial, el modelo **no encontró patrones** (silueta < 0,35 o clusters sin masa) |
-| `OK` | `true` | `items.length > 0` | Hay recomendaciones |
-
-`hasEnoughData=false` **nunca** representa «no encontró clusters»: eso es `true` + `items: []`.
-La combinación es unívoca con los dos campos ya decididos, sin añadir `modelState`.
-
-## 17.6 (F) E058 — contrato exacto
-
-```
-PUT /api/v1/notification-preferences        (Bearer)
-Request (application/json, additionalProperties=false)
-{
-  "pushEnabled":        boolean,   requerido
-  "emailEnabled":       boolean,   requerido
-  "reminderEnabled":    boolean,   requerido
-  "budgetAlerts":       boolean,   opcional  (defecto: true)
-  "goalUpdates":        boolean,   opcional  (defecto: true)
-  "recurringReminders": boolean,   opcional  (defecto: true)
-  "streakReminders":    boolean,   opcional  (defecto: false)
-  "quietHours": {                  opcional
-    "enabled": boolean,            requerido si existe el objeto
-    "start":   "HH:MM",            requerido si enabled=true, 00:00–23:59
-    "end":     "HH:MM"             requerido si enabled=true, 00:00–23:59
-  },
-  "timeZone": "America/Mexico_City",  opcional (IANA), defecto el del perfil
-  "version": integer                opcional: concurrencia optimista
-}
-200 → mismo objeto + "version" (incremental) + "updatedAt" (ISO-8601)
-```
-
-| Regla | Valor |
-|---|---|
-| Semántica | `PUT` = reemplazo completo de las preferencias presentes; las ausentes conservan su defecto |
-| Validación | `start != end`; `HH:MM` con minutos 00–59; `timeZone` debe ser zona IANA válida |
-| `version` | si se envía y no coincide ⇒ `409 CONFLICT`; si se omite, se aplica sin control optimista |
-| Errores | `400` JSON inválido · `401` sin sesión · `409` versión · `422` regla de negocio · `429` · `500` · `503` |
-| Persistencia | `USER#<id> / PREFS#NOTIFICATIONS`, `GetItem`/`PutItem` condicional por `version` |
-| Consumidores | E058 es la única fuente; E019 (onboarding) y E021 (bootstrap) **leen** estas preferencias, no las duplican |
-
-`GET /notification-preferences` (E057) devuelve el mismo objeto; si no existen, devuelve los
-defectos con `version: 0` en lugar de `404`.
-
-## 17.7 (G) E043 / E044 / E047 — verificación con el contrato delante
-
-| Necesidad | Contrato vigente | ¿Falta algo? |
-|---|---|---|
-| Importe solicitado | `amount` (string decimal) | No |
-| Reparto por meta | `allocations[] {goalId, amount}` | No |
-| Importe sin asignar en el preview | `remaining` (E043) | No: equivale a `unallocatedAmount` |
-| Importe aplicado tras el commit | `amount` + `allocations[]` aceptados; si no cabe, `422` (no hay aplicación parcial silenciosa) | No |
-| Identificador de la aportación | `id` (E044/E047) | No |
-| Reversión | `status: active|reversed` + `version` + recarga de E038/E040 | No |
-| Integridad del reparto | invariantes de servidor (§9) | No |
-| Idempotencia | `Idempotency-Key` obligatoria en E044 y E047 | No |
-| Concurrencia | `version` + condición | No |
-
-**Conclusión:** `totalAmount` ≡ `amount`; `allocatedAmount` = suma de `allocations.amount`;
-`unallocatedAmount` ≡ `remaining`; `contribution.id` ≡ `id`; `affectedGoals`/`reversedAmount` son
-derivables de `status` + recarga. **No se reclassifican a ESENCIAL** porque no hay necesidad
-demostrada, y así queda escrito con la comparación campo a campo. `mode`/`splitMode`/`goalIds[]`
-son formas de entrada alternativas: **OPCIONAL**.
-
-## 17.8 Enmiendas actualizadas
-
-| # | Cambio | Aplicado |
-|---|---|---|
-| A1 | 28 referencias `SESSIONHASH` → modelo real (7 specs) | **NO** |
-| A2 | E055: `hasEnoughData` (boolean, requerido) en OpenAPI YAML+JSON y specs | **NO** |
-| A3 | E058: contrato de §17.6 en OpenAPI YAML+JSON y specs | **NO** |
-| A4 | Registrar las 5 decisiones HTTP como «conservar» | **NO** |
-| A5 | E052: `enoughData` + `minimumSamples` (COMPATIBILIDAD) | **NO** |
-| A6 | Época de revocación compartida para E006 | **NO** — requiere RFC propia; toca código de E003/E004 |
-
-**Ninguna enmienda está aplicada.** El detalle exacto de A1–A5 está listo para aplicarse en bloque
-en cuanto se concedan los Gates.
+| Duplicado de correo por caída tras aceptación de SES | Se documenta at-least-once; enlace de un solo uso; no se promete unicidad |
+| Enumeración por latencia | Suelo + jitter + prueba estadística; límites por IP y correo |
+| Worker sin líder (Redis caído) | Fail-safe: no envía, no pierde; admisión sigue en `202` |
+| A6 no aprobado | E006 queda con la alternativa de 30 sesiones y se declara el límite |
+| 319 opcionales pendientes | Registrados por endpoint; se cierran en su Gate |
+| Cambio silencioso futuro | `DECISIONES_CONTRATO_*.json` + CI |

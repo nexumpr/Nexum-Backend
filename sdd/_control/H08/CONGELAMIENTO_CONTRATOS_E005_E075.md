@@ -3,169 +3,122 @@
 | Campo | Valor |
 |---|---|
 | Documento | `sdd/_control/H08/CONGELAMIENTO_CONTRATOS_E005_E075.md` |
-| Fecha | 2026-11-16 |
+| Versión | 3 (revisión 2026-11-16) |
 | Baseline contractual | `sdd/03-endpoints/openapi/nexum-api-v1.{yaml,json}` (H06, 75 operaciones) |
-| SHA de referencia del repositorio | `a26ae8f27e93e3d8550dbd76d6e2c662e08ab271` (PR #65) |
 | Registro por endpoint | `sdd/_control/H08/CLASIFICACION_E005_E075.json` |
 | Decisiones | `sdd/_control/H08/DECISIONES_CONTRATO_E005_E075.json` |
-| RFC aplicable | `RFC-016-CONTRATOS_E005_E075.md` (**PROPUESTA**) |
+| Norma | `RFC-016-CONTRATOS_E005_E075.md` v3.0.0 (**PROPUESTA**) |
 | **`CONTRATOS_E005_E075_FROZEN`** | **`NOT_VERIFIED`** |
 
-> Este documento **no congela nada por existir**. Registra el estado real y qué falta.
-> Ningún contrato se declara congelado sin aprobación humana y enmiendas aplicadas.
+> Este documento registra el estado real. No congela nada por existir.
 
----
-
-## 1. Resultado de la reconciliación
+## 1. Reconciliación
 
 ```
 71 operaciones · 812 diferencias · 0 sin clasificar
-ESENCIAL=1 · COMPATIBILIDAD=22 · OPCIONAL=782 · OBSOLETA=7
+ESENCIAL=2 · COMPATIBILIDAD=22 · OPCIONAL=781 · OBSOLETA=7
+Opcionales: 462 confirmadas por derivación declarada · 319 pendientes de decisión (68 endpoints)
 ```
 
-- **0 diferencias sin clasificar** (requisito de cierre cumplido).
-- **1 ESENCIAL**: `hasEnoughData` en E055.
-- **22 COMPATIBILIDAD**: 5 HTTP + E006 + E052 (2) + E055 + 12 de E058 + E075 + 1 de E031.
-- **7 OBSOLETA**: referencias `SESSIONHASH` en E005–E011.
-- **782 OPCIONAL POSPUESTAS**: el contrato vigente cubre la función; cada una queda registrada
-  con motivo y puede reabrirse por Gate (revisión material por categoría en RFC-016 §17.1).
+| Clase | N | Bloquea congelar |
+|---|---|---|
+| ESENCIAL | 2 — E040 `openingSaved`, E055 `hasEnoughData` | **Sí** |
+| COMPATIBILIDAD | 22 — E006, E017, E031, E037, E042, E052×2, E055, E058×12, E063, E075 | **Sí** |
+| OBSOLETA | 7 — `SESSIONHASH` en E005–E011 (28 refs) | **Sí** |
+| OPCIONAL confirmada | 462 | No (derivación) |
+| OPCIONAL pendiente | 319 | No bloquea; se cierra en el Gate del endpoint |
 
 ## 2. Estado individual de los 71 contratos
 
 `m` = diferencias materiales pendientes (ESENCIAL + COMPATIBILIDAD + OBSOLETA).
-Todas las filas están en `CONTRACT_FROZEN=NOT_VERIFIED` porque la aprobación de RFC-016 está
-pendiente; el motivo específico se indica con `m`.
+Todas las filas están `CONTRACT_FROZEN=NOT_VERIFIED` porque las enmiendas A1–A7 no están aprobadas ni aplicadas.
 
-| Endpoint | m | Estado | Bloqueo |
-|---|---|---|---|
-| E005 | 1 | NOT_VERIFIED | A1 persistencia + SES (AWS_READY) |
-| E006 | 2 | NOT_VERIFIED | A1 + `token`/`resetToken` |
-| E007 | 1 | NOT_VERIFIED | A1 |
-| E008 | 1 | NOT_VERIFIED | A1 |
-| E009 | 1 | NOT_VERIFIED | A1 |
-| E010 | 1 | NOT_VERIFIED | A1 |
-| E011 | 1 | NOT_VERIFIED | A1 |
-| E012 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E013 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E014 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E015 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E016 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E017 | 1 | NOT_VERIFIED | HTTP `201` vs `200` |
-| E018 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E019 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E020 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E021 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E022 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E023 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E024 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E025 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E026 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E027 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E028 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E029 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E030 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E031 | 1 | NOT_VERIFIED | HTTP `204` vs `200` |
-| E032 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E033 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E034 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E035 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E036 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E037 | 1 | NOT_VERIFIED | HTTP `200` vs `201` |
-| E038 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E039 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E040 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E041 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E042 | 1 | NOT_VERIFIED | HTTP `204` vs `200` |
-| E043 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E044 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E045 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E046 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E047 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E048 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E049 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E050 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E051 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E052 | 2 | NOT_VERIFIED | A5 `enoughData`/`minimumSamples` (suficiencia ambigua) |
-| E053 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E054 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E055 | 2 | NOT_VERIFIED | A2 `hasEnoughData` + contenedor `items[]` |
-| E056 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E057 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E058 | 12 | NOT_VERIFIED | A3 preferencias granulares |
-| E059 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E060 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E061 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E062 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E063 | 1 | NOT_VERIFIED | HTTP `202` vs `200` |
-| E064 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E065 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E066 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E067 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E068 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E069 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E070 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E071 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E072 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E073 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E074 | 0 | NOT_VERIFIED | RFC-016 pendiente |
-| E075 | 1 | NOT_VERIFIED | `transcript` vs `text` |
+| Endpoint | m | Bloqueo | Endpoint | m | Bloqueo |
+|---|---|---|---|---|---|
+| E005 | 1 | A1 + AWS_READY(SES) | E041 | 0 | RFC-016 |
+| E006 | 2 | A1 + A6 (época) | E042 | 1 | HTTP |
+| E007 | 1 | A1 | E043 | 0 | RFC-016 |
+| E008 | 1 | A1 | E044 | 0 | RFC-016 |
+| E009 | 1 | A1 | E045 | 0 | RFC-016 |
+| E010 | 1 | A1 | E046 | 0 | RFC-016 |
+| E011 | 1 | A1 | E047 | 0 | RFC-016 |
+| E012 | 0 | RFC-016 | E048 | 0 | RFC-016 |
+| E013 | 0 | RFC-016 | E049 | 0 | RFC-016 |
+| E014 | 0 | RFC-016 | E050 | 0 | RFC-016 |
+| E015 | 0 | RFC-016 | E051 | 0 | RFC-016 |
+| E016 | 0 | RFC-016 | E052 | 2 | A5 |
+| E017 | 1 | HTTP | E053 | 0 | RFC-016 |
+| E018 | 0 | RFC-016 | E054 | 0 | RFC-016 |
+| E019 | 0 | RFC-016 | E055 | 2 | A2 |
+| E020 | 0 | RFC-016 | E056 | 0 | RFC-016 |
+| E021 | 0 | RFC-016 | E057 | 0 | RFC-016 |
+| E022 | 0 | RFC-016 | E058 | 12 | A3 |
+| E023 | 0 | RFC-016 | E059 | 0 | RFC-016 |
+| E024 | 0 | RFC-016 | E060 | 0 | RFC-016 |
+| E025 | 0 | RFC-016 | E061 | 0 | RFC-016 |
+| E026 | 0 | RFC-016 | E062 | 0 | RFC-016 |
+| E027 | 0 | RFC-016 | E063 | 1 | HTTP |
+| E028 | 0 | RFC-016 | E064 | 0 | RFC-016 |
+| E029 | 0 | RFC-016 | E065 | 0 | RFC-016 |
+| E030 | 0 | RFC-016 | E066 | 0 | RFC-016 |
+| E031 | 1 | HTTP | E067 | 0 | RFC-016 |
+| E032 | 0 | RFC-016 | E068 | 0 | RFC-016 |
+| E033 | 0 | RFC-016 | E069 | 0 | RFC-016 |
+| E034 | 0 | RFC-016 | E070 | 0 | RFC-016 |
+| E035 | 0 | RFC-016 | E071 | 0 | RFC-016 |
+| E036 | 0 | RFC-016 | E072 | 0 | RFC-016 |
+| E037 | 1 | HTTP | E073 | 0 | RFC-016 |
+| E038 | 0 | RFC-016 | E074 | 0 | RFC-016 |
+| E039 | 1 | A7 (debe devolver `openingSaved`) | E075 | 1 | `transcript`/`text` |
+| E040 | 1 | **A7 ESENCIAL** | | | |
 
-**Resumen:** 71/71 `NOT_VERIFIED` · 0 congelados · 16 con diferencias materiales · 55 sin
-diferencias materiales (solo opcionales pospuestas).
+**Resumen:** 71/71 `NOT_VERIFIED` · **0 congelados** · **18** con diferencias materiales · 53 sin ellas.
 
-## 3. Qué falta exactamente para congelar
+## 3. Qué falta exactamente
 
 | # | Falta | Instrumento |
 |---|---|---|
-| 1 | Aprobar la clasificación y las decisiones | `APRUEBO_RFC_016_CONTRATOS_E005_E075` |
-| 2 | Aplicar A1 (28 referencias `SESSIONHASH` → modelo real, 7 specs) | `APRUEBO_ENMIENDA_A1_PERSISTENCIA` |
-| 3 | Aplicar A2 (`hasEnoughData` en E055, OpenAPI YAML+JSON) | `APRUEBO_ENMIENDA_A2_E055` |
-| 4 | Aplicar A3 (preferencias granulares E058) | `APRUEBO_ENMIENDA_A3_E058` |
-| 5 | Cerrar las 5 decisiones HTTP como «conservar» en el registro | incluido en (1) |
-| 6 | CI documental verde tras aplicar | automático |
-
-Cuando 1–6 estén hechos, los 71 pasan a `CONTRACT_FROZEN=VERIFIED` salvo E005, que seguirá
-`CONTRACT_FROZEN=VERIFIED` + `AWS_READY=NOT_READY` por SES.
+| 1 | Aprobar clasificación y decisiones | `APRUEBO_RFC_016_CONTRATOS_E005_E075` |
+| 2 | A1 persistencia (7 specs) | `APRUEBO_ENMIENDA_A1_PERSISTENCIA` |
+| 3 | A2 `hasEnoughData` (E055) | `APRUEBO_ENMIENDA_A2_E055` |
+| 4 | A3 contrato E058 (12 campos) | `APRUEBO_ENMIENDA_A3_E058` |
+| 5 | A5 `enoughData`/`minimumSamples` (E052) | `APRUEBO_ENMIENDA_A5_E052` |
+| 6 | A7 `openingSaved` (E040/E039) | `APRUEBO_ENMIENDA_A7_E040` |
+| 7 | A4 registrar las 5 decisiones HTTP | incluido en (1) |
+| 8 | A6 época de revocación (código compartido) | `APRUEBO_RFC_A6_EPOCA_SESION` (no bloquea congelar E006, sí implementarlo) |
+| 9 | CI documental verde tras aplicar | automático |
 
 ## 4. Dependencias externas (no bloquean congelar)
 
 | Dependencia | Estado | Bloquea |
 |---|---|---|
-| SES: identidad verificada | PENDIENTE | despliegue de E005 |
-| SES: salida de sandbox | PENDIENTE | despliegue de E005 |
-| SES: `ses:SendEmail` | NO EXISTE | despliegue de E005 |
-| SES: conectividad desde subred privada | NO DEMOSTRADA | despliegue de E005 |
-| SES: coste | NO VERIFICADO | despliegue de E005 |
-| ML: artefacto + entrenamiento | NO IMPLEMENTADO | despliegue de E055 |
-| Voz: reconocimiento en Android | FUERA del backend | E075 en cliente |
+| SES: remitente real identificado | **PENDIENTE** (no se inventa) | despliegue E005 |
+| SES: identidad verificada y salida de sandbox | PENDIENTE | despliegue E005 |
+| SES: `ses:SendEmail` en rol runtime | NO EXISTE | despliegue E005 |
+| SES: conectividad (interface endpoint) | NO DEMOSTRADA · coste ≈21,60 USD/45 d | despliegue E005 + FinOps |
+| SES: preflight de lecturas | **BLOQUEADO por permisos** | diagnóstico SES |
+| ML: artefacto entrenado e inferencia | NO IMPLEMENTADO | despliegue E055 |
+| A6: migración de época | NO IMPLEMENTADO | implementación E006 |
+| Voz: reconocimiento en Android | fuera del backend | E075 cliente |
 
-## 5. Decisiones registradas (SES, ML, voz)
-
-Ver `RFC-016` §4–§7, `ML_E055_CONTRATO_Y_DISENO.md` y `CONTRATO_INTEGRACION_ANDROID.md`.
-Resumen: SES es el proveedor decidido; K-Means agrupa patrones y la recomendación se redacta de
-forma determinista; el reconocimiento de voz ocurre en Android.
-
-## 6. Reglas de cambio futuro
-
-Cualquier cambio material posterior exige: justificación, análisis de compatibilidad
-(`comparar_contrato_api.py`), enmienda mínima, Gate específico y prueba de regresión. Los cambios
-silenciosos se detectan porque `DECISIONES_CONTRATO_E005_E075.json` fija el valor esperado del
-contrato y el CI falla si no coincide.
-
-Baseline reproducible: los SHA-256 de `nexum-api-v1.yaml` y `nexum-api-v1.json` quedan en
-`BASELINE_SHA256.json`; cualquier modificación contractual cambia su hash y exige manifiesto nuevo.
-
-## 7. Evidencia de pruebas
+## 5. Evidencia de pruebas
 
 | Comprobación | Resultado |
 |---|---|
 | `validar_h06.py` | `H06_CONTRACT_PASS` (75 operaciones) |
-| `verificar_preparacion_e005.py` | `PREPARACION_CONTRATO_PASS` (71 ops, 5 discrepancias, 12 pendientes) |
-| `clasificar_contratos_e005.py` | `CLASIFICACION_OK` (812 diferencias, 0 sin clasificar) |
-| Pruebas del clasificador | 7 OK |
-| Pruebas de contratos | 28 OK |
+| `verificar_preparacion_e005.py` | `PREPARACION_CONTRATO_PASS` (71 ops, 12 decisiones pendientes) |
+| `clasificar_contratos_e005.py` | `CLASIFICACION_OK` (812, 0 sin clasificar) |
+| Pruebas Python | 256 (1 fallo local esperado por `opencode.json`) |
+| Go | `gofmt`/`build`/`vet`/`test` PASS |
+| CI | 13/13 PASS |
 
-## 8. Firma
+## 6. Reglas de cambio futuro
 
-**Sin firma.** Pendiente de `APRUEBO_RFC_016_CONTRATOS_E005_E075` y de las enmiendas A1–A3.
-Este documento quedará `CONTRATOS_E005_E075_FROZEN=VERIFIED` solo tras aplicarlas y verificar CI.
+Todo cambio material exige justificación, análisis de compatibilidad, enmienda mínima, Gate y
+regresión. `DECISIONES_CONTRATO_E005_E075.json` fija el valor esperado y el CI falla si el contrato
+no coincide.
+
+## 7. Firma
+
+**Sin firma.** Pendiente de RFC-016 y de A1–A5/A7. El documento pasará a
+`CONTRATOS_E005_E075_FROZEN=VERIFIED` solo tras aplicarlas, validar los 71 contratos y verde en CI.
