@@ -188,16 +188,19 @@ func (s *PasswordResetStore) MarcarEnviado(ctx context.Context, outboxID, _ stri
 
 // Reintentar reprograma o cierra el trabajo.
 func (s *PasswordResetStore) Reintentar(ctx context.Context, outboxID string, intentos int, proximo time.Time, _ time.Time, fallido bool) error {
-	estado := ":pendiente"
-	if fallido {
-		estado = ":fallido"
+	vals := map[string]types.AttributeValue{
+		":i": &types.AttributeValueMemberN{Value: strconv.Itoa(intentos)},
+		":p": &types.AttributeValueMemberN{Value: strconv.FormatInt(proximo.Unix(), 10)},
 	}
+	if fallido {
+		// Solo el cierre definitivo elimina el material cifrado.
+		vals[":fallido"] = &types.AttributeValueMemberS{Value: "FALLIDO"}
+		return s.actualizarTrabajoCon(ctx, outboxID,
+			"SET #e = :fallido, intentos = :i, proximoIntento = :p REMOVE tokenSello", vals)
+	}
+	vals[":pendiente"] = &types.AttributeValueMemberS{Value: "PENDIENTE"}
 	return s.actualizarTrabajoCon(ctx, outboxID,
-		"SET #e = "+estado+", intentos = :i, proximoIntento = :p REMOVE tokenSello",
-		map[string]types.AttributeValue{
-			":i": &types.AttributeValueMemberN{Value: strconv.Itoa(intentos)},
-			":p": &types.AttributeValueMemberN{Value: strconv.FormatInt(proximo.Unix(), 10)},
-		})
+		"SET #e = :pendiente, intentos = :i, proximoIntento = :p", vals)
 }
 
 func (s *PasswordResetStore) actualizarTrabajo(ctx context.Context, outboxID string, ahora time.Time, expr string) error {
@@ -207,7 +210,7 @@ func (s *PasswordResetStore) actualizarTrabajo(ctx context.Context, outboxID str
 }
 
 func (s *PasswordResetStore) actualizarTrabajoCon(ctx context.Context, outboxID, expr string, extra map[string]types.AttributeValue) error {
-	trabajos, err := s.Pendientes(ctx, time.Now(), 50)
+	trabajos, err := s.todosLosTrabajos(ctx)
 	if err != nil {
 		return err
 	}
@@ -287,4 +290,62 @@ func (s *PasswordResetStore) Consumir(ctx context.Context, tokenHash string, aho
 		return ports.ErrResetTokenInvalido
 	}
 	return nil
+}
+
+// todosLosTrabajos devuelve la cola completa (paginada) sin filtrar por estado, para
+// poder cerrar o reprogramar un trabajo que ya fue reclamado (estado ENVIANDO).
+func (s *PasswordResetStore) todosLosTrabajos(ctx context.Context) ([]ports.ResetTrabajo, error) {
+	var todos []ports.ResetTrabajo
+	var inicio map[string]types.AttributeValue
+	for {
+		out, err := s.client.Query(ctx, &dynamodb.QueryInput{
+			TableName:              aws.String(s.tabla),
+			KeyConditionExpression: aws.String("PK = :q"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":q": &types.AttributeValueMemberS{Value: particionCola},
+			},
+			ExclusiveStartKey: inicio,
+			Limit:             aws.Int32(50),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("consulta de cola: %w", err)
+		}
+		for _, it := range out.Items {
+			todos = append(todos, trabajoDesdeItem(it))
+		}
+		if len(out.LastEvaluatedKey) == 0 {
+			return todos, nil
+		}
+		inicio = out.LastEvaluatedKey
+	}
+}
+
+// trabajoDesdeItem convierte un item de la cola en ResetTrabajo.
+func trabajoDesdeItem(it map[string]types.AttributeValue) ports.ResetTrabajo {
+	t := ports.ResetTrabajo{}
+	if v, ok := it["userId"].(*types.AttributeValueMemberS); ok {
+		t.UserID = v.Value
+	}
+	if v, ok := it["destino"].(*types.AttributeValueMemberS); ok {
+		t.Destino = v.Value
+	}
+	if v, ok := it["tokenSello"].(*types.AttributeValueMemberB); ok {
+		t.TokenSello = v.Value
+	}
+	if v, ok := it["intentos"].(*types.AttributeValueMemberN); ok {
+		if n, err := strconv.Atoi(v.Value); err == nil {
+			t.Intentos = n
+		}
+	}
+	if v, ok := it["expiresAt"].(*types.AttributeValueMemberN); ok {
+		if n, err := strconv.ParseInt(v.Value, 10, 64); err == nil {
+			t.ExpiraEn = time.Unix(n, 0).UTC()
+		}
+	}
+	if v, ok := it["SK"].(*types.AttributeValueMemberS); ok {
+		if j := lastDash(v.Value); j > 0 {
+			t.OutboxID = v.Value[j+1:]
+		}
+	}
+	return t
 }
