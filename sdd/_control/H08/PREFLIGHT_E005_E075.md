@@ -82,6 +82,26 @@ caché por usuario (`GET/SET` con TTL), invalidación por prefijo. Sin cambios d
 | Margen aprobado de I-000 | **6,9387 USD** |
 | **Conclusión** | el endpoint **excede** el margen → requiere reapertura FinOps o alternativa (ver Gate) |
 
+
+## 4 bis. Decisión FinOps propuesta (2026-11-16)
+
+El endpoint interface permanente (2 AZ × 45 d ≈ **21,60 USD**) **no cabe** en el margen de
+**6,9387 USD**. Propuesta, siguiendo el patrón D6 de I-000 (auxiliares por ventana):
+
+| Opción | Coste estimado | Valoración |
+|---|---|---|
+| A. Endpoint permanente 2 AZ × 45 d | ≈ 21,60 USD | **rechazada**: excede margen |
+| **B. Endpoint por ventana de verificación** | 0,02 USD/h × 4 h × 5 ventanas ≈ **0,40 USD** | **propuesta** |
+| C. NAT Gateway | ≈ 32 USD/45 d + datos | rechazada: coste y superficie |
+
+**Condición previa obligatoria:** confirmar que la SES API admite interface endpoint en
+`us-east-2`. Sin permiso de lectura `ec2:DescribeVpcEndpointServices` / `ses:GetAccount` **no puedo
+verificarlo** y no lo afirmo. Si no lo admite, la opción B es imposible y E005 queda
+`BLOCKED_E005_SES_CONNECTIVITY`.
+
+**Techo solicitado:** 0,40 USD por ciclo de verificación, máximo 5 ciclos (2,00 USD) y retirada
+inmediata del endpoint al terminar cada ventana.
+
 ## 5. Cambios mínimos reutilizables propuestos
 
 Una sola vez para los 71 endpoints, sin repetir configuración por endpoint:

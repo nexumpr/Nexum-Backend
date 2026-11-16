@@ -30,3 +30,14 @@
 - Concurrencia: se mantiene el control por `version`/`If-Match` ya definido.
 - Ida y vuelta: el dato escrito se devuelve en las respuestas de creacion, detalle y listado.
 - Dependencias: ninguna nueva de AWS; sin coste adicional.
+
+## Plan de integración SES (A11)
+
+- Secreto **A9** `PASSWORD_RESET_SEAL_KEY_B64` (AES-256-GCM, AAD `userId|outboxId`) en el bundle
+  RFC-004; sin KMS ni secreto adicional.
+- IAM **A10**: `LeadingKeys` con `QUEUE#PWRESET` y `RESET#<sha256>` además de `USER#*`/`REFRESH#*`/
+  `SESSION#*`; acción `ses:SendEmail` acotada a la identidad verificada.
+- Red: sin NAT. Se evaluará interface endpoint de SES API **por ventana** (0,40 USD por ciclo);
+  si SES no admite endpoint privado, `BLOCKED_E005_SES_CONNECTIVITY`.
+- Worker: líder por lease Redis, reclamación atómica con `fence`, backoff truncado a la expiración.
+- Errores de SES no alteran la respuesta (evita enumeración); el trabajo queda `PENDIENTE`.

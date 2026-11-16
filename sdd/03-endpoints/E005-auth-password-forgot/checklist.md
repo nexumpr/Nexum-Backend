@@ -27,3 +27,13 @@
 - [ ] Se consulta en el detalle y en el listado con el mismo tipo y formato.
 - [ ] Se puede editar (si aplica) y la edicion se refleja al releer.
 - [ ] Validacion negativa devuelve 422 sin filtrar datos internos.
+
+## Criterios de aceptación de A11
+
+- [ ] El correo llega realmente al remitente de prueba (no basta `202`).
+- [ ] El token funciona una sola vez y caduca a los 30 minutos.
+- [ ] Un token usado o expirado devuelve error genérico sin filtrar estado.
+- [ ] Correo existente e inexistente producen respuestas indistinguibles.
+- [ ] Fallo de SES no pierde el trabajo aceptado (queda `PENDIENTE` y se reintenta).
+- [ ] A9 y A10 aplicados y verificados; coste dentro del techo FinOps aprobado.
+- [ ] `AWS_VERIFIED` solo con evidencia real de recepción.

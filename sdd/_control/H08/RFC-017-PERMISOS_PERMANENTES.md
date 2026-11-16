@@ -177,3 +177,32 @@ aplicada surtirá efecto en sesión nueva.
 
 **No se ha modificado `opencode.json`.** El archivo local del usuario permanece intacto
 (SHA-256 `B281E263…3A37`) y el candidato vive fuera del árbol versionado.
+
+## 12. Diff definitivo de tres vías (2026-11-16)
+
+| Configuración | Permissions | Policies |
+|---|---|---|
+| `main` (versionada) | 151 | 33 |
+| Local del usuario (intacta) | 161 | 43 |
+| **Candidato reconciliado** | **178** | **47** |
+
+**Reglas nuevas respecto a `main`: 27.** Incluyen lecturas operativas sin datos
+personales (STS, EC2/ELBv2/ASG `describe-*`), ASK para `s3api put-object`, `sts assume-role`,
+ASG/LT, IAM de despliegue, `dynamodb get-item|query`, y DENY explícitos de
+`terminate-instances`, `delete-table`, `iam delete-*`.
+
+**Reglas retiradas: 0.**
+
+- ninguna
+
+**Reglas con efecto cambiado: 11** (todas deliberadas: SDD a ASK, apply a ASK y
+lecturas a ALLOW; ver §5).
+
+**Policies retiradas: 1.** Solo la denegación dura de `terraform apply`, que es
+la decisión central de esta RFC. Las 10 `policy ... allow` de la configuración local **se conservan**.
+
+**Adiciones de este preflight** (lecturas, sin mutación): `aws ses get-account*`,
+`aws ses list-email-identities*`, `aws sesv2 get-account*`, `aws logs describe-log-groups*`,
+`aws ssm get-parameter*`. Con ellas el total asciende a **183 permisos**.
+
+**No se aplica nada**: instalar el candidato exige `APRUEBO_RFC_017_PERMISOS_PERMANENTES`.

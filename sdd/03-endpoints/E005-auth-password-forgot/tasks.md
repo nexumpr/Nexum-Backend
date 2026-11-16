@@ -29,3 +29,11 @@
 - [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
 - [ ] Cubrir con prueba positiva y negativa.
 - [ ] Verificar por HTTP real tras el despliegue autorizado.
+
+## Tareas de A11 — PENDIENTES DE EJECUCIÓN
+
+- [ ] Implementar el puerto de correo y el adaptador SES (AWS SDK v2).
+- [ ] Configurar A9 en el bundle y A10 en la política del runtime (con sus Gates).
+- [ ] Verificar la conectividad privada por ventana y registrar coste real.
+- [ ] Pruebas: envío real, token de un solo uso, expiración, fallo de SES, no enumeración.
+- [ ] Despliegue autorizado y verificación HTTPS de extremo a extremo.
