@@ -2,7 +2,7 @@
   "version": 1,
   "descripcion": "Registro de excepciones de compatibilidad de API (I-150, INF-150-05). Una entrada solo cubre la ruptura exacta que identifica: codigo, ruta, metodo y RFC. Cualquier otra ruptura, en E001 o en los otros 74 contratos, sigue haciendo fallar el comparador.",
   "politica": "La excepcion exige RFC registrada, aprobador humano, documento de Gate que contenga la aprobacion y vigencia no vencida. El comparador herramientas/comparar_contrato_api.py la lee con --excepciones.",
-  "actualizado": "2026-11-11",
+  "actualizado": "2026-11-16",
   "excepciones": [
     {
       "estado": "APPROVED",
@@ -50,6 +50,116 @@
       "justificacion": "El contrato V6.0.2 de E002 devuelve LoginResponse (cinco campos legacy de AuthTokens mas session.id, user y onboarding.configured). AuthTokens se conserva intacto para E003.",
       "detalles": [
         "200: #/components/schemas/AuthTokens -> #/components/schemas/LoginResponse"
+      ]
+    },
+    {
+      "estado": "APPROVED",
+      "alcance": "API_COMPATIBILIDAD",
+      "codigo": "REQUERIDO_RESPUESTA_NUEVO",
+      "ruta": "/api/v1/analytics/insights",
+      "metodo": "get",
+      "rfc": "RFC-016",
+      "aprobado_por": "Scrum Master (Nexum-Backend)",
+      "gate_documento": "sdd/_control/H08/RFC-016-CONTRATOS_E005_E075.md",
+      "vigencia_hasta": "2026-12-31",
+      "justificacion": "A5 exige declarar la suficiencia de datos para que un array vacio no sea ambiguo.",
+      "detalles": [
+        "200.enoughData",
+        "200.minimumSamples"
+      ]
+    },
+    {
+      "estado": "APPROVED",
+      "alcance": "API_COMPATIBILIDAD",
+      "codigo": "REQUERIDO_RESPUESTA_NUEVO",
+      "ruta": "/api/v1/analytics/recommendations",
+      "metodo": "get",
+      "rfc": "RFC-016",
+      "aprobado_por": "Scrum Master (Nexum-Backend)",
+      "gate_documento": "sdd/_control/H08/RFC-016-CONTRATOS_E005_E075.md",
+      "vigencia_hasta": "2026-12-31",
+      "justificacion": "A2 exige distinguir historial insuficiente de ausencia de patrones en el contrato ML.",
+      "detalles": [
+        "200.hasEnoughData"
+      ]
+    },
+    {
+      "estado": "APPROVED",
+      "alcance": "API_COMPATIBILIDAD",
+      "codigo": "REQUERIDO_RESPUESTA_NUEVO",
+      "ruta": "/api/v1/notifications",
+      "metodo": "get",
+      "rfc": "RFC-016",
+      "aprobado_por": "Scrum Master (Nexum-Backend)",
+      "gate_documento": "sdd/_control/H08/RFC-016-CONTRATOS_E005_E075.md",
+      "vigencia_hasta": "2026-12-31",
+      "justificacion": "A8: el total no leido es global y no se puede sumar desde una pagina.",
+      "detalles": [
+        "200.unreadCount"
+      ]
+    },
+    {
+      "estado": "APPROVED",
+      "alcance": "API_COMPATIBILIDAD",
+      "codigo": "CAMPO_REQUERIDO_NUEVO",
+      "ruta": "/api/v1/recurring-payments",
+      "metodo": "post",
+      "rfc": "RFC-016",
+      "aprobado_por": "Scrum Master (Nexum-Backend)",
+      "gate_documento": "sdd/_control/H08/RFC-016-CONTRATOS_E005_E075.md",
+      "vigencia_hasta": "2026-12-31",
+      "justificacion": "A8: sin tipo ni fecha de inicio el servidor no puede clasificar el recurrente ni calcular su vencimiento.",
+      "detalles": [
+        "startDate",
+        "type"
+      ]
+    },
+    {
+      "estado": "APPROVED",
+      "alcance": "API_COMPATIBILIDAD",
+      "codigo": "REQUERIDO_RESPUESTA_NUEVO",
+      "ruta": "/api/v1/recurring-payments",
+      "metodo": "post",
+      "rfc": "RFC-016",
+      "aprobado_por": "Scrum Master (Nexum-Backend)",
+      "gate_documento": "sdd/_control/H08/RFC-016-CONTRATOS_E005_E075.md",
+      "vigencia_hasta": "2026-12-31",
+      "justificacion": "A8: la respuesta de creacion devuelve el recurso completo con los campos persistidos.",
+      "detalles": [
+        "201.startDate",
+        "201.type"
+      ]
+    },
+    {
+      "estado": "APPROVED",
+      "alcance": "API_COMPATIBILIDAD",
+      "codigo": "REQUERIDO_RESPUESTA_NUEVO",
+      "ruta": "/api/v1/recurring-payments/{recurringPaymentId}",
+      "metodo": "get",
+      "rfc": "RFC-016",
+      "aprobado_por": "Scrum Master (Nexum-Backend)",
+      "gate_documento": "sdd/_control/H08/RFC-016-CONTRATOS_E005_E075.md",
+      "vigencia_hasta": "2026-12-31",
+      "justificacion": "A8: el detalle debe permitir consultar lo creado (ida y vuelta).",
+      "detalles": [
+        "200.startDate",
+        "200.type"
+      ]
+    },
+    {
+      "estado": "APPROVED",
+      "alcance": "API_COMPATIBILIDAD",
+      "codigo": "REQUERIDO_RESPUESTA_NUEVO",
+      "ruta": "/api/v1/recurring-payments/{recurringPaymentId}",
+      "metodo": "patch",
+      "rfc": "RFC-016",
+      "aprobado_por": "Scrum Master (Nexum-Backend)",
+      "gate_documento": "sdd/_control/H08/RFC-016-CONTRATOS_E005_E075.md",
+      "vigencia_hasta": "2026-12-31",
+      "justificacion": "A8: la edicion debe devolver el recurso con los valores aplicados.",
+      "detalles": [
+        "200.startDate",
+        "200.type"
       ]
     }
   ]

@@ -16028,9 +16028,11 @@
             "example": true
           },
           "completedAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
-            "nullable": true,
             "example": "2026-11-16T20:15:00Z"
           }
         },
@@ -16443,16 +16445,20 @@
             "minimum": 1
           },
           "contributionId": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
-            "example": "018f90ef-08e5-7a68-b09f-2b67a47c92f0",
-            "nullable": true
+            "example": "018f90ef-08e5-7a68-b09f-2b67a47c92f0"
           },
           "recurringPaymentId": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
-            "example": "018f90ef-08e5-7a68-b09f-2b67a47c92f0",
-            "nullable": true
+            "example": "018f90ef-08e5-7a68-b09f-2b67a47c92f0"
           }
         },
         "required": [
@@ -16607,10 +16613,12 @@
             "example": "2026-11-01"
           },
           "dueDay": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 1,
             "maximum": 28,
-            "nullable": true,
             "example": 5
           }
         },
@@ -16681,10 +16689,12 @@
             "example": "2026-11-01"
           },
           "dueDay": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 1,
             "maximum": 28,
-            "nullable": true,
             "example": 5
           }
         },
@@ -16739,10 +16749,12 @@
             "example": "2026-11-01"
           },
           "dueDay": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 1,
             "maximum": 28,
-            "nullable": true,
             "example": 5
           }
         },
@@ -17548,8 +17560,10 @@
             "default": false
           },
           "quietHours": {
-            "type": "object",
-            "nullable": true,
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
               "enabled": {
                 "type": "boolean"
@@ -17614,8 +17628,10 @@
             "default": false
           },
           "quietHours": {
-            "type": "object",
-            "nullable": true,
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
               "enabled": {
                 "type": "boolean"
@@ -17786,13 +17802,15 @@
             "minimum": 1
           },
           "frequency": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "enum": [
               "daily",
               "weekly",
               "monthly"
             ],
-            "nullable": true,
             "example": "monthly"
           }
         },
@@ -17862,6 +17880,19 @@
           "active": {
             "type": "boolean",
             "example": false
+          },
+          "frequency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              null
+            ],
+            "description": "null cancela la recurrencia; ausente no la modifica"
           }
         },
         "required": [],
