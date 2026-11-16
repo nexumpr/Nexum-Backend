@@ -89,6 +89,19 @@ func (s *e004Sesiones) revocar(sessionID string) {
 	s.revocada[sessionID] = true
 }
 
+// TestE004SesionesRevocacionAfectaAlAutorizador garantiza que el estado revocado del doble
+// produce 401 en el autorizador, de modo que el helper no es código muerto.
+func TestE004SesionesRevocacionAfectaAlAutorizador(t *testing.T) {
+	sesiones := newE004Sesiones()
+	if err := sesiones.AuthorizeSession(context.Background(), e004HTTPUsuario, e004HTTPSesion); err != nil {
+		t.Fatalf("una sesion activa debe autorizar: %v", err)
+	}
+	sesiones.revocar(e004HTTPSesion)
+	if err := sesiones.AuthorizeSession(context.Background(), e004HTTPUsuario, e004HTTPSesion); !errors.Is(err, ports.ErrSessionUnauthorized) {
+		t.Fatalf("una sesion revocada debe rechazarse, obtenido %v", err)
+	}
+}
+
 // e004Almacen es el puerto LogoutStore en memoria de prueba.
 type e004Almacen struct {
 	mu             sync.Mutex
