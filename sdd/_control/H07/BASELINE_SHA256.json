@@ -64,7 +64,7 @@
     "herramientas/tests/test_integridad_sdd.py": "c396d1d11bb5c86f05a06058b3ea2265d96e68107151432e10e7bcd26fa87ab9",
     "herramientas/tests/test_permisos_opencode.py": "847a46b04ff1be0274faf5ef5fa9533ba3d1bfae59da52fbc164fd18f7d80e50",
     "herramientas/tests/test_plan_bootstrap.py": "ea8ea4ab0b8b38317c6e5c40cb1196b55d20a05cdd9205808bd9d1f739131435",
-    "herramientas/tests/test_preparacion_e005.py": "682ada0d7cd5e9da889beb02d15f120bb67a8df4486bace58af5a53fd1652c16",
+    "herramientas/tests/test_preparacion_e005.py": "cbfc34da973d50f568739ec6b5af4291d602db242a5c096e67121500849415d5",
     "herramientas/tests/test_run_ci_y_entorno.py": "4bfe9bb37f23493d2623a461de6692eda7938debe4e1d9f57a74ad098a633f55",
     "herramientas/tests/test_simular_despliegue.py": "a01cddede14c6a749c2ea356b77ce1ad0c5ad2c3e9400f5491ebe68d6e26635e",
     "herramientas/tests/test_verificar_fixture_iac.py": "b9dbd22150e9c834778f36e3bd98d53ea1cd36eb38f7331d6a507409a6677761",

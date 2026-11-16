@@ -183,7 +183,9 @@ class Integridad(unittest.TestCase):
         self.assertEqual(r["operaciones"], 71)
         self.assertEqual(len(r["discrepancias"]), 5)
         self.assertEqual(r["decisiones"], 12)
-        self.assertEqual(r["decisiones_aprobadas"], 0)
+        # Tras los Gates de 2026-11-16 las 12 decisiones estan aprobadas y aplicadas.
+        self.assertEqual(r["decisiones_aprobadas"], 12)
+        self.assertEqual(r["pendientes"], [])
 
     def test_arbol_sintetico_valido_pasa(self):
         arbol = Arbol()
