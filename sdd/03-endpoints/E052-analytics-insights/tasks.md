@@ -24,3 +24,10 @@
 - [ ] `E052-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E052-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
 - [ ] `E052-CT07` Salida ML/IA real solo si proveedor/costo/autorización verificados; prohibido presentar respuesta fija como IA generativa.
+
+## Tareas de la enmienda (A5) — PENDIENTES DE EJECUCION
+
+- [ ] Implementar `enoughData` (boolean) y `minimumSamples` (integer) en la raiz de la respuesta.
+- [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
+- [ ] Cubrir con prueba positiva y negativa.
+- [ ] Verificar por HTTP real tras el despliegue autorizado.

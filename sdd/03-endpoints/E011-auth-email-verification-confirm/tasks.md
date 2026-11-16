@@ -6,7 +6,7 @@
 - [ ] `E011-T02` Implementar request/response DTO estrictos `VerifyEmailRequest` / `Accepted`; rechazo de campos desconocidos.
 - [ ] `E011-T03` Implementar autorización por sujeto JWT y propiedad; públicas solo según allowlist aprobada.
 - [ ] `E011-T04` Implementar caso de uso y invariantes: Token ligado a usuario/correo; uso único transaccional; impedir repetir verificación.
-- [ ] `E011-T05` Implementar adaptador DynamoDB y patrón: Email-reserva / USER#id PROFILE y SESSION#id / SESSIONHASH#digest; token hash con TTL y expiración funcional.
+- [ ] `E011-T05` Implementar adaptador DynamoDB y patrón: Email-reserva / USER#id PROFILE y SESSION#id / REFRESH#<digest>/SESSION; token hash con TTL y expiración funcional.
 - [ ] `E011-T06` Integrar Redis y consistencia multiinstancia sin confiar en caché para privilegios.
 - [ ] `E011-T07` Implementar códigos y errores definidos, ETag e idempotencia según operación.
 - [ ] `E011-T08` Crear unit tests de reglas y validaciones; fixture sin PII/credenciales reales.
@@ -22,3 +22,10 @@
 - [ ] `E011-CT03` Petición sobre recurso de otro usuario no filtra existencia (404), si aplica; verificar propiedad con dos sujetos.
 - [ ] `E011-CT04` Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
 - [ ] `E011-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
+
+## Tareas de la enmienda (A1) — PENDIENTES DE EJECUCION
+
+- [ ] Implementar referencias de persistencia corregidas a `USER#<userId>/SESSION#<sessionId>` y `REFRESH#<sha256(refreshToken)>/SESSION`; sin cambio de tabla ni de codigo.
+- [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
+- [ ] Cubrir con prueba positiva y negativa.
+- [ ] Verificar por HTTP real tras el despliegue autorizado.

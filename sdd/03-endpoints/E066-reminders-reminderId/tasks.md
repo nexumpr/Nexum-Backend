@@ -24,3 +24,10 @@
 - [ ] `E066-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E066-CT06` If-Match omitido -> 428; ETag viejo -> 412; carrera de versiones no pierde actualizaciones.
 - [ ] `E066-CT07` Opt-in/opt-out efectivo; no enviar push con token revocado; no requerir aceptación del equipo Android.
+
+## Tareas de la enmienda (A8) — PENDIENTES DE EJECUCION
+
+- [ ] Implementar `frequency` opcional; `null` cancela la recurrencia.
+- [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
+- [ ] Cubrir con prueba positiva y negativa.
+- [ ] Verificar por HTTP real tras el despliegue autorizado.

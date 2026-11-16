@@ -19,3 +19,11 @@
 - [ ] Dependencias del cliente Mobile nunca constituyen Gate del Backend.
 
 **Criterio de cierre:** ninguna casilla operativa se marca por generar este documento; la documentación contractual se valida con el auditor del ZIP y queda REVIEW hasta aprobación.
+
+## Criterios de aceptacion de la enmienda (A5)
+
+- [ ] El campo aparece en el contrato OpenAPI (YAML y JSON en paridad).
+- [ ] Se persiste y se devuelve en la respuesta de creacion.
+- [ ] Se consulta en el detalle y en el listado con el mismo tipo y formato.
+- [ ] Se puede editar (si aplica) y la edicion se refleja al releer.
+- [ ] Validacion negativa devuelve 422 sin filtrar datos internos.

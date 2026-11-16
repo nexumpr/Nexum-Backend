@@ -1,0 +1,4281 @@
+[
+  {
+    "id": "E005",
+    "folder": "E005-auth-password-forgot",
+    "pdf_pages": [
+      21
+    ],
+    "pdf_class": "Anunciado/no funcional",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/auth/password/forgot",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/auth/password/forgot",
+    "sdd_success": "202",
+    "pdf_success": "202",
+    "sdd_security": "public",
+    "sdd_request_schema": "EmailRequest",
+    "pdf_request_fields": [
+      "email",
+      "locale"
+    ],
+    "sdd_request_fields": [
+      "email"
+    ],
+    "pdf_response_fields": [
+      "accepted",
+      "message",
+      "retryAfterSeconds"
+    ],
+    "sdd_response_fields": [
+      "status",
+      "requestId"
+    ],
+    "pdf_only_request_candidates": [
+      "locale"
+    ],
+    "pdf_only_response_candidates": [
+      "accepted",
+      "message",
+      "retryAfterSeconds"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA",
+      "PERSISTENCIA_OBSOLETA"
+    ]
+  },
+  {
+    "id": "E006",
+    "folder": "E006-auth-password-reset",
+    "pdf_pages": [
+      22
+    ],
+    "pdf_class": "Anunciado/no funcional",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/auth/password/reset",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/auth/password/reset",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "public",
+    "sdd_request_schema": "PasswordResetRequest",
+    "pdf_request_fields": [
+      "resetToken",
+      "newPassword"
+    ],
+    "sdd_request_fields": [
+      "token",
+      "newPassword"
+    ],
+    "pdf_response_fields": [
+      "reset",
+      "revokedSessions"
+    ],
+    "sdd_response_fields": [
+      "status",
+      "requestId"
+    ],
+    "pdf_only_request_candidates": [
+      "resetToken"
+    ],
+    "pdf_only_response_candidates": [
+      "reset",
+      "revokedSessions"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA",
+      "PERSISTENCIA_OBSOLETA"
+    ]
+  },
+  {
+    "id": "E007",
+    "folder": "E007-auth-password-change",
+    "pdf_pages": [
+      23
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/auth/password/change",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/auth/password/change",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "PasswordChangeRequest",
+    "pdf_request_fields": [
+      "currentPassword",
+      "newPassword"
+    ],
+    "sdd_request_fields": [
+      "currentPassword",
+      "newPassword"
+    ],
+    "pdf_response_fields": [
+      "changedAt",
+      "revokedOtherSessions"
+    ],
+    "sdd_response_fields": [
+      "status",
+      "requestId"
+    ],
+    "pdf_only_request_candidates": [],
+    "pdf_only_response_candidates": [
+      "changedAt",
+      "revokedOtherSessions"
+    ],
+    "differences": [
+      "SALIDA_CANDIDATA",
+      "PERSISTENCIA_OBSOLETA"
+    ]
+  },
+  {
+    "id": "E008",
+    "folder": "E008-auth-sessions",
+    "pdf_pages": [
+      24
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/auth/sessions",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/auth/sessions",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "limit",
+      "cursor"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "sessions[]",
+      "sessions[].id",
+      "sessions[].deviceName",
+      "sessions[].platform",
+      "sessions[].createdAt",
+      "sessions[].lastSeenAt",
+      "sessions[].current",
+      "nextCursor"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "limit",
+      "cursor"
+    ],
+    "pdf_only_response_candidates": [
+      "sessions[]",
+      "sessions[].id",
+      "sessions[].deviceName",
+      "sessions[].platform",
+      "sessions[].createdAt",
+      "sessions[].lastSeenAt",
+      "sessions[].current"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA",
+      "PERSISTENCIA_OBSOLETA"
+    ]
+  },
+  {
+    "id": "E009",
+    "folder": "E009-auth-sessions-sessionId",
+    "pdf_pages": [
+      25
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "DELETE",
+    "sdd_path": "/api/v1/auth/sessions/{sessionId}",
+    "pdf_method": "DELETE",
+    "pdf_path": "/api/v1/auth/sessions/{sessionId}",
+    "sdd_success": "204",
+    "pdf_success": "204",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "sessionId"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [],
+    "sdd_response_fields": [],
+    "pdf_only_request_candidates": [
+      "sessionId"
+    ],
+    "pdf_only_response_candidates": [],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "PERSISTENCIA_OBSOLETA"
+    ]
+  },
+  {
+    "id": "E010",
+    "folder": "E010-auth-email-verification-request",
+    "pdf_pages": [
+      26
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/auth/email-verification/request",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/auth/email-verification/request",
+    "sdd_success": "202",
+    "pdf_success": "202",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "email",
+      "locale"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "accepted",
+      "retryAfterSeconds"
+    ],
+    "sdd_response_fields": [
+      "status",
+      "requestId"
+    ],
+    "pdf_only_request_candidates": [
+      "email",
+      "locale"
+    ],
+    "pdf_only_response_candidates": [
+      "accepted",
+      "retryAfterSeconds"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA",
+      "PERSISTENCIA_OBSOLETA"
+    ]
+  },
+  {
+    "id": "E011",
+    "folder": "E011-auth-email-verification-confirm",
+    "pdf_pages": [
+      27
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/auth/email-verification/confirm",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/auth/email-verification/confirm",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "public",
+    "sdd_request_schema": "VerifyEmailRequest",
+    "pdf_request_fields": [
+      "verificationToken"
+    ],
+    "sdd_request_fields": [
+      "token"
+    ],
+    "pdf_response_fields": [
+      "emailVerified",
+      "verifiedAt"
+    ],
+    "sdd_response_fields": [
+      "status",
+      "requestId"
+    ],
+    "pdf_only_request_candidates": [
+      "verificationToken"
+    ],
+    "pdf_only_response_candidates": [
+      "emailVerified",
+      "verifiedAt"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA",
+      "PERSISTENCIA_OBSOLETA"
+    ]
+  },
+  {
+    "id": "E012",
+    "folder": "E012-users-me",
+    "pdf_pages": [
+      28
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/users/me",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/users/me",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "id",
+      "name",
+      "email",
+      "emailVerified",
+      "createdAt",
+      "updatedAt",
+      "accountStatus"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "email",
+      "displayName",
+      "emailVerified",
+      "createdAt",
+      "version"
+    ],
+    "pdf_only_request_candidates": [],
+    "pdf_only_response_candidates": [
+      "name",
+      "updatedAt",
+      "accountStatus"
+    ],
+    "differences": [
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E013",
+    "folder": "E013-users-me",
+    "pdf_pages": [
+      29
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "PATCH",
+    "sdd_path": "/api/v1/users/me",
+    "pdf_method": "PATCH",
+    "pdf_path": "/api/v1/users/me",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "ProfilePatch",
+    "pdf_request_fields": [
+      "name"
+    ],
+    "sdd_request_fields": [
+      "displayName"
+    ],
+    "pdf_response_fields": [
+      "id",
+      "name",
+      "email",
+      "updatedAt",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "email",
+      "displayName",
+      "emailVerified",
+      "createdAt",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "name"
+    ],
+    "pdf_only_response_candidates": [
+      "name",
+      "updatedAt"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E014",
+    "folder": "E014-users-me",
+    "pdf_pages": [
+      30
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "DELETE",
+    "sdd_path": "/api/v1/users/me",
+    "pdf_method": "DELETE",
+    "pdf_path": "/api/v1/users/me",
+    "sdd_success": "202",
+    "pdf_success": "202",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "DeleteAccountRequest",
+    "pdf_request_fields": [
+      "currentPassword",
+      "confirmation"
+    ],
+    "sdd_request_fields": [
+      "confirmation",
+      "currentPassword"
+    ],
+    "pdf_response_fields": [
+      "deletionRequestId",
+      "status",
+      "requestedAt",
+      "message"
+    ],
+    "sdd_response_fields": [
+      "requestId",
+      "status",
+      "requestedAt",
+      "sessionsRevoked"
+    ],
+    "pdf_only_request_candidates": [],
+    "pdf_only_response_candidates": [
+      "deletionRequestId",
+      "message"
+    ],
+    "differences": [
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E015",
+    "folder": "E015-privacy-notices-current",
+    "pdf_pages": [
+      31
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/privacy/notices/current",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/privacy/notices/current",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "public",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "locale"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "noticeId",
+      "version",
+      "title",
+      "content",
+      "locale",
+      "effectiveAt",
+      "requiresAcceptance"
+    ],
+    "sdd_response_fields": [
+      "version",
+      "effectiveAt",
+      "text",
+      "url"
+    ],
+    "pdf_only_request_candidates": [
+      "locale"
+    ],
+    "pdf_only_response_candidates": [
+      "noticeId",
+      "title",
+      "content",
+      "locale",
+      "requiresAcceptance"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E016",
+    "folder": "E016-users-me-consents",
+    "pdf_pages": [
+      32
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/users/me/consents",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/users/me/consents",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "consents[]",
+      "consents[].noticeId",
+      "consents[].version",
+      "consents[].acceptedAt",
+      "consents[].status"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [],
+    "pdf_only_response_candidates": [
+      "consents[]",
+      "consents[].noticeId",
+      "consents[].version",
+      "consents[].acceptedAt",
+      "consents[].status"
+    ],
+    "differences": [
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E017",
+    "folder": "E017-users-me-consents",
+    "pdf_pages": [
+      33
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/users/me/consents",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/users/me/consents",
+    "sdd_success": "201",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "ConsentRequest",
+    "pdf_request_fields": [
+      "noticeId",
+      "version",
+      "accepted"
+    ],
+    "sdd_request_fields": [
+      "noticeVersion",
+      "purpose",
+      "granted"
+    ],
+    "pdf_response_fields": [
+      "noticeId",
+      "version",
+      "acceptedAt"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "noticeVersion",
+      "purpose",
+      "granted",
+      "recordedAt"
+    ],
+    "pdf_only_request_candidates": [
+      "noticeId",
+      "version",
+      "accepted"
+    ],
+    "pdf_only_response_candidates": [
+      "noticeId",
+      "version",
+      "acceptedAt"
+    ],
+    "differences": [
+      "HTTP_EXITO",
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E018",
+    "folder": "E018-users-me-onboarding",
+    "pdf_pages": [
+      34
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/users/me/onboarding",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/users/me/onboarding",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "microphone",
+      "notifications",
+      "configured",
+      "completedAt"
+    ],
+    "sdd_response_fields": [
+      "completedSteps",
+      "done",
+      "version"
+    ],
+    "pdf_only_request_candidates": [],
+    "pdf_only_response_candidates": [
+      "microphone",
+      "notifications",
+      "configured",
+      "completedAt"
+    ],
+    "differences": [
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E019",
+    "folder": "E019-users-me-onboarding",
+    "pdf_pages": [
+      35
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "PATCH",
+    "sdd_path": "/api/v1/users/me/onboarding",
+    "pdf_method": "PATCH",
+    "pdf_path": "/api/v1/users/me/onboarding",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "OnboardingPatch",
+    "pdf_request_fields": [
+      "microphone",
+      "notifications",
+      "configured"
+    ],
+    "sdd_request_fields": [
+      "completedSteps"
+    ],
+    "pdf_response_fields": [
+      "microphone",
+      "notifications",
+      "configured",
+      "completedAt",
+      "updatedAt"
+    ],
+    "sdd_response_fields": [
+      "completedSteps",
+      "done",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "microphone",
+      "notifications",
+      "configured"
+    ],
+    "pdf_only_response_candidates": [
+      "microphone",
+      "notifications",
+      "configured",
+      "completedAt",
+      "updatedAt"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E020",
+    "folder": "E020-users-me-export",
+    "pdf_pages": [
+      36,
+      37,
+      38,
+      39
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/users/me/export",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/users/me/export",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "format"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "exportVersion",
+      "exportedAt",
+      "user",
+      "income",
+      "movements[]",
+      "recurringPayments[]",
+      "goals[]",
+      "contributions[]",
+      "budgets[]",
+      "consents[]",
+      "user.id",
+      "user.name",
+      "user.email",
+      "user.emailVerified",
+      "user.createdAt",
+      "user.updatedAt",
+      "user.accountStatus",
+      "income.amount",
+      "income.frequency",
+      "income.monthlyEquivalent",
+      "income.currency",
+      "income.updatedAt",
+      "income.version",
+      "movements[].id",
+      "movements[].concept",
+      "movements[].amount",
+      "movements[].category",
+      "movements[].type",
+      "movements[].frequency",
+      "movements[].occurredAt",
+      "movements[].recurringPaymentI",
+      "movements[].goalId",
+      "movements[].contributionId",
+      "movements[].source",
+      "movements[].version",
+      "recurringPayments[].id",
+      "recurringPayments[].concept",
+      "recurringPayments[].amount",
+      "recurringPayments[].frequency",
+      "recurringPayments[].category",
+      "recurringPayments[].type",
+      "recurringPayments[].monthlyEqu",
+      "recurringPayments[].nextDueDat",
+      "recurringPayments[].lastPaidAt",
+      "recurringPayments[].active",
+      "goals[].id",
+      "goals[].name",
+      "goals[].target",
+      "goals[].openingSaved",
+      "goals[].saved",
+      "goals[].emoji",
+      "goals[].targetDate",
+      "goals[].remaining",
+      "goals[].percentage",
+      "goals[].completed",
+      "goals[].version",
+      "contributions[].id",
+      "contributions[].totalRequested",
+      "contributions[].totalApplied",
+      "contributions[].unallocated",
+      "contributions[].mode",
+      "contributions[].splitMode",
+      "contributions[].status",
+      "contributions[].createdAt",
+      "contributions[].allocations[]",
+      "budgets[].category",
+      "budgets[].monthlyLimit",
+      "budgets[].enabled",
+      "consents[].noticeId",
+      "consents[].version",
+      "consents[].acceptedAt",
+      "consents[].status"
+    ],
+    "sdd_response_fields": [
+      "profile",
+      "exportedAt",
+      "movements",
+      "goals",
+      "consents",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "format"
+    ],
+    "pdf_only_response_candidates": [
+      "exportVersion",
+      "user",
+      "income",
+      "movements[]",
+      "recurringPayments[]",
+      "goals[]",
+      "contributions[]",
+      "budgets[]",
+      "consents[]",
+      "user.id",
+      "user.name",
+      "user.email",
+      "user.emailVerified",
+      "user.createdAt",
+      "user.updatedAt",
+      "user.accountStatus",
+      "income.amount",
+      "income.frequency",
+      "income.monthlyEquivalent",
+      "income.currency",
+      "income.updatedAt",
+      "income.version",
+      "movements[].id",
+      "movements[].concept",
+      "movements[].amount",
+      "movements[].category",
+      "movements[].type",
+      "movements[].frequency",
+      "movements[].occurredAt",
+      "movements[].recurringPaymentI",
+      "movements[].goalId",
+      "movements[].contributionId",
+      "movements[].source",
+      "movements[].version",
+      "recurringPayments[].id",
+      "recurringPayments[].concept",
+      "recurringPayments[].amount",
+      "recurringPayments[].frequency",
+      "recurringPayments[].category",
+      "recurringPayments[].type",
+      "recurringPayments[].monthlyEqu",
+      "recurringPayments[].nextDueDat",
+      "recurringPayments[].lastPaidAt",
+      "recurringPayments[].active",
+      "goals[].id",
+      "goals[].name",
+      "goals[].target",
+      "goals[].openingSaved",
+      "goals[].saved",
+      "goals[].emoji",
+      "goals[].targetDate",
+      "goals[].remaining",
+      "goals[].percentage",
+      "goals[].completed",
+      "goals[].version",
+      "contributions[].id",
+      "contributions[].totalRequested",
+      "contributions[].totalApplied",
+      "contributions[].unallocated",
+      "contributions[].mode",
+      "contributions[].splitMode",
+      "contributions[].status",
+      "contributions[].createdAt",
+      "contributions[].allocations[]",
+      "budgets[].category",
+      "budgets[].monthlyLimit",
+      "budgets[].enabled",
+      "consents[].noticeId",
+      "consents[].version",
+      "consents[].acceptedAt",
+      "consents[].status"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E021",
+    "folder": "E021-bootstrap",
+    "pdf_pages": [
+      40,
+      41,
+      42,
+      43
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/bootstrap",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/bootstrap",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "include",
+      "period"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "user",
+      "income",
+      "financialSummary",
+      "recurringPayments[]",
+      "goals[]",
+      "budgets[]",
+      "onboarding",
+      "streak",
+      "serverTime",
+      "user.id",
+      "user.name",
+      "user.email",
+      "user.emailVerified",
+      "user.createdAt",
+      "user.updatedAt",
+      "user.accountStatus",
+      "income.amount",
+      "income.frequency",
+      "income.monthlyEquivalent",
+      "income.currency",
+      "income.updatedAt",
+      "income.version",
+      "financialSummary.period",
+      "financialSummary.currency",
+      "financialSummary.incomeMonthl",
+      "financialSummary.recurringFixe",
+      "financialSummary.oneTimeFixed",
+      "financialSummary.fixedMonthly",
+      "financialSummary.antMonthly",
+      "financialSummary.reservedMont",
+      "financialSummary.availableEsti",
+      "financialSummary.isNegative",
+      "financialSummary.calculatedAt",
+      "recurringPayments[].id",
+      "recurringPayments[].concept",
+      "recurringPayments[].amount",
+      "recurringPayments[].frequency",
+      "recurringPayments[].category",
+      "recurringPayments[].type",
+      "recurringPayments[].monthlyEqu",
+      "recurringPayments[].nextDueDat",
+      "recurringPayments[].lastPaidAt",
+      "recurringPayments[].active",
+      "goals[].id",
+      "goals[].name",
+      "goals[].target",
+      "goals[].openingSaved",
+      "goals[].saved",
+      "goals[].emoji",
+      "goals[].targetDate",
+      "goals[].remaining",
+      "goals[].percentage",
+      "goals[].completed",
+      "goals[].version",
+      "budgets[].category",
+      "budgets[].monthlyLimit",
+      "budgets[].enabled",
+      "onboarding.microphone",
+      "onboarding.notifications",
+      "onboarding.configured",
+      "onboarding.completedAt",
+      "streak.days",
+      "streak.lastSavingDate",
+      "streak.nextMilestoneDays",
+      "streak.progressPercentage",
+      "streak.pigMessage",
+      "streak.milestones[]",
+      "streak.milestones[].days",
+      "streak.milestones[].reached"
+    ],
+    "sdd_response_fields": [
+      "profile",
+      "financialSummary",
+      "catalogVersion"
+    ],
+    "pdf_only_request_candidates": [
+      "include",
+      "period"
+    ],
+    "pdf_only_response_candidates": [
+      "user",
+      "income",
+      "recurringPayments[]",
+      "goals[]",
+      "budgets[]",
+      "onboarding",
+      "streak",
+      "serverTime",
+      "user.id",
+      "user.name",
+      "user.email",
+      "user.emailVerified",
+      "user.createdAt",
+      "user.updatedAt",
+      "user.accountStatus",
+      "income.amount",
+      "income.frequency",
+      "income.monthlyEquivalent",
+      "income.currency",
+      "income.updatedAt",
+      "income.version",
+      "financialSummary.period",
+      "financialSummary.currency",
+      "financialSummary.incomeMonthl",
+      "financialSummary.recurringFixe",
+      "financialSummary.oneTimeFixed",
+      "financialSummary.fixedMonthly",
+      "financialSummary.antMonthly",
+      "financialSummary.reservedMont",
+      "financialSummary.availableEsti",
+      "financialSummary.isNegative",
+      "financialSummary.calculatedAt",
+      "recurringPayments[].id",
+      "recurringPayments[].concept",
+      "recurringPayments[].amount",
+      "recurringPayments[].frequency",
+      "recurringPayments[].category",
+      "recurringPayments[].type",
+      "recurringPayments[].monthlyEqu",
+      "recurringPayments[].nextDueDat",
+      "recurringPayments[].lastPaidAt",
+      "recurringPayments[].active",
+      "goals[].id",
+      "goals[].name",
+      "goals[].target",
+      "goals[].openingSaved",
+      "goals[].saved",
+      "goals[].emoji",
+      "goals[].targetDate",
+      "goals[].remaining",
+      "goals[].percentage",
+      "goals[].completed",
+      "goals[].version",
+      "budgets[].category",
+      "budgets[].monthlyLimit",
+      "budgets[].enabled",
+      "onboarding.microphone",
+      "onboarding.notifications",
+      "onboarding.configured",
+      "onboarding.completedAt",
+      "streak.days",
+      "streak.lastSavingDate",
+      "streak.nextMilestoneDays",
+      "streak.progressPercentage",
+      "streak.pigMessage",
+      "streak.milestones[]",
+      "streak.milestones[].days",
+      "streak.milestones[].reached"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E022",
+    "folder": "E022-catalogs-categories",
+    "pdf_pages": [
+      44
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/catalogs/categories",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/catalogs/categories",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "public",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "includeInactive"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "categories[]",
+      "categories[].id",
+      "categories[].name",
+      "categories[].emoji",
+      "categories[].budgetable",
+      "categories[].allowedExpenseTyp",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "includeInactive"
+    ],
+    "pdf_only_response_candidates": [
+      "categories[]",
+      "categories[].id",
+      "categories[].name",
+      "categories[].emoji",
+      "categories[].budgetable",
+      "categories[].allowedExpenseTyp",
+      "version"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E023",
+    "folder": "E023-catalogs-frequencies",
+    "pdf_pages": [
+      45
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/catalogs/frequencies",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/catalogs/frequencies",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "public",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "context"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "frequencies[]",
+      "frequencies[].code",
+      "frequencies[].label",
+      "frequencies[].monthlyFactor",
+      "frequencies[].allowedContexts[]",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "context"
+    ],
+    "pdf_only_response_candidates": [
+      "frequencies[]",
+      "frequencies[].code",
+      "frequencies[].label",
+      "frequencies[].monthlyFactor",
+      "frequencies[].allowedContexts[]",
+      "version"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E024",
+    "folder": "E024-income",
+    "pdf_pages": [
+      46
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/income",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/income",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "amount",
+      "frequency",
+      "monthlyEquivalent",
+      "currency",
+      "updatedAt",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "amount",
+      "currency",
+      "frequency",
+      "version"
+    ],
+    "pdf_only_request_candidates": [],
+    "pdf_only_response_candidates": [
+      "monthlyEquivalent",
+      "updatedAt"
+    ],
+    "differences": [
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E025",
+    "folder": "E025-income",
+    "pdf_pages": [
+      47
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "PUT",
+    "sdd_path": "/api/v1/income",
+    "pdf_method": "PUT",
+    "pdf_path": "/api/v1/income",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "IncomeUpdate",
+    "pdf_request_fields": [
+      "amount",
+      "frequency"
+    ],
+    "sdd_request_fields": [
+      "amount",
+      "currency",
+      "frequency"
+    ],
+    "pdf_response_fields": [
+      "amount",
+      "frequency",
+      "monthlyEquivalent",
+      "currency",
+      "updatedAt",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "amount",
+      "currency",
+      "frequency",
+      "version"
+    ],
+    "pdf_only_request_candidates": [],
+    "pdf_only_response_candidates": [
+      "monthlyEquivalent",
+      "updatedAt"
+    ],
+    "differences": [
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E026",
+    "folder": "E026-financial-summary",
+    "pdf_pages": [
+      48
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/financial-summary",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/financial-summary",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "period"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "period",
+      "currency",
+      "incomeMonthly",
+      "recurringFixedMonthly",
+      "oneTimeFixedMonthly",
+      "fixedMonthly",
+      "antMonthly",
+      "reservedMonthly",
+      "availableEstimated",
+      "isNegative",
+      "calculatedAt"
+    ],
+    "sdd_response_fields": [
+      "period",
+      "currency",
+      "income",
+      "expenses",
+      "savings",
+      "net",
+      "asOf"
+    ],
+    "pdf_only_request_candidates": [
+      "period"
+    ],
+    "pdf_only_response_candidates": [
+      "incomeMonthly",
+      "recurringFixedMonthly",
+      "oneTimeFixedMonthly",
+      "fixedMonthly",
+      "antMonthly",
+      "reservedMonthly",
+      "availableEstimated",
+      "isNegative",
+      "calculatedAt"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E027",
+    "folder": "E027-movements",
+    "pdf_pages": [
+      49,
+      50
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/movements",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/movements",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "type",
+      "period",
+      "from",
+      "to",
+      "category",
+      "limit",
+      "cursor"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "items[]",
+      "items[].id",
+      "items[].concept",
+      "items[].amount",
+      "items[].category",
+      "items[].type",
+      "items[].frequency",
+      "items[].occurredAt",
+      "items[].recurringPaymentId",
+      "items[].goalId",
+      "items[].contributionId",
+      "items[].source",
+      "items[].version",
+      "nextCursor"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "type",
+      "period",
+      "from",
+      "to",
+      "category",
+      "limit",
+      "cursor"
+    ],
+    "pdf_only_response_candidates": [
+      "items[]",
+      "items[].id",
+      "items[].concept",
+      "items[].amount",
+      "items[].category",
+      "items[].type",
+      "items[].frequency",
+      "items[].occurredAt",
+      "items[].recurringPaymentId",
+      "items[].goalId",
+      "items[].contributionId",
+      "items[].source",
+      "items[].version"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E028",
+    "folder": "E028-movements",
+    "pdf_pages": [
+      51,
+      52,
+      53
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/movements",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/movements",
+    "sdd_success": "201",
+    "pdf_success": "201",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "MovementCreate",
+    "pdf_request_fields": [
+      "concept",
+      "amount",
+      "category",
+      "type",
+      "frequency",
+      "occurredAt",
+      "source"
+    ],
+    "sdd_request_fields": [
+      "type",
+      "amount",
+      "currency",
+      "categoryId",
+      "description",
+      "occurredAt"
+    ],
+    "pdf_response_fields": [
+      "id",
+      "concept",
+      "amount",
+      "category",
+      "type",
+      "frequency",
+      "occurredAt",
+      "source",
+      "version",
+      "summary",
+      "summary.period",
+      "summary.currency",
+      "summary.incomeMonthly",
+      "summary.recurringFixedMonthly",
+      "summary.oneTimeFixedMonthly",
+      "summary.fixedMonthly",
+      "summary.antMonthly",
+      "summary.reservedMonthly",
+      "summary.availableEstimated",
+      "summary.isNegative",
+      "summary.calculatedAt"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "type",
+      "amount",
+      "currency",
+      "categoryId",
+      "description",
+      "occurredAt",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "concept",
+      "category",
+      "frequency",
+      "source"
+    ],
+    "pdf_only_response_candidates": [
+      "concept",
+      "category",
+      "frequency",
+      "source",
+      "summary",
+      "summary.period",
+      "summary.currency",
+      "summary.incomeMonthly",
+      "summary.recurringFixedMonthly",
+      "summary.oneTimeFixedMonthly",
+      "summary.fixedMonthly",
+      "summary.antMonthly",
+      "summary.reservedMonthly",
+      "summary.availableEstimated",
+      "summary.isNegative",
+      "summary.calculatedAt"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E029",
+    "folder": "E029-movements-movementId",
+    "pdf_pages": [
+      54
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/movements/{movementId}",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/movements/{movementId}",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "movementId"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "id",
+      "concept",
+      "amount",
+      "category",
+      "type",
+      "frequency",
+      "occurredAt",
+      "recurringPaymentId",
+      "goalId",
+      "contributionId",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "type",
+      "amount",
+      "currency",
+      "categoryId",
+      "description",
+      "occurredAt",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "movementId"
+    ],
+    "pdf_only_response_candidates": [
+      "concept",
+      "category",
+      "frequency",
+      "recurringPaymentId",
+      "goalId",
+      "contributionId"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E030",
+    "folder": "E030-movements-movementId",
+    "pdf_pages": [
+      55
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "PATCH",
+    "sdd_path": "/api/v1/movements/{movementId}",
+    "pdf_method": "PATCH",
+    "pdf_path": "/api/v1/movements/{movementId}",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "MovementPatch",
+    "pdf_request_fields": [
+      "movementId",
+      "concept",
+      "amount",
+      "category",
+      "type"
+    ],
+    "sdd_request_fields": [
+      "categoryId",
+      "description",
+      "occurredAt"
+    ],
+    "pdf_response_fields": [
+      "id",
+      "concept",
+      "amount",
+      "category",
+      "type",
+      "occurredAt",
+      "version",
+      "updatedAt"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "type",
+      "amount",
+      "currency",
+      "categoryId",
+      "description",
+      "occurredAt",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "movementId",
+      "concept",
+      "amount",
+      "category",
+      "type"
+    ],
+    "pdf_only_response_candidates": [
+      "concept",
+      "category",
+      "updatedAt"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E031",
+    "folder": "E031-movements-movementId",
+    "pdf_pages": [
+      56,
+      57
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "DELETE",
+    "sdd_path": "/api/v1/movements/{movementId}",
+    "pdf_method": "DELETE",
+    "pdf_path": "/api/v1/movements/{movementId}",
+    "sdd_success": "204",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "movementId",
+      "reason"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "deletedMovementId",
+      "affectedGoalId",
+      "reversedContributionId",
+      "summary",
+      "summary.period",
+      "summary.currency",
+      "summary.incomeMonthly",
+      "summary.recurringFixedMonthly",
+      "summary.oneTimeFixedMonthly",
+      "summary.fixedMonthly",
+      "summary.antMonthly",
+      "summary.reservedMonthly",
+      "summary.availableEstimated",
+      "summary.isNegative",
+      "summary.calculatedAt"
+    ],
+    "sdd_response_fields": [],
+    "pdf_only_request_candidates": [
+      "movementId",
+      "reason"
+    ],
+    "pdf_only_response_candidates": [
+      "deletedMovementId",
+      "affectedGoalId",
+      "reversedContributionId",
+      "summary",
+      "summary.period",
+      "summary.currency",
+      "summary.incomeMonthly",
+      "summary.recurringFixedMonthly",
+      "summary.oneTimeFixedMonthly",
+      "summary.fixedMonthly",
+      "summary.antMonthly",
+      "summary.reservedMonthly",
+      "summary.availableEstimated",
+      "summary.isNegative",
+      "summary.calculatedAt"
+    ],
+    "differences": [
+      "HTTP_EXITO",
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E032",
+    "folder": "E032-recurring-payments",
+    "pdf_pages": [
+      58
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/recurring-payments",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/recurring-payments",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "type",
+      "limit",
+      "cursor"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "items[]",
+      "items[].id",
+      "items[].concept",
+      "items[].amount",
+      "items[].frequency",
+      "items[].category",
+      "items[].type",
+      "items[].monthlyEquivalent",
+      "items[].nextDueDate",
+      "items[].lastPaidAt",
+      "items[].active",
+      "nextCursor"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "type",
+      "limit",
+      "cursor"
+    ],
+    "pdf_only_response_candidates": [
+      "items[]",
+      "items[].id",
+      "items[].concept",
+      "items[].amount",
+      "items[].frequency",
+      "items[].category",
+      "items[].type",
+      "items[].monthlyEquivalent",
+      "items[].nextDueDate",
+      "items[].lastPaidAt",
+      "items[].active"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E033",
+    "folder": "E033-recurring-payments",
+    "pdf_pages": [
+      59,
+      60
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/recurring-payments",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/recurring-payments",
+    "sdd_success": "201",
+    "pdf_success": "201",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "RecurringCreate",
+    "pdf_request_fields": [
+      "concept",
+      "amount",
+      "frequency",
+      "category",
+      "type",
+      "startDate",
+      "dueDay"
+    ],
+    "sdd_request_fields": [
+      "name",
+      "amount",
+      "currency",
+      "frequency",
+      "nextDueDate"
+    ],
+    "pdf_response_fields": [
+      "id",
+      "concept",
+      "amount",
+      "frequency",
+      "category",
+      "type",
+      "monthlyEquivalent",
+      "startDate",
+      "nextDueDate",
+      "active",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "name",
+      "amount",
+      "currency",
+      "frequency",
+      "nextDueDate",
+      "active",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "concept",
+      "category",
+      "type",
+      "startDate",
+      "dueDay"
+    ],
+    "pdf_only_response_candidates": [
+      "concept",
+      "category",
+      "type",
+      "monthlyEquivalent",
+      "startDate"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E034",
+    "folder": "E034-recurring-payments-recurringPaymentId",
+    "pdf_pages": [
+      61
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/recurring-payments/{recurringPaymentId}",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/recurring-payments/{recurringPaymentId}",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "recurringPaymentId"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "id",
+      "concept",
+      "amount",
+      "frequency",
+      "category",
+      "type",
+      "monthlyEquivalent",
+      "startDate",
+      "nextDueDate",
+      "active",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "name",
+      "amount",
+      "currency",
+      "frequency",
+      "nextDueDate",
+      "active",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "recurringPaymentId"
+    ],
+    "pdf_only_response_candidates": [
+      "concept",
+      "category",
+      "type",
+      "monthlyEquivalent",
+      "startDate"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E035",
+    "folder": "E035-recurring-payments-recurringPaymentId",
+    "pdf_pages": [
+      62,
+      63
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "PATCH",
+    "sdd_path": "/api/v1/recurring-payments/{recurringPaymentId}",
+    "pdf_method": "PATCH",
+    "pdf_path": "/api/v1/recurring-payments/{recurringPaymentId}",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "RecurringPatch",
+    "pdf_request_fields": [
+      "recurringPaymentId",
+      "concept",
+      "amount",
+      "frequency",
+      "category",
+      "type",
+      "startDate",
+      "dueDay"
+    ],
+    "sdd_request_fields": [
+      "name",
+      "amount",
+      "active",
+      "nextDueDate"
+    ],
+    "pdf_response_fields": [
+      "id",
+      "concept",
+      "amount",
+      "frequency",
+      "category",
+      "type",
+      "monthlyEquivalent",
+      "nextDueDate",
+      "updatedAt",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "name",
+      "amount",
+      "currency",
+      "frequency",
+      "nextDueDate",
+      "active",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "recurringPaymentId",
+      "concept",
+      "frequency",
+      "category",
+      "type",
+      "startDate",
+      "dueDay"
+    ],
+    "pdf_only_response_candidates": [
+      "concept",
+      "category",
+      "type",
+      "monthlyEquivalent",
+      "updatedAt"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E036",
+    "folder": "E036-recurring-payments-recurringPaymentId",
+    "pdf_pages": [
+      64
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "DELETE",
+    "sdd_path": "/api/v1/recurring-payments/{recurringPaymentId}",
+    "pdf_method": "DELETE",
+    "pdf_path": "/api/v1/recurring-payments/{recurringPaymentId}",
+    "sdd_success": "204",
+    "pdf_success": "204",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "recurringPaymentId"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [],
+    "sdd_response_fields": [],
+    "pdf_only_request_candidates": [
+      "recurringPaymentId"
+    ],
+    "pdf_only_response_candidates": [],
+    "differences": [
+      "ENTRADA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E037",
+    "folder": "E037-recurring-payments-recurringPaymentId-payments",
+    "pdf_pages": [
+      65
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/recurring-payments/{recurringPaymentId}/payments",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/recurring-payments/{recurringPaymentId}/payments",
+    "sdd_success": "200",
+    "pdf_success": "201",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "RecurringPaymentCreate",
+    "pdf_request_fields": [
+      "recurringPaymentId",
+      "paidAt",
+      "occurrenceDate",
+      "amount"
+    ],
+    "sdd_request_fields": [
+      "paidAt",
+      "amount",
+      "currency"
+    ],
+    "pdf_response_fields": [
+      "movement.id",
+      "movement.concept",
+      "movement.amount",
+      "movement.category",
+      "movement.type",
+      "movement.recurringPaymentId",
+      "movement.occurredAt",
+      "occurrenceDate",
+      "recurringPayment.nextDueDate"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "type",
+      "amount",
+      "currency",
+      "categoryId",
+      "description",
+      "occurredAt",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "recurringPaymentId",
+      "occurrenceDate"
+    ],
+    "pdf_only_response_candidates": [
+      "movement.id",
+      "movement.concept",
+      "movement.amount",
+      "movement.category",
+      "movement.type",
+      "movement.recurringPaymentId",
+      "movement.occurredAt",
+      "occurrenceDate",
+      "recurringPayment.nextDueDate"
+    ],
+    "differences": [
+      "HTTP_EXITO",
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E038",
+    "folder": "E038-goals",
+    "pdf_pages": [
+      66
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/goals",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/goals",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "status",
+      "limit",
+      "cursor"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "items[]",
+      "items[].id",
+      "items[].name",
+      "items[].target",
+      "items[].openingSaved",
+      "items[].saved",
+      "items[].emoji",
+      "items[].targetDate",
+      "items[].remaining",
+      "items[].percentage",
+      "items[].completed",
+      "items[].version",
+      "totals.saved",
+      "totals.activeCount",
+      "nextCursor"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "status",
+      "limit",
+      "cursor"
+    ],
+    "pdf_only_response_candidates": [
+      "items[]",
+      "items[].id",
+      "items[].name",
+      "items[].target",
+      "items[].openingSaved",
+      "items[].saved",
+      "items[].emoji",
+      "items[].targetDate",
+      "items[].remaining",
+      "items[].percentage",
+      "items[].completed",
+      "items[].version",
+      "totals.saved",
+      "totals.activeCount"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E039",
+    "folder": "E039-goals",
+    "pdf_pages": [
+      67,
+      68
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/goals",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/goals",
+    "sdd_success": "201",
+    "pdf_success": "201",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "GoalCreate",
+    "pdf_request_fields": [
+      "name",
+      "target",
+      "openingSaved",
+      "emoji",
+      "targetDate"
+    ],
+    "sdd_request_fields": [
+      "name",
+      "targetAmount",
+      "currency",
+      "targetDate",
+      "initialSavedAmount"
+    ],
+    "pdf_response_fields": [
+      "id",
+      "name",
+      "target",
+      "openingSaved",
+      "saved",
+      "emoji",
+      "targetDate",
+      "remaining",
+      "percentage",
+      "completed",
+      "createdAt",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "name",
+      "targetAmount",
+      "savedAmount",
+      "currency",
+      "targetDate",
+      "status",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "target",
+      "openingSaved",
+      "emoji"
+    ],
+    "pdf_only_response_candidates": [
+      "target",
+      "openingSaved",
+      "saved",
+      "emoji",
+      "remaining",
+      "percentage",
+      "completed",
+      "createdAt"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E040",
+    "folder": "E040-goals-goalId",
+    "pdf_pages": [
+      69
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/goals/{goalId}",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/goals/{goalId}",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "goalId"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "id",
+      "name",
+      "target",
+      "openingSaved",
+      "contributedNet",
+      "saved",
+      "emoji",
+      "targetDate",
+      "remaining",
+      "percentage",
+      "completed",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "name",
+      "targetAmount",
+      "savedAmount",
+      "currency",
+      "targetDate",
+      "status",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "goalId"
+    ],
+    "pdf_only_response_candidates": [
+      "target",
+      "openingSaved",
+      "contributedNet",
+      "saved",
+      "emoji",
+      "remaining",
+      "percentage",
+      "completed"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E041",
+    "folder": "E041-goals-goalId",
+    "pdf_pages": [
+      70
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "PATCH",
+    "sdd_path": "/api/v1/goals/{goalId}",
+    "pdf_method": "PATCH",
+    "pdf_path": "/api/v1/goals/{goalId}",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "GoalPatch",
+    "pdf_request_fields": [
+      "goalId",
+      "name",
+      "target",
+      "openingSaved",
+      "emoji",
+      "targetDate"
+    ],
+    "sdd_request_fields": [
+      "name",
+      "targetAmount",
+      "targetDate",
+      "status"
+    ],
+    "pdf_response_fields": [
+      "id",
+      "name",
+      "target",
+      "openingSaved",
+      "contributedNet",
+      "saved",
+      "emoji",
+      "targetDate",
+      "remaining",
+      "percentage",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "name",
+      "targetAmount",
+      "savedAmount",
+      "currency",
+      "targetDate",
+      "status",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "goalId",
+      "target",
+      "openingSaved",
+      "emoji"
+    ],
+    "pdf_only_response_candidates": [
+      "target",
+      "openingSaved",
+      "contributedNet",
+      "saved",
+      "emoji",
+      "remaining",
+      "percentage"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E042",
+    "folder": "E042-goals-goalId",
+    "pdf_pages": [
+      71
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "DELETE",
+    "sdd_path": "/api/v1/goals/{goalId}",
+    "pdf_method": "DELETE",
+    "pdf_path": "/api/v1/goals/{goalId}",
+    "sdd_success": "204",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "goalId"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "deletedGoalId",
+      "releasedAmount",
+      "reversedAllocations",
+      "affectedPeriods[]"
+    ],
+    "sdd_response_fields": [],
+    "pdf_only_request_candidates": [
+      "goalId"
+    ],
+    "pdf_only_response_candidates": [
+      "deletedGoalId",
+      "releasedAmount",
+      "reversedAllocations",
+      "affectedPeriods[]"
+    ],
+    "differences": [
+      "HTTP_EXITO",
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E043",
+    "folder": "E043-goal-contributions-preview",
+    "pdf_pages": [
+      72,
+      73
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/goal-contributions/preview",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/goal-contributions/preview",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "ContributionPreviewRequest",
+    "pdf_request_fields": [
+      "totalAmount",
+      "mode",
+      "splitMode",
+      "goalId",
+      "goalIds[]",
+      "allocations[]",
+      "allocations[].goalId",
+      "allocations[].amount"
+    ],
+    "sdd_request_fields": [
+      "amount",
+      "currency",
+      "allocations"
+    ],
+    "pdf_response_fields": [
+      "totalAmount",
+      "allocatedAmount",
+      "unallocatedAmount",
+      "allocations[]",
+      "allocations[].goalId",
+      "allocations[].goalName",
+      "allocations[].amount",
+      "allocations[].remainingAfter",
+      "valid",
+      "errors[]"
+    ],
+    "sdd_response_fields": [
+      "amount",
+      "currency",
+      "allocations",
+      "remaining",
+      "canCommit"
+    ],
+    "pdf_only_request_candidates": [
+      "totalAmount",
+      "mode",
+      "splitMode",
+      "goalId",
+      "goalIds[]",
+      "allocations[]",
+      "allocations[].goalId",
+      "allocations[].amount"
+    ],
+    "pdf_only_response_candidates": [
+      "totalAmount",
+      "allocatedAmount",
+      "unallocatedAmount",
+      "allocations[]",
+      "allocations[].goalId",
+      "allocations[].goalName",
+      "allocations[].amount",
+      "allocations[].remainingAfter",
+      "valid",
+      "errors[]"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E044",
+    "folder": "E044-goal-contributions",
+    "pdf_pages": [
+      74,
+      75
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/goal-contributions",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/goal-contributions",
+    "sdd_success": "201",
+    "pdf_success": "201",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "ContributionCreate",
+    "pdf_request_fields": [
+      "totalAmount",
+      "mode",
+      "splitMode",
+      "goalId",
+      "goalIds[]",
+      "allocations[]",
+      "allocations[].goalId",
+      "allocations[].amount"
+    ],
+    "sdd_request_fields": [
+      "amount",
+      "currency",
+      "allocations",
+      "occurredAt"
+    ],
+    "pdf_response_fields": [
+      "contribution.id",
+      "contribution.totalRequested",
+      "contribution.totalApplied",
+      "contribution.unallocated",
+      "contribution.mode",
+      "contribution.splitMode",
+      "contribution.createdAt",
+      "allocations[]",
+      "allocations[].allocationId",
+      "allocations[].goalId",
+      "allocations[].amount",
+      "allocations[].movementId",
+      "allocations[].goalSavedAfter"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "amount",
+      "currency",
+      "allocations",
+      "occurredAt",
+      "status",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "totalAmount",
+      "mode",
+      "splitMode",
+      "goalId",
+      "goalIds[]",
+      "allocations[]",
+      "allocations[].goalId",
+      "allocations[].amount"
+    ],
+    "pdf_only_response_candidates": [
+      "contribution.id",
+      "contribution.totalRequested",
+      "contribution.totalApplied",
+      "contribution.unallocated",
+      "contribution.mode",
+      "contribution.splitMode",
+      "contribution.createdAt",
+      "allocations[]",
+      "allocations[].allocationId",
+      "allocations[].goalId",
+      "allocations[].amount",
+      "allocations[].movementId",
+      "allocations[].goalSavedAfter"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E045",
+    "folder": "E045-goal-contributions",
+    "pdf_pages": [
+      76,
+      77
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/goal-contributions",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/goal-contributions",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "goalId",
+      "from",
+      "to",
+      "status",
+      "limit",
+      "cursor"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "items[]",
+      "items[].id",
+      "items[].totalRequested",
+      "items[].totalApplied",
+      "items[].unallocated",
+      "items[].mode",
+      "items[].splitMode",
+      "items[].status",
+      "items[].createdAt",
+      "items[].allocations[]",
+      "nextCursor",
+      "items[].allocations[].allocationId",
+      "items[].allocations[].goalId",
+      "items[].allocations[].amount",
+      "items[].allocations[].movementI",
+      "items[].allocations[].reversed"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "goalId",
+      "from",
+      "to",
+      "status",
+      "limit",
+      "cursor"
+    ],
+    "pdf_only_response_candidates": [
+      "items[]",
+      "items[].id",
+      "items[].totalRequested",
+      "items[].totalApplied",
+      "items[].unallocated",
+      "items[].mode",
+      "items[].splitMode",
+      "items[].status",
+      "items[].createdAt",
+      "items[].allocations[]",
+      "items[].allocations[].allocationId",
+      "items[].allocations[].goalId",
+      "items[].allocations[].amount",
+      "items[].allocations[].movementI",
+      "items[].allocations[].reversed"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E046",
+    "folder": "E046-goal-contributions-contributionId",
+    "pdf_pages": [
+      78
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/goal-contributions/{contributionId}",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/goal-contributions/{contributionId}",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "contributionId"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "id",
+      "totalRequested",
+      "totalApplied",
+      "unallocated",
+      "mode",
+      "splitMode",
+      "status",
+      "createdAt",
+      "allocations[]",
+      "allocations[].allocationId",
+      "allocations[].goalId",
+      "allocations[].amount",
+      "allocations[].movementId",
+      "allocations[].reversed"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "amount",
+      "currency",
+      "allocations",
+      "occurredAt",
+      "status",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "contributionId"
+    ],
+    "pdf_only_response_candidates": [
+      "totalRequested",
+      "totalApplied",
+      "unallocated",
+      "mode",
+      "splitMode",
+      "createdAt",
+      "allocations[]",
+      "allocations[].allocationId",
+      "allocations[].goalId",
+      "allocations[].amount",
+      "allocations[].movementId",
+      "allocations[].reversed"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E047",
+    "folder": "E047-goal-contributions-contributionId-reverse",
+    "pdf_pages": [
+      79
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/goal-contributions/{contributionId}/reverse",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/goal-contributions/{contributionId}/reverse",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "ReverseContributionRequest",
+    "pdf_request_fields": [
+      "contributionId",
+      "reason"
+    ],
+    "sdd_request_fields": [
+      "reason"
+    ],
+    "pdf_response_fields": [
+      "contributionId",
+      "status",
+      "reversedAmount",
+      "affectedGoals[]",
+      "affectedGoals[].goalId",
+      "affectedGoals[].released",
+      "affectedGoals[].savedAfter",
+      "reversedAt"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "amount",
+      "currency",
+      "allocations",
+      "occurredAt",
+      "status",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "contributionId"
+    ],
+    "pdf_only_response_candidates": [
+      "contributionId",
+      "reversedAmount",
+      "affectedGoals[]",
+      "affectedGoals[].goalId",
+      "affectedGoals[].released",
+      "affectedGoals[].savedAfter",
+      "reversedAt"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E048",
+    "folder": "E048-budgets",
+    "pdf_pages": [
+      80
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/budgets",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/budgets",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "period"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "currency",
+      "limits[]",
+      "limits[].category",
+      "limits[].monthlyLimit",
+      "limits[].enabled",
+      "updatedAt",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "period"
+    ],
+    "pdf_only_response_candidates": [
+      "currency",
+      "limits[]",
+      "limits[].category",
+      "limits[].monthlyLimit",
+      "limits[].enabled",
+      "updatedAt",
+      "version"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E049",
+    "folder": "E049-budgets",
+    "pdf_pages": [
+      81
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "PUT",
+    "sdd_path": "/api/v1/budgets",
+    "pdf_method": "PUT",
+    "pdf_path": "/api/v1/budgets",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "BudgetReplace",
+    "pdf_request_fields": [
+      "limits[]",
+      "limits[].category",
+      "limits[].monthlyLimit"
+    ],
+    "sdd_request_fields": [
+      "period",
+      "currency",
+      "budgets"
+    ],
+    "pdf_response_fields": [
+      "limits[]",
+      "limits[].category",
+      "limits[].monthlyLimit",
+      "limits[].enabled",
+      "updatedAt",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "limits[]",
+      "limits[].category",
+      "limits[].monthlyLimit"
+    ],
+    "pdf_only_response_candidates": [
+      "limits[]",
+      "limits[].category",
+      "limits[].monthlyLimit",
+      "limits[].enabled",
+      "updatedAt",
+      "version"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E050",
+    "folder": "E050-budgets-usage",
+    "pdf_pages": [
+      82
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/budgets/usage",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/budgets/usage",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "period"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "period",
+      "items[]",
+      "items[].category",
+      "items[].limit",
+      "items[].spent",
+      "items[].remaining",
+      "items[].usedPercentage",
+      "items[].overLimit",
+      "currency",
+      "calculatedAt"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "period"
+    ],
+    "pdf_only_response_candidates": [
+      "period",
+      "items[]",
+      "items[].category",
+      "items[].limit",
+      "items[].spent",
+      "items[].remaining",
+      "items[].usedPercentage",
+      "items[].overLimit",
+      "currency",
+      "calculatedAt"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E051",
+    "folder": "E051-dashboard",
+    "pdf_pages": [
+      83,
+      84,
+      85
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/dashboard",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/dashboard",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "period"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "period",
+      "financialSummary",
+      "streak",
+      "recurringPreview[]",
+      "topCategories[]",
+      "tip.title",
+      "tip.text",
+      "tip.reason",
+      "userGreeting",
+      "calculatedAt",
+      "financialSummary.period",
+      "financialSummary.currency",
+      "financialSummary.incomeMonthl",
+      "financialSummary.recurringFixe",
+      "financialSummary.oneTimeFixed",
+      "financialSummary.fixedMonthly",
+      "financialSummary.antMonthly",
+      "financialSummary.reservedMont",
+      "financialSummary.availableEsti",
+      "financialSummary.isNegative",
+      "financialSummary.calculatedAt",
+      "streak.days",
+      "streak.lastSavingDate",
+      "streak.nextMilestoneDays",
+      "streak.progressPercentage",
+      "streak.pigMessage",
+      "streak.milestones[]",
+      "streak.milestones[].days",
+      "streak.milestones[].reached",
+      "recurringPreview[].id",
+      "recurringPreview[].concept",
+      "recurringPreview[].amount",
+      "recurringPreview[].frequency",
+      "recurringPreview[].category",
+      "recurringPreview[].type",
+      "recurringPreview[].monthlyEquiv",
+      "recurringPreview[].nextDueDate",
+      "recurringPreview[].lastPaidAt",
+      "recurringPreview[].active",
+      "topCategories[].category",
+      "topCategories[].total",
+      "topCategories[].relativePercenta",
+      "topCategories[].shareOfTotal"
+    ],
+    "sdd_response_fields": [
+      "period",
+      "summary",
+      "goals",
+      "latestMovements",
+      "asOf"
+    ],
+    "pdf_only_request_candidates": [
+      "period"
+    ],
+    "pdf_only_response_candidates": [
+      "financialSummary",
+      "streak",
+      "recurringPreview[]",
+      "topCategories[]",
+      "tip.title",
+      "tip.text",
+      "tip.reason",
+      "userGreeting",
+      "calculatedAt",
+      "financialSummary.period",
+      "financialSummary.currency",
+      "financialSummary.incomeMonthl",
+      "financialSummary.recurringFixe",
+      "financialSummary.oneTimeFixed",
+      "financialSummary.fixedMonthly",
+      "financialSummary.antMonthly",
+      "financialSummary.reservedMont",
+      "financialSummary.availableEsti",
+      "financialSummary.isNegative",
+      "financialSummary.calculatedAt",
+      "streak.days",
+      "streak.lastSavingDate",
+      "streak.nextMilestoneDays",
+      "streak.progressPercentage",
+      "streak.pigMessage",
+      "streak.milestones[]",
+      "streak.milestones[].days",
+      "streak.milestones[].reached",
+      "recurringPreview[].id",
+      "recurringPreview[].concept",
+      "recurringPreview[].amount",
+      "recurringPreview[].frequency",
+      "recurringPreview[].category",
+      "recurringPreview[].type",
+      "recurringPreview[].monthlyEquiv",
+      "recurringPreview[].nextDueDate",
+      "recurringPreview[].lastPaidAt",
+      "recurringPreview[].active",
+      "topCategories[].category",
+      "topCategories[].total",
+      "topCategories[].relativePercenta",
+      "topCategories[].shareOfTotal"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E052",
+    "folder": "E052-analytics-insights",
+    "pdf_pages": [
+      86
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/analytics/insights",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/analytics/insights",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "windowDays",
+      "endDate"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "windowDays",
+      "from",
+      "to",
+      "antExpenseCount",
+      "minimumSamples",
+      "enoughData",
+      "title",
+      "summary",
+      "afternoonCount",
+      "afternoonPercentage",
+      "weekdayBars[]",
+      "weekdayBars[].weekday",
+      "weekdayBars[].total"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "windowDays",
+      "endDate"
+    ],
+    "pdf_only_response_candidates": [
+      "windowDays",
+      "from",
+      "to",
+      "antExpenseCount",
+      "minimumSamples",
+      "enoughData",
+      "title",
+      "summary",
+      "afternoonCount",
+      "afternoonPercentage",
+      "weekdayBars[]",
+      "weekdayBars[].weekday",
+      "weekdayBars[].total"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E053",
+    "folder": "E053-analytics-categories",
+    "pdf_pages": [
+      87
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/analytics/categories",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/analytics/categories",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "period",
+      "limit",
+      "type"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "period",
+      "categories[]",
+      "categories[].category",
+      "categories[].total",
+      "categories[].percentageOfTop",
+      "categories[].shareOfTotal",
+      "allCategoriesTotal"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "period",
+      "limit",
+      "type"
+    ],
+    "pdf_only_response_candidates": [
+      "period",
+      "categories[]",
+      "categories[].category",
+      "categories[].total",
+      "categories[].percentageOfTop",
+      "categories[].shareOfTotal",
+      "allCategoriesTotal"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E054",
+    "folder": "E054-analytics-spending-patterns",
+    "pdf_pages": [
+      88
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/analytics/spending-patterns",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/analytics/spending-patterns",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "windowDays"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "windowDays",
+      "count",
+      "afternoonWindowStart",
+      "afternoonWindowEndExclusive",
+      "afternoonCount",
+      "afternoonPercentage",
+      "patternDetected",
+      "headline"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "windowDays"
+    ],
+    "pdf_only_response_candidates": [
+      "windowDays",
+      "count",
+      "afternoonWindowStart",
+      "afternoonWindowEndExclusive",
+      "afternoonCount",
+      "afternoonPercentage",
+      "patternDetected",
+      "headline"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E055",
+    "folder": "E055-analytics-recommendations",
+    "pdf_pages": [
+      89
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/analytics/recommendations",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/analytics/recommendations",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "period",
+      "limit"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "recommendations[]",
+      "recommendations[].id",
+      "recommendations[].title",
+      "recommendations[].text",
+      "recommendations[].reason",
+      "recommendations[].basedOnPeri",
+      "recommendations[].category",
+      "recommendations[].observedAm",
+      "hasEnoughData"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "period",
+      "limit"
+    ],
+    "pdf_only_response_candidates": [
+      "recommendations[]",
+      "recommendations[].id",
+      "recommendations[].title",
+      "recommendations[].text",
+      "recommendations[].reason",
+      "recommendations[].basedOnPeri",
+      "recommendations[].category",
+      "recommendations[].observedAm",
+      "hasEnoughData"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E056",
+    "folder": "E056-analytics-savings-streak",
+    "pdf_pages": [
+      90
+    ],
+    "pdf_class": "UI visible",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/analytics/savings-streak",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/analytics/savings-streak",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "asOf"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "days",
+      "lastSavingDate",
+      "nextMilestoneDays",
+      "progressPercentage",
+      "pigMessage",
+      "milestones[]",
+      "milestones[].days",
+      "milestones[].reached"
+    ],
+    "sdd_response_fields": [
+      "days",
+      "timezone",
+      "asOfDate"
+    ],
+    "pdf_only_request_candidates": [
+      "asOf"
+    ],
+    "pdf_only_response_candidates": [
+      "lastSavingDate",
+      "nextMilestoneDays",
+      "progressPercentage",
+      "pigMessage",
+      "milestones[]",
+      "milestones[].days",
+      "milestones[].reached"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E057",
+    "folder": "E057-notification-preferences",
+    "pdf_pages": [
+      91
+    ],
+    "pdf_class": "Anunciado/no funcional",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/notification-preferences",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/notification-preferences",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "enabled",
+      "budgetAlerts",
+      "goalUpdates",
+      "recurringReminders",
+      "streakReminders",
+      "quietHours.enabled",
+      "quietHours.start",
+      "quietHours.end",
+      "timeZone",
+      "updatedAt"
+    ],
+    "sdd_response_fields": [
+      "pushEnabled",
+      "emailEnabled",
+      "reminderEnabled",
+      "version"
+    ],
+    "pdf_only_request_candidates": [],
+    "pdf_only_response_candidates": [
+      "enabled",
+      "budgetAlerts",
+      "goalUpdates",
+      "recurringReminders",
+      "streakReminders",
+      "quietHours.enabled",
+      "quietHours.start",
+      "quietHours.end",
+      "timeZone",
+      "updatedAt"
+    ],
+    "differences": [
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E058",
+    "folder": "E058-notification-preferences",
+    "pdf_pages": [
+      92
+    ],
+    "pdf_class": "Anunciado/no funcional",
+    "sdd_method": "PUT",
+    "sdd_path": "/api/v1/notification-preferences",
+    "pdf_method": "PUT",
+    "pdf_path": "/api/v1/notification-preferences",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "NotificationPreferencesUpdate",
+    "pdf_request_fields": [
+      "enabled",
+      "budgetAlerts",
+      "goalUpdates",
+      "recurringReminders",
+      "streakReminders",
+      "quietHours.enabled",
+      "quietHours.start",
+      "quietHours.end"
+    ],
+    "sdd_request_fields": [
+      "pushEnabled",
+      "emailEnabled",
+      "reminderEnabled"
+    ],
+    "pdf_response_fields": [
+      "enabled",
+      "budgetAlerts",
+      "goalUpdates",
+      "recurringReminders",
+      "streakReminders",
+      "quietHours",
+      "timeZone",
+      "updatedAt",
+      "quietHours.enabled",
+      "quietHours.start",
+      "quietHours.end"
+    ],
+    "sdd_response_fields": [
+      "pushEnabled",
+      "emailEnabled",
+      "reminderEnabled",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "enabled",
+      "budgetAlerts",
+      "goalUpdates",
+      "recurringReminders",
+      "streakReminders",
+      "quietHours.enabled",
+      "quietHours.start",
+      "quietHours.end"
+    ],
+    "pdf_only_response_candidates": [
+      "enabled",
+      "budgetAlerts",
+      "goalUpdates",
+      "recurringReminders",
+      "streakReminders",
+      "quietHours",
+      "timeZone",
+      "updatedAt",
+      "quietHours.enabled",
+      "quietHours.start",
+      "quietHours.end"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E059",
+    "folder": "E059-devices-push-tokens",
+    "pdf_pages": [
+      93
+    ],
+    "pdf_class": "Anunciado/no funcional",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/devices/push-tokens",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/devices/push-tokens",
+    "sdd_success": "201",
+    "pdf_success": "201",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "PushTokenRegister",
+    "pdf_request_fields": [
+      "token",
+      "deviceId",
+      "platform",
+      "appVersion",
+      "locale",
+      "timeZone"
+    ],
+    "sdd_request_fields": [
+      "provider",
+      "token",
+      "deviceLabel"
+    ],
+    "pdf_response_fields": [
+      "deviceRegistrationId",
+      "deviceId",
+      "registeredAt",
+      "active"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "provider",
+      "deviceLabel",
+      "registeredAt"
+    ],
+    "pdf_only_request_candidates": [
+      "deviceId",
+      "platform",
+      "appVersion",
+      "locale",
+      "timeZone"
+    ],
+    "pdf_only_response_candidates": [
+      "deviceRegistrationId",
+      "deviceId",
+      "active"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E060",
+    "folder": "E060-devices-push-tokens-deviceRegistrationId",
+    "pdf_pages": [
+      94
+    ],
+    "pdf_class": "Anunciado/no funcional",
+    "sdd_method": "DELETE",
+    "sdd_path": "/api/v1/devices/push-tokens/{deviceRegistrationId}",
+    "pdf_method": "DELETE",
+    "pdf_path": "/api/v1/devices/push-tokens/{deviceRegistrationId}",
+    "sdd_success": "204",
+    "pdf_success": "204",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "deviceRegistrationId"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [],
+    "sdd_response_fields": [],
+    "pdf_only_request_candidates": [
+      "deviceRegistrationId"
+    ],
+    "pdf_only_response_candidates": [],
+    "differences": [
+      "ENTRADA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E061",
+    "folder": "E061-notifications",
+    "pdf_pages": [
+      95
+    ],
+    "pdf_class": "Anunciado/no funcional",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/notifications",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/notifications",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "unreadOnly",
+      "type",
+      "limit",
+      "cursor"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "items[]",
+      "items[].id",
+      "items[].type",
+      "items[].title",
+      "items[].body",
+      "items[].relatedEntityId",
+      "items[].createdAt",
+      "items[].readAt",
+      "unreadCount",
+      "nextCursor"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "unreadOnly",
+      "type",
+      "limit",
+      "cursor"
+    ],
+    "pdf_only_response_candidates": [
+      "items[]",
+      "items[].id",
+      "items[].type",
+      "items[].title",
+      "items[].body",
+      "items[].relatedEntityId",
+      "items[].createdAt",
+      "items[].readAt",
+      "unreadCount"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E062",
+    "folder": "E062-notifications-notificationId-read",
+    "pdf_pages": [
+      96
+    ],
+    "pdf_class": "Anunciado/no funcional",
+    "sdd_method": "PATCH",
+    "sdd_path": "/api/v1/notifications/{notificationId}/read",
+    "pdf_method": "PATCH",
+    "pdf_path": "/api/v1/notifications/{notificationId}/read",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "notificationId"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "id",
+      "readAt",
+      "unreadCount"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "title",
+      "message",
+      "isRead",
+      "createdAt"
+    ],
+    "pdf_only_request_candidates": [
+      "notificationId"
+    ],
+    "pdf_only_response_candidates": [
+      "readAt",
+      "unreadCount"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E063",
+    "folder": "E063-notifications-read-all",
+    "pdf_pages": [
+      97
+    ],
+    "pdf_class": "Opcional/no requerido para V6",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/notifications/read-all",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/notifications/read-all",
+    "sdd_success": "202",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "before"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "updatedCount",
+      "readAt"
+    ],
+    "sdd_response_fields": [
+      "status",
+      "requestId"
+    ],
+    "pdf_only_request_candidates": [
+      "before"
+    ],
+    "pdf_only_response_candidates": [
+      "updatedCount",
+      "readAt"
+    ],
+    "differences": [
+      "HTTP_EXITO",
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E064",
+    "folder": "E064-reminders",
+    "pdf_pages": [
+      98
+    ],
+    "pdf_class": "Anunciado/no funcional",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/reminders",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/reminders",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "type",
+      "activeOnly",
+      "limit",
+      "cursor"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "items[]",
+      "items[].id",
+      "items[].type",
+      "items[].title",
+      "items[].relatedEntityId",
+      "items[].nextTriggerAt",
+      "items[].frequency",
+      "items[].timeZone",
+      "items[].enabled",
+      "nextCursor"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "type",
+      "activeOnly",
+      "limit",
+      "cursor"
+    ],
+    "pdf_only_response_candidates": [
+      "items[]",
+      "items[].id",
+      "items[].type",
+      "items[].title",
+      "items[].relatedEntityId",
+      "items[].nextTriggerAt",
+      "items[].frequency",
+      "items[].timeZone",
+      "items[].enabled"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E065",
+    "folder": "E065-reminders",
+    "pdf_pages": [
+      99
+    ],
+    "pdf_class": "Anunciado/no funcional",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/reminders",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/reminders",
+    "sdd_success": "201",
+    "pdf_success": "201",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "ReminderCreate",
+    "pdf_request_fields": [
+      "type",
+      "title",
+      "relatedEntityId",
+      "triggerAt",
+      "frequency",
+      "timeZone",
+      "enabled"
+    ],
+    "sdd_request_fields": [
+      "title",
+      "dueAt",
+      "timezone"
+    ],
+    "pdf_response_fields": [
+      "id",
+      "type",
+      "title",
+      "relatedEntityId",
+      "nextTriggerAt",
+      "frequency",
+      "timeZone",
+      "enabled",
+      "createdAt"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "title",
+      "dueAt",
+      "timezone",
+      "active",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "type",
+      "relatedEntityId",
+      "triggerAt",
+      "frequency",
+      "timeZone",
+      "enabled"
+    ],
+    "pdf_only_response_candidates": [
+      "type",
+      "relatedEntityId",
+      "nextTriggerAt",
+      "frequency",
+      "timeZone",
+      "enabled",
+      "createdAt"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E066",
+    "folder": "E066-reminders-reminderId",
+    "pdf_pages": [
+      100
+    ],
+    "pdf_class": "Anunciado/no funcional",
+    "sdd_method": "PATCH",
+    "sdd_path": "/api/v1/reminders/{reminderId}",
+    "pdf_method": "PATCH",
+    "pdf_path": "/api/v1/reminders/{reminderId}",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "ReminderPatch",
+    "pdf_request_fields": [
+      "reminderId",
+      "title",
+      "triggerAt",
+      "frequency",
+      "timeZone",
+      "enabled"
+    ],
+    "sdd_request_fields": [
+      "title",
+      "dueAt",
+      "active"
+    ],
+    "pdf_response_fields": [
+      "id",
+      "title",
+      "nextTriggerAt",
+      "frequency",
+      "timeZone",
+      "enabled",
+      "updatedAt"
+    ],
+    "sdd_response_fields": [
+      "id",
+      "title",
+      "dueAt",
+      "timezone",
+      "active",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "reminderId",
+      "triggerAt",
+      "frequency",
+      "timeZone",
+      "enabled"
+    ],
+    "pdf_only_response_candidates": [
+      "nextTriggerAt",
+      "frequency",
+      "timeZone",
+      "enabled",
+      "updatedAt"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E067",
+    "folder": "E067-reminders-reminderId",
+    "pdf_pages": [
+      101
+    ],
+    "pdf_class": "Anunciado/no funcional",
+    "sdd_method": "DELETE",
+    "sdd_path": "/api/v1/reminders/{reminderId}",
+    "pdf_method": "DELETE",
+    "pdf_path": "/api/v1/reminders/{reminderId}",
+    "sdd_success": "204",
+    "pdf_success": "204",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "reminderId"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [],
+    "sdd_response_fields": [],
+    "pdf_only_request_candidates": [
+      "reminderId"
+    ],
+    "pdf_only_response_candidates": [],
+    "differences": [
+      "ENTRADA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E068",
+    "folder": "E068-users-me-preferences",
+    "pdf_pages": [
+      102
+    ],
+    "pdf_class": "Opcional/no requerido para V6",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/users/me/preferences",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/users/me/preferences",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "appearance",
+      "locale",
+      "currency",
+      "timeZone",
+      "updatedAt"
+    ],
+    "sdd_response_fields": [
+      "locale",
+      "timezone",
+      "version"
+    ],
+    "pdf_only_request_candidates": [],
+    "pdf_only_response_candidates": [
+      "appearance",
+      "currency",
+      "timeZone",
+      "updatedAt"
+    ],
+    "differences": [
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E069",
+    "folder": "E069-users-me-preferences",
+    "pdf_pages": [
+      103
+    ],
+    "pdf_class": "Opcional/no requerido para V6",
+    "sdd_method": "PATCH",
+    "sdd_path": "/api/v1/users/me/preferences",
+    "pdf_method": "PATCH",
+    "pdf_path": "/api/v1/users/me/preferences",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "UserPreferencesPatch",
+    "pdf_request_fields": [
+      "appearance",
+      "locale",
+      "timeZone"
+    ],
+    "sdd_request_fields": [
+      "locale",
+      "timezone"
+    ],
+    "pdf_response_fields": [
+      "appearance",
+      "locale",
+      "currency",
+      "timeZone",
+      "updatedAt"
+    ],
+    "sdd_response_fields": [
+      "locale",
+      "timezone",
+      "version"
+    ],
+    "pdf_only_request_candidates": [
+      "appearance",
+      "timeZone"
+    ],
+    "pdf_only_response_candidates": [
+      "appearance",
+      "currency",
+      "timeZone",
+      "updatedAt"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E070",
+    "folder": "E070-help-faq",
+    "pdf_pages": [
+      104
+    ],
+    "pdf_class": "Opcional/no requerido para V6",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/help/faq",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/help/faq",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "public",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "locale"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "items[]",
+      "items[].id",
+      "items[].question",
+      "items[].answer",
+      "items[].order",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "locale"
+    ],
+    "pdf_only_response_candidates": [
+      "items[]",
+      "items[].id",
+      "items[].question",
+      "items[].answer",
+      "items[].order",
+      "version"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E071",
+    "folder": "E071-education-tips",
+    "pdf_pages": [
+      105
+    ],
+    "pdf_class": "Opcional/no requerido para V6",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/education/tips",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/education/tips",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "public",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "locale",
+      "topic",
+      "limit"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "items[]",
+      "items[].id",
+      "items[].title",
+      "items[].body",
+      "items[].topic",
+      "items[].sourceLabel"
+    ],
+    "sdd_response_fields": [
+      "items",
+      "nextCursor"
+    ],
+    "pdf_only_request_candidates": [
+      "locale",
+      "topic",
+      "limit"
+    ],
+    "pdf_only_response_candidates": [
+      "items[]",
+      "items[].id",
+      "items[].title",
+      "items[].body",
+      "items[].topic",
+      "items[].sourceLabel"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E072",
+    "folder": "E072-health-live",
+    "pdf_pages": [
+      106
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/health/live",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/health/live",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "public",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "status",
+      "service",
+      "version"
+    ],
+    "sdd_response_fields": [
+      "status",
+      "service",
+      "timestamp"
+    ],
+    "pdf_only_request_candidates": [],
+    "pdf_only_response_candidates": [
+      "version"
+    ],
+    "differences": [
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E073",
+    "folder": "E073-health-ready",
+    "pdf_pages": [
+      107
+    ],
+    "pdf_class": "Soporte producción",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/health/ready",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/health/ready",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "public",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "status",
+      "checks.dynamodb",
+      "checks.configuration",
+      "checkedAt"
+    ],
+    "sdd_response_fields": [
+      "status",
+      "service",
+      "timestamp"
+    ],
+    "pdf_only_request_candidates": [],
+    "pdf_only_response_candidates": [
+      "checks.dynamodb",
+      "checks.configuration",
+      "checkedAt"
+    ],
+    "differences": [
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E074",
+    "folder": "E074-demo-bootstrap",
+    "pdf_pages": [
+      108,
+      109,
+      110
+    ],
+    "pdf_class": "Opcional/no requerido para V6",
+    "sdd_method": "GET",
+    "sdd_path": "/api/v1/demo/bootstrap",
+    "pdf_method": "GET",
+    "pdf_path": "/api/v1/demo/bootstrap",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "sin contenido",
+    "pdf_request_fields": [
+      "version"
+    ],
+    "sdd_request_fields": [],
+    "pdf_response_fields": [
+      "mode",
+      "userName",
+      "income",
+      "recurring[]",
+      "movements[]",
+      "goals[]",
+      "budgets[]",
+      "income.amount",
+      "income.frequency",
+      "income.monthlyEquivalent",
+      "income.currency",
+      "income.updatedAt",
+      "income.version",
+      "recurring[].id",
+      "recurring[].concept",
+      "recurring[].amount",
+      "recurring[].frequency",
+      "recurring[].category",
+      "recurring[].type",
+      "recurring[].monthlyEquivalent",
+      "recurring[].nextDueDate",
+      "recurring[].lastPaidAt",
+      "recurring[].active",
+      "movements[].id",
+      "movements[].concept",
+      "movements[].amount",
+      "movements[].category",
+      "movements[].type",
+      "movements[].frequency",
+      "movements[].occurredAt",
+      "movements[].recurringPaymentI",
+      "movements[].goalId",
+      "movements[].contributionId",
+      "movements[].source",
+      "movements[].version",
+      "goals[].id",
+      "goals[].name",
+      "goals[].target",
+      "goals[].openingSaved",
+      "goals[].saved",
+      "goals[].emoji",
+      "goals[].targetDate",
+      "goals[].remaining",
+      "goals[].percentage",
+      "goals[].completed",
+      "goals[].version",
+      "budgets[].category",
+      "budgets[].monthlyLimit",
+      "budgets[].enabled"
+    ],
+    "sdd_response_fields": [
+      "enabled",
+      "scope"
+    ],
+    "pdf_only_request_candidates": [
+      "version"
+    ],
+    "pdf_only_response_candidates": [
+      "mode",
+      "userName",
+      "income",
+      "recurring[]",
+      "movements[]",
+      "goals[]",
+      "budgets[]",
+      "income.amount",
+      "income.frequency",
+      "income.monthlyEquivalent",
+      "income.currency",
+      "income.updatedAt",
+      "income.version",
+      "recurring[].id",
+      "recurring[].concept",
+      "recurring[].amount",
+      "recurring[].frequency",
+      "recurring[].category",
+      "recurring[].type",
+      "recurring[].monthlyEquivalent",
+      "recurring[].nextDueDate",
+      "recurring[].lastPaidAt",
+      "recurring[].active",
+      "movements[].id",
+      "movements[].concept",
+      "movements[].amount",
+      "movements[].category",
+      "movements[].type",
+      "movements[].frequency",
+      "movements[].occurredAt",
+      "movements[].recurringPaymentI",
+      "movements[].goalId",
+      "movements[].contributionId",
+      "movements[].source",
+      "movements[].version",
+      "goals[].id",
+      "goals[].name",
+      "goals[].target",
+      "goals[].openingSaved",
+      "goals[].saved",
+      "goals[].emoji",
+      "goals[].targetDate",
+      "goals[].remaining",
+      "goals[].percentage",
+      "goals[].completed",
+      "goals[].version",
+      "budgets[].category",
+      "budgets[].monthlyLimit",
+      "budgets[].enabled"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  },
+  {
+    "id": "E075",
+    "folder": "E075-voice-parse",
+    "pdf_pages": [
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120,
+      121,
+      122,
+      123,
+      124
+    ],
+    "pdf_class": "Opcional/no requerido para V6",
+    "sdd_method": "POST",
+    "sdd_path": "/api/v1/voice/parse",
+    "pdf_method": "POST",
+    "pdf_path": "/api/v1/voice/parse",
+    "sdd_success": "200",
+    "pdf_success": "200",
+    "sdd_security": "bearer",
+    "sdd_request_schema": "VoiceParseRequest",
+    "pdf_request_fields": [
+      "transcript",
+      "locale"
+    ],
+    "sdd_request_fields": [
+      "text",
+      "locale"
+    ],
+    "pdf_response_fields": [
+      "concept",
+      "amount",
+      "category",
+      "frequency",
+      "type",
+      "confidence",
+      "needsReview"
+    ],
+    "sdd_response_fields": [
+      "intent",
+      "requiresConfirmation",
+      "parsedAmount",
+      "currency"
+    ],
+    "pdf_only_request_candidates": [
+      "transcript"
+    ],
+    "pdf_only_response_candidates": [
+      "concept",
+      "amount",
+      "category",
+      "frequency",
+      "type",
+      "confidence",
+      "needsReview"
+    ],
+    "differences": [
+      "ENTRADA_CANDIDATA",
+      "SALIDA_CANDIDATA"
+    ]
+  }
+]

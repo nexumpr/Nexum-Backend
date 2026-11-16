@@ -24,3 +24,10 @@
 - [ ] `E061-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E061-CT06` Paginación 25/100, filtro modificado con cursor antiguo -> 400, lectura sin Scan, sin duplicados en páginas.
 - [ ] `E061-CT07` Opt-in/opt-out efectivo; no enviar push con token revocado; no requerir aceptación del equipo Android.
+
+## Tareas de la enmienda (A8) — PENDIENTES DE EJECUCION
+
+- [ ] Implementar filtro `type` aplicado antes de paginar y `unreadCount` global en la pagina.
+- [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
+- [ ] Cubrir con prueba positiva y negativa.
+- [ ] Verificar por HTTP real tras el despliegue autorizado.

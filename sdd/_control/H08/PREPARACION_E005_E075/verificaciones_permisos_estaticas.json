@@ -1,0 +1,166 @@
+{
+  "method": "simulation-of-last-matching-rule-and-hard-deny; not installed OpenCode runtime",
+  "cases": [
+    {
+      "action": "shell",
+      "resource": "terraform apply e005.tfplan",
+      "expected": "ask",
+      "actual": "ask",
+      "rule": "terraform apply*",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "terraform destroy",
+      "expected": "deny",
+      "actual": "deny",
+      "rule": "policy:shell:terraform destroy*",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "aws s3api put-object --bucket xx",
+      "expected": "ask",
+      "actual": "ask",
+      "rule": "aws s3api put-object *",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "aws s3api delete-object --bucket xx",
+      "expected": "deny",
+      "actual": "deny",
+      "rule": "policy:shell:aws * delete-*",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "aws sts assume-role --role-arn xx",
+      "expected": "ask",
+      "actual": "ask",
+      "rule": "aws sts assume-role *",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling start-instance-refresh --auto-scaling-group-name xx",
+      "expected": "ask",
+      "actual": "ask",
+      "rule": "aws autoscaling start-instance-refresh *",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "aws autoscaling update-auto-scaling-group --max-size 3",
+      "expected": "ask",
+      "actual": "ask",
+      "rule": "aws autoscaling update-auto-scaling-group *",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "aws ec2 describe-instances",
+      "expected": "allow",
+      "actual": "allow",
+      "rule": "aws ec2 describe-instances *",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "aws dynamodb scan",
+      "expected": "deny",
+      "actual": "deny",
+      "rule": "aws *",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "aws dynamodb get-item --table-name XX",
+      "expected": "ask",
+      "actual": "ask",
+      "rule": "aws dynamodb get-item *",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "git push origin main",
+      "expected": "deny",
+      "actual": "deny",
+      "rule": "policy:shell:git push origin main*",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "git push --force origin feature",
+      "expected": "deny",
+      "actual": "deny",
+      "rule": "policy:shell:git push --force*",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "git push origin feature",
+      "expected": "ask",
+      "actual": "ask",
+      "rule": "git push *",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "gh pr merge 63",
+      "expected": "ask",
+      "actual": "ask",
+      "rule": "gh pr merge *",
+      "pass": true
+    },
+    {
+      "action": "shell",
+      "resource": "git status",
+      "expected": "allow",
+      "actual": "allow",
+      "rule": "git status*",
+      "pass": true
+    },
+    {
+      "action": "edit",
+      "resource": "sdd/03-endpoints/E005-auth-password-forgot/spec.md",
+      "expected": "ask",
+      "actual": "ask",
+      "rule": "sdd/**/spec.md",
+      "pass": true
+    },
+    {
+      "action": "edit",
+      "resource": "sdd/03-endpoints/E005-auth-password-forgot/plan.md",
+      "expected": "ask",
+      "actual": "ask",
+      "rule": "sdd/**/plan.md",
+      "pass": true
+    },
+    {
+      "action": "edit",
+      "resource": "constitution.md",
+      "expected": "deny",
+      "actual": "deny",
+      "rule": "constitution.md",
+      "pass": true
+    },
+    {
+      "action": "read",
+      "resource": ".env.local",
+      "expected": "deny",
+      "actual": "deny",
+      "rule": "policy:read:*.env*",
+      "pass": true
+    },
+    {
+      "action": "edit",
+      "resource": ".env",
+      "expected": "deny",
+      "actual": "deny",
+      "rule": "policy:edit:*.env*",
+      "pass": true
+    }
+  ],
+  "all_pass": true
+}

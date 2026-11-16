@@ -6107,6 +6107,19 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "income",
+                "expense",
+                "saving"
+              ]
+            }
           }
         ],
         "responses": {
@@ -9054,6 +9067,18 @@
             "schema": {
               "type": "string",
               "format": "date-time"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "reversed"
+              ]
             }
           }
         ],
@@ -12323,6 +12348,21 @@
             "required": false,
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "budget",
+                "goal",
+                "recurring",
+                "streak",
+                "system"
+              ]
             }
           }
         ],
@@ -15827,6 +15867,11 @@
           "sessionsRevoked": {
             "type": "boolean",
             "example": true
+          },
+          "deletionRequestId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "018f90ef-08e5-7a68-b09f-2b67a47c92f0"
           }
         },
         "required": [
@@ -15858,6 +15903,15 @@
             "type": "string",
             "example": "https://example.invalid/privacy",
             "format": "uri"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 20000,
+            "example": "Aviso de privacidad..."
+          },
+          "requiresAcceptance": {
+            "type": "boolean",
+            "example": true
           }
         },
         "required": [
@@ -15960,6 +16014,26 @@
             "type": "integer",
             "example": 1,
             "minimum": 1
+          },
+          "microphone": {
+            "type": "boolean",
+            "example": true
+          },
+          "notifications": {
+            "type": "boolean",
+            "example": true
+          },
+          "configured": {
+            "type": "boolean",
+            "example": true
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "example": "2026-11-16T20:15:00Z"
           }
         },
         "required": [
@@ -15983,6 +16057,18 @@
               "type": "string",
               "example": "profile"
             }
+          },
+          "microphone": {
+            "type": "boolean",
+            "example": true
+          },
+          "notifications": {
+            "type": "boolean",
+            "example": true
+          },
+          "configured": {
+            "type": "boolean",
+            "example": true
           }
         },
         "required": [
@@ -16012,6 +16098,11 @@
             "type": "integer",
             "example": 1,
             "minimum": 1
+          },
+          "timeZone": {
+            "type": "string",
+            "example": "America/Mexico_City",
+            "maxLength": 64
           }
         },
         "required": [
@@ -16037,6 +16128,11 @@
             "type": "string",
             "example": "America/Mexico_City",
             "minLength": 3,
+            "maxLength": 64
+          },
+          "timeZone": {
+            "type": "string",
+            "example": "America/Mexico_City",
             "maxLength": 64
           }
         },
@@ -16347,6 +16443,22 @@
             "type": "integer",
             "example": 1,
             "minimum": 1
+          },
+          "contributionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "018f90ef-08e5-7a68-b09f-2b67a47c92f0"
+          },
+          "recurringPaymentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "018f90ef-08e5-7a68-b09f-2b67a47c92f0"
           }
         },
         "required": [
@@ -16485,6 +16597,29 @@
             "type": "integer",
             "example": 1,
             "minimum": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "income",
+              "expense",
+              "saving"
+            ],
+            "example": "expense"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-01"
+          },
+          "dueDay": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 28,
+            "example": 5
           }
         },
         "required": [
@@ -16495,7 +16630,9 @@
           "frequency",
           "nextDueDate",
           "active",
-          "version"
+          "version",
+          "type",
+          "startDate"
         ],
         "description": "Contrato formal Nexum RecurringPayment"
       },
@@ -16536,6 +16673,29 @@
             "type": "string",
             "example": "2026-11-05",
             "format": "date"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "income",
+              "expense",
+              "saving"
+            ],
+            "example": "expense"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-01"
+          },
+          "dueDay": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 28,
+            "example": 5
           }
         },
         "required": [
@@ -16543,7 +16703,9 @@
           "amount",
           "currency",
           "frequency",
-          "nextDueDate"
+          "nextDueDate",
+          "type",
+          "startDate"
         ],
         "description": "Contrato formal Nexum RecurringCreate"
       },
@@ -16571,6 +16733,29 @@
             "type": "string",
             "example": "2026-11-05",
             "format": "date"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "income",
+              "expense",
+              "saving"
+            ],
+            "example": "expense"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-01"
+          },
+          "dueDay": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 28,
+            "example": 5
           }
         },
         "required": [],
@@ -16658,6 +16843,11 @@
             "type": "integer",
             "example": 1,
             "minimum": 1
+          },
+          "openingSaved": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]{2}$",
+            "example": "750.00"
           }
         },
         "required": [
@@ -17352,6 +17542,49 @@
             "type": "integer",
             "example": 1,
             "minimum": 1
+          },
+          "budgetAlerts": {
+            "type": "boolean",
+            "default": true
+          },
+          "goalUpdates": {
+            "type": "boolean",
+            "default": true
+          },
+          "recurringReminders": {
+            "type": "boolean",
+            "default": true
+          },
+          "streakReminders": {
+            "type": "boolean",
+            "default": false
+          },
+          "quietHours": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "start": {
+                "type": "string",
+                "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+              },
+              "end": {
+                "type": "string",
+                "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          },
+          "timeZone": {
+            "type": "string",
+            "example": "America/Mexico_City",
+            "maxLength": 64
           }
         },
         "required": [
@@ -17377,6 +17610,49 @@
           "reminderEnabled": {
             "type": "boolean",
             "example": true
+          },
+          "budgetAlerts": {
+            "type": "boolean",
+            "default": true
+          },
+          "goalUpdates": {
+            "type": "boolean",
+            "default": true
+          },
+          "recurringReminders": {
+            "type": "boolean",
+            "default": true
+          },
+          "streakReminders": {
+            "type": "boolean",
+            "default": false
+          },
+          "quietHours": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "start": {
+                "type": "string",
+                "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+              },
+              "end": {
+                "type": "string",
+                "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          },
+          "timeZone": {
+            "type": "string",
+            "example": "America/Mexico_City",
+            "maxLength": 64
           }
         },
         "required": [
@@ -17474,6 +17750,11 @@
             "type": "string",
             "example": "2026-11-05T17:00:00Z",
             "format": "date-time"
+          },
+          "unreadCount": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 6
           }
         },
         "required": [
@@ -17519,6 +17800,18 @@
             "type": "integer",
             "example": 1,
             "minimum": 1
+          },
+          "frequency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly"
+            ],
+            "example": "monthly"
           }
         },
         "required": [
@@ -17551,6 +17844,15 @@
             "example": "America/Mexico_City",
             "minLength": 3,
             "maxLength": 64
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly"
+            ],
+            "example": "monthly"
           }
         },
         "required": [
@@ -17578,6 +17880,19 @@
           "active": {
             "type": "boolean",
             "example": false
+          },
+          "frequency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              null
+            ],
+            "description": "null cancela la recurrencia; ausente no la modifica"
           }
         },
         "required": [],
@@ -17948,6 +18263,25 @@
           "nextCursor": {
             "type": "string",
             "example": "opaque.cursor.string"
+          },
+          "totals": {
+            "type": "object",
+            "required": [
+              "activeCount",
+              "saved"
+            ],
+            "properties": {
+              "activeCount": {
+                "type": "integer",
+                "minimum": 0,
+                "example": 4
+              },
+              "saved": {
+                "type": "string",
+                "pattern": "^[0-9]+\\.[0-9]{2}$",
+                "example": "750.00"
+              }
+            }
           }
         },
         "required": [
@@ -18032,10 +18366,21 @@
           "nextCursor": {
             "type": "string",
             "example": "opaque.cursor.string"
+          },
+          "enoughData": {
+            "type": "boolean",
+            "example": true
+          },
+          "minimumSamples": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 12
           }
         },
         "required": [
-          "items"
+          "items",
+          "enoughData",
+          "minimumSamples"
         ],
         "description": "Contrato formal Nexum PageOfInsight"
       },
@@ -18095,10 +18440,15 @@
           "nextCursor": {
             "type": "string",
             "example": "opaque.cursor.string"
+          },
+          "hasEnoughData": {
+            "type": "boolean",
+            "example": true
           }
         },
         "required": [
-          "items"
+          "items",
+          "hasEnoughData"
         ],
         "description": "Contrato formal Nexum PageOfRecommendation"
       },
@@ -18116,10 +18466,16 @@
           "nextCursor": {
             "type": "string",
             "example": "opaque.cursor.string"
+          },
+          "unreadCount": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 7
           }
         },
         "required": [
-          "items"
+          "items",
+          "unreadCount"
         ],
         "description": "Contrato formal Nexum PageOfNotification"
       },

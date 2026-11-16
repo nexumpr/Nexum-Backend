@@ -22,3 +22,10 @@
 - [ ] `E019-CT03` Petición sobre recurso de otro usuario no filtra existencia (404), si aplica; verificar propiedad con dos sujetos.
 - [ ] `E019-CT04` Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
 - [ ] `E019-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
+
+## Tareas de la enmienda (A8) — PENDIENTES DE EJECUCION
+
+- [ ] Implementar `microphone`, `notifications`, `configured` (boolean) en request y respuesta; `completedAt` en respuesta.
+- [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
+- [ ] Cubrir con prueba positiva y negativa.
+- [ ] Verificar por HTTP real tras el despliegue autorizado.

@@ -24,3 +24,10 @@
 - [ ] `E055-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E055-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
 - [ ] `E055-CT07` Salida ML/IA real solo si proveedor/costo/autorización verificados; prohibido presentar respuesta fija como IA generativa.
+
+## Tareas de la enmienda (A2) — PENDIENTES DE EJECUCION
+
+- [ ] Implementar `hasEnoughData` (boolean, requerido): distingue historial insuficiente de ausencia de patrones.
+- [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
+- [ ] Cubrir con prueba positiva y negativa.
+- [ ] Verificar por HTTP real tras el despliegue autorizado.

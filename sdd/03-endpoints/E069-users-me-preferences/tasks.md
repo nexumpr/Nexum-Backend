@@ -23,3 +23,10 @@
 - [ ] `E069-CT04` Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
 - [ ] `E069-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E069-CT06` If-Match omitido -> 428; ETag viejo -> 412; carrera de versiones no pierde actualizaciones.
+
+## Tareas de la enmienda (A8) — PENDIENTES DE EJECUCION
+
+- [ ] Implementar `timeZone` (IANA) editable en request y respuesta.
+- [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
+- [ ] Cubrir con prueba positiva y negativa.
+- [ ] Verificar por HTTP real tras el despliegue autorizado.

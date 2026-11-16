@@ -24,3 +24,10 @@
 - [ ] `E033-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E033-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
 - [ ] `E033-CT07` Repetición idéntica de Idempotency-Key -> respuesta estable; payload diferente con misma key -> 409; carrera multiinstancia.
+
+## Tareas de la enmienda (A8) — PENDIENTES DE EJECUCION
+
+- [ ] Implementar `type`, `startDate` y `dueDay` en request y respuesta.
+- [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
+- [ ] Cubrir con prueba positiva y negativa.
+- [ ] Verificar por HTTP real tras el despliegue autorizado.

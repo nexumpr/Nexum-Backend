@@ -85,3 +85,11 @@ Invariante: Desactivación debe prevalecer antes de enviar; consentimiento expl�
 - Dependencias: H04 A-030/A-040/A-050/A-060/A-070/A-080; H05 I-040/I-050/I-150; seguridad GOV-06/07/11/15/16.
 - **Contrato diseñado:** documentado en H06. **Pruebas HTTP/Dynamo/Redis y despliegue:** NOT_RUN; solo H08+, no afirmar `PASS`.
 - **Responsabilidad:** Backend independiente del equipo móvil. La API cumple contrato sin solicitar aprobación de Android.
+
+## Enmienda aprobada — RFC-016 (A3, 2026-11-16)
+
+Gate: `APRUEBO_RFC_016_CONTRATOS_E005_E075` y `APRUEBO_ENMIENDA_A3`.
+
+- Contrato tras la enmienda: preferencias granulares: `budgetAlerts`, `goalUpdates`, `recurringReminders`, `streakReminders`, `quietHours{enabled,start,end}` y `timeZone` (IANA).
+- Compatibilidad: cambio aditivo; ningun cliente existente (E001-E004) se ve afectado.
+- Autoridad: el OpenAPI actualizado es la fuente de transporte.
