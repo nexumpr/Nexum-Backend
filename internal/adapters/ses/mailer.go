@@ -11,15 +11,17 @@ import (
 )
 
 // Mailer implementa ports.Correo con Amazon SES v2 (API HTTPS, no SMTP).
+//
+// Nexum es solo Android: no existe ni se crea frontend web. El correo incluye el
+// token para que la app lo introduzca en el flujo de E006; no hay URL de recuperacion.
 type Mailer struct {
-	client  *sesv2.Client
-	from    string
-	baseURL string
+	client *sesv2.Client
+	from   string
 }
 
 // NewMailer construye el adaptador. Sin cliente o sin remitente queda inerte.
-func NewMailer(client *sesv2.Client, from, baseURL string) *Mailer {
-	return &Mailer{client: client, from: from, baseURL: baseURL}
+func NewMailer(client *sesv2.Client, from string) *Mailer {
+	return &Mailer{client: client, from: from}
 }
 
 // Disponible indica si el adaptador puede enviar.
@@ -34,19 +36,13 @@ func (m *Mailer) EnviarRecuperacion(ctx context.Context, destino, token string, 
 	if !m.Disponible() {
 		return "", fmt.Errorf("correo no configurado")
 	}
-	enlace := fmt.Sprintf("%s/auth/password/reset?token=%s", m.baseURL, token)
 	texto := fmt.Sprintf(
 		"Recibimos una solicitud para restablecer tu contrasena de Nexum.\n\n"+
-			"Abre este enlace antes de %s (hora UTC):\n%s\n\n"+
-			"Si no solicitaste el cambio, ignora este mensaje: tu contrasena no se modificara.\n",
-		expiraEn.UTC().Format("2006-01-02 15:04"), enlace,
-	)
-	html := fmt.Sprintf(
-		"<p>Recibimos una solicitud para restablecer tu contrase&ntilde;a de Nexum.</p>"+
-			"<p><a href=\"%s\">Restablecer contrase&ntilde;a</a></p>"+
-			"<p>El enlace caduca el %s (UTC) y solo puede usarse una vez.</p>"+
-			"<p>Si no lo solicitaste, ignora este mensaje.</p>",
-		enlace, expiraEn.UTC().Format("2006-01-02 15:04"),
+			"Introduce este codigo en la aplicacion Android antes de %s (hora UTC):\n\n"+
+			"%s\n\n"+
+			"El codigo es de un solo uso. Si no solicitaste el cambio, ignora este mensaje: "+
+			"tu contrasena no se modificara.\n",
+		expiraEn.UTC().Format("2006-01-02 15:04"), token,
 	)
 
 	out, err := m.client.SendEmail(ctx, &sesv2.SendEmailInput{
@@ -57,7 +53,6 @@ func (m *Mailer) EnviarRecuperacion(ctx context.Context, destino, token string, 
 				Subject: &types.Content{Data: aws.String("Recupera tu contrasena de Nexum")},
 				Body: &types.Body{
 					Text: &types.Content{Data: aws.String(texto)},
-					Html: &types.Content{Data: aws.String(html)},
 				},
 			},
 		},

@@ -85,7 +85,7 @@ func buscarNo(context.Context, string) (string, bool, error) { return "", false,
 
 func TestE005SinComponentesNoAcepta(t *testing.T) {
 	s := appIdentity.NewPasswordResetService(&storeFake{}, nil, nil, nil, nil)
-	if err := s.Solicitar(context.Background(), "a@example.invalid", nil); !errors.Is(err, ports.ErrResetNoDisponible) {
+	if err := s.Solicitar(context.Background(), "a@example.invalid", "1.2.3.4", nil); !errors.Is(err, ports.ErrResetNoDisponible) {
 		t.Fatalf("esperado ErrResetNoDisponible, obtenido %v", err)
 	}
 }
@@ -95,7 +95,7 @@ func TestE005AdmiteSinEnviarEnLaPeticion(t *testing.T) {
 	correo := &correoFake{}
 	s := servicio(store, correo, &selladorFake{}, &limitadorFake{permitir: true})
 
-	if err := s.Solicitar(context.Background(), "Usuario@Example.invalid", buscarSi); err != nil {
+	if err := s.Solicitar(context.Background(), "Usuario@Example.invalid", "1.2.3.4", buscarSi); err != nil {
 		t.Fatalf("error inesperado: %v", err)
 	}
 	if len(correo.envios) != 0 {
@@ -117,7 +117,7 @@ func TestE005AADEsUserIDyOutbox(t *testing.T) {
 	store := &storeFake{}
 	sell := &selladorFake{}
 	s := servicio(store, &correoFake{}, sell, &limitadorFake{permitir: true})
-	if err := s.Solicitar(context.Background(), "a@example.invalid", buscarSi); err != nil {
+	if err := s.Solicitar(context.Background(), "a@example.invalid", "1.2.3.4", buscarSi); err != nil {
 		t.Fatal(err)
 	}
 	adm := store.admisiones[0]
@@ -130,7 +130,7 @@ func TestE005AADEsUserIDyOutbox(t *testing.T) {
 func TestE005CuentaInexistenteMismaAdmision(t *testing.T) {
 	store := &storeFake{}
 	s := servicio(store, &correoFake{}, &selladorFake{}, &limitadorFake{permitir: true})
-	if err := s.Solicitar(context.Background(), "nadie@example.invalid", buscarNo); err != nil {
+	if err := s.Solicitar(context.Background(), "nadie@example.invalid", "1.2.3.4", buscarNo); err != nil {
 		t.Fatal(err)
 	}
 	if len(store.admisiones) != 1 {
@@ -145,7 +145,7 @@ func TestE005FalloDeInfraestructuraNoSeConfundeConInexistente(t *testing.T) {
 	store := &storeFake{}
 	s := servicio(store, &correoFake{}, &selladorFake{}, &limitadorFake{permitir: true})
 	fallo := func(context.Context, string) (string, bool, error) { return "", false, errors.New("dynamodb") }
-	if err := s.Solicitar(context.Background(), "a@example.invalid", fallo); err == nil {
+	if err := s.Solicitar(context.Background(), "a@example.invalid", "1.2.3.4", fallo); err == nil {
 		t.Fatal("un fallo de DynamoDB no puede aceptarse como cuenta inexistente")
 	}
 	if len(store.admisiones) != 0 {
@@ -156,7 +156,7 @@ func TestE005FalloDeInfraestructuraNoSeConfundeConInexistente(t *testing.T) {
 func TestE005CuotaSeAplicaAntesDeCrearTrabajo(t *testing.T) {
 	store := &storeFake{}
 	s := servicio(store, &correoFake{}, &selladorFake{}, &limitadorFake{permitir: false})
-	if err := s.Solicitar(context.Background(), "a@example.invalid", buscarSi); !errors.Is(err, ports.ErrResetCuota) {
+	if err := s.Solicitar(context.Background(), "a@example.invalid", "1.2.3.4", buscarSi); !errors.Is(err, ports.ErrResetCuota) {
 		t.Fatalf("esperado ErrResetCuota, obtenido %v", err)
 	}
 	if len(store.admisiones) != 0 {
@@ -166,7 +166,7 @@ func TestE005CuotaSeAplicaAntesDeCrearTrabajo(t *testing.T) {
 
 func TestE005LimitadorCaidoFallaCerrado(t *testing.T) {
 	s := servicio(&storeFake{}, &correoFake{}, &selladorFake{}, &limitadorFake{permitir: true, err: errors.New("redis")})
-	if err := s.Solicitar(context.Background(), "a@example.invalid", buscarSi); !errors.Is(err, ports.ErrResetNoDisponible) {
+	if err := s.Solicitar(context.Background(), "a@example.invalid", "1.2.3.4", buscarSi); !errors.Is(err, ports.ErrResetNoDisponible) {
 		t.Fatalf("esperado ErrResetNoDisponible, obtenido %v", err)
 	}
 }

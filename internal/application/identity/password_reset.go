@@ -62,19 +62,30 @@ func (s *PasswordResetService) Disponible() bool {
 type BuscarCuenta func(ctx context.Context, email string) (userID string, encontrada bool, err error)
 
 // Solicitar ejecuta la admision del trabajo. No envia correo.
-func (s *PasswordResetService) Solicitar(ctx context.Context, email string, buscar BuscarCuenta) error {
+//
+// Aplica dos cuotas antes de persistir: por correo (3/15 min) y por IP (10/15 min).
+// Ambas fallan cerrado si Redis no responde.
+func (s *PasswordResetService) Solicitar(ctx context.Context, email, ip string, buscar BuscarCuenta) error {
 	if !s.Disponible() {
 		return ports.ErrResetNoDisponible
 	}
 	email = strings.ToLower(strings.TrimSpace(email))
 
-	permitido, err := s.limitador.Permitir(ctx, "pwreset:"+email)
+	permitido, err := s.limitador.Permitir(ctx, "email:"+email)
 	if err != nil {
-		// Fail-closed: sin cuota fiable no se crea trabajo.
 		return ports.ErrResetNoDisponible
 	}
 	if !permitido {
 		return ports.ErrResetCuota
+	}
+	if ip != "" {
+		okIP, errIP := s.limitador.Permitir(ctx, "ip:"+ip)
+		if errIP != nil {
+			return ports.ErrResetNoDisponible
+		}
+		if !okIP {
+			return ports.ErrResetCuota
+		}
 	}
 
 	userID, encontrada, err := "", false, error(nil)

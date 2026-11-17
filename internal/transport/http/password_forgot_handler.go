@@ -68,7 +68,7 @@ func (h *PasswordForgotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := h.servicio.Solicitar(r.Context(), req.Email, h.buscar); err != nil {
+	if err := h.servicio.Solicitar(r.Context(), req.Email, ipDelCliente(r), h.buscar); err != nil {
 		switch {
 		case errors.Is(err, ports.ErrResetCuota):
 			w.Header().Set("Retry-After", "900")
@@ -88,6 +88,16 @@ func (h *PasswordForgotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusAccepted)
 	_ = json.NewEncoder(w).Encode(acceptedResponse{Status: "accepted", RequestID: nuevoRequestID()})
+}
+
+// ipDelCliente extrae la IP de la cadena de proxies de confianza (CloudFront/ALB).
+// Si la cadena no es valida devuelve cadena vacia: la cuota por IP se omite y la de
+// correo sigue aplicandose.
+func ipDelCliente(r *http.Request) string {
+	if ip, ok := clientIPFromTrustedChain(r); ok {
+		return ip
+	}
+	return ""
 }
 
 // nuevoRequestID genera un UUID v4 sin dependencias externas.

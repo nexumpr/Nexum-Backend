@@ -39,16 +39,17 @@ func (l *PasswordResetLimiter) identificador(clase, valor string) string {
 	return "nexum:v1:pwreset:" + clase + ":" + hex.EncodeToString(mac.Sum(nil))[:32]
 }
 
-// Permitir aplica la cuota por correo (3 cada 15 minutos) de forma atómica en Redis.
-//
-// La cuota por IP se aplica en la capa HTTP con el middleware de tasa existente: este
-// puerto solo recibe el correo. Se documenta la diferencia para no afirmar dos cuotas
-// cuando solo una se evalúa aquí.
-func (l *PasswordResetLimiter) Permitir(ctx context.Context, correo string) (bool, error) {
+// Permitir consume una cuota atómica en Redis. La clave indica el ámbito:
+// "email:<correo>" (3 por 15 min) o "ip:<direccion>" (10 por 15 min).
+func (l *PasswordResetLimiter) Permitir(ctx context.Context, clave string) (bool, error) {
 	if l == nil || l.client == nil {
 		return false, errors.New("limitador no disponible")
 	}
-	return l.consumir(ctx, l.identificador("email", correo), 3, 15*time.Minute)
+	limite := int64(3)
+	if len(clave) >= 3 && clave[:3] == "ip:" {
+		limite = 10
+	}
+	return l.consumir(ctx, l.identificador("cuota", clave), limite, 15*time.Minute)
 }
 
 func (l *PasswordResetLimiter) consumir(ctx context.Context, clave string, limite int64, ventana time.Duration) (bool, error) {

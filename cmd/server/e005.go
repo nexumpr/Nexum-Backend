@@ -44,7 +44,6 @@ func montarE005(
 
 	sellador, errSellador := cryptoAdapter.NuevoSealer(os.Getenv("PASSWORD_RESET_SEAL_KEY_B64"))
 	remitente := os.Getenv("NEXUM_SES_FROM_EMAIL")
-	basePublica := os.Getenv("NEXUM_PUBLIC_BASE_URL")
 
 	if clienteDynamo != nil && tabla != "" {
 		store := dynamoAdapter.NewPasswordResetStore(clienteDynamo, tabla)
@@ -58,13 +57,13 @@ func montarE005(
 			}
 		}
 
-		if errSellador == nil && remitente != "" && basePublica != "" && limitador != nil {
+		if errSellador == nil && remitente != "" && limitador != nil {
 			cfgSES, errCfg := config.LoadDefaultConfig(ctx, config.WithRegion(regionSES()))
 			if errCfg != nil {
 				logger.Error("E005: no se pudo configurar SES; el endpoint respondera 503",
 					slog.String("error_class", "ses_config"))
 			} else {
-				correo := sesAdapter.NewMailer(sesv2.NewFromConfig(cfgSES), remitente, basePublica)
+				correo := sesAdapter.NewMailer(sesv2.NewFromConfig(cfgSES), remitente)
 				servicio = appIdentity.NewPasswordResetService(store, correo, sellador, limitador, logger)
 				if clienteRedis != nil {
 					if elector, errE := cacheinfra.NewWorkerElector(clienteRedis, "nexum:v1:worker:pwreset:leader"); errE == nil {
