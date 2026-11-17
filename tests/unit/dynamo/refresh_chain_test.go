@@ -281,6 +281,43 @@ func evaluarAtomo(atomo string, item map[string]types.AttributeValue, nombres ma
 		_, ok := item[nombre]
 		return !ok, nil
 	}
+	// Comparaciones numéricas de DynamoDB (`expiresAt > :now`). Si el atributo no existe,
+	// la condición es falsa (no un error), igual que en el servicio real.
+	for _, operador := range []string{" >= ", " <= ", " > ", " < "} {
+		partes := strings.SplitN(atomo, operador, 2)
+		if len(partes) != 2 {
+			continue
+		}
+		nombre := resolverNombre(partes[0], nombres)
+		esperado, ok := valores[strings.TrimSpace(partes[1])]
+		if !ok {
+			return false, errors.New("valor de condicion ausente: " + partes[1])
+		}
+		actual, existe := item[nombre]
+		if !existe {
+			return false, nil
+		}
+		actualN, okA := actual.(*types.AttributeValueMemberN)
+		esperadoN, okE := esperado.(*types.AttributeValueMemberN)
+		if !okA || !okE {
+			return false, errors.New("comparacion no numerica no soportada por el doble: " + atomo)
+		}
+		a, errA := strconv.ParseInt(actualN.Value, 10, 64)
+		b, errB := strconv.ParseInt(esperadoN.Value, 10, 64)
+		if errA != nil || errB != nil {
+			return false, errors.New("numero invalido en condicion: " + atomo)
+		}
+		switch operador {
+		case " >= ":
+			return a >= b, nil
+		case " <= ":
+			return a <= b, nil
+		case " > ":
+			return a > b, nil
+		default:
+			return a < b, nil
+		}
+	}
 	partes := strings.SplitN(atomo, " = ", 2)
 	if len(partes) != 2 {
 		return false, errors.New("condicion no soportada por el doble de prueba: " + atomo)
