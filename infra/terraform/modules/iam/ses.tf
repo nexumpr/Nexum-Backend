@@ -27,6 +27,15 @@ variable "ses_from_email" {
   }
 }
 
+# SES v2 autoriza SendEmail contra la identidad del remitente y, en sandbox,
+# tambien contra la identidad del destinatario verificado. El recurso se limita
+# al espacio de identidades de la cuenta; la condicion ses:FromAddress mantiene
+# el remitente fijo y aws:SecureTransport exige HTTPS.
+locals {
+  ses_identity_parts  = split("/", var.ses_sender_identity_arn)
+  ses_identity_prefix = join("/", slice(local.ses_identity_parts, 0, length(local.ses_identity_parts) - 1))
+}
+
 resource "aws_iam_role_policy" "runtime_ses" {
   count = var.ses_sender_identity_arn == "" ? 0 : 1
 
@@ -40,7 +49,7 @@ resource "aws_iam_role_policy" "runtime_ses" {
         Sid      = "SendPasswordResetEmailOnly"
         Effect   = "Allow"
         Action   = ["ses:SendEmail"]
-        Resource = var.ses_sender_identity_arn
+        Resource = "${local.ses_identity_prefix}/*"
         Condition = {
           StringEquals = {
             "ses:FromAddress" = var.ses_from_email
