@@ -96,8 +96,8 @@ class ConfiguracionGitleaks(unittest.TestCase):
         rutas = re.findall(r"regexes\s*=\s*\[\s*'''(.*?)'''", self.sin_comentarios)
         self.assertEqual(
             len(rutas),
-            4,
-            "manifiesto + constante de estado de I-120 + passphrase sintetica E001 + clave de idempotencia E001",
+            7,
+            "manifiesto + constante de estado de I-120 + passphrase sintetica E001 + clave de idempotencia E001 + convencion sintetica de la oleada E007-E011 + literal no-hex de la prueba E010",
         )
         candidatos = [r for r in rutas if "[a-f0-9]{64}" in r]
         self.assertEqual(len(candidatos), 1)
