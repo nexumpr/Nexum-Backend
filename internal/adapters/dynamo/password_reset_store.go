@@ -93,11 +93,12 @@ func (s *PasswordResetStore) Pendientes(ctx context.Context, ahora time.Time, li
 	out, err := s.client.Query(ctx, &dynamodb.QueryInput{
 		TableName:                aws.String(s.tabla),
 		KeyConditionExpression:   aws.String("PK = :q"),
-		FilterExpression:         aws.String("#e = :pendiente AND proximoIntento <= :ahora AND expiresAt > :ahora"),
+		FilterExpression:         aws.String("(#e = :pendiente AND proximoIntento <= :ahora) OR (#e = :enviando AND leaseUntil < :ahora)"),
 		ExpressionAttributeNames: map[string]string{"#e": "estado"},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":q":         &types.AttributeValueMemberS{Value: particionCola},
 			":pendiente": &types.AttributeValueMemberS{Value: "PENDIENTE"},
+			":enviando":  &types.AttributeValueMemberS{Value: "ENVIANDO"},
 			":ahora":     &types.AttributeValueMemberN{Value: strconv.FormatInt(ahora.Unix(), 10)},
 		},
 		Limit: aws.Int32(25), // acotado: evita G115
@@ -162,8 +163,8 @@ func (s *PasswordResetStore) Reclamar(ctx context.Context, outboxID string, ahor
 		clave := s.claveTrabajo(t)
 		_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 			TableName: aws.String(s.tabla), Key: clave,
-			UpdateExpression:         aws.String("SET #e = :enviando, leaseUntil = :lease, fence = if_not_exists(fence, :zero) + :one"),
-			ConditionExpression:      aws.String("#e = :pendiente"),
+			UpdateExpression:         aws.String("SET #e = :enviando, owner = :owner, leaseUntil = :lease, fence = if_not_exists(fence, :zero) + :one"),
+			ConditionExpression:      aws.String("(#e = :pendiente) OR (#e = :enviando AND leaseUntil < :ahora)"),
 			ExpressionAttributeNames: map[string]string{"#e": "estado"},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":enviando":  &types.AttributeValueMemberS{Value: "ENVIANDO"},
@@ -171,6 +172,8 @@ func (s *PasswordResetStore) Reclamar(ctx context.Context, outboxID string, ahor
 				":lease":     &types.AttributeValueMemberN{Value: strconv.FormatInt(ahora.Add(lease).Unix(), 10)},
 				":zero":      &types.AttributeValueMemberN{Value: "0"},
 				":one":       &types.AttributeValueMemberN{Value: "1"},
+				":owner":     &types.AttributeValueMemberS{Value: "worker"},
+				":ahora":     &types.AttributeValueMemberN{Value: strconv.FormatInt(ahora.Unix(), 10)},
 			},
 		})
 		if err != nil {
@@ -222,6 +225,7 @@ func (s *PasswordResetStore) actualizarTrabajoCon(ctx context.Context, outboxID,
 			":enviado":   &types.AttributeValueMemberS{Value: "ENVIADO"},
 			":pendiente": &types.AttributeValueMemberS{Value: "PENDIENTE"},
 			":fallido":   &types.AttributeValueMemberS{Value: "FALLIDO"},
+			":fence":     &types.AttributeValueMemberN{Value: strconv.Itoa(t.Fence)},
 		}
 		for k, v := range extra {
 			vals[k] = v
@@ -229,6 +233,7 @@ func (s *PasswordResetStore) actualizarTrabajoCon(ctx context.Context, outboxID,
 		_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 			TableName: aws.String(s.tabla), Key: s.claveTrabajo(t),
 			UpdateExpression:          aws.String(expr),
+			ConditionExpression:       aws.String("fence = :fence"),
 			ExpressionAttributeNames:  map[string]string{"#e": "estado"},
 			ExpressionAttributeValues: vals,
 		})
@@ -340,6 +345,11 @@ func trabajoDesdeItem(it map[string]types.AttributeValue) ports.ResetTrabajo {
 	if v, ok := it["expiresAt"].(*types.AttributeValueMemberN); ok {
 		if n, err := strconv.ParseInt(v.Value, 10, 64); err == nil {
 			t.ExpiraEn = time.Unix(n, 0).UTC()
+		}
+	}
+	if v, ok := it["fence"].(*types.AttributeValueMemberN); ok {
+		if n, err := strconv.Atoi(v.Value); err == nil {
+			t.Fence = n
 		}
 	}
 	if v, ok := it["SK"].(*types.AttributeValueMemberS); ok {

@@ -65,6 +65,20 @@ func (l *PasswordResetLimiter) consumir(ctx context.Context, clave string, limit
 	return n <= limite, nil
 }
 
+// scriptRenovar extiende el TTL solo si el valor sigue siendo del solicitante.
+const scriptRenovar = `
+if redis.call("get", KEYS[1]) == ARGV[1] then
+  return redis.call("expire", KEYS[1], ARGV[2])
+end
+return 0`
+
+// scriptLiberar borra la clave solo si pertenece al solicitante.
+const scriptLiberar = `
+if redis.call("get", KEYS[1]) == ARGV[1] then
+  return redis.call("del", KEYS[1])
+end
+return 0`
+
 // WorkerElector implementa el liderazgo del worker con SET NX + renovación de TTL.
 // El lease NO sustituye la reclamación atómica por trabajo.
 type WorkerElector struct {
@@ -98,20 +112,12 @@ func (e *WorkerElector) Adquirir(ctx context.Context, _ string, ttl time.Duratio
 	if ok {
 		return true, nil
 	}
-	actual, err := e.client.Get(ctx, e.clave).Result()
+	// Renovacion atomica: solo el propietario extiende el TTL (sin GET/EXPIRE).
+	renovado, err := e.client.Eval(ctx, scriptRenovar, []string{e.clave}, e.id, int(ttl.Seconds())).Int()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return false, nil
-		}
-		return false, fmt.Errorf("lectura de lease: %w", err)
-	}
-	if actual != e.id {
-		return false, nil
-	}
-	if err := e.client.Expire(ctx, e.clave, ttl).Err(); err != nil {
 		return false, fmt.Errorf("renovacion de lease: %w", err)
 	}
-	return true, nil
+	return renovado == 1, nil
 }
 
 // Liberar cede el liderazgo solo si sigue siendo propio.
@@ -119,8 +125,6 @@ func (e *WorkerElector) Liberar(ctx context.Context) {
 	if e == nil || e.client == nil {
 		return
 	}
-	actual, err := e.client.Get(ctx, e.clave).Result()
-	if err == nil && actual == e.id {
-		_ = e.client.Del(ctx, e.clave).Err()
-	}
+	// Liberacion atomica: solo borra si sigue siendo propio (sin GET/DEL).
+	_, _ = e.client.Eval(ctx, scriptLiberar, []string{e.clave}, e.id).Int()
 }

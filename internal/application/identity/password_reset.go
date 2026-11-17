@@ -78,14 +78,17 @@ func (s *PasswordResetService) Solicitar(ctx context.Context, email, ip string, 
 	if !permitido {
 		return ports.ErrResetCuota
 	}
-	if ip != "" {
-		okIP, errIP := s.limitador.Permitir(ctx, "ip:"+ip)
-		if errIP != nil {
-			return ports.ErrResetNoDisponible
-		}
-		if !okIP {
-			return ports.ErrResetCuota
-		}
+	// Politica segura: sin IP fiable no se aplica cuota por IP y el contrato exige
+	// no aceptar la solicitud, para que una cabecera ausente no eluda el limite.
+	if ip == "" {
+		return ports.ErrResetNoDisponible
+	}
+	okIP, errIP := s.limitador.Permitir(ctx, "ip:"+ip)
+	if errIP != nil {
+		return ports.ErrResetNoDisponible
+	}
+	if !okIP {
+		return ports.ErrResetCuota
 	}
 
 	userID, encontrada, err := "", false, error(nil)

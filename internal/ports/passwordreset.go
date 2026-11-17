@@ -36,6 +36,9 @@ type ResetTrabajo struct {
 	TokenSello []byte
 	ExpiraEn   time.Time
 	Intentos   int
+	// Fence identifica la reclamacion vigente: un worker con valor antiguo no
+	// puede cerrar el trabajo que otro ya reclamo.
+	Fence int
 }
 
 // ResetStore persiste la admision y la cola durable de envio.
