@@ -1,7 +1,7 @@
 # Checklist de calidad — E006
 
-**Diseño H06:** aprobado. **Implementación local:** 2026-11-17. **CI:** pendiente del PR.
-**AWS:** `NOT_RUN`. **Respuesta:** 200 `Accepted`.
+**Diseño H06:** aprobado. **Implementación local:** 2026-11-17. **CI:** PASS (PR #71 13/13; `main` run `44116124273`).
+**AWS:** `DEPLOYED_VERIFIED`. **Respuesta:** 200 `Accepted`. **Aceptación:** `E006_USER_ACCEPTED = CONFIRMED`.
 
 - [x] Gate local registrado en `sdd/_control/H08/GATE_H08E_E006.md`; no confundir instalación con aprobación.
 - [x] Método/path conservan el ID del inventario H04 (`nexum_e006`).
@@ -15,9 +15,14 @@
 - [x] Pruebas de error pertinentes al caso (400/409/422/429/503) y de éxito 200.
 - [x] Sin PII ni secretos en logs, cuerpos de error, fixtures ni evidencias.
 - [x] Tests unitarios, de adaptador y HTTP escritos; ejecución en CI Linux (Windows bloquea binarios de prueba).
-- [ ] Dos instancias AWS, TLS público e IaC: **NOT_RUN**; requieren Gate de despliegue.
-- [ ] Gate de release y rollback: pendientes de autorización humana.
+- [x] Dos instancias AWS, TLS público e IaC: **VERIFIED** (LT v8, ASG 2/2/2, dos targets healthy, CloudFront con E006 400/422/400; 404 antes del release).
+- [x] Gate de release y rollback: apply autorizado por SHA-256 (`90988C7C…2D63`) con 0 add/4 change/0 destroy; rollback conservado (16 objetos S3).
 - [x] Dependencias del cliente Mobile no constituyen Gate del Backend.
+
+**Cierre:** la aceptación funcional del responsable confirma el restablecimiento real de
+contraseña en Postman. Replay 409, revocación de access/refresh y concurrencia AWS conservan
+evidencia **pendiente**; no se declaran PASS. Limitación multi-AZ declarada: ambas instancias
+en `us-east-2a` por capacidad de `t4g.micro` en `us-east-2b`.
 
 **Criterio de cierre:** la spec solo podrá declararse `AWS_VERIFIED` tras el cambio real de
 contraseña por HTTPS, el rechazo de la contraseña anterior, el 409 del token reutilizado y la

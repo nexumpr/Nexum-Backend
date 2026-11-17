@@ -4,7 +4,7 @@
 |---|---|
 | Documento | `sdd/_control/H08/RFC-018-A6-EPOCA_REVOCACION.md` |
 | Fecha | 2026-11-17 |
-| Estado | **PROPUESTO — pendiente de `APRUEBO_RFC_018_A6_EPOCA_REVOCACION`** |
+| Estado | **APPROVED — 2026-11-17** (frase `APRUEBO_RFC_018_A6_EPOCA_REVOCACION`) |
 | Autoridad de origen | RFC-016 §17.3 (A6) y contrato E006 |
 | Alcance | Código compartido de E002, E003, middleware de sesión y E006 |
 | Aprobador | Responsable del proyecto |
@@ -81,3 +81,13 @@ Un token legado (sin `epo`) sigue siendo válido antes del primer cambio de cont
 ```
 APRUEBO_RFC_018_A6_EPOCA_REVOCACION
 ```
+
+## 8. Aprobación humana
+
+| Campo | Valor |
+|---|---|
+| Frase | `APRUEBO_RFC_018_A6_EPOCA_REVOCACION` |
+| Fecha | 2026-11-17 |
+| Aprobador | Responsable del proyecto |
+| Alcance | A6 tal como se describe en este RFC, dentro del PR #71 |
+| Condición | El PR conserva el HEAD `9c9e9855a834e5c42f49fefb59501346e1449286` y sus verificaciones |

@@ -1,6 +1,6 @@
 # Gate H08-E / E006 — Confirmar restablecimiento de contraseña
 
-**ESTADO:** `AUTHORIZED_E006_LOCAL` (2026-11-17). Implementación local completada; PR y CI
+**ESTADO:** `MERGED + DEPLOYED_AWS + USER_ACCEPTED_CONFIRMED` (2026-11-17). Implementación local completada; PR y CI
 pendientes al registrar este Gate. `AWS_NOT_RUN`: ningún despliegue, Terraform, IAM, DynamoDB
 ni secreto modificado por esta unidad.
 
@@ -93,3 +93,39 @@ APRUEBO_RFC_018_A6_EPOCA_REVOCACION
 APRUEBO_MERGE_PR_<NUMERO_REAL>_SHA_<HEAD_REAL>
 APRUEBO_APPLY_<PLAN>_SHA256_<SHA256_REAL>
 ```
+
+## 9. Aprobaciones humanas recibidas (2026-11-17)
+
+```
+APRUEBO_RFC_018_A6_EPOCA_REVOCACION
+APRUEBO_MERGE_PR_71_SHA_9c9e9855a834e5c42f49fefb59501346e1449286
+```
+
+- HEAD verificado antes de fusionar: `9c9e9855a834e5c42f49fefb59501346e1449286`.
+- CI del PR: **13/13 SUCCESS** (Go Backend CI run `44113138268`, SDD `44113138225`).
+- Sin cambios de código posteriores a la aprobación. El Gate de apply queda pendiente del
+  SHA-256 del plan real.
+
+## 10. Cierre de despliegue y aceptación (2026-11-17)
+
+| Campo | Valor |
+|---|---|
+| Merge | PR #71 MERGED; `main` `578b0db3b9bb765afc981a86b23c6ade10ed80ea` |
+| CI de `main` | Go Backend CI `44116124273` SUCCESS; SDD `44116124463` SUCCESS |
+| Release | `v0.13.0+578b0db3b9bb`; binario SHA-256 `6b87752f…bb522`; unidad `6fa4d5fb…05cc` |
+| Apply | `APRUEBO_APPLY_LT_IAM_E006_SHA256_90988C7C…2D63`; **0 add · 4 change · 0 destroy** |
+| Launch Template | `lt-05445f32a7ee8a2f7` **v8** |
+| IAM | 16 objetos S3 de artefactos (rollback conservado) |
+| Flota | `i-01b1a4606bd773838` e `i-07c1c2facc51aa2a1`, LT v8, `InService/Healthy`, ASG 2/2/2, 2 targets healthy |
+| HTTPS | E006 400/422/400 sobre CloudFront; 404 con nodos v7 antes del release; health 200 |
+| Regresión | E001 400, E002 401, E003 401, E004 401, E005 422 (negativas dirigidas; sin cambios de estado) |
+| Aceptación | `E006_USER_ACCEPTED = CONFIRMED` (declaración del responsable: restablecimiento real comprobado en Postman) |
+
+**Evidencia individual pendiente (no declarada PASS):** reutilización del token (409),
+revocación de access/refresh anteriores (401) y concurrencia real en AWS no cuentan con
+evidencia independiente registrada; se conservan como pendientes. La aceptación funcional
+confirmada no se extrapola a esas variantes.
+
+**Limitación declarada:** ambas instancias quedaron en `us-east-2a` por falta de capacidad
+`t4g.micro` en `us-east-2b`; el ASG conserva ambas subredes y recuperará multi-AZ cuando la
+capacidad esté disponible.

@@ -1682,3 +1682,59 @@
 - **Estado:** `E006_PR=VERIFIED`, `E006_CI_PASS=VERIFIED`; `E006_MERGED` y `E006_AWS_DEPLOYED` `NOT_RUN`. Gate de merge debe citar el SHA final tras este commit documental.
 - **Siguiente:** aprobar `APRUEBO_RFC_018_A6_EPOCA_REVOCACION`, fusionar con Gate por SHA, publicar artefacto ARM64 del CI de `main`, plan Terraform (LT v8 + 2 ARN nuevos), apply, instance refresh y pruebas HTTPS reales.
 
+### E006 — merge, release y plan (2026-11-17)
+
+| FECHA | ETAPA | SHA/RECURSO | RESULTADO | EVIDENCIA | SIGUIENTE_ACCION |
+|---|---|---|---|---|---|
+| 2026-11-17 | RFC-018 | — | `APRUEBO_RFC_018_A6_EPOCA_REVOCACION` registrada | RFC-018 y Gate E006 (local) | Merge |
+| 2026-11-17 | Merge PR #71 | `578b0db3b9bb765afc981a86b23c6ade10ed80ea` | **MERGED** | `--match-head-commit` sobre `9c9e985` | CI main |
+| 2026-11-17 | CI main | run `44116124273` | **SUCCESS** | artefacto `binario-578b0db...` | Release |
+| 2026-11-17 | Release S3 | `v0.13.0+578b0db3b9bb` | **PUBLICADO** | binario 20 240 393 B SHA-256 `6b87752f...bb522`; unidad `6fa4d5fb...05cc`; SSE AES256, checksums S3 coincidentes | Terraform plan |
+| 2026-11-17 | Plan Terraform | SHA-256 `90988C7CB5D49F62498C6FDF00DF7AC5BA6349D034D392060880DD52598C2D63` | **PREPARADO** | `e006-lt-iam.tfplan`, 0 add/4 change/0 destroy; LT a v0.13.0; IAM 16 objetos S3 | Gate de apply |
+
+- **Apply:** `NOT_RUN`. Frase solicitada: `APRUEBO_APPLY_LT_IAM_E006_SHA256_90988C7CB5D49F62498C6FDF00DF7AC5BA6349D034D392060880DD52598C2D63`.
+- **AWS de solo lectura:** sesión válida con `AWS_CONFIG_FILE=$env:USERPROFILE\.aws\config`; ASG `nexum-h08i-asg-backend` en 2/2/2, instancias `i-0a29459932ba2005a` (2a) e `i-0aa83349628e21b8f` (2b) `InService/Healthy`, LT `lt-05445f32a7ee8a2f7` `$Latest`.
+- **Sin secretos:** no se registran tokens, contraseñas ni credenciales; el plan y el override viven en `C:\Nexum-Custodia\H08E-E006-20261117\`.
+- **Documentos locales pendientes de publicar por flujo autorizado:** `RFC-018` (APPROVED), `GATE_H08E_E006` (aprobaciones), `GATE_H08E_E006_DESPLIEGUE_AWS.md` y este checkpoint.
+
+### E006 — apply, Launch Template e instance refresh (2026-11-17)
+
+| FECHA | ETAPA | SHA/RECURSO | RESULTADO | EVIDENCIA | SIGUIENTE_ACCION |
+|---|---|---|---|---|---|
+| 2026-11-17 | Gate apply | `APRUEBO_APPLY_LT_IAM_E006_SHA256_90988C7C...2D63` | Autorizado | Hash del plan recalculado antes de aplicar: idéntico | Apply |
+| 2026-11-17 | Apply | plan `90988C7C...2D63` | **0 added, 4 changed, 0 destroyed** | `terraform apply` del artefacto exacto; excepción temporal de permisos retirada | Verificar LT/IAM |
+| 2026-11-17 | Launch Template | `lt-05445f32a7ee8a2f7` **v8** | **VERIFICADO** | `describe-launch-template-versions $Latest`; state `latest_version=8` | Refresh |
+| 2026-11-17 | IAM runtime | 19 ARN (16 S3) | **VERIFICADO** | `terraform show -json` del state; incluye `v0.13.0+578b0db3b9bb` y conserva los 7 releases previos | Refresh |
+| 2026-11-17 | Capacidad | Max 2→3 (desired 2) | Aplicado | `update-auto-scaling-group` | Refresh |
+| 2026-11-17 | Instance refresh | `1a348a2b-5248-4e5b-80f4-fb9f1019c72b` | **InProgress** | `MinHealthyPercentage=100`, `MaxHealthyPercentage=150`, `InstanceWarmup=120`, Rolling | Poll |
+
+- **Estado:** `E006_AWS_DEPLOYED=IN_PROGRESS`; `E006_HTTPS_AVAILABLE` y `E006_POSTMAN_USER_ACCEPTANCE_PENDING` `NOT_RUN`.
+- **Siguiente:** confirmar `Successful 100 %`, restaurar Max 2, verificar dos EC2 en LT v8 y dos targets `healthy`, y ejecutar las pruebas HTTPS.
+
+### E006 — despliegue AWS completado (2026-11-17)
+
+- **Apply:** `0 added, 4 changed, 0 destroyed` con el plan `90988C7C...2D63`; LT `lt-05445f32a7ee8a2f7` **v8**; IAM runtime con **16 objetos S3** (todos los releases, incluido `v0.13.0+578b0db3b9bb`); DynamoDB, SES, Redis, CloudFront, ALB, VPC, subredes, SGs y secretos sin cambios.
+- **Instance refresh `1a348a2b-...`:** iniciado y luego **cancelado** al quedar bloqueado en `WaitingForInstanceWarmup` >15 min pese a 3 instancias `Healthy`. Recuperación controlada: protección de la instancia v8, retirada de protección de las v7, descenso temporal de capacidad (Min/Desired 1), terminación de ambas v7 y nueva instancia v8.
+- **Capacidad us-east-2b:** dos lanzamientos fallidos por falta de `t4g.micro`; se aplicó la recuperación documentada (ASG restringido temporalmente a `us-east-2a` y subredes restauradas después).
+- **Flota final:** `i-01b1a4606bd773838` e `i-07c1facc51aa2a1` (corregido: `i-07c1c2facc51aa2a1`), ambas **LT v8**, `InService/Healthy`, en `us-east-2a`; ASG **Min 2 / Desired 2 / Max 2**; subredes `2a` y `2b` restauradas; **2 targets healthy** en `nexum-h08i-tg-backend`. Limitación declarada: sin redundancia multi-AZ efectiva mientras la capacidad de 2b siga sin verificarse.
+- **HTTPS E006 (CloudFront, flota final):** JSON malformado **400**, campo desconocido **400**, contraseña corta **422**, token inexistente **400**, `health/live` **200**. Antes, con nodos v7 sirviendo, la misma ruta devolvía **404**, lo que demuestra el cambio real de release.
+- **Regresión dirigida E001–E005:** `register` inválido **400**, `login` desconocido **401**, `refresh` inválido **401**, `logout` sin Bearer **401**, `password/forgot` inválido **422**, health **200**. Sin cambios de estado ni contraseñas.
+- **Estado:** `E006_AWS_DEPLOYED=VERIFIED`, `E006_HTTPS_AVAILABLE=VERIFIED`. `E006_PASSWORD_CHANGED`, `E006_OLD_PASSWORD_REJECTED`, `E006_OLD_ACCESS_REVOKED`, `E006_OLD_REFRESH_REVOKED`, `E006_TOKEN_REPLAY_409` y `E006_READY_FOR_ANDROID` quedan **pendientes de la prueba Postman con token real**.
+- **Postman:** solicitudes A–D documentadas en `GATE_H08E_E006_DESPLIEGUE_AWS.md` §6. El responsable debe solicitar E005 para su cuenta, copiar el token NUEVO y ejecutar E006; no se almacenan tokens ni contraseñas.
+- **Siguiente acción:** aceptación funcional del responsable en Postman; después, publicar los documentos de gobierno locales por el flujo documental autorizado.
+
+### E006 — cierre documental y aceptación del usuario (2026-11-17)
+
+| FECHA | ETAPA | RAMA/COMMIT | RESULTADO | EVIDENCIA | SIGUIENTE_ACCION |
+|---|---|---|---|---|---|
+| 2026-11-17 | Recuperación documental | `docs/h08e-e006-closure` desde `578b0db` | RFC-018, Gate E006, Gate de despliegue, tasks/checklist y estado reconciliados | `git status`; documentación local preservada tras el merge | PR documental |
+| 2026-11-17 | Aceptación funcional | — | **`E006_USER_ACCEPTED = CONFIRMED`** | Declaración del responsable: restablecimiento real de contraseña comprobado en Postman | Registrar y publicar |
+| 2026-11-17 | PR documental | (pendiente de publicar) | Abierto para revisión | CI/SDD en curso | Merge autorizado |
+
+- **Alcance de la aceptación:** el responsable confirmó personalmente en Postman que la recuperación (E005) y el restablecimiento real de contraseña (E006) funcionan. No se registran tokens, contraseñas ni cuerpos de respuesta.
+- **Evidencias existentes:** PR #71 MERGED (`main` `578b0db3b9bb765afc981a86b23c6ade10ed80ea`); CI `44116124273` SUCCESS; release `v0.13.0+578b0db3b9bb` (binario `6b87752f…bb522`, unidad `6fa4d5fb…05cc`); apply `90988C7C…2D63` con 0 add/4 change/0 destroy; LT v8; ASG 2/2/2; dos targets healthy; E006 por CloudFront con 400/422/400 (404 con nodos v7 antes del release); regresión dirigida E001–E005.
+- **Pendiente de evidencia individual (no declarado PASS ni fallo):** replay del token (409), revocación de access/refresh anteriores (401) y concurrencia real en AWS. No se solicita repetir el restablecimiento para cerrar documentos.
+- **Limitación multi-AZ:** ambas instancias quedaron en `us-east-2a` por falta de capacidad `t4g.micro` en `us-east-2b`; el ASG conserva ambas subredes.
+- **Sin cambios funcionales:** esta unidad no modifica código Go, Terraform, IAM, Redis, DynamoDB, OpenAPI ni AWS.
+- **Publicación:** un único PR documental; el SHA de merge se confirmará en el reporte de cierre y en el historial de GitHub, ya que no puede formar parte del propio commit fusionado.
+
