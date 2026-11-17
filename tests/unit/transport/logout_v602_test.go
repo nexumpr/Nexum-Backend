@@ -65,7 +65,7 @@ func newE004Sesiones() *e004Sesiones {
 	return &e004Sesiones{revocada: map[string]bool{}}
 }
 
-func (s *e004Sesiones) AuthorizeSession(_ context.Context, userID, sessionID string) error {
+func (s *e004Sesiones) AuthorizeSession(_ context.Context, userID, sessionID string, _ int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.consultas++
@@ -94,11 +94,11 @@ func (s *e004Sesiones) revocar(sessionID string) {
 // produce 401 en el autorizador, de modo que el helper no es código muerto.
 func TestE004SesionesRevocacionAfectaAlAutorizador(t *testing.T) {
 	sesiones := newE004Sesiones()
-	if err := sesiones.AuthorizeSession(context.Background(), e004HTTPUsuario, e004HTTPSesion); err != nil {
+	if err := sesiones.AuthorizeSession(context.Background(), e004HTTPUsuario, e004HTTPSesion, 0); err != nil {
 		t.Fatalf("una sesion activa debe autorizar: %v", err)
 	}
 	sesiones.revocar(e004HTTPSesion)
-	if err := sesiones.AuthorizeSession(context.Background(), e004HTTPUsuario, e004HTTPSesion); !errors.Is(err, ports.ErrSessionUnauthorized) {
+	if err := sesiones.AuthorizeSession(context.Background(), e004HTTPUsuario, e004HTTPSesion, 0); !errors.Is(err, ports.ErrSessionUnauthorized) {
 		t.Fatalf("una sesion revocada debe rechazarse, obtenido %v", err)
 	}
 }

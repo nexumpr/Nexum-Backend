@@ -287,7 +287,7 @@ func (d *loginStoreDoble) CreateSession(context.Context, appIdentity.SessionReco
 
 type emisorDoble struct{}
 
-func (emisorDoble) IssueAccessToken(context.Context, string, string, time.Time) (string, string, error) {
+func (emisorDoble) IssueAccessToken(context.Context, string, string, int64, time.Time) (string, string, error) {
 	return "jwt-de-prueba", "jti-de-prueba", nil
 }
 

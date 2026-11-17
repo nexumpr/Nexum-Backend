@@ -158,7 +158,7 @@ func (l *e003Limiter) AllowRefresh(_ context.Context, ip, digest string) (bool, 
 
 type e003Issuer struct{ err error }
 
-func (i *e003Issuer) IssueAccessToken(context.Context, string, string, time.Time) (string, string, error) {
+func (i *e003Issuer) IssueAccessToken(context.Context, string, string, int64, time.Time) (string, string, error) {
 	if i.err != nil {
 		return "", "", i.err
 	}

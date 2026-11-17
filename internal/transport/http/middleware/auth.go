@@ -96,7 +96,7 @@ func AuthenticateBearer(tokenProvider ports.TokenProvider, authorizers ...ports.
 			}
 
 			if authorizer != nil {
-				if errSesion := authorizer.AuthorizeSession(r.Context(), claims.Subject, claims.SessionID); errSesion != nil {
+				if errSesion := authorizer.AuthorizeSession(r.Context(), claims.Subject, claims.SessionID, claims.Epoch); errSesion != nil {
 					if errors.Is(errSesion, ports.ErrSessionUnauthorized) {
 						_ = httputil.WriteErrorEnvelope(
 							w,

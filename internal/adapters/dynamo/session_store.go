@@ -76,6 +76,10 @@ func (s *SessionStore) LookupIdentity(ctx context.Context, normalizedEmail strin
 	if value, ok := perfil["emailVerified"].(*types.AttributeValueMemberBOOL); ok {
 		emailVerified = value.Value
 	}
+	sessionEpoch := int64(0)
+	if epoch, ok := attributeInt(perfil["sessionEpoch"]); ok {
+		sessionEpoch = epoch
+	}
 
 	return &appIdentity.StoredIdentity{
 		UserID:        userID,
@@ -84,6 +88,7 @@ func (s *SessionStore) LookupIdentity(ctx context.Context, normalizedEmail strin
 		PasswordHash:  stringAttribute(perfil["passwordHash"]),
 		EmailVerified: emailVerified,
 		Status:        stringAttribute(perfil["status"]),
+		SessionEpoch:  sessionEpoch,
 	}, nil
 }
 
@@ -136,6 +141,9 @@ func (s *SessionStore) CreateSession(ctx context.Context, record appIdentity.Ses
 		"expiresAt":    numberAttr(record.ExpiresAt.UTC().Unix()),
 		"expiresAtISO": stringAttr(expiresAt),
 		"version":      numberAttr(1),
+		// Época de revocación con la que nace la sesión (A6). El middleware compara este
+		// valor (vía claim `epo`) con el `sessionEpoch` del perfil.
+		"sessionEpoch": numberAttr(record.SessionEpoch),
 	}
 	if record.DeviceID != "" {
 		sessionItem["deviceId"] = stringAttr(record.DeviceID)

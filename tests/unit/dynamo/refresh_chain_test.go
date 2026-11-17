@@ -67,6 +67,17 @@ func (m *memoriaDynamo) GetItem(_ context.Context, params *dynamodb.GetItemInput
 	return &dynamodb.GetItemOutput{Item: copiarItem(item)}, nil
 }
 
+// Query y UpdateItem existen solo para que el doble satisfaga interfaces más amplias
+// (por ejemplo, la admisión de E005). Si un camino los usara, el test debe fallar en vez
+// de simular una semántica que el doble no implementa.
+func (m *memoriaDynamo) Query(context.Context, *dynamodb.QueryInput, ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+	return nil, errors.New("query no soportada por el doble de prueba")
+}
+
+func (m *memoriaDynamo) UpdateItem(context.Context, *dynamodb.UpdateItemInput, ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
+	return nil, errors.New("update no soportado por el doble de prueba")
+}
+
 func (m *memoriaDynamo) TransactWriteItems(_ context.Context, params *dynamodb.TransactWriteItemsInput, _ ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -321,7 +332,7 @@ func mapaString(item map[string]types.AttributeValue, nombre string) string {
 
 type issuerCadena struct{}
 
-func (issuerCadena) IssueAccessToken(context.Context, string, string, time.Time) (string, string, error) {
+func (issuerCadena) IssueAccessToken(context.Context, string, string, int64, time.Time) (string, string, error) {
 	return "jwt-sintetico", "jti-sintetico", nil
 }
 

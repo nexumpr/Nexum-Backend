@@ -27,6 +27,12 @@ type TokenClaims struct {
 	// JTI permite que el emisor fije el identificador único del token y lo persista con la
 	// sesión (E002). Si llega vacío, el proveedor genera uno aleatorio.
 	JTI string `json:"jti,omitempty"`
+
+	// Epoch es la época de revocación de sesiones (A6, RFC-016 §17.3). Un token emitido
+	// antes de que existiera el claim se interpreta como época 0. Tras un cambio de
+	// contraseña (E006) el perfil incrementa su época y todo token con una época anterior
+	// deja de autorizar, sin recorrer sesiones.
+	Epoch int64 `json:"epo,omitempty"`
 }
 
 // PasswordHasher abstrae el algoritmo de derivación de claves para contraseñas (A-010 §2.5: Argon2id).

@@ -119,6 +119,9 @@ func (s *RefreshStore) LoadSession(ctx context.Context, userID, sessionID string
 	if used, ok := attributeISOTime(item["lastUsedAt"]); ok {
 		session.LastUsedAt = used
 	}
+	if epoch, ok := attributeInt(item["sessionEpoch"]); ok {
+		session.SessionEpoch = epoch
+	}
 	return session, nil
 }
 
@@ -148,6 +151,10 @@ func (s *RefreshStore) RotateRefresh(ctx context.Context, rotation appIdentity.R
 	userPK, userSK := domainDynamo.UserKeys(rotation.UserID)
 	oldPK, oldSK := domainDynamo.RefreshKeys(rotation.OldDigest)
 	newPK, newSK := domainDynamo.RefreshKeys(rotation.NewDigest)
+
+	// La época 0 representa tanto un perfil anterior a A6 (sin atributo) como el valor
+	// explícito 0; la condición acepta ambas formas y exige igualdad estricta para épocas > 0.
+	condicionEpoca := "attribute_exists(PK) AND #status = :active AND (attribute_not_exists(#epoch) OR #epoch = :epoch)"
 
 	newLocator := map[string]types.AttributeValue{
 		"PK":         stringAttr(newPK),
@@ -220,21 +227,25 @@ func (s *RefreshStore) RotateRefresh(ctx context.Context, rotation appIdentity.R
 				":active":     stringAttr(appIdentity.StatusActive),
 			},
 		}},
-		// 3. La cuenta propietaria debe seguir ACTIVE en el momento atómico de la
-		//    rotación: cierra la carrera entre comprobar el perfil y escribir la sesión.
-		//    Deshabilitar o eliminar el usuario impide cualquier renovación posterior.
+		// 3. La cuenta propietaria debe seguir ACTIVE y en la MISMA época de revocación en
+		//    el momento atómico de la rotación: cierra la carrera entre comprobar el perfil
+		//    y escribir la sesión, y un cambio de contraseña concurrente (E006/A6) impide
+		//    renovar con una sesión anterior.
 		{ConditionCheck: &types.ConditionCheck{
 			TableName: aws.String(s.table),
 			Key: map[string]types.AttributeValue{
 				"PK": stringAttr(userPK),
 				"SK": stringAttr(userSK),
 			},
-			ConditionExpression: aws.String("attribute_exists(PK) AND #status = :active"),
+			ConditionExpression: aws.String(condicionEpoca),
 			ExpressionAttributeNames: map[string]string{
 				"#status": "status",
+				"#epoch":  "sessionEpoch",
 			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":active": stringAttr(appIdentity.StatusActive),
+				":zero":   numberAttr(0),
+				":epoch":  numberAttr(rotation.SessionEpoch),
 			},
 		}},
 		// 4. El localizador del token nuevo nace en la misma transacción.
@@ -278,6 +289,9 @@ func (s *RefreshStore) LoadUserProfile(ctx context.Context, userID string) (*app
 	perfil := &appIdentity.RefreshUser{
 		UserID: stringAttribute(item["userId"]),
 		Status: stringAttribute(item["status"]),
+	}
+	if epoch, ok := attributeInt(item["sessionEpoch"]); ok {
+		perfil.SessionEpoch = epoch
 	}
 	if perfil.UserID == "" {
 		perfil.UserID = userID
