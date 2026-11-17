@@ -1745,3 +1745,27 @@
 - Se mantiene explícitamente **pendiente de evidencia individual** (no PASS): replay 409, revocación de access/refresh y concurrencia real en AWS.
 - Sin cambios de código Go, Terraform, IAM, Redis, DynamoDB, OpenAPI ni AWS. Sin nuevo despliegue.
 
+
+### Oleada E007-E011 - arranque, aislamiento y preflight (2026-11-17)
+
+**Base verificada.** `git fetch origin`; `origin/main` = `4ba790a9ffa99b15bb73a6b2e93e691a2ba716b6` (merge del PR #72). El worktree principal estaba en `docs/h08e-e006-closure` (`7a58c27`, ancestro de main) con **una unica modificacion local ajena: `opencode.json`** (70 lineas de permisos locales). Se preservo intacta y **no se commiteo**. `git checkout -B main origin/main` por fast-forward.
+
+**Gobierno.** Creados `sdd/_control/H08/RFC-019-OLEADA_E007_E011.md` (estado **PROPUESTO**) y `sdd/_control/H08/GATE_H08E_E007_E011_OLEADA.md` (`AUTHORIZED_E007_E011_LOCAL`). La RFC resuelve las dos reglas que impedian la oleada: E-1 concurrencia de specs (AGENTS.md / R-007) y E-2 release agrupado (constitution.md 14 y tabla de las 71 specs). Conserva PR por endpoint, Gate de merge por HEAD SHA, Gate de apply por SHA-256 del plan y todas las reglas `deny`. Frase pendiente: `APRUEBO_RFC_019_OLEADA_E007_E011`. **PR #73** abierto (`docs/h08e-rfc019-oleada-e007-e011`, commit `e73fc35`).
+
+**Aislamiento real.** Tres worktrees Git bajo `.worktrees/` (excluido en `.gitignore`), todos desde `origin/main` `4ba790a` y verificados por `git worktree list`:
+
+| Linea | Worktree | Rama | Endpoints |
+|---|---|---|---|
+| A | `.worktrees/worktree-auth-change` | `feat/h08e-e007-password-change` | E007 |
+| B | `.worktrees/worktree-sessions` | `feat/h08e-e008-sessions` -> `feat/h08e-e009-sessions-revoke` (apilada) | E008, E009 |
+| C | `.worktrees/worktree-email-verification` | `feat/h08e-e010-email-verification` -> `feat/h08e-e011-email-verification-confirm` (apilada) | E010, E011 |
+
+**Decisiones de diseno registradas.**
+- **E007:** reutiliza la epoca de revocacion A6/RFC-018. Incrementar `sessionEpoch` en la misma transaccion que el nuevo `passwordHash` invalida **todas** las sesiones, incluida la actual (`refresh.go` rechaza `session.SessionEpoch != user.SessionEpoch`; el middleware compara `epo`). Es la unica opcion atomica y el contrato `Accepted` no admite devolver tokens nuevos: el cliente reautentica. Descartado revocar sesion por sesion (fan-out no atomico).
+- **E008/E009:** `Query` sobre `USER#<id>` con `begins_with(SESSION#)`; prohibido `Scan`. `lastSeenAt` se mapea desde `lastUsedAt`. El router gana soporte minimo de `{param}` con prioridad literal, sin framework nuevo.
+- **E010/E011:** namespace `ONE_USE#*`, ya autorizado por IAM (`leading_key_patterns`), separado de `RESET#` de E005/E006. SES reutiliza la politica vigente (`ses:SendEmail` sobre `identity/*` con `ses:FromAddress` fijo): **E010 no requiere cambio IAM**.
+- **Terraform:** no hacen falta recursos nuevos. Solo `aws_launch_template.backend`, `terraform_data.invariantes_computo` y los 2 ARN S3 nuevos en `aws_iam_role_policy.runtime`, igual que en E004/E005/E006.
+
+**Preflight AWS: BLOQUEADO.** `aws sts get-caller-identity` devuelve *Your session has expired. Please reauthenticate using 'aws login'*. Requiere accion de UI del responsable. Consecuencia: no se pudo leer ASG, instancias, version de Launch Template ni targets. Ademas, las variables `AWS_CONFIG_FILE`, `AWS_PROFILE` y `AWS_REGION` estaban definidas como **cadena vacia** en el entorno, lo que rompia incluso la carga de perfiles; se corrigieron por comando a `%USERPROFILE%\.aws\config` y perfil `nexum`.
+
+**Estado por endpoint:** E007, E008, E009, E010, E011 = `IMPLEMENTING` (lineas en ejecucion). Nada mergeado, nada desplegado. `AWS_NOT_RUN`.
