@@ -1,8 +1,9 @@
 # Tareas planificadas — E006
 
-> Implementación local 2026-11-17 (Gate `GATE_H08E_E006.md`). `[x]` = hecho y verificable en
-> el código/pruebas del repositorio; la ejecución de pruebas y la verificación AWS se anotan
-> por separado. `AWS_NOT_RUN` hasta el Gate de despliegue.
+> Implementación y despliegue 2026-11-17 (Gate `GATE_H08E_E006.md`). `[x]` = hecho y
+> verificable en código, pruebas o AWS según se indica. CI PASS y AWS `DEPLOYED_VERIFIED`;
+> `E006_USER_ACCEPTED = CONFIRMED`. La evidencia individual de replay/revocación/concurrencia
+> en AWS sigue pendiente y no se declara PASS.
 
 - [x] `E006-T01` OpenAPI `operationId=nexum_e006` contrastado con `POST /api/v1/auth/password/reset`; contrato sin cambios.
 - [x] `E006-T02` DTO estricto `PasswordResetRequest` (`token`, `newPassword`) con rechazo de campos desconocidos y tipos incorrectos.
@@ -14,8 +15,8 @@
 - [x] `E006-T08` Pruebas unitarias de validación, caducidad, reutilización, concurrencia y perfiles legados.
 - [x] `E006-T09` Pruebas de adaptador y HTTP escritas sobre el doble con estado; ejecución real en CI.
 - [x] `E006-T10` Negativas de token usado/expirado/inexistente y dos solicitudes concurrentes.
-- [ ] `E006-T11` CI + seguridad + contratos: **pendiente del run real del PR**.
-- [ ] `E006-T12` Release, despliegue en dos nodos y prueba HTTPS: **NOT_RUN**.
+- [x] `E006-T11` CI + seguridad + contratos: **PASS** en PR #71 (13/13; run `44110769604`) y en `main` (run `44116124273`).
+- [x] `E006-T12` Release, despliegue en dos nodos y prueba HTTPS: **VERIFIED** — release `v0.13.0+578b0db3b9bb`, LT v8, ASG 2/2/2, 2 targets healthy; aceptación funcional confirmada por el responsable en Postman (`E006_USER_ACCEPTED = CONFIRMED`). Evidencia individual de replay/revocación/concurrencia: pendiente.
 
 ## A6 — cambio compartido (RFC-018)
 
@@ -27,16 +28,24 @@
 
 ## Casos concretos
 
-- [x] `E006-CT01` Respuesta 200 `Accepted` con UUID v4 verificada en prueba de transporte.
-- [x] `E006-CT02` JSON malformado, campo desconocido, tipo incorrecto y longitudes fuera de rango.
-- [x] `E006-CT03` Sin recurso ajeno: el token resuelve su propio `userId`; una cuenta deshabilitada no cambia contraseña.
-- [x] `E006-CT04` Fallo de DynamoDB/Redis -> 503; ninguna escritura parcial.
-- [x] `E006-CT05` Dos nodos lógicos sobre el mismo almacén: una sola transacción gana.
-- [x] `E006-CT06` Token reutilizado -> 409; sesiones anteriores rechazadas en ambos nodos lógicos.
+- [x] `E006-CT01` Respuesta 200 `Accepted` con UUID v4 verificada en prueba de transporte; aceptación funcional confirmada por el responsable en Postman.
+- [x] `E006-CT02` JSON malformado, campo desconocido, tipo incorrecto y longitudes fuera de rango (400/422) verificados por HTTPS real.
+- [x] `E006-CT03` Sin recurso ajeno: el token resuelve su propio `userId`; una cuenta deshabilitada no cambia contraseña (prueba de aplicación; AWS individual pendiente).
+- [x] `E006-CT04` Fallo de DynamoDB/Redis -> 503; ninguna escritura parcial (pruebas de aplicación/adaptador).
+- [x] `E006-CT05` Dos nodos lógicos sobre el mismo almacén: una sola transacción gana (prueba local).
+- [x] `E006-CT06` Token reutilizado -> 409; sesiones anteriores rechazadas en ambos nodos lógicos (pruebas locales). Evidencia AWS individual: **pendiente**.
 
 ## Enmienda A1
 
 - [x] Persistencia corregida a `USER#<userId>/SESSION#<sessionId>` y `REFRESH#<sha256>/SESSION`; sin tabla ni índice nuevos.
 - [x] Validación de entrada y mensaje 422 (`newPassword` 12–128, token no vacío).
 - [x] Prueba positiva y negativa de la validación.
-- [ ] Verificación HTTP real: pendiente del despliegue autorizado.
+- [x] Verificación HTTP real del cambio: E006 desplegado, 400/422/400 por CloudFront y aceptación funcional confirmada por el responsable.
+
+## Estado AWS (evidencia, sin duplicar tareas)
+
+- PR #71 MERGED (`main` `578b0db3b9bb765afc981a86b23c6ade10ed80ea`); CI de `main` `44116124273` SUCCESS; release `v0.13.0+578b0db3b9bb`; apply `90988C7C...2D63` con 0 add/4 change/0 destroy; LT v8; IAM con 16 objetos S3.
+- Dos instancias LT v8 `InService/Healthy`, ASG 2/2/2 y dos targets healthy; E006 por CloudFront (400/422/400; 404 con nodos v7 antes del release); regresión dirigida E001–E005 sin cambios de estado.
+- Aceptación funcional del responsable: `E006_USER_ACCEPTED = CONFIRMED`.
+- **Pendiente de evidencia individual (no PASS):** replay 409, revocación de access/refresh y concurrencia real en AWS.
+- **Limitación:** ambas instancias en `us-east-2a` por falta de capacidad `t4g.micro` en `us-east-2b`; subredes restauradas.
