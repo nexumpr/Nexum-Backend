@@ -88,7 +88,7 @@ func e009HTTPRegistro(userID, sessionID string) appIdentity.RevokeSessionRecord 
 		Status:      appIdentity.StatusActive,
 		Version:     1,
 		HasVersion:  true,
-		ExpiresAt:   e004HTTPAhora.Add(24 * time.Hour),
+		ExpiresAt:   time.Now().UTC().Add(24 * time.Hour),
 		HasExpiry:   true,
 	}
 }
