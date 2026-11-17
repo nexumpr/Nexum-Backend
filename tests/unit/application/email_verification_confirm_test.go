@@ -246,7 +246,6 @@ type e011Estado struct {
 	mu      sync.Mutex
 	perfil  appIdentity.EmailVerificationProfile
 	token   appIdentity.EmailVerificationTokenRecord
-	errores []error
 }
 
 func (s *e011Estado) LoadEmailVerificationProfile(context.Context, string) (*appIdentity.EmailVerificationProfile, error) {
