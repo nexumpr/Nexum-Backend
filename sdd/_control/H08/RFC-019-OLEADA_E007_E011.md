@@ -5,7 +5,7 @@
 | Documento | `sdd/_control/H08/RFC-019-OLEADA_E007_E011.md` |
 | Versión | 1.0.0 |
 | Fecha | 2026-11-17 |
-| Estado | **PROPUESTO — no vigente hasta la frase de aprobación** |
+| Estado | **APPROVED — APRUEBO_RFC_019_OLEADA_E007_E011 concedida por el responsable el 2026-11-17** |
 | Autoridad que la motiva | Instrucción humana de la sesión de trabajo del 2026-11-17: «AUTORIZO INICIAR EL DESARROLLO CONTROLADO DE E007, E008, E009, E010 Y E011», con objetivo de entrega funcional en AWS el 2026-11-20 |
 | Aprobador | Responsable de Nexum-Backend |
 | Frase de aprobación | `APRUEBO_RFC_019_OLEADA_E007_E011` |
@@ -107,3 +107,4 @@ antes de empezar. No requiere una RFC nueva por oleada; sí requiere un Gate por
 | Fecha | Cambio | Estado |
 |---|---|---|
 | 2026-11-17 | Creación. Excepción E-1 (concurrencia) y E-2 (release agrupado) para E007–E011 | PROPUESTO |
+| 2026-11-17 | Aprobación humana APRUEBO_RFC_019_OLEADA_E007_E011. Condiciones de la sección 3 intactas | **APPROVED** |

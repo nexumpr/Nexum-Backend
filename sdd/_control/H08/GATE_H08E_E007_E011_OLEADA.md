@@ -6,7 +6,7 @@
 | Fecha | 2026-11-17 |
 | Base de trabajo | `main` `4ba790a9ffa99b15bb73a6b2e93e691a2ba716b6` |
 | Instrumento de gobierno | `RFC-019-OLEADA_E007_E011.md` |
-| Estado | `AUTHORIZED_E007_E011_LOCAL` |
+| Estado | `AUTHORIZED_E007_E011_LOCAL` · gobierno **APROBADO** (APRUEBO_RFC_019_OLEADA_E007_E011, 2026-11-17) |
 
 ## 1. Alcance autorizado
 
@@ -53,8 +53,8 @@ Se actualiza en cada checkpoint; nunca se adelanta un estado.
 
 | Necesidad | Frase |
 |---|---|
-| Gobierno de la oleada | `APRUEBO_RFC_019_OLEADA_E007_E011` |
+| Gobierno de la oleada | CONCEDIDA: `APRUEBO_RFC_019_OLEADA_E007_E011` (2026-11-17) |
 | Merge de cada PR | `APRUEBO_MERGE_PR_<N>_SHA_<SHA40>` |
 | Apply del plan de release | `APRUEBO_APPLY_<ALCANCE>_SHA256_<HASH>` |
 
-Ninguna de estas frases se ha concedido todavía. Este documento no las sustituye.
+La frase de gobierno fue concedida el 2026-11-17. Las frases de merge por PR y la de apply del plan siguen pendientes y no se infieren de la aprobación de la RFC.
