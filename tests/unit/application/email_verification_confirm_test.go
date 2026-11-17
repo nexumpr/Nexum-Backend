@@ -243,9 +243,9 @@ func TestE011ValidacionDelToken(t *testing.T) {
 // e011Estado implementa la transacción real sobre estado en memoria: dos confirmaciones
 // simultáneas compiten por el mismo token y solo una puede ganar.
 type e011Estado struct {
-	mu      sync.Mutex
-	perfil  appIdentity.EmailVerificationProfile
-	token   appIdentity.EmailVerificationTokenRecord
+	mu     sync.Mutex
+	perfil appIdentity.EmailVerificationProfile
+	token  appIdentity.EmailVerificationTokenRecord
 }
 
 func (s *e011Estado) LoadEmailVerificationProfile(context.Context, string) (*appIdentity.EmailVerificationProfile, error) {
