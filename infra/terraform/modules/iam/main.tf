@@ -53,6 +53,9 @@ locals {
       "REFRESH#*",
       "ONE_USE#*",
       "LOOKUP#SESSION#*",
+      # E005 (RFC-016 17.2): token de recuperacion y cola durable del worker.
+      "RESET#*",
+      "QUEUE#*",
       "PUBLIC#CATALOG",
       "PUBLIC#CONTENT",
     ],

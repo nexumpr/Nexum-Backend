@@ -1591,3 +1591,31 @@
 - **Sin instalar:** `opencode.json` local intacto; nada aplicado. Gates pendientes: RFC-017, A9, A10, SES y FinOps.
 
 - **RFC-017 revisado (base local):** candidato reconstruido desde el `opencode.json` local (no del versionado) → **184 permisos / 47 politicas**, 0 duplicados. `aws ssm get-parameter*` **retirado** por admitir `--with-decryption`; SSM queda en DENY y exige excepcion por operacion. Verificado: `terraform apply` y `-auto-approve` DENY; solo `<archivo>.tfplan` ASK; `aws *` nunca en allow; denies de destruccion/git/secretos intactos.
+
+### H08-E / E005 - corte vertical implementado (2026-11-16)
+
+- **Codigo:** internal/ports/passwordreset.go (puertos ResetStore/ResetTokenStore/Correo/Sellador y errores), internal/application/identity/password_reset.go (admission de 2 acciones identica con o sin cuenta, token 32B CSPRNG, hash SHA-256 persistido, sello AES para reintento, TTL 30 min, barrido acotado Reintentar, validacion de email) y internal/transport/http/password_forgot_handler.go (202 Accepted, 422/503/500, sin enumeracion).
+- **Invariante:** sin sellador o sin correo el servicio devuelve ErrResetNoDisponible -> 503. Nunca se acepta trabajo que nadie podria enviar.
+- **Pruebas:** 	ests/unit/application/password_reset_test.go con 7 casos (sin componente, cuenta existente, inexistente, fallo de correo, fallo de persistencia, reintento, validacion). No se ejecutan en este host por la politica de Control de aplicaciones (binario de prueba bloqueado); go build y go vet ./... PASS. La autoridad es el CI Linux.
+- **No desplegado:** el endpoint no se registra en cmd/server hasta tener adaptador DynamoDB + sellador (A9) y correo real (SES). A9/A10/SES siguen en sus Gates de AWS.
+
+### H08-E / E005 - correccion de defectos y worker real (2026-11-16)
+
+- **A (latencia):** el envio sale de la peticion; Solicitar solo persiste. La latencia deja de depender de que la cuenta exista.
+- **B (errores):** BuscarCuenta devuelve (userID, encontrada, err). Un fallo de DynamoDB se propaga; nunca se convierte en «cuenta inexistente».
+- **C (AAD):** vuelve a ser userID|outboxID en Sellar y en Abrir; ResetTrabajo lleva UserID.
+- **D (worker real):** password_reset_worker.go con liderazgo por lease, reclamacion atomica por trabajo, backoff 30 s/2/10 min/1/6 h, maximo 6 intentos, descarte de expirados y Run(ctx) con apagado por contexto.
+- **E (cuotas):** Limitador se aplica antes de crear trabajo; si el limitador falla se responde 503 (fail-closed).
+- **F/G:** requestId UUIDv4 con crypto/rand; el handler rechaza campos desconocidos y JSON concatenado.
+- **H/I/J:** 202 solo tras persistir; misma admision con o sin cuenta; el worker documenta semantica at-least-once.
+- **Pruebas:** 12 casos. No ejecutables en este host (Control de aplicaciones); go build y go vet PASS; la autoridad es el CI Linux.
+- **Pendiente para desplegar:** adaptador DynamoDB (RESET#/QUEUE#PWRESET), sellador AES real (A9), SES y registro en cmd/server.
+
+### H08-E / E005 - A9 y A10 aplicados en AWS (2026-11-17)
+
+- **A9 (secreto de sellado):** el bundle S3 tenia `PASSWORD_RESET_SEAL_KEY_B64` (32 bytes al decodificar base64), pero **faltaba `NEXUM_SES_FROM_EMAIL`**. Se anadio `nexumproyectomov@gmail.com` preservando el resto de variables y la misma clave (hash de la clave sin cambios). Version inicial `ovW8.ZtlTaBrIXEvk.DlfKvaVZZ9h4fQ`; version publicada con `If-Match` y SSE `AES256`: **`jy7ZFSjyIo6l358NOlehigibwz9PZIZI`** (2 826 bytes, ETag `f0b1743ae2eb8401c5cdfffd741bbaf5`). Verificada como ultima version. La clave no se imprimio ni se regenero.
+- **Bootstrap:** el Launch Template v5 usa `SECRETOS_URI=s3://nexum-h08i-secretos-713797602090/nexum/secrets/v1/secrets.json` sin version fija; `aws s3 cp` descarga la ultima version, que es `jy7ZFS...`.
+- **A10 (IAM + Redis):** plan `C:\Nexum-Custodia\H08E-E005-20261117\a10-e005.tfplan`, SHA-256 `FDF4FE1A10C451AB8379AA2A5BBDD4D1FDCC9876145894FC399BEBDDF9E05FA8`; Gate `sdd/_control/H08/GATE_H08E_E005_A10.md`. Apply real: **1 added, 2 changed, 0 destroyed**. Verificado por `terraform show -json`: politica `nexum-h08i-runtime-ses` con `ses:SendEmail` sobre `identity/nexumproyectomov@gmail.com` y condicion `ses:FromAddress`; politica `nexum-h08i-runtime-approved-data-access` con `RESET#*` y `QUEUE#*` en tabla y `GSI1`; usuario de aplicacion con `password`, ACL intacta, grupo con `nexum-app` y `nexum-default-off`, TLS y cifrado en reposo. El usuario `default` sigue reportando `no-password` con `access_string=off ~* -@all`: normalizacion no persistente, sin cambio efectivo. Coste incremental 0.0000 USD.
+- **Conectividad SES:** no existe interface endpoint en la VPC. Servicio descubierto: `com.amazonaws.us-east-2.email` (API; `email-smtp` es SMTP). Se preparo el cambio Terraform opt-in (`habilitar_endpoint_ses`, default `true` en `envs/h08i`; modulo con default `false`) y el plan integral `C:\Nexum-Custodia\H08E-E005-20261117\ses-endpoint.tfplan`, SHA-256 **`2B91C6C85204A465C176042FBB4F392B5288B0810CCE2D6829C20BDB7E8E9974`**, 185 068 bytes: **1 create** (`aws_vpc_endpoint.ses[0]`, `com.amazonaws.us-east-2.email`, Interface, 2 subredes us-east-2a/2b, SG `sg-0f643e89e2daa488e`, Private DNS) + **1 update** (normalizacion Redis conocida) + 0 destroy/replace/import. Gate `sdd/_control/H08/GATE_H08E_E005_SES_ENDPOINT.md` con coste 0.02 USD/h (0.48 USD/dia; 16.32 USD/34 d; 21.60 USD/45 d) y frase `APRUEBO_SES_ENDPOINT_2AZ_SHA_2B91C6C85204A465C176042FBB4F392B5288B0810CCE2D6829C20BDB7E8E9974`. **No aplicado**: pendiente de Gate humano.
+- **PR #68:** HEAD `f6e4d89b5a5e1e591124d0e93c3606cb349d0252`, 13/13 checks PASS, `MERGEABLE`/`CLEAN`; sin merge. Pendiente commit de Gates/Terraform/memoria y CI del nuevo HEAD.
+- **Sin desplegar:** E005 no esta en AWS; no hay instancia refresh, ni artefacto ARM64 nuevo, ni prueba HTTPS/correo. `E005_AWS_VERIFIED=NOT_RUN`, `E005_SES_DELIVERY_VERIFIED=NOT_RUN`, `E001_E004_REGRESSION=NOT_RUN`.
