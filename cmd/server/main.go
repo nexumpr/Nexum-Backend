@@ -151,6 +151,11 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	_, cerrarE005 := montarE005(ctx, router, clienteDynamo, clienteRedis, cfgDeps.TablaDynamoDB, logger)
 	defer cerrarE005()
 
+	// H08-E / E006: confirmacion de restablecimiento con token de un solo uso y
+	// revocacion por epoca (A6). Reutiliza la tabla, el hasher Argon2id, el material JWT
+	// y Redis ya existentes; sin IAM ni recursos nuevos.
+	montarE006(router, clienteDynamo, clienteRedis, cfgDeps.TablaDynamoDB, logger)
+
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
 	// Start bloquea hasta que el listener falla o se cierra; el canal transporta

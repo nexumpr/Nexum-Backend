@@ -1,32 +1,42 @@
 # Tareas planificadas — E006
 
-> Todas las tareas de implementación están **TODO** hasta H08. Este archivo es especificación, no evidencia de código.
+> Implementación local 2026-11-17 (Gate `GATE_H08E_E006.md`). `[x]` = hecho y verificable en
+> el código/pruebas del repositorio; la ejecución de pruebas y la verificación AWS se anotan
+> por separado. `AWS_NOT_RUN` hasta el Gate de despliegue.
 
-- [ ] `E006-T01` Revisar OpenAPI `operationId=nexum_e006` vs `POST /api/v1/auth/password/reset` y contrato de dominio.
-- [ ] `E006-T02` Implementar request/response DTO estrictos `PasswordResetRequest` / `Accepted`; rechazo de campos desconocidos.
-- [ ] `E006-T03` Implementar autorización por sujeto JWT y propiedad; públicas solo según allowlist aprobada.
-- [ ] `E006-T04` Implementar caso de uso y invariantes: Token hash de un uso, vigencia corta y revocación de todas las sesiones; no aceptar reutilización.
-- [ ] `E006-T05` Implementar adaptador DynamoDB y patrón: Email-reserva / USER#id PROFILE y SESSION#id / REFRESH#<digest>/SESSION; token hash con TTL y expiración funcional.
-- [ ] `E006-T06` Integrar Redis y consistencia multiinstancia sin confiar en caché para privilegios.
-- [ ] `E006-T07` Implementar códigos y errores definidos, ETag e idempotencia según operación.
-- [ ] `E006-T08` Crear unit tests de reglas y validaciones; fixture sin PII/credenciales reales.
-- [ ] `E006-T09` Crear integración Dynamo y prueba HTTP desde cliente externo conforme OpenAPI.
-- [ ] `E006-T10` Ejecutar negativas de auth/ownership/concurrencia y carga paginada cuando aplique.
-- [ ] `E006-T11` CI + seguridad + revisión de contratos + rollback y trazas saneadas.
-- [ ] `E006-T12` Solicitar autorización humana de release; desplegar desde IaC/CI, probar en dos nodos y registrar evidencia real.
+- [x] `E006-T01` OpenAPI `operationId=nexum_e006` contrastado con `POST /api/v1/auth/password/reset`; contrato sin cambios.
+- [x] `E006-T02` DTO estricto `PasswordResetRequest` (`token`, `newPassword`) con rechazo de campos desconocidos y tipos incorrectos.
+- [x] `E006-T03` Ruta pública sin Bearer; `userId` se deriva del token persistido, nunca del cliente.
+- [x] `E006-T04` Caso de uso: token de un solo uso, caducidad lógica, perfil `ACTIVE`, Argon2id y transacción atómica.
+- [x] `E006-T05` Adaptador DynamoDB: `RESET#<sha256>/RESET` + `USER#<id>/PROFILE` en una `TransactWriteItems` de 2 acciones; sin `Scan`.
+- [x] `E006-T06` Redis: cuota de confirmación 10/15 min por IP con Lua atómico y fail-closed; la época no se cachea.
+- [x] `E006-T07` Códigos 200/400/409/422/429/500/503 y errores uniformes sin filtrar token ni contraseña.
+- [x] `E006-T08` Pruebas unitarias de validación, caducidad, reutilización, concurrencia y perfiles legados.
+- [x] `E006-T09` Pruebas de adaptador y HTTP escritas sobre el doble con estado; ejecución real en CI.
+- [x] `E006-T10` Negativas de token usado/expirado/inexistente y dos solicitudes concurrentes.
+- [ ] `E006-T11` CI + seguridad + contratos: **pendiente del run real del PR**.
+- [ ] `E006-T12` Release, despliegue en dos nodos y prueba HTTPS: **NOT_RUN**.
+
+## A6 — cambio compartido (RFC-018)
+
+- [x] `sessionEpoch` persistido en `PROFILE`; lectura en login y emisión del claim `epo`.
+- [x] Refresh compara época de sesión y perfil y la exige en la transacción de rotación.
+- [x] Middleware lee `PROFILE` con consistencia fuerte; 401 desalineado, 503 sin persistencia.
+- [x] Compatibilidad: perfil/sesión/JWT sin época = 0.
+- [x] E006 incrementa la época exactamente una vez dentro de su transacción.
 
 ## Casos concretos
 
-- [ ] `E006-CT01` Solicitud válida produce el código y esquema exactos indicados en OpenAPI; ejemplos sintéticos deben validarse con JSON Schema.
-- [ ] `E006-CT02` JSON malformado, campos desconocidos, tipo incorrecto y longitud excedida -> 400/422 sin secretos en logs.
-- [ ] `E006-CT03` Petición sobre recurso de otro usuario no filtra existencia (404), si aplica; verificar propiedad con dos sujetos.
-- [ ] `E006-CT04` Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
-- [ ] `E006-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
-- [ ] `E006-CT06` Revocación/rotación en nodo A persiste y es observable inmediatamente en nodo B; token reutilizado rechazado.
+- [x] `E006-CT01` Respuesta 200 `Accepted` con UUID v4 verificada en prueba de transporte.
+- [x] `E006-CT02` JSON malformado, campo desconocido, tipo incorrecto y longitudes fuera de rango.
+- [x] `E006-CT03` Sin recurso ajeno: el token resuelve su propio `userId`; una cuenta deshabilitada no cambia contraseña.
+- [x] `E006-CT04` Fallo de DynamoDB/Redis -> 503; ninguna escritura parcial.
+- [x] `E006-CT05` Dos nodos lógicos sobre el mismo almacén: una sola transacción gana.
+- [x] `E006-CT06` Token reutilizado -> 409; sesiones anteriores rechazadas en ambos nodos lógicos.
 
-## Tareas de la enmienda (A1) — PENDIENTES DE EJECUCION
+## Enmienda A1
 
-- [ ] Implementar referencias de persistencia corregidas a `USER#<userId>/SESSION#<sessionId>` y `REFRESH#<sha256(refreshToken)>/SESSION`; sin cambio de tabla ni de codigo.
-- [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
-- [ ] Cubrir con prueba positiva y negativa.
-- [ ] Verificar por HTTP real tras el despliegue autorizado.
+- [x] Persistencia corregida a `USER#<userId>/SESSION#<sessionId>` y `REFRESH#<sha256>/SESSION`; sin tabla ni índice nuevos.
+- [x] Validación de entrada y mensaje 422 (`newPassword` 12–128, token no vacío).
+- [x] Prueba positiva y negativa de la validación.
+- [ ] Verificación HTTP real: pendiente del despliegue autorizado.

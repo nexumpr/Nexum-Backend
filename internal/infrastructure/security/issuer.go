@@ -82,7 +82,9 @@ func NewRSAAccessTokenIssuer(provider *RSATokenProvider) *RSAAccessTokenIssuer {
 }
 
 // IssueAccessToken emite el JWT y devuelve también el jti persistido en la sesión.
-func (i *RSAAccessTokenIssuer) IssueAccessToken(ctx context.Context, userID, sessionID string, now time.Time) (string, string, error) {
+// `epoch` es la época de revocación vigente del perfil (A6): se incluye en el claim `epo`
+// para que el middleware pueda compararla con `sessionEpoch` tras un cambio de contraseña.
+func (i *RSAAccessTokenIssuer) IssueAccessToken(ctx context.Context, userID, sessionID string, epoch int64, now time.Time) (string, string, error) {
 	if i == nil || i.provider == nil {
 		return "", "", ErrSigningKeyUnavailable
 	}
@@ -99,6 +101,7 @@ func (i *RSAAccessTokenIssuer) IssueAccessToken(ctx context.Context, userID, ses
 		IssuedAt:  issued,
 		ExpiresAt: issued.Add(appIdentity.AccessTokenTTL),
 		JTI:       jti,
+		Epoch:     epoch,
 	})
 	if err != nil {
 		return "", "", err

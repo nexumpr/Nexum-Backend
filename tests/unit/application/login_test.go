@@ -40,7 +40,7 @@ type fakeIssuer struct {
 	err   error
 }
 
-func (f *fakeIssuer) IssueAccessToken(context.Context, string, string, time.Time) (string, string, error) {
+func (f *fakeIssuer) IssueAccessToken(context.Context, string, string, int64, time.Time) (string, string, error) {
 	return f.token, f.jti, f.err
 }
 

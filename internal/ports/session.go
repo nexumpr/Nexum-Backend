@@ -24,15 +24,17 @@ var (
 // ya validado criptográficamente (E004, GOV-06).
 //
 // Contrato:
-//   - Recibe exclusivamente `sub` y `sid` extraídos de claims verificados; nunca datos del
-//     cuerpo, cabeceras libres o parámetros controlados por el cliente.
-//   - Devuelve nil sólo si la sesión existe, pertenece al sujeto, está ACTIVE y no ha expirado.
-//   - Devuelve ErrSessionUnauthorized para cualquier estado no utilizable.
+//   - Recibe exclusivamente `sub`, `sid` y `epo` extraídos de claims verificados; nunca datos
+//     del cuerpo, cabeceras libres o parámetros controlados por el cliente.
+//   - Devuelve nil sólo si la sesión existe, pertenece al sujeto, está ACTIVE, no ha expirado
+//     y la época de revocación (`epo` del token frente a `sessionEpoch` del perfil) coincide.
+//   - Devuelve ErrSessionUnauthorized para cualquier estado no utilizable, incluida una época
+//     desalineada tras un cambio de contraseña (A6, RFC-016 §17.3).
 //   - Devuelve ErrSessionUnavailable cuando no puede determinarse el estado.
 //
 // La revocación debe ser observable de inmediato por cualquier instancia: la implementación
 // autoritativa es DynamoDB con lectura consistente. Una caché puede ayudar al rendimiento,
 // pero nunca puede autorizar una sesión que ya fue revocada (A-080 §2.6).
 type SessionAuthorizer interface {
-	AuthorizeSession(ctx context.Context, userID, sessionID string) error
+	AuthorizeSession(ctx context.Context, userID, sessionID string, epoch int64) error
 }

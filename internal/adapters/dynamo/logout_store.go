@@ -192,12 +192,13 @@ func (s *LogoutStore) RevokeLogoutSession(ctx context.Context, revocation appIde
 }
 
 // AuthorizeSession implementa ports.SessionAuthorizer: comprueba que la sesión del token siga
-// existiendo, pertenezca al sujeto, no esté revocada y no haya expirado.
+// existiendo, pertenezca al sujeto, no esté revocada, no haya expirado y que la época de
+// revocación del token (`epo`) coincida con la vigente del perfil (A6, RFC-016 §17.3).
 //
 // No compara el `jti` del token con `accessJti`: E003 rota el jti en cada refresh, de modo que
 // compararlo invalidaría access tokens todavía válidos de una sesión activa (T19). La
-// revocación se aplica al estado de la sesión, no a un token concreto.
-func (s *LogoutStore) AuthorizeSession(ctx context.Context, userID, sessionID string) error {
+// revocación se aplica al estado de la sesión y a la época del perfil, no a un token concreto.
+func (s *LogoutStore) AuthorizeSession(ctx context.Context, userID, sessionID string, epoch int64) error {
 	if s == nil || s.client == nil || s.table == "" {
 		return ports.ErrSessionUnavailable
 	}
@@ -226,7 +227,50 @@ func (s *LogoutStore) AuthorizeSession(ctx context.Context, userID, sessionID st
 	if expires, ok := attributeTime(item); ok && !time.Now().UTC().Before(expires) {
 		return ports.ErrSessionUnauthorized
 	}
+
+	// Época de revocación: se lee el perfil con consistencia fuerte. Un fallo de DynamoDB
+	// debe responder 503, nunca autorizar por defecto; una época desalineada responde 401.
+	perfil, errPerfil := s.profileForSession(ctx, userID)
+	if errPerfil != nil {
+		return ports.ErrSessionUnavailable
+	}
+	if perfil == nil {
+		return ports.ErrSessionUnauthorized
+	}
+	if perfil.Status != "" && !strings.EqualFold(strings.TrimSpace(perfil.Status), appIdentity.StatusActive) {
+		return ports.ErrSessionUnauthorized
+	}
+	if perfil.Epoch != epoch {
+		return ports.ErrSessionUnauthorized
+	}
 	return nil
+}
+
+// sessionProfile es la lectura mínima del perfil necesaria para verificar la época.
+type sessionProfile struct {
+	Status string
+	Epoch  int64
+}
+
+// profileForSession lee `USER#<id>/PROFILE` con consistencia fuerte. Devuelve (nil, nil)
+// cuando el perfil no existe: una cuenta eliminada no autoriza ninguna sesión.
+func (s *LogoutStore) profileForSession(ctx context.Context, userID string) (*sessionProfile, error) {
+	pk, sk := domainDynamo.UserKeys(userID)
+	item, err := s.getItem(ctx, pk, sk)
+	if err != nil {
+		return nil, err
+	}
+	if item == nil {
+		return nil, nil
+	}
+	if entity := stringAttribute(item["entityType"]); entity != "" && entity != "USER_PROFILE" {
+		return nil, nil
+	}
+	perfil := &sessionProfile{Status: stringAttribute(item["status"])}
+	if epoch, ok := attributeInt(item["sessionEpoch"]); ok {
+		perfil.Epoch = epoch
+	}
+	return perfil, nil
 }
 
 // statusMatchesActive acepta `ACTIVE` y el estado vacío heredado de ítems escritos antes de

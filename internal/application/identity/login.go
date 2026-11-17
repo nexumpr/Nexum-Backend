@@ -93,6 +93,9 @@ type StoredIdentity struct {
 	PasswordHash  string
 	EmailVerified bool
 	Status        string
+	// SessionEpoch es la época de revocación vigente del perfil (A6). Un perfil previo a
+	// A6 no tiene el atributo y se interpreta como 0.
+	SessionEpoch int64
 }
 
 // SessionRecord es la sesión que se persiste de forma atómica con su localizador de refresh.
@@ -108,6 +111,8 @@ type SessionRecord struct {
 	CreatedAt   time.Time
 	ExpiresAt   time.Time
 	Status      string
+	// SessionEpoch es la época de revocación con la que nació la sesión (A6).
+	SessionEpoch int64
 }
 
 // LoginStore es el puerto de persistencia de E002: lectura de identidad y escritura
@@ -120,7 +125,7 @@ type LoginStore interface {
 
 // AccessTokenIssuer abstrae la emisión del JWT para poder probar sin claves reales.
 type AccessTokenIssuer interface {
-	IssueAccessToken(ctx context.Context, userID, sessionID string, now time.Time) (token, jti string, err error)
+	IssueAccessToken(ctx context.Context, userID, sessionID string, epoch int64, now time.Time) (token, jti string, err error)
 }
 
 // LoginService orquesta la autenticación completa de E002.
@@ -277,23 +282,24 @@ func (s *LoginService) Login(ctx context.Context, in LoginCommand) (*LoginRespon
 		return nil, ErrLoginUnavailable
 	}
 
-	accessToken, jti, err := s.issuer.IssueAccessToken(ctx, identity.UserID, sessionID, now)
+	accessToken, jti, err := s.issuer.IssueAccessToken(ctx, identity.UserID, sessionID, identity.SessionEpoch, now)
 	if err != nil {
 		return nil, ErrLoginUnavailable
 	}
 
 	record := SessionRecord{
-		UserID:      identity.UserID,
-		SessionID:   sessionID,
-		FamilyID:    familyID,
-		RefreshHash: HashToken(refreshToken),
-		AccessJTI:   jti,
-		DeviceID:    cmd.DeviceID,
-		DeviceName:  cmd.DeviceName,
-		Platform:    cmd.Platform,
-		CreatedAt:   now,
-		ExpiresAt:   now.Add(RefreshTokenTTL),
-		Status:      "ACTIVE",
+		UserID:       identity.UserID,
+		SessionID:    sessionID,
+		FamilyID:     familyID,
+		RefreshHash:  HashToken(refreshToken),
+		AccessJTI:    jti,
+		DeviceID:     cmd.DeviceID,
+		DeviceName:   cmd.DeviceName,
+		Platform:     cmd.Platform,
+		CreatedAt:    now,
+		ExpiresAt:    now.Add(RefreshTokenTTL),
+		Status:       "ACTIVE",
+		SessionEpoch: identity.SessionEpoch,
 	}
 	if err := s.store.CreateSession(ctx, record); err != nil {
 		return nil, ErrLoginUnavailable

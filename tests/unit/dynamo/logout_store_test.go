@@ -44,7 +44,7 @@ type e004Emisor struct {
 	n  int
 }
 
-func (e *e004Emisor) IssueAccessToken(_ context.Context, _, _ string, _ time.Time) (string, string, error) {
+func (e *e004Emisor) IssueAccessToken(_ context.Context, _, _ string, _ int64, _ time.Time) (string, string, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.n++
@@ -168,7 +168,7 @@ func TestE004LogoutRevocaYBloqueaRefresh(t *testing.T) {
 		t.Fatalf("refresh tras logout debe ser 401, obtenido %v", err)
 	}
 	// T05: el JWT de la sesión cerrada ya no autoriza.
-	if err := store.AuthorizeSession(ctx, e004Usuario, "sesion-a"); !errors.Is(err, ports.ErrSessionUnauthorized) {
+	if err := store.AuthorizeSession(ctx, e004Usuario, "sesion-a", 0); !errors.Is(err, ports.ErrSessionUnauthorized) {
 		t.Fatalf("AuthorizeSession tras logout debe rechazar, obtenido %v", err)
 	}
 }
@@ -189,7 +189,7 @@ func TestE004LogoutNoAfectaOtraSesion(t *testing.T) {
 	if status := stringAttrDe(e004EstadoSesion(m, e004Usuario, "sesion-b"), "status"); status != appIdentity.StatusActive {
 		t.Fatalf("sesion-b debe seguir ACTIVE, obtenido %q", status)
 	}
-	if err := dynamoAdapter.NewLogoutStore(m, e004Tabla).AuthorizeSession(ctx, e004Usuario, "sesion-b"); err != nil {
+	if err := dynamoAdapter.NewLogoutStore(m, e004Tabla).AuthorizeSession(ctx, e004Usuario, "sesion-b", 0); err != nil {
 		t.Fatalf("sesion-b debe seguir autorizando, obtenido %v", err)
 	}
 	tokens, err := e004RefreshService(m).Refresh(ctx, appIdentity.RefreshCommand{RefreshToken: e004RefreshB})
@@ -230,7 +230,7 @@ func TestE004RotacionPreviaNoInvalidaAccessToken(t *testing.T) {
 	}
 
 	// El jti cambió con cada rotación; la sesión sigue ACTIVE y debe autorizar.
-	if err := dynamoAdapter.NewLogoutStore(m, e004Tabla).AuthorizeSession(ctx, e004Usuario, "sesion-a"); err != nil {
+	if err := dynamoAdapter.NewLogoutStore(m, e004Tabla).AuthorizeSession(ctx, e004Usuario, "sesion-a", 0); err != nil {
 		t.Fatalf("una sesion ACTIVE rotada debe seguir autorizando (no se compara el jti): %v", err)
 	}
 
@@ -279,10 +279,10 @@ func TestE004RevocacionObservableEnDosInstancias(t *testing.T) {
 	nodoA := dynamoAdapter.NewLogoutStore(m, e004Tabla)
 	nodoB := dynamoAdapter.NewLogoutStore(m, e004Tabla)
 
-	if err := nodoA.AuthorizeSession(ctx, e004Usuario, "sesion-a"); err != nil {
+	if err := nodoA.AuthorizeSession(ctx, e004Usuario, "sesion-a", 0); err != nil {
 		t.Fatalf("antes del cierre el nodo A debe autorizar: %v", err)
 	}
-	if err := nodoB.AuthorizeSession(ctx, e004Usuario, "sesion-a"); err != nil {
+	if err := nodoB.AuthorizeSession(ctx, e004Usuario, "sesion-a", 0); err != nil {
 		t.Fatalf("antes del cierre el nodo B debe autorizar: %v", err)
 	}
 
@@ -291,7 +291,7 @@ func TestE004RevocacionObservableEnDosInstancias(t *testing.T) {
 		t.Fatalf("cierre en el nodo A fallo: %v", err)
 	}
 
-	if err := nodoB.AuthorizeSession(ctx, e004Usuario, "sesion-a"); !errors.Is(err, ports.ErrSessionUnauthorized) {
+	if err := nodoB.AuthorizeSession(ctx, e004Usuario, "sesion-a", 0); !errors.Is(err, ports.ErrSessionUnauthorized) {
 		t.Fatalf("el nodo B debe rechazar la sesion revocada por A, obtenido %v", err)
 	}
 }
@@ -311,7 +311,7 @@ func TestE004SesionAjenaNoSeRevoca(t *testing.T) {
 	if status := stringAttrDe(e004EstadoSesion(m, e004Usuario, "sesion-a"), "status"); status != appIdentity.StatusActive {
 		t.Fatalf("la sesion del titular debe seguir ACTIVE, obtenido %q", status)
 	}
-	if err := dynamoAdapter.NewLogoutStore(m, e004Tabla).AuthorizeSession(ctx, e004Usuario, "sesion-a"); err != nil {
+	if err := dynamoAdapter.NewLogoutStore(m, e004Tabla).AuthorizeSession(ctx, e004Usuario, "sesion-a", 0); err != nil {
 		t.Fatalf("la sesion del titular debe seguir autorizando: %v", err)
 	}
 }
@@ -326,7 +326,7 @@ func TestE004PersistenciaNoDisponible(t *testing.T) {
 	if !errors.Is(err, appIdentity.ErrLogoutUnavailable) {
 		t.Fatalf("sin persistencia el cierre debe ser ErrLogoutUnavailable, obtenido %v", err)
 	}
-	if err := store.AuthorizeSession(ctx, e004Usuario, "sesion-a"); !errors.Is(err, ports.ErrSessionUnavailable) {
+	if err := store.AuthorizeSession(ctx, e004Usuario, "sesion-a", 0); !errors.Is(err, ports.ErrSessionUnavailable) {
 		t.Fatalf("sin persistencia la autorizacion debe ser ErrSessionUnavailable, obtenido %v", err)
 	}
 
@@ -336,7 +336,7 @@ func TestE004PersistenciaNoDisponible(t *testing.T) {
 		dynamoAdapter.NewLogoutStore(nil, e004Tabla),
 		dynamoAdapter.NewLogoutStore(e004Fallo{}, ""),
 	} {
-		if err := sinConfig.AuthorizeSession(ctx, e004Usuario, "sesion-a"); !errors.Is(err, ports.ErrSessionUnavailable) {
+		if err := sinConfig.AuthorizeSession(ctx, e004Usuario, "sesion-a", 0); !errors.Is(err, ports.ErrSessionUnavailable) {
 			t.Fatalf("configuracion ausente debe devolver ErrSessionUnavailable, obtenido %v", err)
 		}
 	}
@@ -346,10 +346,10 @@ func TestE004PersistenciaNoDisponible(t *testing.T) {
 func TestE004SesionInexistenteNoAutoriza(t *testing.T) {
 	m := newMemoriaDynamo()
 	store := dynamoAdapter.NewLogoutStore(m, e004Tabla)
-	if err := store.AuthorizeSession(context.Background(), e004Usuario, "sesion-inexistente"); !errors.Is(err, ports.ErrSessionUnauthorized) {
+	if err := store.AuthorizeSession(context.Background(), e004Usuario, "sesion-inexistente", 0); !errors.Is(err, ports.ErrSessionUnauthorized) {
 		t.Fatalf("sesion inexistente debe ser ErrSessionUnauthorized, obtenido %v", err)
 	}
-	if err := store.AuthorizeSession(context.Background(), "", ""); !errors.Is(err, ports.ErrSessionUnauthorized) {
+	if err := store.AuthorizeSession(context.Background(), "", "", 0); !errors.Is(err, ports.ErrSessionUnauthorized) {
 		t.Fatalf("identificadores vacios deben ser ErrSessionUnauthorized, obtenido %v", err)
 	}
 }
@@ -408,7 +408,7 @@ func TestE004LogoutConcurrenteConRefresh(t *testing.T) {
 		if status := stringAttrDe(e004EstadoSesion(m, e004Usuario, "sesion-a"), "status"); status != appIdentity.StatusRevoked {
 			t.Fatalf("iteracion %d: la sesion debe quedar REVOKED, obtenido %q", iteracion, status)
 		}
-		if err := dynamoAdapter.NewLogoutStore(m, e004Tabla).AuthorizeSession(ctx, e004Usuario, "sesion-a"); !errors.Is(err, ports.ErrSessionUnauthorized) {
+		if err := dynamoAdapter.NewLogoutStore(m, e004Tabla).AuthorizeSession(ctx, e004Usuario, "sesion-a", 0); !errors.Is(err, ports.ErrSessionUnauthorized) {
 			t.Fatalf("iteracion %d: la sesion revocada no debe autorizar, obtenido %v", iteracion, err)
 		}
 	}

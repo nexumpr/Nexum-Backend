@@ -87,6 +87,9 @@ type RefreshSession struct {
 	ExpiresAt   time.Time
 	HasExpiry   bool
 	Version     int64
+	// SessionEpoch es la época de revocación con la que nació la sesión (A6). Una sesión
+	// creada antes de A6 no tiene el atributo y se interpreta como 0.
+	SessionEpoch int64
 }
 
 // RefreshRotation describe la transición atómica que consume el token presentado y emite
@@ -105,6 +108,9 @@ type RefreshRotation struct {
 	// replica en el localizador nuevo para que ambos caduquen juntos.
 	ExpiresAt time.Time
 	Now       time.Time
+	// SessionEpoch es la época de revocación de la sesión; la transacción exige que el
+	// perfil conserve la misma época, cerrando la carrera con un cambio de contraseña (A6).
+	SessionEpoch int64
 }
 
 // RefreshRevocation revoca de forma durable la sesión de la familia afectada.
@@ -122,6 +128,8 @@ type RefreshRevocation struct {
 type RefreshUser struct {
 	UserID string
 	Status string
+	// SessionEpoch es la época de revocación vigente del perfil (A6). Ausente = 0.
+	SessionEpoch int64
 }
 
 // RefreshStore es el puerto de persistencia de E003. Se implementa sobre DynamoDB real;
@@ -273,7 +281,7 @@ func (s *RefreshService) Refresh(ctx context.Context, in RefreshCommand) (*AuthT
 	if errUser != nil {
 		return nil, ErrRefreshUnavailable
 	}
-	if err := verifyUserState(user, session.UserID); err != nil {
+	if err := verifyUserState(user, session); err != nil {
 		return nil, err
 	}
 
@@ -293,6 +301,7 @@ func (s *RefreshService) Refresh(ctx context.Context, in RefreshCommand) (*AuthT
 		NewVersion:      session.Version + 1,
 		ExpiresAt:       session.ExpiresAt,
 		Now:             now,
+		SessionEpoch:    session.SessionEpoch,
 	}
 	if err := s.store.RotateRefresh(ctx, rotation); err != nil {
 		if errors.Is(err, ErrRefreshConflict) {
@@ -366,23 +375,30 @@ func verifySessionState(session *RefreshSession, locator *RefreshLocator, digest
 	return nil
 }
 
-// verifyUserState exige que el perfil exista, pertenezca al mismo usuario y esté ACTIVE.
-func verifyUserState(user *RefreshUser, sessionUserID string) error {
+// verifyUserState exige que el perfil exista, pertenezca al mismo usuario, esté ACTIVE y
+// que la época de la sesión siga siendo la vigente (A6). Una sesión creada antes de un
+// cambio de contraseña no puede renovar aunque siga marcada ACTIVE.
+func verifyUserState(user *RefreshUser, session *RefreshSession) error {
 	if user == nil {
 		return ErrInvalidRefreshToken
 	}
-	if user.UserID != "" && user.UserID != sessionUserID {
+	if user.UserID != "" && user.UserID != session.UserID {
 		return ErrInvalidRefreshToken
 	}
 	if !statusMatches(user.Status, StatusActive) {
 		return ErrInvalidRefreshToken
 	}
+	if session.SessionEpoch != user.SessionEpoch {
+		return ErrInvalidRefreshToken
+	}
 	return nil
 }
 
-// issueNext genera el access token, su jti y el refresh opaco con su digest.
+// issueNext genera el access token, su jti y el refresh opaco con su digest. El token nuevo
+// porta la misma época que la sesión: tras un cambio de contraseña la sesión antigua ya no
+// llega aquí (A6).
 func (s *RefreshService) issueNext(ctx context.Context, session *RefreshSession, now time.Time) (string, string, string, string, error) {
-	accessToken, jti, err := s.issuer.IssueAccessToken(ctx, session.UserID, session.SessionID, now)
+	accessToken, jti, err := s.issuer.IssueAccessToken(ctx, session.UserID, session.SessionID, session.SessionEpoch, now)
 	if err != nil {
 		return "", "", "", "", ErrRefreshUnavailable
 	}
@@ -457,7 +473,7 @@ func (s *RefreshService) classifyConflict(ctx context.Context, digest string, no
 	if errUser != nil {
 		return ErrRefreshUnavailable
 	}
-	if err := verifyUserState(user, session.UserID); err != nil {
+	if err := verifyUserState(user, session); err != nil {
 		return err
 	}
 	return ErrRefreshConflict

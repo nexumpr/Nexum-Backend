@@ -49,6 +49,10 @@ type JWTPayload struct {
 	ExpiresAt int64    `json:"exp"`
 	Roles     []string `json:"roles,omitempty"`
 	JWTID     string   `json:"jti"`
+	// Epoch es la época de revocación (A6). Se omite en el JSON cuando vale 0 para no
+	// alterar el tamaño de los tokens de perfiles que nunca cambiaron su contraseña;
+	// al validar, su ausencia se interpreta como 0.
+	Epoch int64 `json:"epo,omitempty"`
 }
 
 // RSATokenProvider implementa el puerto ports.TokenProvider con firmas RSA-SHA256 (RS256).
@@ -150,6 +154,7 @@ func (p *RSATokenProvider) GenerateAccessToken(ctx context.Context, claims ports
 		ExpiresAt: exp.Unix(),
 		Roles:     claims.Roles,
 		JWTID:     jti,
+		Epoch:     claims.Epoch,
 	}
 
 	headerJSON, err := json.Marshal(header)
@@ -284,6 +289,7 @@ func (p *RSATokenProvider) ValidateAccessToken(ctx context.Context, tokenString 
 		IssuedAt:  time.Unix(payload.IssuedAt, 0).UTC(),
 		ExpiresAt: time.Unix(payload.ExpiresAt, 0).UTC(),
 		Roles:     payload.Roles,
+		Epoch:     payload.Epoch,
 	}, nil
 }
 
