@@ -77,12 +77,20 @@ regexes = ['''^\s*(?:const\s+)?key\s*:?=\s*"0123456789abcdef"\s*$''']
 # Los endpoints de identidad se prueban con literales que la regla `generic-api-key`
 # interpreta como credenciales. La excepcion NO es por ruta: exige que el VALOR cumpla
 # una convencion que ninguna credencial real usa (sufijo `Passphrase#2026` o prefijo
-# `token-sintetico-`), y solo aplica dentro de `tests/`. Cualquier otro literal, en
-# tests o fuera de ellos, sigue generando hallazgo.
+# `token-sintetico-`), y solo aplica en los archivos de prueba enumerados uno a uno.
+# Cualquier otro literal, en esos archivos o fuera de ellos, sigue generando hallazgo.
 [[rules.allowlists]]
 description = "Credenciales sinteticas de pruebas Nexum (convencion explicita de valor, solo en tests/)"
 condition = "AND"
-paths = ['''^tests/.*\.go$''']
+paths = [
+  '''^tests/unit/application/password_change_test\.go$''',
+  '''^tests/unit/transport/password_change_test\.go$''',
+  '''^tests/unit/dynamo/password_change_store_test\.go$''',
+  '''^tests/unit/application/email_verification_confirm_test\.go$''',
+  '''^tests/unit/transport/email_verification_confirm_test\.go$''',
+  '''^tests/unit/dynamo/email_verification_confirm_store_test\.go$''',
+  '''^tests/unit/dynamo/email_verification_store_test\.go$''',
+]
 regexTarget = "line"
 regexes = [
   '''(?i)\b\w*pass(?:word|phrase)\b"?\s*[:=]\s*"?(?:[A-Za-z]+)?Passphrase#2026''',
