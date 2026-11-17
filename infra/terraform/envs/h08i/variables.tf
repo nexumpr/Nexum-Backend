@@ -49,6 +49,12 @@ variable "ventana_mantenimiento_activa" {
   default     = false
 }
 
+variable "habilitar_endpoint_ses" {
+  description = "Crea el interface endpoint de SES API v2 (email) para E005; 0.02 USD/h (2 AZ). Activado en produccion para que los planes futuros no propongan destruirlo."
+  type        = bool
+  default     = true
+}
+
 variable "etiquetas" {
   description = "Etiquetas adicionales para default_tags"
   type        = map(string)

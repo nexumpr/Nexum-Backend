@@ -308,6 +308,26 @@ resource "aws_vpc_endpoint" "permanente" {
   }
 }
 
+# SES API v2 (no SMTP): endpoint opt-in para E005. Sin NAT, las EC2 privadas no
+# alcanzan `email.us-east-2.amazonaws.com`; este interface endpoint resuelve la
+# API por PrivateLink con DNS privado. Coste 0.01 USD/h por AZ (2 AZ = 0.02 USD/h).
+resource "aws_vpc_endpoint" "ses" {
+  count = var.habilitar_endpoint_ses ? 1 : 0
+
+  vpc_id              = aws_vpc.principal.id
+  service_name        = "com.amazonaws.${var.region}.email"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = [for s in aws_subnet.privada : s.id]
+  security_group_ids  = [aws_security_group.endpoints.id]
+  private_dns_enabled = true
+
+  tags = {
+    Name = "${local.nombre}-vpce-ses"
+    Modo = "permanente"
+    Spec = "E005-SES"
+  }
+}
+
 resource "aws_vpc_endpoint" "ventana" {
   for_each = var.ventana_mantenimiento_activa ? local.endpoints_ventana : {}
 

@@ -72,6 +72,7 @@ module "red" {
   zonas                        = var.zonas
   puerto_backend               = var.puerto_backend
   ventana_mantenimiento_activa = var.ventana_mantenimiento_activa
+  habilitar_endpoint_ses       = var.habilitar_endpoint_ses
 }
 
 output "vpc_id" {

@@ -36,6 +36,11 @@ output "interface_endpoint_permanente" {
   value       = { for k, e in aws_vpc_endpoint.permanente : k => e.id }
 }
 
+output "interface_endpoint_ses" {
+  description = "Interface endpoint de SES API v2 (vacío si está desactivado)"
+  value       = try(aws_vpc_endpoint.ses[0].id, "")
+}
+
 output "interface_endpoints_ventana" {
   description = "Interface endpoints activos sólo en ventana de mantenimiento"
   value       = { for k, e in aws_vpc_endpoint.ventana : k => e.id }
