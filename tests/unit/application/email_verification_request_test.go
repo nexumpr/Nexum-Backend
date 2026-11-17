@@ -110,7 +110,7 @@ func TestE010SolicitudPersisteSoloElHashYEnvia(t *testing.T) {
 	if guardado.TokenHash == correo.token {
 		t.Fatalf("el token en claro no puede persistirse")
 	}
-	if len(guardado.TokenHash) != 64 || strings.ContainsAny(guardado.TokenHash, "ghijklmnopqrstuvwxyzGHIJKLMNOPQRSTUVWXYZ+/=") {
+	if len(guardado.TokenHash) != 64 || strings.Trim(guardado.TokenHash, "0123456789abcdef") != "" {
 		t.Fatalf("el hash debe ser sha256 hex de 64 caracteres")
 	}
 	if len(correo.token) != 43 {
