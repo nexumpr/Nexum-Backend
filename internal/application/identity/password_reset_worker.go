@@ -2,6 +2,8 @@ package identity
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"log/slog"
 	"time"
 
@@ -10,20 +12,21 @@ import (
 
 // ResetWorker procesa la cola durable de recuperacion de contrasena.
 //
-// Coordinacion: solo el nodo que obtiene el lease en Redis trabaja, y cada trabajo se
-// reclama de forma atomica en DynamoDB. El lease NO sustituye la reclamacion.
-// Semantica de entrega: at-least-once (SES puede aceptar y el proceso caer antes de
-// marcar ENVIADO); el reenvio usa el mismo enlace de un solo uso.
+// Coordinacion: solo el nodo con el lease en Redis trabaja, y cada trabajo se reclama
+// de forma atomica en DynamoDB con un `owner` unico y un `fence` creciente. Un worker
+// cuyo lease o fence quedo obsoleto NO puede cerrar ni reprogramar el trabajo.
+// Entrega at-least-once: si SES acepta y el proceso cae, se reenvia el mismo enlace.
 type ResetWorker struct {
-	store      ports.ResetStore
-	correo     ports.Correo
-	sellador   ports.Sellador
-	arrendador ports.Arrendador
-	logger     *slog.Logger
-	Intervalo  time.Duration
-	Lote       int
-	Lease      time.Duration
-	AhorroMax  int
+	store       ports.ResetStore
+	correo      ports.Correo
+	sellador    ports.Sellador
+	arrendador  ports.Arrendador
+	logger      *slog.Logger
+	owner       string
+	Intervalo   time.Duration
+	Lote        int
+	Lease       time.Duration
+	MaxIntentos int
 }
 
 // NewResetWorker construye el worker. Cualquier dependencia nil lo deja inerte.
@@ -34,16 +37,21 @@ func NewResetWorker(
 	arrendador ports.Arrendador,
 	logger *slog.Logger,
 ) *ResetWorker {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		b = []byte{0, 1, 2, 3, 4, 5, 6, 7}
+	}
 	return &ResetWorker{
-		store:      store,
-		correo:     correo,
-		sellador:   sellador,
-		arrendador: arrendador,
-		logger:     logger,
-		Intervalo:  15 * time.Second,
-		Lote:       25,
-		Lease:      30 * time.Second,
-		AhorroMax:  6,
+		store:       store,
+		correo:      correo,
+		sellador:    sellador,
+		arrendador:  arrendador,
+		logger:      logger,
+		owner:       "pwreset-" + hex.EncodeToString(b),
+		Intervalo:   15 * time.Second,
+		Lote:        25,
+		Lease:       30 * time.Second,
+		MaxIntentos: 6,
 	}
 }
 
@@ -51,6 +59,9 @@ func NewResetWorker(
 func (w *ResetWorker) Disponible() bool {
 	return w != nil && w.store != nil && w.correo != nil && w.sellador != nil && w.arrendador != nil
 }
+
+// Owner expone el identificador de instancia usado en la reclamacion.
+func (w *ResetWorker) Owner() string { return w.owner }
 
 // Run se ejecuta hasta cancelar el contexto (apagado controlado del servidor).
 func (w *ResetWorker) Run(ctx context.Context) {
@@ -69,8 +80,7 @@ func (w *ResetWorker) Run(ctx context.Context) {
 	}
 }
 
-// Ciclo ejecuta una pasada completa: comprueba liderazgo y procesa un lote.
-// Devuelve cuantos envios se completaron.
+// Ciclo hace una pasada: comprueba liderazgo y procesa un lote.
 func (w *ResetWorker) Ciclo(ctx context.Context) int {
 	if !w.Disponible() {
 		return 0
@@ -90,24 +100,28 @@ func (w *ResetWorker) Ciclo(ctx context.Context) int {
 	enviados := 0
 	for _, t := range trabajos {
 		if !t.ExpiraEn.After(ahora) {
-			_ = w.store.Reintentar(ctx, t.OutboxID, t.Intentos, ahora, ahora, true)
+			_ = w.store.Reintentar(ctx, t, t.Intentos, ahora, ahora, true)
 			continue
 		}
-		ok, err := w.store.Reclamar(ctx, t.OutboxID, ahora, w.Lease)
+		fence, ok, err := w.store.Reclamar(ctx, t.OutboxID, w.owner, ahora, w.Lease)
 		if err != nil || !ok {
-			continue
+			continue // otro nodo lo tomo
 		}
+		// El fence de ESTA reclamacion viaja con el trabajo: sin el no se puede cerrar.
+		t.Fence = fence
+		t.Owner = w.owner
+
 		token, err := w.sellador.Abrir(t.TokenSello, t.UserID+"|"+t.OutboxID)
 		if err != nil {
-			_ = w.store.Reintentar(ctx, t.OutboxID, t.Intentos, ahora, ahora, true)
+			_ = w.store.Reintentar(ctx, t, t.Intentos, ahora, ahora, true)
 			continue
 		}
 		if _, err := w.correo.EnviarRecuperacion(ctx, t.Destino, token, t.ExpiraEn); err != nil {
 			intentos := t.Intentos + 1
-			_ = w.store.Reintentar(ctx, t.OutboxID, intentos, ahora.Add(espera(intentos)), ahora, intentos >= w.AhorroMax)
+			_ = w.store.Reintentar(ctx, t, intentos, ahora.Add(espera(intentos)), ahora, intentos >= w.MaxIntentos)
 			continue
 		}
-		if err := w.store.MarcarEnviado(ctx, t.OutboxID, "", ahora); err == nil {
+		if err := w.store.MarcarEnviado(ctx, t, "", ahora); err == nil {
 			enviados++
 		}
 	}

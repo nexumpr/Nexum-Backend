@@ -149,95 +149,102 @@ func lastDash(s string) int {
 	return -1
 }
 
-// Reclamar toma el trabajo de forma condicional (PENDIENTE -> ENVIANDO).
-func (s *PasswordResetStore) Reclamar(ctx context.Context, outboxID string, ahora time.Time, lease time.Duration) (bool, error) {
-	// El SK se reconstruye desde la propia cola para no duplicar estado en memoria.
-	trabajos, err := s.Pendientes(ctx, ahora, 50)
+// buscarTrabajo localiza un item de la cola por su outboxID (sin Scan).
+func (s *PasswordResetStore) buscarTrabajo(ctx context.Context, outboxID string) (ports.ResetTrabajo, error) {
+	trabajos, err := s.todosLosTrabajos(ctx)
 	if err != nil {
-		return false, err
+		return ports.ResetTrabajo{}, err
 	}
 	for _, t := range trabajos {
-		if t.OutboxID != outboxID {
-			continue
+		if t.OutboxID == outboxID {
+			return t, nil
 		}
-		clave := s.claveTrabajo(t)
-		_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-			TableName: aws.String(s.tabla), Key: clave,
-			UpdateExpression:         aws.String("SET #e = :enviando, owner = :owner, leaseUntil = :lease, fence = if_not_exists(fence, :zero) + :one"),
-			ConditionExpression:      aws.String("(#e = :pendiente) OR (#e = :enviando AND leaseUntil < :ahora)"),
-			ExpressionAttributeNames: map[string]string{"#e": "estado"},
-			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":enviando":  &types.AttributeValueMemberS{Value: "ENVIANDO"},
-				":pendiente": &types.AttributeValueMemberS{Value: "PENDIENTE"},
-				":lease":     &types.AttributeValueMemberN{Value: strconv.FormatInt(ahora.Add(lease).Unix(), 10)},
-				":zero":      &types.AttributeValueMemberN{Value: "0"},
-				":one":       &types.AttributeValueMemberN{Value: "1"},
-				":owner":     &types.AttributeValueMemberS{Value: "worker"},
-				":ahora":     &types.AttributeValueMemberN{Value: strconv.FormatInt(ahora.Unix(), 10)},
-			},
-		})
-		if err != nil {
-			return false, nil // condicion no cumplida: otro nodo lo tomo
-		}
-		return true, nil
 	}
-	return false, nil
+	return ports.ResetTrabajo{}, fmt.Errorf("trabajo %s no encontrado", outboxID)
 }
 
-// MarcarEnviado cierra el trabajo y elimina el token cifrado.
-func (s *PasswordResetStore) MarcarEnviado(ctx context.Context, outboxID, _ string, ahora time.Time) error {
-	return s.actualizarTrabajo(ctx, outboxID, ahora, "SET #e = :enviado, enviadoEn = :s REMOVE tokenSello")
+// Reclamar toma el trabajo de forma condicional y devuelve el fence de ESTA
+// reclamacion. El worker lo conserva: sin el no puede cerrar el trabajo.
+func (s *PasswordResetStore) Reclamar(ctx context.Context, outboxID, owner string, ahora time.Time, lease time.Duration) (int, bool, error) {
+	trabajo, err := s.buscarTrabajo(ctx, outboxID)
+	if err != nil {
+		return 0, false, nil
+	}
+	out, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(s.tabla), Key: s.claveTrabajo(trabajo),
+		UpdateExpression: aws.String("SET #e = :enviando, #owner = :owner, leaseUntil = :lease, fence = if_not_exists(fence, :zero) + :one"),
+		ConditionExpression: aws.String(
+			"(#e = :pendiente) OR (#e = :enviando AND leaseUntil < :ahora)"),
+		ExpressionAttributeNames: map[string]string{"#e": "estado", "#owner": "owner"},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":enviando":  &types.AttributeValueMemberS{Value: "ENVIANDO"},
+			":pendiente": &types.AttributeValueMemberS{Value: "PENDIENTE"},
+			":owner":     &types.AttributeValueMemberS{Value: owner},
+			":lease":     &types.AttributeValueMemberN{Value: strconv.FormatInt(ahora.Add(lease).Unix(), 10)},
+			":ahora":     &types.AttributeValueMemberN{Value: strconv.FormatInt(ahora.Unix(), 10)},
+			":zero":      &types.AttributeValueMemberN{Value: "0"},
+			":one":       &types.AttributeValueMemberN{Value: "1"},
+		},
+		ReturnValues: types.ReturnValueAllNew,
+	})
+	if err != nil {
+		return 0, false, nil // condicion no cumplida: otro nodo lo tomo
+	}
+	fence := 0
+	if v, ok := out.Attributes["fence"].(*types.AttributeValueMemberN); ok {
+		if n, errN := strconv.Atoi(v.Value); errN == nil {
+			fence = n
+		}
+	}
+	return fence, true, nil
 }
 
-// Reintentar reprograma o cierra el trabajo.
-func (s *PasswordResetStore) Reintentar(ctx context.Context, outboxID string, intentos int, proximo time.Time, _ time.Time, fallido bool) error {
+// MarcarEnviado cierra el trabajo exigiendo estado, owner y fence vigentes.
+func (s *PasswordResetStore) MarcarEnviado(ctx context.Context, trabajo ports.ResetTrabajo, _ string, ahora time.Time) error {
+	return s.actualizarTrabajo(ctx, trabajo,
+		"SET #e = :enviado, enviadoEn = :s REMOVE tokenSello",
+		map[string]types.AttributeValue{":s": &types.AttributeValueMemberN{Value: strconv.FormatInt(ahora.Unix(), 10)}},
+		map[string]types.AttributeValue{":enviado": &types.AttributeValueMemberS{Value: "ENVIADO"}},
+	)
+}
+
+// Reintentar reprograma (conservando el sobre) o cierra el trabajo como fallido.
+func (s *PasswordResetStore) Reintentar(ctx context.Context, trabajo ports.ResetTrabajo, intentos int, proximo time.Time, _ time.Time, fallido bool) error {
 	vals := map[string]types.AttributeValue{
 		":i": &types.AttributeValueMemberN{Value: strconv.Itoa(intentos)},
 		":p": &types.AttributeValueMemberN{Value: strconv.FormatInt(proximo.Unix(), 10)},
 	}
 	if fallido {
-		// Solo el cierre definitivo elimina el material cifrado.
 		vals[":fallido"] = &types.AttributeValueMemberS{Value: "FALLIDO"}
-		return s.actualizarTrabajoCon(ctx, outboxID,
-			"SET #e = :fallido, intentos = :i, proximoIntento = :p REMOVE tokenSello", vals)
+		return s.actualizarTrabajo(ctx, trabajo,
+			"SET #e = :fallido, intentos = :i, proximoIntento = :p REMOVE tokenSello", vals, nil)
 	}
 	vals[":pendiente"] = &types.AttributeValueMemberS{Value: "PENDIENTE"}
-	return s.actualizarTrabajoCon(ctx, outboxID,
-		"SET #e = :pendiente, intentos = :i, proximoIntento = :p", vals)
+	return s.actualizarTrabajo(ctx, trabajo,
+		"SET #e = :pendiente, intentos = :i, proximoIntento = :p", vals, nil)
 }
 
-func (s *PasswordResetStore) actualizarTrabajo(ctx context.Context, outboxID string, ahora time.Time, expr string) error {
-	return s.actualizarTrabajoCon(ctx, outboxID, expr, map[string]types.AttributeValue{
-		":s": &types.AttributeValueMemberN{Value: strconv.FormatInt(ahora.Unix(), 10)},
-	})
-}
-
-func (s *PasswordResetStore) actualizarTrabajoCon(ctx context.Context, outboxID, expr string, extra map[string]types.AttributeValue) error {
-	trabajos, err := s.todosLosTrabajos(ctx)
-	if err != nil {
-		return err
+func (s *PasswordResetStore) actualizarTrabajo(ctx context.Context, trabajo ports.ResetTrabajo, expr string, extra map[string]types.AttributeValue, principal map[string]types.AttributeValue) error {
+	vals := map[string]types.AttributeValue{
+		":enviando": &types.AttributeValueMemberS{Value: "ENVIANDO"},
+		":owner":    &types.AttributeValueMemberS{Value: trabajo.Owner},
+		":fence":    &types.AttributeValueMemberN{Value: strconv.Itoa(trabajo.Fence)},
 	}
-	for _, t := range trabajos {
-		if t.OutboxID != outboxID {
-			continue
-		}
-		vals := map[string]types.AttributeValue{
-			":enviado":   &types.AttributeValueMemberS{Value: "ENVIADO"},
-			":pendiente": &types.AttributeValueMemberS{Value: "PENDIENTE"},
-			":fallido":   &types.AttributeValueMemberS{Value: "FALLIDO"},
-			":fence":     &types.AttributeValueMemberN{Value: strconv.Itoa(t.Fence)},
-		}
-		for k, v := range extra {
-			vals[k] = v
-		}
-		_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-			TableName: aws.String(s.tabla), Key: s.claveTrabajo(t),
-			UpdateExpression:          aws.String(expr),
-			ConditionExpression:       aws.String("fence = :fence"),
-			ExpressionAttributeNames:  map[string]string{"#e": "estado"},
-			ExpressionAttributeValues: vals,
-		})
-		return err
+	for k, v := range extra {
+		vals[k] = v
+	}
+	for k, v := range principal {
+		vals[k] = v
+	}
+	_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(s.tabla), Key: s.claveTrabajo(trabajo),
+		UpdateExpression:          aws.String(expr),
+		ConditionExpression:       aws.String("#e = :enviando AND #owner = :owner AND fence = :fence"),
+		ExpressionAttributeNames:  map[string]string{"#e": "estado", "#owner": "owner"},
+		ExpressionAttributeValues: vals,
+	})
+	if err != nil {
+		return fmt.Errorf("actualizacion condicionada del trabajo: %w", err)
 	}
 	return nil
 }
@@ -346,6 +353,9 @@ func trabajoDesdeItem(it map[string]types.AttributeValue) ports.ResetTrabajo {
 		if n, err := strconv.ParseInt(v.Value, 10, 64); err == nil {
 			t.ExpiraEn = time.Unix(n, 0).UTC()
 		}
+	}
+	if v, ok := it["owner"].(*types.AttributeValueMemberS); ok {
+		t.Owner = v.Value
 	}
 	if v, ok := it["fence"].(*types.AttributeValueMemberN); ok {
 		if n, err := strconv.Atoi(v.Value); err == nil {

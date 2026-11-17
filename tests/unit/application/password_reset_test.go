@@ -12,12 +12,17 @@ import (
 )
 
 type storeFake struct {
-	admisiones []ports.ResetAdmission
-	marcados   []string
-	reintentos []string
-	trabajos   []ports.ResetTrabajo
-	reclamar   bool
-	pendientes error
+	admisiones   []ports.ResetAdmission
+	marcados     []string
+	reintentos   []string
+	trabajos     []ports.ResetTrabajo
+	reclamar     bool
+	pendientes   error
+	reclamado    string
+	owner        string
+	fence        int
+	marcadoFence int
+	marcadoOwner string
 }
 
 func (s *storeFake) Admitir(_ context.Context, adm ports.ResetAdmission) error {
@@ -27,15 +32,22 @@ func (s *storeFake) Admitir(_ context.Context, adm ports.ResetAdmission) error {
 func (s *storeFake) Pendientes(_ context.Context, _ time.Time, _ int) ([]ports.ResetTrabajo, error) {
 	return s.trabajos, s.pendientes
 }
-func (s *storeFake) Reclamar(_ context.Context, _ string, _ time.Time, _ time.Duration) (bool, error) {
-	return s.reclamar, nil
+func (s *storeFake) Reclamar(_ context.Context, outboxID, owner string, _ time.Time, _ time.Duration) (int, bool, error) {
+	s.reclamado = outboxID
+	s.owner = owner
+	return s.fence, s.reclamar, nil
 }
-func (s *storeFake) MarcarEnviado(_ context.Context, outboxID, _ string, _ time.Time) error {
-	s.marcados = append(s.marcados, outboxID)
+func (s *storeFake) MarcarEnviado(_ context.Context, tr ports.ResetTrabajo, _ string, _ time.Time) error {
+	s.marcados = append(s.marcados, tr.OutboxID)
+	s.marcadoFence = tr.Fence
+	s.marcadoOwner = tr.Owner
+	if tr.Fence != s.fence {
+		return ports.ErrResetTokenInvalido
+	}
 	return nil
 }
-func (s *storeFake) Reintentar(_ context.Context, outboxID string, _ int, _ time.Time, _ time.Time, _ bool) error {
-	s.reintentos = append(s.reintentos, outboxID)
+func (s *storeFake) Reintentar(_ context.Context, tr ports.ResetTrabajo, _ int, _ time.Time, _ time.Time, _ bool) error {
+	s.reintentos = append(s.reintentos, tr.OutboxID)
 	return nil
 }
 
@@ -239,5 +251,44 @@ func TestE005ValidacionDeEmail(t *testing.T) {
 	}
 	if !appIdentity.ValidarEmail("usuario@example.invalid") {
 		t.Fatal("deberia aceptar un correo valido")
+	}
+}
+
+func TestE005FenceViajaConElTrabajo(t *testing.T) {
+	store := &storeFake{
+		reclamar: true,
+		fence:    7,
+		trabajos: []ports.ResetTrabajo{{
+			OutboxID: "ob-1", UserID: "u", Destino: "a@example.invalid",
+			TokenSello: []byte("sobre:tok"), ExpiraEn: time.Now().Add(10 * time.Minute),
+		}},
+	}
+	w := worker(store, &correoFake{}, &selladorFake{}, &arrendadorFake{lider: true})
+	if n := w.Ciclo(context.Background()); n != 1 {
+		t.Fatalf("esperado 1 envio, obtenido %d", n)
+	}
+	if store.owner == "" || store.owner == "worker" {
+		t.Fatalf("owner debe identificar la instancia, obtenido %q", store.owner)
+	}
+	if store.marcadoFence != 7 || store.marcadoOwner != store.owner {
+		t.Fatalf("fence/owner no viajaron al cierre: fence=%d owner=%q", store.marcadoFence, store.marcadoOwner)
+	}
+}
+
+func TestE005FencingRechazaCierreConFenceAjeno(t *testing.T) {
+	store := &storeFake{
+		reclamar: true,
+		fence:    9, // el trabajo ya fue reclamado con fence mayor
+		trabajos: []ports.ResetTrabajo{{
+			OutboxID: "ob-1", UserID: "u", Destino: "a@example.invalid",
+			TokenSello: []byte("sobre:tok"), ExpiraEn: time.Now().Add(10 * time.Minute),
+		}},
+	}
+	// El worker recibe fence 9 de la reclamacion; simulamos que el cierre ve un fence
+	// distinto forzando el valor devuelto.
+	w := worker(store, &correoFake{}, &selladorFake{}, &arrendadorFake{lider: true})
+	store.fence = 10 // el otro worker reclamo entre la reclamacion y el cierre
+	if n := w.Ciclo(context.Background()); n != 0 {
+		t.Fatalf("un fence obsoleto no puede cerrar el trabajo: %d", n)
 	}
 }

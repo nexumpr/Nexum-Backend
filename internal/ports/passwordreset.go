@@ -39,6 +39,8 @@ type ResetTrabajo struct {
 	// Fence identifica la reclamacion vigente: un worker con valor antiguo no
 	// puede cerrar el trabajo que otro ya reclamo.
 	Fence int
+	// Owner es la instancia que reclamo el trabajo.
+	Owner string
 }
 
 // ResetStore persiste la admision y la cola durable de envio.
@@ -46,14 +48,17 @@ type ResetStore interface {
 	// Admitir ejecuta una transaccion con 2 acciones sobre 2 items distintos:
 	// RESET#<hash> y QUEUE#PWRESET/<vencimiento>#<id>. Identica con o sin cuenta.
 	Admitir(ctx context.Context, adm ResetAdmission) error
-	// Pendientes devuelve hasta `limite` trabajos vencidos de QUEUE#PWRESET.
+	// Pendientes devuelve hasta `limite` trabajos elegibles: PENDIENTES vencidos y
+	// ENVIANDO cuyo lease expiro (worker caido).
 	Pendientes(ctx context.Context, ahora time.Time, limite int) ([]ResetTrabajo, error)
-	// Reclamar toma el trabajo de forma condicional (PENDIENTE -> ENVIANDO + fence).
-	Reclamar(ctx context.Context, outboxID string, ahora time.Time, lease time.Duration) (bool, error)
-	// MarcarEnviado cierra el trabajo y elimina el token cifrado.
-	MarcarEnviado(ctx context.Context, outboxID, messageID string, ahora time.Time) error
-	// Reintentar reprograma el trabajo con backoff o lo cierra como fallido/expirado.
-	Reintentar(ctx context.Context, outboxID string, intentos int, proximo time.Time, ahora time.Time, fallido bool) error
+	// Reclamar toma el trabajo de forma condicional (PENDIENTE o ENVIANDO con lease
+	// vencido), fija un owner unico y devuelve el fence de ESTA reclamacion. El worker
+	// debe conservarlo: un fence antiguo no puede cerrar el trabajo.
+	Reclamar(ctx context.Context, outboxID, owner string, ahora time.Time, lease time.Duration) (fence int, ok bool, err error)
+	// MarcarEnviado cierra el trabajo exigiendo estado ENVIANDO, owner y fence.
+	MarcarEnviado(ctx context.Context, trabajo ResetTrabajo, messageID string, ahora time.Time) error
+	// Reintentar reprograma o cierra exigiendo estado ENVIANDO, owner y fence.
+	Reintentar(ctx context.Context, trabajo ResetTrabajo, intentos int, proximo time.Time, ahora time.Time, fallido bool) error
 }
 
 // ResetTokenStore resuelve y consume el token de E006 (publico, sin sesion).
