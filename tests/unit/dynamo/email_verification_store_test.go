@@ -209,7 +209,7 @@ func TestE010PerfilAtributosYAusencia(t *testing.T) {
 		"userId":        strAttr(e010User),
 		"email":         strAttr("verificacion@example.invalid"),
 		"status":        strAttr(appIdentity.StatusActive),
-		"emailVerified": boolAttr(false),
+		"emailVerified": &types.AttributeValueMemberBOOL{Value: false},
 		"version":       numAttr(7),
 	})
 
