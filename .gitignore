@@ -82,3 +82,7 @@ Thumbs.db
 .h03b_*/
 *.tmp
 *.temp
+
+# Worktrees locales de desarrollo paralelo (H08-E oleadas). Nunca se versionan:
+# cada worktree tiene su propia rama y su propio .git apuntando al repositorio.
+.worktrees/

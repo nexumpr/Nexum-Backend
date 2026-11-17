@@ -72,3 +72,52 @@ paths = [
 ]
 regexTarget = "line"
 regexes = ['''^\s*(?:const\s+)?key\s*:?=\s*"0123456789abcdef"\s*$''']
+
+# Oleada E007-E011 (2026-11-17): convencion de credenciales SINTETICAS de prueba.
+# Los endpoints de identidad se prueban con literales que la regla `generic-api-key`
+# interpreta como credenciales. La excepcion NO es por ruta: exige que el VALOR cumpla
+# una convencion que ninguna credencial real usa (sufijo `Passphrase#2026` o prefijo
+# `token-sintetico-`), y solo aplica en los archivos de prueba enumerados uno a uno.
+# Cualquier otro literal, en esos archivos o fuera de ellos, sigue generando hallazgo.
+[[rules.allowlists]]
+description = "Credenciales sinteticas de pruebas Nexum (convencion explicita de valor, solo en tests/)"
+condition = "AND"
+paths = [
+  '''^tests/unit/application/password_change_test\.go$''',
+  '''^tests/unit/transport/password_change_test\.go$''',
+  '''^tests/unit/dynamo/password_change_store_test\.go$''',
+  '''^tests/unit/application/email_verification_confirm_test\.go$''',
+  '''^tests/unit/transport/email_verification_confirm_test\.go$''',
+  '''^tests/unit/dynamo/email_verification_confirm_store_test\.go$''',
+  '''^tests/unit/dynamo/email_verification_store_test\.go$''',
+  '''^memoria\.md$''',
+]
+regexTarget = "line"
+regexes = [
+  '''(?i)\b\w*pass(?:word|phrase)\b"?\s*[:=]\s*"?(?:[A-Za-z]+)?Passphrase#2026''',
+  '''(?i)"?\b\w*token\b"?\s*[:=]\s*"?token-sintetico-[a-z0-9-]+''',
+]
+
+# Hallazgo real identificado por la instrumentacion de CI (2026-11-17):
+# generic-api-key en tests/unit/application/email_verification_request_test.go:113,
+# presente en los commits 142cd72e9e12, b9d34bdaf2ea y 3e8c0ca8930a. Es el literal de
+# caracteres no hexadecimales de una asercion (`ContainsAny`), no una credencial. El
+# arbol actual ya lo sustituyo por una validacion estricta, pero el historial de las
+# ramas E010/E011 no se reescribe. La excepcion exige archivo exacto, la llamada
+# `ContainsAny` y el literal exacto; cualquier otro valor en ese archivo se detecta.
+[[rules.allowlists]]
+description = "Literal de conjunto de caracteres no-hex de la prueba E010 (no es credencial)"
+condition = "AND"
+paths = ['''^tests/unit/application/email_verification_request_test\.go$''']
+regexTarget = "line"
+regexes = ['''ContainsAny\([^)]*"ghijklmnopqrstuvwxyzGHIJKLMNOPQRSTUVWXYZ\+/="''']
+
+# Segundo falso positivo del mismo archivo (commits b9d34bd y 142cd72): el literal
+# "0123456789abcdef" dentro de strings.Trim se interpreta como clave. Es un valor
+# sintetico de 16 hex usado para validar el alfabeto del digest, no una credencial.
+[[rules.allowlists]]
+description = "Literal hex de validacion en la prueba E010 (no es credencial)"
+condition = "AND"
+paths = ['''^tests/unit/application/email_verification_request_test\.go$''']
+regexTarget = "line"
+regexes = ['''Trim\([^)]*"0123456789abcdef"''']
