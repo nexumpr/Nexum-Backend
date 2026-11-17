@@ -1802,3 +1802,17 @@
 **Alternativa descartada con evidencia:** una `[[allowlists]]` global con `targetRules` y `condition = "AND"` **oculto una credencial inyectada en el manifiesto** (fixture con valor no-digest -> 0 hallazgos). Se revirtio: el proyecto mantiene la excepcion dentro de la regla y el baseline como mecanismo de falsos positivos historicos.
 
 **Verificacion:** fixture del manifiesto real -> 0 hallazgos; fixture con credencial sintetica fuera del manifiesto -> detectada; TOML valido; 19 pruebas de `test_gitleaks_config` OK.
+
+### Oleada E007-E011 - instrumentacion de CI y corte por caida de red (2026-11-17)
+
+**Aprobacion recibida:** el responsable autorizo expresamente la instrumentacion temporal de `.github/workflows/go-backend.yml` en el PR #73 para identificar los tres hallazgos de gitleaks.
+
+**Cambio aplicado (commit local `15d5313`):** el paso `gitleaks` conserva el comando, la configuracion, el baseline, `--redact` y `--exit-code 1`, y anade `--report-format json --report-path "$RUNNER_TEMP/gitleaks.json"`. Se agrega un paso `if: always()` que imprime **solo** `RuleID | File | StartLine | Commit | Fingerprint`. No imprime `Secret` ni `Match`, no publica el JSON, no usa `continue-on-error` y no altera los required checks. YAML validado (12 jobs, 4 pasos en `secretos`).
+
+**Estado de publicacion: NO PUBLICADO.** `git push` falla con `Could not resolve host: github.com`. Comprobado ademas que `sts.us-east-2.amazonaws.com` y `www.google.com` tampoco resuelven: es una **caida total de DNS del entorno**, no un problema del repositorio, de credenciales ni de permisos. No se modifico ninguna configuracion de red.
+
+**Consecuencia:** el commit `15d5313` esta **solo en local**. Los PR #73-#78 siguen con los HEAD remotos anteriores (`#73` = `d9fb11f`). No se pudo consultar CI, ni fusionar, ni desplegar.
+
+**Causa raiz de gitleaks: aun no identificada.** El CI escanea 285 commits (todas las refs) y reporta 3 hallazgos; el clon local `--single-branch` con el mismo comando reporta 0. La instrumentacion es precisamente lo que permitira atribuirlos sin suposiciones. No se modifico `.gitleaks.toml` ni el baseline en esta unidad.
+
+**Siguiente accion exacta al restablecerse la red:** `git push` del commit `15d5313` a `docs/h08e-rfc019-oleada-e007-e011`, esperar el run, leer el paso "Diagnostico de hallazgos", corregir los tres hallazgos exactos, retirar la instrumentacion antes del merge y solicitar `APRUEBO_MERGE_PR_73_SHA_<HEAD>`.
