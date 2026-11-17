@@ -1660,7 +1660,7 @@
 | ETAPA | FECHA | RAMA/COMMIT | HECHO | EVIDENCIA | BLOQUEO | SIGUIENTE_ACCION |
 |---|---|---|---|---|---|---|
 | Recuperacion | 2026-11-17 | `feat/h08e-e006-password-reset` desde `fadeb3b` | Codigo E006/A6 existente recuperado; build y vet PASS | `go build ./...`, `go vet ./...` sin salida | Ninguno | Documentacion y commit |
-| Publicacion | 2026-11-17 | commit del PR | Commit + push + PR unico | (se completa al publicar) | Ninguno | CI Linux |
+| Publicacion | 2026-11-17 | PR #71, HEAD `f2915ac` | Commit, push y PR unico; CI 13/13 SUCCESS | Run `44110769604`; SDD `44110769660` | Ninguno | Gate RFC-018 + merge |
 
 - **Alcance implementado:** `POST /api/v1/auth/password/reset` publico con DTO estricto, token de un solo uso sobre el `RESET#<sha256>/RESET` real de E005, Argon2id, caducidad logica explicita, perfil `ACTIVE` y **una** `TransactWriteItems` de 2 acciones sobre `PROFILE` y `RESET`. Errores 400/409/422/429/500/503; el token y la contrasena nunca se registran ni se devuelven.
 - **Transaccion:** perfil con `SET passwordHash, passwordChangedAt, sessionEpoch ADD version :one` (legado: `SET version = :one`) y condicion de version + epoca; token con `used=true`, `usedAt` y condicion `used` ausente/false + `expiresAt > now`. Los valores de expresion no usados se omiten por rama: DynamoDB rechaza claves sobrantes.
@@ -1673,4 +1673,12 @@
 - **Gitleaks 8.30.1 sobre el arbol:** ningun hallazgo en los archivos nuevos de E006.
 - **Estado:** `E006_IMPLEMENTED_LOCAL`; `E006_CI_PASS`, `E006_PR`, `E006_MERGED`, `E006_AWS_DEPLOYED` y las verificaciones HTTPS quedan `NOT_RUN` hasta sus Gates.
 - **Gates pendientes:** `APRUEBO_RFC_018_A6_EPOCA_REVOCACION`, `APRUEBO_MERGE_PR_<N>_SHA_<HEAD>` y el Gate de apply ligado al SHA-256 del plan.
+
+### E006 — PR #71 y CI verde (2026-11-17)
+
+- **PR #71** (`feat/h08e-e006-password-reset` → `main`), primer HEAD `f8e0247`. Run `44110045202`: 10 checks PASS y **fallo unico** en `Formato, vet, build y pruebas`; `PR Quality Gate` y `CI Success` fallaron por arrastre.
+- **Causa raiz demostrada:** el doble `memoriaDynamo` solo evaluaba igualdades; la condicion real de E006 `expiresAt > :nowEpoch` devolvia «condicion no soportada» y el adaptador la traducia correctamente a 503. **No era un defecto del adaptador.** Se extendio el doble con comparaciones numericas (`>=`, `<=`, `>`, `<`), devolviendo falso si el atributo no existe, como DynamoDB.
+- **HEAD actual:** `f2915ac` (`test(e006): doble dinamodb soporta comparaciones numericas de expiracion`). Run `44110769604` **13/13 SUCCESS**; SDD documental run `44110769660` SUCCESS. PR `MERGEABLE`/`CLEAN`.
+- **Estado:** `E006_PR=VERIFIED`, `E006_CI_PASS=VERIFIED`; `E006_MERGED` y `E006_AWS_DEPLOYED` `NOT_RUN`. Gate de merge debe citar el SHA final tras este commit documental.
+- **Siguiente:** aprobar `APRUEBO_RFC_018_A6_EPOCA_REVOCACION`, fusionar con Gate por SHA, publicar artefacto ARM64 del CI de `main`, plan Terraform (LT v8 + 2 ARN nuevos), apply, instance refresh y pruebas HTTPS reales.
 
