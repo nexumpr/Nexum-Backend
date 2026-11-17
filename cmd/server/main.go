@@ -155,6 +155,8 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	// revocacion por epoca (A6). Reutiliza la tabla, el hasher Argon2id, el material JWT
 	// y Redis ya existentes; sin IAM ni recursos nuevos.
 	montarE006(router, clienteDynamo, clienteRedis, cfgDeps.TablaDynamoDB, logger)
+	// E008: montaje de la oleada E007-E011 (RFC-019).
+	montarE008(router, clienteDynamo, cfgDeps.TablaDynamoDB, logger)
 
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
