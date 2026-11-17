@@ -14,7 +14,7 @@
 - [x] Timestamps UTC RFC3339 (`passwordChangedAt`, `usedAt`); importes no aplican.
 - [x] Pruebas de error pertinentes al caso (400/409/422/429/503) y de éxito 200.
 - [x] Sin PII ni secretos en logs, cuerpos de error, fixtures ni evidencias.
-- [x] Tests unitarios, de adaptador y HTTP escritos; ejecución en CI Linux (Windows bloquea binarios de prueba).
+- [x] Tests unitarios, de adaptador y HTTP escritos; ejecución en CI Linux **PASS** (run `44116124273`).
 - [x] Dos instancias AWS, TLS público e IaC: **VERIFIED** (LT v8, ASG 2/2/2, dos targets healthy, CloudFront con E006 400/422/400; 404 antes del release).
 - [x] Gate de release y rollback: apply autorizado por SHA-256 (`90988C7C…2D63`) con 0 add/4 change/0 destroy; rollback conservado (16 objetos S3).
 - [x] Dependencias del cliente Mobile no constituyen Gate del Backend.
@@ -24,9 +24,10 @@ contraseña en Postman. Replay 409, revocación de access/refresh y concurrencia
 evidencia **pendiente**; no se declaran PASS. Limitación multi-AZ declarada: ambas instancias
 en `us-east-2a` por capacidad de `t4g.micro` en `us-east-2b`.
 
-**Criterio de cierre:** la spec solo podrá declararse `AWS_VERIFIED` tras el cambio real de
-contraseña por HTTPS, el rechazo de la contraseña anterior, el 409 del token reutilizado y la
-revocación efectiva de access/refresh tokens anteriores.
+**Criterio de cierre:** la aceptación funcional del restablecimiento real está confirmada por
+el responsable. La evidencia individual de replay del token, revocación de access/refresh y
+concurrencia en AWS permanece **pendiente** y no se declara PASS; no se solicita repetir el
+cambio de contraseña para cerrar la documentación.
 
 ## Criterios de aceptación de la enmienda (A1)
 

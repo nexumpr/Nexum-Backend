@@ -1,8 +1,9 @@
 # Tareas planificadas — E006
 
-> Implementación local 2026-11-17 (Gate `GATE_H08E_E006.md`). `[x]` = hecho y verificable en
-> el código/pruebas del repositorio; la ejecución de pruebas y la verificación AWS se anotan
-> por separado. `AWS_NOT_RUN` hasta el Gate de despliegue.
+> Implementación y despliegue 2026-11-17 (Gate `GATE_H08E_E006.md`). `[x]` = hecho y
+> verificable en código, pruebas o AWS según se indica. CI PASS y AWS `DEPLOYED_VERIFIED`;
+> `E006_USER_ACCEPTED = CONFIRMED`. La evidencia individual de replay/revocación/concurrencia
+> en AWS sigue pendiente y no se declara PASS.
 
 - [x] `E006-T01` OpenAPI `operationId=nexum_e006` contrastado con `POST /api/v1/auth/password/reset`; contrato sin cambios.
 - [x] `E006-T02` DTO estricto `PasswordResetRequest` (`token`, `newPassword`) con rechazo de campos desconocidos y tipos incorrectos.
@@ -39,15 +40,12 @@
 - [x] Persistencia corregida a `USER#<userId>/SESSION#<sessionId>` y `REFRESH#<sha256>/SESSION`; sin tabla ni índice nuevos.
 - [x] Validación de entrada y mensaje 422 (`newPassword` 12–128, token no vacío).
 - [x] Prueba positiva y negativa de la validación.
-- [ ] Verificación HTTP real: pendiente del despliegue autorizado.
+- [x] Verificación HTTP real del cambio: E006 desplegado, 400/422/400 por CloudFront y aceptación funcional confirmada por el responsable.
 
-## Cierre AWS (2026-11-17)
+## Estado AWS (evidencia, sin duplicar tareas)
 
-- [x] PR #71 MERGED; `main` `578b0db3b9bb765afc981a86b23c6ade10ed80ea`; CI de `main` SUCCESS.
-- [x] Release `v0.13.0+578b0db3b9bb` publicado con checksums verificados.
-- [x] Apply autorizado por SHA-256 (0 add · 4 change · 0 destroy); LT v8; IAM con 16 objetos S3.
-- [x] Dos instancias LT v8 `InService/Healthy`, ASG 2/2/2 y dos targets healthy; E006 servido por CloudFront (400/422/400; 404 con nodos v7 antes del release).
-- [x] Regresión dirigida E001–E005 por HTTPS (negativas; sin cambios de estado).
-- [x] Aceptación funcional del responsable en Postman: `E006_USER_ACCEPTED = CONFIRMED`.
-- [ ] Evidencia individual AWS de replay 409, revocación de access/refresh y concurrencia: pendiente.
+- PR #71 MERGED (`main` `578b0db3b9bb765afc981a86b23c6ade10ed80ea`); CI de `main` `44116124273` SUCCESS; release `v0.13.0+578b0db3b9bb`; apply `90988C7C...2D63` con 0 add/4 change/0 destroy; LT v8; IAM con 16 objetos S3.
+- Dos instancias LT v8 `InService/Healthy`, ASG 2/2/2 y dos targets healthy; E006 por CloudFront (400/422/400; 404 con nodos v7 antes del release); regresión dirigida E001–E005 sin cambios de estado.
+- Aceptación funcional del responsable: `E006_USER_ACCEPTED = CONFIRMED`.
+- **Pendiente de evidencia individual (no PASS):** replay 409, revocación de access/refresh y concurrencia real en AWS.
 - **Limitación:** ambas instancias en `us-east-2a` por falta de capacidad `t4g.micro` en `us-east-2b`; subredes restauradas.

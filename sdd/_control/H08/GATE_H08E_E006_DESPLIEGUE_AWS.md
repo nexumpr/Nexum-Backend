@@ -1,8 +1,6 @@
 # Gate H08-E / E006 — Apply del plan Terraform (LT v8 + IAM)
 
-**ESTADO:** `APPLIED + AWS_DEPLOYED + USER_ACCEPTED_CONFIRMED` (2026-11-17).
-
-No se ha ejecutado `terraform apply`. No se ha modificado ningún recurso AWS desde este plan.
+**ESTADO:** `APPLIED + AWS_DEPLOYED + USER_ACCEPTED_CONFIRMED` (2026-11-17). El plan autorizado fue aplicado con el resultado real registrado en §7; no se ejecutó ningún otro cambio de infraestructura.
 
 ## 1. Base
 
@@ -52,13 +50,13 @@ ALB, el endpoint de SES ni el bundle RFC-004.
   `USER#*` y `RESET#*`; no se amplía ningún permiso.
 - Coste incremental del plan: **0.0000 USD** (Launch Template e IAM inline no generan cargos).
 
-## 4. Frase solicitada
+## 4. Frase autorizada y ejecutada
 
 ```
 APRUEBO_APPLY_LT_IAM_E006_SHA256_90988C7CB5D49F62498C6FDF00DF7AC5BA6349D034D392060880DD52598C2D63
 ```
 
-## 5. Después del apply (sin nueva aprobación de plan)
+## 5. Procedimiento ejecutado tras el apply
 
 1. Verificar `latest_version` del LT y el estado remoto.
 2. Instance refresh con `MinHealthyPercentage=100`, `MaxHealthyPercentage=150`,

@@ -1738,3 +1738,10 @@
 - **Sin cambios funcionales:** esta unidad no modifica código Go, Terraform, IAM, Redis, DynamoDB, OpenAPI ni AWS.
 - **Publicación:** un único PR documental (**#72**, `docs/h08e-e006-closure`); el SHA de merge se confirmará en el reporte de cierre y en el historial de GitHub, ya que no puede formar parte del propio commit fusionado.
 
+### E006 — corrección documental previa al merge (2026-11-17)
+
+- Revisión de contradicciones en el PR #72: retirados de `GATE_H08E_E006.md` los estados `AWS_NOT_RUN`, PR/CI pendientes y el bloque de Gates pendientes; de `GATE_H08E_E006_DESPLIEGUE_AWS.md` la afirmación de apply no ejecutado; de `tasks.md` la cabecera `AWS_NOT_RUN` y las entradas duplicadas de cierre AWS; de `checklist.md` el criterio que contradecía la aceptación.
+- `ESTADO_Y_GATES.md` conserva **una sola** fila vigente de E006, con implementación, despliegue y aceptación.
+- Se mantiene explícitamente **pendiente de evidencia individual** (no PASS): replay 409, revocación de access/refresh y concurrencia real en AWS.
+- Sin cambios de código Go, Terraform, IAM, Redis, DynamoDB, OpenAPI ni AWS. Sin nuevo despliegue.
+
