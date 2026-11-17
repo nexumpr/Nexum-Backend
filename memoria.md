@@ -1790,3 +1790,15 @@
 **Bloqueo 3 - Gates humanos.** Ningun merge se ha ejecutado. Frases pendientes: `APRUEBO_RFC_019_OLEADA_E007_E011`; `APRUEBO_MERGE_PR_<N>_SHA_<SHA40>` por PR (#73, #74, #76, #78, #75, #77); despues `APRUEBO_APPLY_..._SHA256_<HASH>` sobre el plan de release.
 
 **Sin desplegar:** `AWS_NOT_RUN`, `DEPLOY_NOT_RUN`, `HTTP_AWS_NOT_RUN`. Ningun recurso creado, modificado ni destruido. Ningun cambio IAM ni Terraform: E007-E011 usan solo `USER#*`, `SESSION#*`, `REFRESH#*` y `ONE_USE#*`, ya autorizados, y la politica SES vigente.
+
+### Oleada E007-E011 - causa raiz real de gitleaks y correccion (2026-11-17)
+
+**Diagnostico corregido.** La hipotesis anterior (manifiesto reordenado) era **erronea**. Al reproducir el escaneo como lo hace CI (`--source .` dentro de un export limpio, sin `.worktrees/` ni `dist/`), el arbol de #73 presenta **6 hallazgos, ninguno en el manifiesto**: `.gitleaks-baseline.json` (2), `computo/main.tf`, `RFC-009`, `telemetry_test.go` y `observability_health_test.go`, todos suprimidos por el baseline en CI. La allowlist del manifiesto **si funciona** cuando `paths` se evalua contra la raiz del escaneo; mi prueba anterior usaba `--source` con prefijo y por eso no coincidia.
+
+**Causa raiz real:** CI escanea el **historial de commits**, no solo el arbol. Un commit anterior de esta rama contiene `memoria.md` citando los literales sinteticos del diagnostico (`...Passphrase#2026` y tokens `token-sintetico-...`). Esos commits permanecen en el historial y no se reescriben (prohibido force push), de modo que el hallazgo persiste aunque el arbol actual este limpio.
+
+**Correccion aplicada:** se amplia la allowlist de **convencion de valor** (no de ruta) para incluir `memoria.md`. Solo admite valores que terminen en `Passphrase#2026` o empiecen por `token-sintetico-`, que ninguna credencial real usa.
+
+**Alternativa descartada con evidencia:** una `[[allowlists]]` global con `targetRules` y `condition = "AND"` **oculto una credencial inyectada en el manifiesto** (fixture con valor no-digest -> 0 hallazgos). Se revirtio: el proyecto mantiene la excepcion dentro de la regla y el baseline como mecanismo de falsos positivos historicos.
+
+**Verificacion:** fixture del manifiesto real -> 0 hallazgos; fixture con credencial sintetica fuera del manifiesto -> detectada; TOML valido; 19 pruebas de `test_gitleaks_config` OK.

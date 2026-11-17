@@ -90,6 +90,7 @@ paths = [
   '''^tests/unit/transport/email_verification_confirm_test\.go$''',
   '''^tests/unit/dynamo/email_verification_confirm_store_test\.go$''',
   '''^tests/unit/dynamo/email_verification_store_test\.go$''',
+  '''^memoria\.md$''',
 ]
 regexTarget = "line"
 regexes = [
