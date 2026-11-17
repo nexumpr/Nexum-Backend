@@ -1769,3 +1769,24 @@
 **Preflight AWS: BLOQUEADO.** `aws sts get-caller-identity` devuelve *Your session has expired. Please reauthenticate using 'aws login'*. Requiere accion de UI del responsable. Consecuencia: no se pudo leer ASG, instancias, version de Launch Template ni targets. Ademas, las variables `AWS_CONFIG_FILE`, `AWS_PROFILE` y `AWS_REGION` estaban definidas como **cadena vacia** en el entorno, lo que rompia incluso la carga de perfiles; se corrigieron por comando a `%USERPROFILE%\.aws\config` y perfil `nexum`.
 
 **Estado por endpoint:** E007, E008, E009, E010, E011 = `IMPLEMENTING` (lineas en ejecucion). Nada mergeado, nada desplegado. `AWS_NOT_RUN`.
+
+### Oleada E007-E011 - implementacion concurrente completada, PRs abiertos (2026-11-17)
+
+| FECHA | OLEADA | ENDPOINT | AGENTE | ETAPA | PR/SHA | EVIDENCIA | ESTADO | SIGUIENTE_ACCION |
+|---|---|---|---|---|---|---|---|---|
+| 2026-11-17 | E007-E011 | gobierno | orquestador | RFC + Gate + gitleaks | #73 `01a2da5` | 13/13 checks PASS antes de los dos ultimos commits | ABIERTO | `APRUEBO_RFC_019_OLEADA_E007_E011` + merge |
+| 2026-11-17 | E007-E011 | E007 | linea A | codigo + commit + push | #74 `0f99d16` | build/vet/gofmt PASS; tests application+transport PASS; dynamo y cmd/server via binario precompilado | ABIERTO, CI rojo | rebasar tras #73 |
+| 2026-11-17 | E007-E011 | E008 | linea B | codigo + commit + push | #76 `f56dc2a` | build/vet/gofmt PASS; 5 pruebas dynamo y 9 de transporte PASS; application bloqueado por el host | ABIERTO, CI rojo | rebasar tras #73 |
+| 2026-11-17 | E007-E011 | E009 | linea B (2) | codigo + commit + push | #78 `cb31da2` | router parametrizado + revocacion; go build/vet/gofmt PASS | ABIERTO | rebasar tras #76 |
+| 2026-11-17 | E007-E011 | E010 | linea C | codigo + commit + push | #75 `3f8c33e` | build/vet/gofmt PASS; dynamo y transporte PASS | ABIERTO, CI rojo | rebasar tras #73 |
+| 2026-11-17 | E007-E011 | E011 | linea C | codigo + commit + push | #77 `ccebd7e` | transporte PASS; build/vet/gofmt PASS | ABIERTO | rebasar tras #75 |
+
+**Aislamiento.** Tres worktrees bajo `.worktrees/` (excluidos del manifiesto en el validador y en `.gitignore`), cada linea con su rama; ninguna linea escribio fuera de su worktree. `cmd/server/main.go`, `memoria.md`, `BASELINE_SHA256.json` y Terraform quedaron reservados al orquestador y **no** fueron tocados por los agentes.
+
+**Bloqueo 1 - gitleaks sistemico.** Los cinco PRs de endpoint fallan el job `Escaneo de secretos` con **1 hallazgo** cada uno. El detalle va redactado (`--redact`) y el log no imprime la tabla de hallazgos, por lo que no se pudo atribuir con certeza. Los candidatos identificados por inspeccion son literales sinteticos de prueba (`OldPassphrase#2026` en `tests/unit/application/password_change_test.go`, `token-sintetico-de-verificacion-...` en `tests/unit/application/email_verification_confirm_test.go`). Se anadio en `.gitleaks.toml` (PR #73) una excepcion por **convencion de valor** (sufijo `Passphrase#2026` o prefijo `token-sintetico-`) acotada a `tests/`, **no** una allowlist por ruta. Requiere rebasar los cinco PRs para que la hereden y confirmar si queda algun hallazgo residual sin atribuir.
+
+**Bloqueo 2 - sesion AWS expirada.** `aws sts get-caller-identity` responde *Your session has expired. Please reauthenticate using aws login*. Sin sesion no se puede leer ASG, Launch Template, instancias ni targets, ni publicar en S3, ni generar el plan. Requiere accion de UI del responsable. Ademas `AWS_CONFIG_FILE`, `AWS_PROFILE` y `AWS_REGION` estaban como cadena vacia en el entorno y se corrigen por comando.
+
+**Bloqueo 3 - Gates humanos.** Ningun merge se ha ejecutado. Frases pendientes: `APRUEBO_RFC_019_OLEADA_E007_E011`; `APRUEBO_MERGE_PR_<N>_SHA_<SHA40>` por PR (#73, #74, #76, #78, #75, #77); despues `APRUEBO_APPLY_..._SHA256_<HASH>` sobre el plan de release.
+
+**Sin desplegar:** `AWS_NOT_RUN`, `DEPLOY_NOT_RUN`, `HTTP_AWS_NOT_RUN`. Ningun recurso creado, modificado ni destruido. Ningun cambio IAM ni Terraform: E007-E011 usan solo `USER#*`, `SESSION#*`, `REFRESH#*` y `ONE_USE#*`, ya autorizados, y la politica SES vigente.
