@@ -69,7 +69,7 @@ func montarE008(
 
 	if servicio == nil || tokens == nil || autorizador == nil {
 		logger.Warn("E008: componentes incompletos; el endpoint respondera 503",
-			slog.String("motivo", "sin_persistencia_tokens_autorizador_o_clave_cursor"))
+			slog.String("motivo", "sin_persistencia_credenciales_autorizador_o_clave_cursor"))
 	}
 
 	handler := nexumhttp.NewSessionsHandler(servicio, tokens, autorizador, logger)
