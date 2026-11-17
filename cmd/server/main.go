@@ -145,6 +145,12 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	logoutHandler := nexumhttp.NewLogoutHandler(logoutService, verificadorTokens, logoutStore, logger)
 	router.HandleFunc(http.MethodPost, "/auth/logout", logoutHandler.ServeHTTP)
 
+	// H08-E / E005: recuperacion de contrasena. SES real, persistentcia DynamoDB,
+	// cuotas y liderazgo Redis y worker durable. Fail-closed: si falta A9 (clave de
+	// sellado), remitente/base publica o Redis, el endpoint responde 503.
+	_, cerrarE005 := montarE005(ctx, router, clienteDynamo, clienteRedis, cfgDeps.TablaDynamoDB, logger)
+	defer cerrarE005()
+
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
 	// Start bloquea hasta que el listener falla o se cierra; el canal transporta
