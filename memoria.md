@@ -1729,12 +1729,12 @@
 |---|---|---|---|---|---|
 | 2026-11-17 | Recuperación documental | `docs/h08e-e006-closure` desde `578b0db` | RFC-018, Gate E006, Gate de despliegue, tasks/checklist y estado reconciliados | `git status`; documentación local preservada tras el merge | PR documental |
 | 2026-11-17 | Aceptación funcional | — | **`E006_USER_ACCEPTED = CONFIRMED`** | Declaración del responsable: restablecimiento real de contraseña comprobado en Postman | Registrar y publicar |
-| 2026-11-17 | PR documental | (pendiente de publicar) | Abierto para revisión | CI/SDD en curso | Merge autorizado |
+| 2026-11-17 | PR documental | PR **#72** (`docs/h08e-e006-closure`) | Abierto para revisión | CI/SDD en curso | Gate de merge |
 
 - **Alcance de la aceptación:** el responsable confirmó personalmente en Postman que la recuperación (E005) y el restablecimiento real de contraseña (E006) funcionan. No se registran tokens, contraseñas ni cuerpos de respuesta.
 - **Evidencias existentes:** PR #71 MERGED (`main` `578b0db3b9bb765afc981a86b23c6ade10ed80ea`); CI `44116124273` SUCCESS; release `v0.13.0+578b0db3b9bb` (binario `6b87752f…bb522`, unidad `6fa4d5fb…05cc`); apply `90988C7C…2D63` con 0 add/4 change/0 destroy; LT v8; ASG 2/2/2; dos targets healthy; E006 por CloudFront con 400/422/400 (404 con nodos v7 antes del release); regresión dirigida E001–E005.
 - **Pendiente de evidencia individual (no declarado PASS ni fallo):** replay del token (409), revocación de access/refresh anteriores (401) y concurrencia real en AWS. No se solicita repetir el restablecimiento para cerrar documentos.
 - **Limitación multi-AZ:** ambas instancias quedaron en `us-east-2a` por falta de capacidad `t4g.micro` en `us-east-2b`; el ASG conserva ambas subredes.
 - **Sin cambios funcionales:** esta unidad no modifica código Go, Terraform, IAM, Redis, DynamoDB, OpenAPI ni AWS.
-- **Publicación:** un único PR documental; el SHA de merge se confirmará en el reporte de cierre y en el historial de GitHub, ya que no puede formar parte del propio commit fusionado.
+- **Publicación:** un único PR documental (**#72**, `docs/h08e-e006-closure`); el SHA de merge se confirmará en el reporte de cierre y en el historial de GitHub, ya que no puede formar parte del propio commit fusionado.
 
