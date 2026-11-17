@@ -1745,3 +1745,74 @@
 - Se mantiene explícitamente **pendiente de evidencia individual** (no PASS): replay 409, revocación de access/refresh y concurrencia real en AWS.
 - Sin cambios de código Go, Terraform, IAM, Redis, DynamoDB, OpenAPI ni AWS. Sin nuevo despliegue.
 
+
+### Oleada E007-E011 - arranque, aislamiento y preflight (2026-11-17)
+
+**Base verificada.** `git fetch origin`; `origin/main` = `4ba790a9ffa99b15bb73a6b2e93e691a2ba716b6` (merge del PR #72). El worktree principal estaba en `docs/h08e-e006-closure` (`7a58c27`, ancestro de main) con **una unica modificacion local ajena: `opencode.json`** (70 lineas de permisos locales). Se preservo intacta y **no se commiteo**. `git checkout -B main origin/main` por fast-forward.
+
+**Gobierno.** Creados `sdd/_control/H08/RFC-019-OLEADA_E007_E011.md` (estado **PROPUESTO**) y `sdd/_control/H08/GATE_H08E_E007_E011_OLEADA.md` (`AUTHORIZED_E007_E011_LOCAL`). La RFC resuelve las dos reglas que impedian la oleada: E-1 concurrencia de specs (AGENTS.md / R-007) y E-2 release agrupado (constitution.md 14 y tabla de las 71 specs). Conserva PR por endpoint, Gate de merge por HEAD SHA, Gate de apply por SHA-256 del plan y todas las reglas `deny`. Frase pendiente: `APRUEBO_RFC_019_OLEADA_E007_E011`. **PR #73** abierto (`docs/h08e-rfc019-oleada-e007-e011`, commit `e73fc35`).
+
+**Aislamiento real.** Tres worktrees Git bajo `.worktrees/` (excluido en `.gitignore`), todos desde `origin/main` `4ba790a` y verificados por `git worktree list`:
+
+| Linea | Worktree | Rama | Endpoints |
+|---|---|---|---|
+| A | `.worktrees/worktree-auth-change` | `feat/h08e-e007-password-change` | E007 |
+| B | `.worktrees/worktree-sessions` | `feat/h08e-e008-sessions` -> `feat/h08e-e009-sessions-revoke` (apilada) | E008, E009 |
+| C | `.worktrees/worktree-email-verification` | `feat/h08e-e010-email-verification` -> `feat/h08e-e011-email-verification-confirm` (apilada) | E010, E011 |
+
+**Decisiones de diseno registradas.**
+- **E007:** reutiliza la epoca de revocacion A6/RFC-018. Incrementar `sessionEpoch` en la misma transaccion que el nuevo `passwordHash` invalida **todas** las sesiones, incluida la actual (`refresh.go` rechaza `session.SessionEpoch != user.SessionEpoch`; el middleware compara `epo`). Es la unica opcion atomica y el contrato `Accepted` no admite devolver tokens nuevos: el cliente reautentica. Descartado revocar sesion por sesion (fan-out no atomico).
+- **E008/E009:** `Query` sobre `USER#<id>` con `begins_with(SESSION#)`; prohibido `Scan`. `lastSeenAt` se mapea desde `lastUsedAt`. El router gana soporte minimo de `{param}` con prioridad literal, sin framework nuevo.
+- **E010/E011:** namespace `ONE_USE#*`, ya autorizado por IAM (`leading_key_patterns`), separado de `RESET#` de E005/E006. SES reutiliza la politica vigente (`ses:SendEmail` sobre `identity/*` con `ses:FromAddress` fijo): **E010 no requiere cambio IAM**.
+- **Terraform:** no hacen falta recursos nuevos. Solo `aws_launch_template.backend`, `terraform_data.invariantes_computo` y los 2 ARN S3 nuevos en `aws_iam_role_policy.runtime`, igual que en E004/E005/E006.
+
+**Preflight AWS: BLOQUEADO.** `aws sts get-caller-identity` devuelve *Your session has expired. Please reauthenticate using 'aws login'*. Requiere accion de UI del responsable. Consecuencia: no se pudo leer ASG, instancias, version de Launch Template ni targets. Ademas, las variables `AWS_CONFIG_FILE`, `AWS_PROFILE` y `AWS_REGION` estaban definidas como **cadena vacia** en el entorno, lo que rompia incluso la carga de perfiles; se corrigieron por comando a `%USERPROFILE%\.aws\config` y perfil `nexum`.
+
+**Estado por endpoint:** E007, E008, E009, E010, E011 = `IMPLEMENTING` (lineas en ejecucion). Nada mergeado, nada desplegado. `AWS_NOT_RUN`.
+
+### Oleada E007-E011 - implementacion concurrente completada, PRs abiertos (2026-11-17)
+
+| FECHA | OLEADA | ENDPOINT | AGENTE | ETAPA | PR/SHA | EVIDENCIA | ESTADO | SIGUIENTE_ACCION |
+|---|---|---|---|---|---|---|---|---|
+| 2026-11-17 | E007-E011 | gobierno | orquestador | RFC + Gate + gitleaks | #73 `01a2da5` | 13/13 checks PASS antes de los dos ultimos commits | ABIERTO | `APRUEBO_RFC_019_OLEADA_E007_E011` + merge |
+| 2026-11-17 | E007-E011 | E007 | linea A | codigo + commit + push | #74 `0f99d16` | build/vet/gofmt PASS; tests application+transport PASS; dynamo y cmd/server via binario precompilado | ABIERTO, CI rojo | rebasar tras #73 |
+| 2026-11-17 | E007-E011 | E008 | linea B | codigo + commit + push | #76 `f56dc2a` | build/vet/gofmt PASS; 5 pruebas dynamo y 9 de transporte PASS; application bloqueado por el host | ABIERTO, CI rojo | rebasar tras #73 |
+| 2026-11-17 | E007-E011 | E009 | linea B (2) | codigo + commit + push | #78 `cb31da2` | router parametrizado + revocacion; go build/vet/gofmt PASS | ABIERTO | rebasar tras #76 |
+| 2026-11-17 | E007-E011 | E010 | linea C | codigo + commit + push | #75 `3f8c33e` | build/vet/gofmt PASS; dynamo y transporte PASS | ABIERTO, CI rojo | rebasar tras #73 |
+| 2026-11-17 | E007-E011 | E011 | linea C | codigo + commit + push | #77 `ccebd7e` | transporte PASS; build/vet/gofmt PASS | ABIERTO | rebasar tras #75 |
+
+**Aislamiento.** Tres worktrees bajo `.worktrees/` (excluidos del manifiesto en el validador y en `.gitignore`), cada linea con su rama; ninguna linea escribio fuera de su worktree. `cmd/server/main.go`, `memoria.md`, `BASELINE_SHA256.json` y Terraform quedaron reservados al orquestador y **no** fueron tocados por los agentes.
+
+**Bloqueo 1 - gitleaks sistemico.** Los cinco PRs de endpoint fallan el job `Escaneo de secretos` con **1 hallazgo** cada uno. El detalle va redactado (`--redact`) y el log no imprime la tabla de hallazgos, por lo que no se pudo atribuir con certeza. Los candidatos identificados por inspeccion son literales sinteticos de prueba en `tests/unit/application/password_change_test.go` y `tests/unit/application/email_verification_confirm_test.go` (passphrases y tokens ficticios, no credenciales). Se anadio en `.gitleaks.toml` (PR #73) una excepcion por **convencion de valor** de las fixtures sinteticas, acotada a una lista **enumerada** de archivos de prueba, **no** una allowlist por ruta. Requiere rebasar los cinco PRs para que la hereden y confirmar si queda algun hallazgo residual sin atribuir.
+
+**Bloqueo 2 - sesion AWS expirada.** `aws sts get-caller-identity` responde *Your session has expired. Please reauthenticate using aws login*. Sin sesion no se puede leer ASG, Launch Template, instancias ni targets, ni publicar en S3, ni generar el plan. Requiere accion de UI del responsable. Ademas `AWS_CONFIG_FILE`, `AWS_PROFILE` y `AWS_REGION` estaban como cadena vacia en el entorno y se corrigen por comando.
+
+**Bloqueo 3 - Gates humanos.** Ningun merge se ha ejecutado. Frases pendientes: `APRUEBO_RFC_019_OLEADA_E007_E011`; `APRUEBO_MERGE_PR_<N>_SHA_<SHA40>` por PR (#73, #74, #76, #78, #75, #77); despues `APRUEBO_APPLY_..._SHA256_<HASH>` sobre el plan de release.
+
+**Sin desplegar:** `AWS_NOT_RUN`, `DEPLOY_NOT_RUN`, `HTTP_AWS_NOT_RUN`. Ningun recurso creado, modificado ni destruido. Ningun cambio IAM ni Terraform: E007-E011 usan solo `USER#*`, `SESSION#*`, `REFRESH#*` y `ONE_USE#*`, ya autorizados, y la politica SES vigente.
+
+### Oleada E007-E011 - causa raiz real de gitleaks y correccion (2026-11-17)
+
+**Diagnostico corregido.** La hipotesis anterior (manifiesto reordenado) era **erronea**. Al reproducir el escaneo como lo hace CI (`--source .` dentro de un export limpio, sin `.worktrees/` ni `dist/`), el arbol de #73 presenta **6 hallazgos, ninguno en el manifiesto**: `.gitleaks-baseline.json` (2), `computo/main.tf`, `RFC-009`, `telemetry_test.go` y `observability_health_test.go`, todos suprimidos por el baseline en CI. La allowlist del manifiesto **si funciona** cuando `paths` se evalua contra la raiz del escaneo; mi prueba anterior usaba `--source` con prefijo y por eso no coincidia.
+
+**Causa raiz real:** CI escanea el **historial de commits**, no solo el arbol. Un commit anterior de esta rama contiene `memoria.md` citando los literales sinteticos del diagnostico (`...Passphrase#2026` y tokens `token-sintetico-...`). Esos commits permanecen en el historial y no se reescriben (prohibido force push), de modo que el hallazgo persiste aunque el arbol actual este limpio.
+
+**Correccion aplicada:** se amplia la allowlist de **convencion de valor** (no de ruta) para incluir `memoria.md`. Solo admite valores que terminen en `Passphrase#2026` o empiecen por `token-sintetico-`, que ninguna credencial real usa.
+
+**Alternativa descartada con evidencia:** una `[[allowlists]]` global con `targetRules` y `condition = "AND"` **oculto una credencial inyectada en el manifiesto** (fixture con valor no-digest -> 0 hallazgos). Se revirtio: el proyecto mantiene la excepcion dentro de la regla y el baseline como mecanismo de falsos positivos historicos.
+
+**Verificacion:** fixture del manifiesto real -> 0 hallazgos; fixture con credencial sintetica fuera del manifiesto -> detectada; TOML valido; 19 pruebas de `test_gitleaks_config` OK.
+
+### Oleada E007-E011 - instrumentacion de CI y corte por caida de red (2026-11-17)
+
+**Aprobacion recibida:** el responsable autorizo expresamente la instrumentacion temporal de `.github/workflows/go-backend.yml` en el PR #73 para identificar los tres hallazgos de gitleaks.
+
+**Cambio aplicado (commit local `15d5313`):** el paso `gitleaks` conserva el comando, la configuracion, el baseline, `--redact` y `--exit-code 1`, y anade `--report-format json --report-path "$RUNNER_TEMP/gitleaks.json"`. Se agrega un paso `if: always()` que imprime **solo** `RuleID | File | StartLine | Commit | Fingerprint`. No imprime `Secret` ni `Match`, no publica el JSON, no usa `continue-on-error` y no altera los required checks. YAML validado (12 jobs, 4 pasos en `secretos`).
+
+**Estado de publicacion: NO PUBLICADO.** `git push` falla con `Could not resolve host: github.com`. Comprobado ademas que `sts.us-east-2.amazonaws.com` y `www.google.com` tampoco resuelven: es una **caida total de DNS del entorno**, no un problema del repositorio, de credenciales ni de permisos. No se modifico ninguna configuracion de red.
+
+**Consecuencia:** el commit `15d5313` esta **solo en local**. Los PR #73-#78 siguen con los HEAD remotos anteriores (`#73` = `d9fb11f`). No se pudo consultar CI, ni fusionar, ni desplegar.
+
+**Causa raiz de gitleaks: aun no identificada.** El CI escanea 285 commits (todas las refs) y reporta 3 hallazgos; el clon local `--single-branch` con el mismo comando reporta 0. La instrumentacion es precisamente lo que permitira atribuirlos sin suposiciones. No se modifico `.gitleaks.toml` ni el baseline en esta unidad.
+
+**Siguiente accion exacta al restablecerse la red:** `git push` del commit `15d5313` a `docs/h08e-rfc019-oleada-e007-e011`, esperar el run, leer el paso "Diagnostico de hallazgos", corregir los tres hallazgos exactos, retirar la instrumentacion antes del merge y solicitar `APRUEBO_MERGE_PR_73_SHA_<HEAD>`.

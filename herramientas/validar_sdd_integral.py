@@ -4,7 +4,7 @@ from pathlib import Path
 import argparse,csv,hashlib,json,re,subprocess,sys,runpy
 
 MANIFEST="sdd/_control/H07/BASELINE_SHA256.json"
-SKIP_PARTS={'.git','__pycache__','node_modules','.pytest_cache','.terraform'}
+SKIP_PARTS={'.git','__pycache__','node_modules','.pytest_cache','.terraform','.worktrees'}
 # Artefactos locales excluidos por .gitignore: no son documentos ni código versionable.
 # El plan se conserva en disco para su Gate, pero nunca se publica.
 SKIP_SUFFIXES=('.tfplan',)
