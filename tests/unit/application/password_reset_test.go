@@ -12,17 +12,18 @@ import (
 )
 
 type storeFake struct {
-	admisiones   []ports.ResetAdmission
-	marcados     []string
-	reintentos   []string
-	trabajos     []ports.ResetTrabajo
-	reclamar     bool
-	pendientes   error
-	reclamado    string
-	owner        string
-	fence        int
-	marcadoFence int
-	marcadoOwner string
+	admisiones     []ports.ResetAdmission
+	marcados       []string
+	reintentos     []string
+	trabajos       []ports.ResetTrabajo
+	reclamar       bool
+	pendientes     error
+	reclamado      string
+	owner          string
+	fence          int
+	marcadoFence   int
+	marcadoOwner   string
+	rechazarCierre bool
 }
 
 func (s *storeFake) Admitir(_ context.Context, adm ports.ResetAdmission) error {
@@ -41,7 +42,7 @@ func (s *storeFake) MarcarEnviado(_ context.Context, tr ports.ResetTrabajo, _ st
 	s.marcados = append(s.marcados, tr.OutboxID)
 	s.marcadoFence = tr.Fence
 	s.marcadoOwner = tr.Owner
-	if tr.Fence != s.fence {
+	if s.rechazarCierre {
 		return ports.ErrResetTokenInvalido
 	}
 	return nil
@@ -284,10 +285,10 @@ func TestE005FencingRechazaCierreConFenceAjeno(t *testing.T) {
 			TokenSello: []byte("sobre:tok"), ExpiraEn: time.Now().Add(10 * time.Minute),
 		}},
 	}
-	// El worker recibe fence 9 de la reclamacion; simulamos que el cierre ve un fence
-	// distinto forzando el valor devuelto.
+	// El cierre falla porque otro worker reclamo el trabajo entre la reclamacion y el
+	// cierre: la condicion por fence no se cumple y el envio no se cuenta.
+	store.rechazarCierre = true
 	w := worker(store, &correoFake{}, &selladorFake{}, &arrendadorFake{lider: true})
-	store.fence = 10 // el otro worker reclamo entre la reclamacion y el cierre
 	if n := w.Ciclo(context.Background()); n != 0 {
 		t.Fatalf("un fence obsoleto no puede cerrar el trabajo: %d", n)
 	}
