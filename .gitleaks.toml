@@ -72,3 +72,17 @@ paths = [
 ]
 regexTarget = "line"
 regexes = ['''^\s*(?:const\s+)?key\s*:?=\s*"0123456789abcdef"\s*$''']
+
+# E007 (oleada 2026-11-17): el cuerpo sintetico de la prueba de transporte usa
+# `currentPassword`/`newPassword` con valores literales de prueba. No son credenciales:
+# no autentican ni acceden a servicio alguno y el endpoint solo se ejercita con dobles
+# en memoria. Excepcion minima: ruta exacta, `regexTarget = "line"` y adyacencia
+# campo/valor con los dos literales concretos. Otra ruta, otro campo u otro valor
+# siguen generando hallazgo; no se usa `[^\r\n]*` para no ocultar una credencial real
+# situada en la misma linea tras el nombre del campo.
+[[rules.allowlists]]
+description = "Passphrases sinteticas de la prueba de transporte E007 (literales fijos, no credenciales; ruta exacta)"
+condition = "AND"
+paths = ['''^tests/unit/transport/password_change_test\.go$''']
+regexTarget = "line"
+regexes = ['''(?i)"?\b(?:current|new)Password\b"?\s*[:=]\s*"?(?:Old|New)Passphrase#2026''']
