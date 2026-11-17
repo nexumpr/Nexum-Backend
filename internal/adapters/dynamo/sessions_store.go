@@ -154,3 +154,165 @@ func parseSessionTime(value string) (time.Time, bool) {
 	}
 	return time.Time{}, false
 }
+
+// LoadSessionForRevoke lee `USER#<userID>/SESSION#<sessionID>` con consistencia fuerte (E009).
+// Devuelve (nil, nil) cuando la clave no existe, el TTL ya la purgó o el ítem es de otra
+// entidad: el llamador responde 404 homogéneo en todos esos casos.
+func (s *SessionsStore) LoadSessionForRevoke(ctx context.Context, userID, sessionID string) (*appIdentity.RevokeSessionRecord, error) {
+	if s == nil || s.client == nil || s.table == "" {
+		return nil, appIdentity.ErrSessionRevokeUnavailable
+	}
+	if strings.TrimSpace(userID) == "" || strings.TrimSpace(sessionID) == "" {
+		return nil, nil
+	}
+
+	pk, sk := domainDynamo.UserSessionKeys(userID, sessionID)
+	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(pk),
+			"SK": stringAttr(sk),
+		},
+		// Lectura consistente: la decisión de propiedad y el CAS de versión no pueden basarse
+		// en una réplica retrasada.
+		ConsistentRead: aws.Bool(true),
+	})
+	if err != nil {
+		return nil, appIdentity.ErrSessionRevokeUnavailable
+	}
+	if out == nil || out.Item == nil {
+		return nil, nil
+	}
+	item := out.Item
+	if entity := stringAttribute(item["entityType"]); entity != "USER_SESSION" {
+		// Otra entidad en la misma clave no es una sesión: no se revoca nada.
+		return nil, nil
+	}
+
+	record := &appIdentity.RevokeSessionRecord{
+		UserID:      stringAttribute(item["userId"]),
+		SessionID:   stringAttribute(item["sessionId"]),
+		RefreshHash: stringAttribute(item["refreshHash"]),
+		Status:      stringAttribute(item["status"]),
+	}
+	if record.UserID == "" || record.SessionID == "" {
+		return nil, nil
+	}
+	if version, ok := attributeInt(item["version"]); ok {
+		record.Version = version
+		record.HasVersion = true
+	}
+	if expires, ok := attributeTime(item); ok {
+		record.ExpiresAt = expires
+		record.HasExpiry = true
+	}
+	return record, nil
+}
+
+// RevokeOwnedSession aplica `ACTIVE -> REVOKED` en UNA transacción condicional de dos acciones
+// (E009):
+//
+//  1. la sesión pasa a REVOKED con `revokedAt`, `revokedAtISO` y `revokeReason`, con CAS
+//     `attribute_exists(PK) AND #status = :active AND #version = :expected` e incremento de
+//     versión;
+//  2. el localizador del refresh vigente (`refreshHash` leído de la sesión) pasa a REVOKED con
+//     condición `attribute_exists(PK)`, de modo que E003 deje de poder rotar y responda 401.
+//
+// Un fallo de condición de la sesión se traduce en ErrSessionRevokeConflict (el llamador relee
+// y decide). Si sólo falló el localizador (el TTL pudo purgarlo entre la lectura y la
+// transacción) se repite únicamente la sesión, que es la autoridad. Ningún camino permite
+// responder 204 sin revocación durable.
+func (s *SessionsStore) RevokeOwnedSession(ctx context.Context, revocation appIdentity.SessionRevocation) error {
+	if s == nil || s.client == nil || s.table == "" {
+		return appIdentity.ErrSessionRevokeUnavailable
+	}
+	if strings.TrimSpace(revocation.UserID) == "" || strings.TrimSpace(revocation.SessionID) == "" {
+		return appIdentity.ErrSessionRevokeUnavailable
+	}
+
+	now := revocation.Now.UTC()
+	nowISO := now.Format(time.RFC3339)
+	reason := strings.TrimSpace(revocation.Reason)
+	if reason == "" {
+		reason = appIdentity.RevokeReasonUserRevokedSession
+	}
+
+	sessionPK, sessionSK := domainDynamo.UserSessionKeys(revocation.UserID, revocation.SessionID)
+
+	condicion := "attribute_exists(PK) AND #status = :active"
+	actualizacion := "SET #status = :revoked, revokedAt = :now, revokedAtISO = :nowIso, revokeReason = :reason, #version = :one"
+	valores := map[string]types.AttributeValue{
+		":revoked": stringAttr(appIdentity.StatusRevoked),
+		":now":     stringAttr(nowISO),
+		":nowIso":  stringAttr(nowISO),
+		":reason":  stringAttr(reason),
+		":active":  stringAttr(appIdentity.StatusActive),
+		":one":     numberAttr(1),
+	}
+	if revocation.HasVersion {
+		condicion += " AND #version = :expected"
+		actualizacion = "SET #status = :revoked, revokedAt = :now, revokedAtISO = :nowIso, revokeReason = :reason ADD #version :one"
+		valores[":expected"] = numberAttr(revocation.ExpectedVersion)
+	}
+
+	sessionItem := types.TransactWriteItem{Update: &types.Update{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(sessionPK),
+			"SK": stringAttr(sessionSK),
+		},
+		UpdateExpression:    aws.String(actualizacion),
+		ConditionExpression: aws.String(condicion),
+		ExpressionAttributeNames: map[string]string{
+			"#status":  "status",
+			"#version": "version",
+		},
+		ExpressionAttributeValues: valores,
+	}}
+
+	items := []types.TransactWriteItem{sessionItem}
+	if digest := strings.TrimSpace(revocation.RefreshHash); digest != "" {
+		pk, sk := domainDynamo.RefreshKeys(digest)
+		items = append(items, types.TransactWriteItem{Update: &types.Update{
+			TableName: aws.String(s.table),
+			Key: map[string]types.AttributeValue{
+				"PK": stringAttr(pk),
+				"SK": stringAttr(sk),
+			},
+			UpdateExpression:    aws.String("SET #status = :revoked, revokedAt = :now, revokeReason = :reason"),
+			ConditionExpression: aws.String("attribute_exists(PK)"),
+			ExpressionAttributeNames: map[string]string{
+				"#status": "status",
+			},
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":revoked": stringAttr(appIdentity.StatusRevoked),
+				":now":     stringAttr(nowISO),
+				":reason":  stringAttr(reason),
+			},
+		}})
+	}
+
+	_, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
+	if err == nil {
+		return nil
+	}
+	if !isConditionalCancel(err) {
+		return appIdentity.ErrSessionRevokeUnavailable
+	}
+	if transactionItemFailed(err, 0) {
+		// La sesión no estaba ACTIVE o cambió de versión: conflicto real, no fallo de
+		// servicio. El llamador releyendo decide.
+		return appIdentity.ErrSessionRevokeConflict
+	}
+	// Sólo falló el localizador: la transacción se canceló completa y la sesión sigue ACTIVE.
+	// Se repite únicamente la sesión para dejar la revocación aplicada.
+	if _, errRetry := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{sessionItem},
+	}); errRetry != nil {
+		if isConditionalCancel(errRetry) {
+			return appIdentity.ErrSessionRevokeConflict
+		}
+		return appIdentity.ErrSessionRevokeUnavailable
+	}
+	return nil
+}
