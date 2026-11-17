@@ -200,12 +200,43 @@ func (s *PasswordResetStore) Reclamar(ctx context.Context, outboxID, owner strin
 }
 
 // MarcarEnviado cierra el trabajo exigiendo estado, owner y fence vigentes.
-func (s *PasswordResetStore) MarcarEnviado(ctx context.Context, trabajo ports.ResetTrabajo, _ string, ahora time.Time) error {
-	return s.actualizarTrabajo(ctx, trabajo,
-		"SET #e = :enviado, enviadoEn = :s REMOVE tokenSello",
-		map[string]types.AttributeValue{":s": &types.AttributeValueMemberN{Value: strconv.FormatInt(ahora.Unix(), 10)}},
+func (s *PasswordResetStore) MarcarEnviado(ctx context.Context, trabajo ports.ResetTrabajo, mensajeID string, ahora time.Time) error {
+	extra := map[string]types.AttributeValue{
+		":s": &types.AttributeValueMemberN{Value: strconv.FormatInt(ahora.Unix(), 10)},
+	}
+	expr := "SET #e = :enviado, enviadoEn = :s REMOVE tokenSello"
+	if mensajeID != "" {
+		expr = "SET #e = :enviado, enviadoEn = :s, mensajeId = :m REMOVE tokenSello"
+		extra[":m"] = &types.AttributeValueMemberS{Value: mensajeID}
+	}
+	return s.actualizarTrabajo(ctx, trabajo, expr, extra,
 		map[string]types.AttributeValue{":enviado": &types.AttributeValueMemberS{Value: "ENVIADO"}},
 	)
+}
+
+// RegistrarUltimoError persiste solo un codigo de diagnostico (sin mensaje crudo,
+// sin token y sin PII) en el trabajo reclamado por este worker.
+func (s *PasswordResetStore) RegistrarUltimoError(ctx context.Context, trabajo ports.ResetTrabajo, codigo string, ahora time.Time) error {
+	_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:           aws.String(s.tabla),
+		Key:                 s.claveTrabajo(trabajo),
+		UpdateExpression:    aws.String("SET ultimoError = :e, ultimoErrorEn = :t"),
+		ConditionExpression: aws.String("#e = :enviando AND #owner = :owner AND fence = :fence"),
+		ExpressionAttributeNames: map[string]string{
+			"#e": "estado", "#owner": "owner",
+		},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":e":        &types.AttributeValueMemberS{Value: codigo},
+			":t":        &types.AttributeValueMemberN{Value: strconv.FormatInt(ahora.Unix(), 10)},
+			":enviando": &types.AttributeValueMemberS{Value: "ENVIANDO"},
+			":owner":    &types.AttributeValueMemberS{Value: trabajo.Owner},
+			":fence":    &types.AttributeValueMemberN{Value: strconv.Itoa(trabajo.Fence)},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("registro de ultimo error: %w", err)
+	}
+	return nil
 }
 
 // Reintentar reprograma (conservando el sobre) o cierra el trabajo como fallido.

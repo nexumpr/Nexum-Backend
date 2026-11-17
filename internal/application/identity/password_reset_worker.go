@@ -5,10 +5,18 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/nexumpr/Nexum-Backend/internal/ports"
 )
+
+// almacenErrores es una extension opcional del store para diagnostico. No
+// cambia el puerto ResetStore: los dobles de prueba que no la implementan
+// siguen funcionando.
+type almacenErrores interface {
+	RegistrarUltimoError(ctx context.Context, trabajo ports.ResetTrabajo, codigo string, ahora time.Time) error
+}
 
 // ResetWorker procesa la cola durable de recuperacion de contrasena.
 //
@@ -116,16 +124,51 @@ func (w *ResetWorker) Ciclo(ctx context.Context) int {
 			_ = w.store.Reintentar(ctx, t, t.Intentos, ahora, ahora, true)
 			continue
 		}
-		if _, err := w.correo.EnviarRecuperacion(ctx, t.Destino, token, t.ExpiraEn); err != nil {
+		msgID, envErr := w.correo.EnviarRecuperacion(ctx, t.Destino, token, t.ExpiraEn)
+		if envErr != nil {
+			codigo := codigoErrorEnvio(envErr)
+			if sink, ok := w.store.(almacenErrores); ok {
+				_ = sink.RegistrarUltimoError(ctx, t, codigo, ahora)
+			}
+			if w.logger != nil {
+				w.logger.WarnContext(ctx, "fallo de envio de recuperacion",
+					"outbox", t.OutboxID, "codigo", codigo)
+			}
 			intentos := t.Intentos + 1
 			_ = w.store.Reintentar(ctx, t, intentos, ahora.Add(espera(intentos)), ahora, intentos >= w.MaxIntentos)
 			continue
 		}
-		if err := w.store.MarcarEnviado(ctx, t, "", ahora); err == nil {
+		if err := w.store.MarcarEnviado(ctx, t, msgID, ahora); err == nil {
 			enviados++
 		}
 	}
 	return enviados
+}
+
+// codigoErrorEnvio clasifica el error sin persistir el mensaje crudo ni PII.
+func codigoErrorEnvio(err error) string {
+	if err == nil {
+		return ""
+	}
+	s := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(s, "not verified"):
+		return "RECIPIENT_NOT_VERIFIED"
+	case strings.Contains(s, "suppress"):
+		return "SUPPRESSED"
+	case strings.Contains(s, "access denied") || strings.Contains(s, "accessdenied"):
+		return "ACCESS_DENIED"
+	case strings.Contains(s, "throttl") || strings.Contains(s, "too many requests") || strings.Contains(s, "rate exceeded"):
+		return "THROTTLED"
+	case strings.Contains(s, "timeout") || strings.Contains(s, "deadline exceeded"):
+		return "TIMEOUT"
+	case strings.Contains(s, "connection") || strings.Contains(s, "no such host") || strings.Contains(s, "tls"):
+		return "NETWORK"
+	case strings.Contains(s, "message rejected") || strings.Contains(s, "messagerejected"):
+		return "MESSAGE_REJECTED"
+	default:
+		return "SEND_ERROR"
+	}
 }
 
 // espera aplica el backoff aprobado: 30 s, 2 min, 10 min, 1 h, 6 h.
