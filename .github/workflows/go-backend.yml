@@ -210,16 +210,7 @@ jobs:
         run: |
           go run github.com/zricethezav/gitleaks/v8@v8.30.1 \
             detect --source . --config .gitleaks.toml \
-            --baseline-path .gitleaks-baseline.json --no-banner --redact --exit-code 1 \
-            --report-format json --report-path "$RUNNER_TEMP/gitleaks.json"
-
-      # Diagnostico temporal (PR #73): solo metadatos. Nunca Secret ni Match.
-      - name: Diagnostico de hallazgos (solo metadatos)
-        if: always()
-        run: |
-          f="$RUNNER_TEMP/gitleaks.json"
-          if [ ! -f "$f" ]; then echo "sin reporte"; exit 0; fi
-          python3 -c "import json,os;d=json.load(open(os.environ['RUNNER_TEMP']+'/gitleaks.json'));print('hallazgos:',len(d));[print(' | '.join([str(x.get('RuleID','')),str(x.get('File','')),str(x.get('StartLine','')),str(x.get('Commit',''))[:12],str(x.get('Fingerprint',''))[:24]])) for x in d]"
+            --baseline-path .gitleaks-baseline.json --no-banner --redact --exit-code 1
 
   iac:
     name: Validacion Terraform e IaC
