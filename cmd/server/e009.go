@@ -46,7 +46,7 @@ func montarE009(
 	}
 	if tokens == nil || sessions == nil {
 		logger.Warn("E009: componentes de autenticacion incompletos; el endpoint respondera 503",
-			slog.String("motivo", "sin_tokens_o_autorizador"))
+			slog.String("motivo", "sin_credenciales_autorizador_o_persistencia"))
 	}
 
 	handler := nexumhttp.NewSessionRevokeHandler(servicio, tokens, sessions, logger)
