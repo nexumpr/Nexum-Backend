@@ -72,3 +72,19 @@ paths = [
 ]
 regexTarget = "line"
 regexes = ['''^\s*(?:const\s+)?key\s*:?=\s*"0123456789abcdef"\s*$''']
+
+# Oleada E007-E011 (2026-11-17): convencion de credenciales SINTETICAS de prueba.
+# Los endpoints de identidad se prueban con literales que la regla `generic-api-key`
+# interpreta como credenciales. La excepcion NO es por ruta: exige que el VALOR cumpla
+# una convencion que ninguna credencial real usa (sufijo `Passphrase#2026` o prefijo
+# `token-sintetico-`), y solo aplica dentro de `tests/`. Cualquier otro literal, en
+# tests o fuera de ellos, sigue generando hallazgo.
+[[rules.allowlists]]
+description = "Credenciales sinteticas de pruebas Nexum (convencion explicita de valor, solo en tests/)"
+condition = "AND"
+paths = ['''^tests/.*\.go$''']
+regexTarget = "line"
+regexes = [
+  '''(?i)\b\w*pass(?:word|phrase)\b"?\s*[:=]\s*"?(?:[A-Za-z]+)?Passphrase#2026''',
+  '''(?i)"?\b\w*token\b"?\s*[:=]\s*"?token-sintetico-[a-z0-9-]+''',
+]
