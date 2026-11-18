@@ -6,7 +6,7 @@
 | Fecha | 2026-11-18 |
 | Base | `main` `88ef920` |
 | Gate | `GATE_H08E_OLEADA_1.md` |
-| Estado | **PROPUESTO** — no autoriza implementación hasta la frase del Gate §14 |
+| Estado | **PROPUESTO** — no autoriza implementación hasta la frase del Gate §15 |
 
 Este documento fija la forma de trabajo y los contratos internos para que tres líneas escriban en
 paralelo sin conflictos. No sustituye al OpenAPI: si hay discrepancia, gana el OpenAPI vigente
@@ -143,7 +143,7 @@ type privacyNoticeResponse struct {
     EffectiveAt        string `json:"effectiveAt"`
     Text               string `json:"text"`
     URL                string `json:"url"`
-    Content            string `json:"content,omitempty"`
+    Content            string `json:"content"`
     RequiresAcceptance bool   `json:"requiresAcceptance"`
 }
 
@@ -249,16 +249,23 @@ func AvisoVigente() Notice
 ```
 
 - Archivo embebido: `internal/application/privacy/aviso_2026_11_v2.txt` con `//go:embed`.
-  Contenido exacto: **5921 bytes UTF-8**, salto de línea final, SHA-256
-  `27037a1a78b0b86c640fd7fbf0a455826699eadfdd7f55112086bfd6dd187b13`.
+  Contenido exacto: **6158 bytes UTF-8**, salto de línea final, SHA-256
+  `29b27611c6127e85ec3aca7601e38dec1fc188f305ffee6109d71e9cf1218a06`.
 - `Version = "2026-11-v2"`; `URL = "https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current"`;
-  `RequiresAcceptance = true`; `EffectiveAt` se fija en el release que publica la versión (UTC, no
-  retroactiva).
+  `RequiresAcceptance = true`.
+- `EffectiveAt` es una **constante** fijada en el release que publica la versión (UTC, no
+  retroactiva); nunca se calcula con `time.Now()` por petición. Un test verifica que no es cero.
 - `Text` es el resumen aprobado en el Gate; `Content` es el archivo embebido.
+- **Obligatoriedad exacta:** `version`, `effectiveAt`, `text` y `url` son requeridos y se serializan
+  sin `omitempty`. `content` y `requiresAcceptance` son opcionales en OpenAPI; esta versión emite
+  ambos siempre y el DTO no usa `omitempty` en ninguno, para no perder valores falsos o vacíos.
 - Prueba obligatoria `TestE015ContenidoSHA`: recalcula el SHA del archivo y falla si no coincide
   con el valor aprobado. Prueba de contrato: 200 con los seis campos, sin 503.
 - **No hay dependencia de `nexumpr/nexum-privacidad`**, no se crea web ni landing y no se modifica
   ningún repositorio ajeno.
+- **PENDIENTE_DECISION_HUMANA:** canal de contacto de privacidad efectivo. El texto no promete un
+  medio específico; E015 no se declara funcional hasta que el responsable publique/confirme el canal
+  y apruebe el contenido con la frase de D-E015.
 - La **adopción del texto** exige la frase separada de D-E015; sin ella el PR de E015 no se fusiona.
   El desarrollo (handler, DTO, pruebas) no se bloquea.
 
@@ -353,14 +360,47 @@ E015 se sirve desde el backend con el aviso embebido y probado por SHA. **No** s
 funcional hasta que el responsable apruebe el contenido con la frase de D-E015; si no lo aprueba,
 el PR de E015 no se fusiona y el contador máximo es 25/75. No hay 503 ni texto provisional.
 
-## 9. Pruebas compartidas mínimas
+## 9. Pruebas progresivas (sin stubs)
 
-- `tests/integration/oleada1_routes_test.go`: arranca el binario real y comprueba que las 15 rutas
-  existen (401/400/200 según corresponda) y que una ruta de Oleada 2 sigue en 404.
+### 9.1 PR de andamiaje (0 endpoints)
+
+Debe poder fusionarse con **cero** endpoints de Oleada 1. Pruebas:
+
+- registro válido de un montaje (ID, método, ruta, función no nula);
+- `panic` ante ID duplicado;
+- `panic` ante `(método, ruta)` duplicado, aunque el ID sea distinto;
+- orden de montaje determinista (IDs ordenados);
+- sólo se aceptan IDs de la lista autorizada de 15; un ID futuro (E072+) se rechaza;
+- `init()` no hace I/O ni lee variables de entorno;
+- con cero registros, `montarOleada1` no registra ninguna ruta y el router responde 404.
+
+No se registran handlers ficticios ni rutas de relleno para hacer pasar pruebas.
+
+### 9.2 PR de cada endpoint
+
+Cada PR prueba **exclusivamente** su endpoint y sus dependencias:
+
+- ruta y método registrados por su `init()`;
+- contrato, errores, aislamiento, CAS/concurrencia y persistencia;
+- no exige que existan los otros 14 endpoints;
+- no usa stubs de otros endpoints.
+
+### 9.3 Ensayo de integración final
+
+Se ejecuta cuando los 15 PR funcionales están preparados, antes del primer merge de endpoint:
+
+- `tests/integration/oleada1_routes_test.go` exige **exactamente 15** rutas de Oleada 1, sin
+  duplicados y sin rutas de Oleada 2;
+- arranca el binario real y comprueba códigos de contrato (401/400/200 según ruta);
+- regresión E001–E011;
+- este test **no** se incluye en el andamiaje ni en PR individuales; se añade en el commit de
+  integración cuando el conjunto está completo.
+
+### 9.4 Pruebas transversales
+
 - `tests/unit/transport/oleada1_contract_test.go`: serialización exacta de cada DTO y rechazo de
   campos desconocidos.
-- `tests/unit/dynamo/oleada1_conditions_test.go`: ninguna expresión declara valores no usados
-  (recorre las transacciones y updates emitidos por los dobles).
+- `tests/unit/dynamo/oleada1_conditions_test.go`: ninguna expresión declara valores no usados.
 - `tests/security/oleada1_authz_test.go`: usuario B no accede a recursos de A; tokens revocados
   rechazados por el middleware.
 
