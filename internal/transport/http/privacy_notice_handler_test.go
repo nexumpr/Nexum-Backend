@@ -21,7 +21,7 @@ func (p proveedorAvisoFalso) Current() (appPrivacy.Notice, error) { return p.avi
 func avisoValido() appPrivacy.Notice {
 	return appPrivacy.Notice{
 		Version:            "2026-11-v2",
-		EffectiveAt:        time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC),
+		EffectiveAt:        time.Date(2026, 11, 18, 0, 0, 0, 0, time.UTC),
 		Text:               "resumen",
 		URL:                "https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current",
 		Content:            "contenido",

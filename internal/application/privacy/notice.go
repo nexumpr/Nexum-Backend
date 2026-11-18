@@ -3,6 +3,7 @@ package privacy
 import (
 	_ "embed"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -22,6 +23,15 @@ const (
 	// la página externa en cada petición.
 	URLAnuncio = "https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current"
 
+	// EffectiveAtEnvVar es la variable de entorno inmutable del release. Se
+	// configura en el bundle RFC-004 durante la promoción; no requiere cambiar
+	// código ni HEAD después de aprobar los merges.
+	EffectiveAtEnvVar = "E015_EFFECTIVE_AT"
+
+	// EffectiveAtMinimo impide fechas históricas anteriores a la primera
+	// publicación autorizada. No se usa para calcular la fecha.
+	EffectiveAtMinimo = "2026-11-18T00:00:00Z"
+
 	// TextoResumen es el resumen legible que acompaña al contenido íntegro.
 	TextoResumen = "Nexum trata tu nombre, correo y contraseña (hash Argon2id) para autenticarte; " +
 		"tu ingreso base y compromisos declarados para calcular su equivalente mensual; y datos " +
@@ -32,16 +42,48 @@ const (
 		"conservación y versiones, está en el campo content y en la URL de este endpoint."
 )
 
-// ErrFechaEfectivaNoAprobada indica que aún no existe una fecha de publicación
-// aprobada. No se inventa ni se calcula con time.Now(): el endpoint queda
-// bloqueado hasta que el responsable fije la fecha real.
-var ErrFechaEfectivaNoAprobada = errors.New("fecha efectiva del aviso no aprobada")
+// ErrFechaEfectivaNoAprobada indica que falta una fecha de publicación válida.
+// No se inventa ni se calcula con time.Now(): la release no se promueve sin la
+// configuración del bundle.
+var ErrFechaEfectivaNoAprobada = errors.New("fecha efectiva del aviso no configurada")
 
-// effectiveAtAviso es la fecha de entrada en vigor de esta versión. Es una
-// configuración inmutable por versión, no se calcula por petición ni se
-// retrotrae. Se fija a la primera publicación autorizada (2026-11-18) y el
-// Gate de publicación la valida antes de promover.
-var effectiveAtAviso = "2026-11-18T00:00:00Z"
+// ParseEffectiveAt valida RFC3339, normaliza a UTC y rechaza fechas anteriores
+// a la primera publicación autorizada. La fecha puede ser futura; no se
+// retrotrae.
+func ParseEffectiveAt(raw string) (time.Time, error) {
+	limpio := strings.TrimSpace(raw)
+	if limpio == "" {
+		return time.Time{}, ErrFechaEfectivaNoAprobada
+	}
+	fecha, err := time.Parse(time.RFC3339, limpio)
+	if err != nil {
+		return time.Time{}, ErrFechaEfectivaNoAprobada
+	}
+	fecha = fecha.UTC()
+	minimo, _ := time.Parse(time.RFC3339, EffectiveAtMinimo)
+	if fecha.Before(minimo) {
+		return time.Time{}, ErrFechaEfectivaNoAprobada
+	}
+	return fecha, nil
+}
+
+// Proveedor es el aviso de una versión con su fecha efectiva inmutable.
+type Proveedor struct {
+	EffectiveAt time.Time
+}
+
+// ProveedorDesdeEntorno lee la fecha una sola vez del entorno del release. Es
+// el mecanismo que usa cmd/server; no consulta la fecha por petición.
+func ProveedorDesdeEntorno(getenv func(string) string) (Proveedor, error) {
+	if getenv == nil {
+		return Proveedor{}, ErrFechaEfectivaNoAprobada
+	}
+	fecha, err := ParseEffectiveAt(getenv(EffectiveAtEnvVar))
+	if err != nil {
+		return Proveedor{}, err
+	}
+	return Proveedor{EffectiveAt: fecha}, nil
+}
 
 // Notice es el aviso vigente servido por la API.
 type Notice struct {
@@ -53,14 +95,9 @@ type Notice struct {
 	RequiresAcceptance bool
 }
 
-// AvisoVigente devuelve el aviso sólo si existe una fecha efectiva aprobada.
-// No consulta servicios externos ni datos de usuario.
-func AvisoVigente() (Notice, error) {
-	if effectiveAtAviso == "" {
-		return Notice{}, ErrFechaEfectivaNoAprobada
-	}
-	effectiveAt, err := time.Parse(time.RFC3339, effectiveAtAviso)
-	if err != nil {
+// AvisoVigente construye el aviso con la fecha ya validada del release.
+func AvisoVigente(effectiveAt time.Time) (Notice, error) {
+	if effectiveAt.IsZero() {
 		return Notice{}, ErrFechaEfectivaNoAprobada
 	}
 	return Notice{
@@ -73,11 +110,8 @@ func AvisoVigente() (Notice, error) {
 	}, nil
 }
 
-// Proveedor implementa el puerto que consume el handler HTTP.
-type Proveedor struct{}
-
-// Current devuelve el aviso vigente o el error de bloqueo.
-func (Proveedor) Current() (Notice, error) { return AvisoVigente() }
+// Current implementa el puerto que consume el handler HTTP.
+func (p Proveedor) Current() (Notice, error) { return AvisoVigente(p.EffectiveAt) }
 
 // Contenido expone el texto íntegro para pruebas de hash.
 func Contenido() string { return contenidoAviso }

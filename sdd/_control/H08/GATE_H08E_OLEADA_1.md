@@ -156,7 +156,7 @@ integrante: **no se modifica, no se usa como dependencia y no bloquea esta olead
 | Campo | Valor |
 |---|---|
 | `version` | `2026-11-v2` |
-| `effectiveAt` | `2026-11-18T00:00:00Z` (fecha propuesta de entrada en vigor; se valida en el Gate de release y no se calcula por petición) |
+| `effectiveAt` | Variable inmutable `E015_EFFECTIVE_AT` del bundle RFC-004, configurada al preparar el release; RFC3339, UTC, no anterior a `2026-11-18T00:00:00Z`; misma en ambas EC2 y validada por smoke test |
 | `text` | resumen legible (abajo) |
 | `url` | `https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current` |
 | `content` | texto íntegro versionado (abajo) |
@@ -263,11 +263,13 @@ Para dudas, solicitudes o quejas relacionadas con los datos personales, el canal
   configuración de cifrado y copias a la operación de AWS.
 - **Datos del responsable autorizados:** nombre, domicilio y correo de privacidad constan en el
   aviso; no son datos inventados.
-- **PENDIENTE_DECISION_HUMANA:** aprobación expresa de este texto (SHA-256) y de la fecha
-  `2026-11-18T00:00:00Z`. Hasta esa frase, el PR #91 no se fusiona.
-- **effectiveAt:** constante inmutable por versión `2026-11-18T00:00:00Z`; no se calcula con
-  `time.Now()` por petición ni se fija retroactivamente. El Gate de release la valida antes de
-  promover.
+- **PENDIENTE_DECISION_HUMANA:** aprobación expresa de este texto (SHA-256) y del mecanismo
+  `E015_EFFECTIVE_AT`; la fecha concreta se fija al preparar el release. Hasta esa frase, el PR
+  #91 no se fusiona.
+- **effectiveAt:** se lee una sola vez de `E015_EFFECTIVE_AT` (bundle RFC-004) al arrancar; no se
+  calcula con `time.Now()` por petición. Se valida RFC3339, UTC y no anterior a
+  `2026-11-18T00:00:00Z`; el smoke test exige HTTP 200 antes de promover y bloquea la release si
+  falta la variable.
 
 **Aprobación de contenido:** el desarrollo de E015 (handler, proveedor, DTO y pruebas) queda
 autorizado con el Gate de §15, pero **la adopción del texto** requiere la frase separada:
@@ -545,4 +547,4 @@ Se actualiza en cada checkpoint; nunca se adelanta un estado.
 | 2026-11-18 | **v1.1.0:** corrige RFC-020 (9 valores publicados, sin eliminar `biweekly`/`yearly`), separa el contenido de E015 del alcance y registra `BLOCKED_CONTENIDO_EXTERNO` con R-E015-01/02/03; FinOps incremental estimado en lugar de `0.0000`; disponibilidad AZ declarada `NOT_VERIFIED` | PROPUESTO |
 | 2026-11-18 | **v1.2.0:** E015 deja de depender de `nexumpr/nexum-privacidad`; el aviso se sirve desde la API (`/api/v1/privacy/notices/current`) con versión `2026-11-v2`. La adopción del texto exige frase separada; sin ella el PR de E015 no se fusiona. Sin web adicional ni 503 | PROPUESTO |
 | 2026-11-18 | **v1.2.1:** aviso corregido para no afirmar funciones no implementadas (eliminación automática, notificaciones, analítica, voz), no prometer canal de Ayuda ni plazos de conservación no verificados y no afirmar TLS 1.3. `content` de **6761 bytes** UTF-8, SHA-256 `68f1052a…05c9`; canal de contacto y `effectiveAt` quedan como decisiones humanas del release | **PROPUESTO** |
-| 2026-11-18 | **v1.2.2:** datos del responsable autorizados (nombre, domicilio, correo), `url` pública `https://nexumpr.github.io/nexum-privacidad/`, `effectiveAt` inmutable `2026-11-18T00:00:00Z` validado por prueba y `content` final de **6761 bytes** SHA-256 `68f1052a.05c9`. Se registra que la página pública es de otro integrante y puede citar infraestructura obsoleta; no se modifica ni se usa como fuente contractual | **PROPUESTO** |
+| 2026-11-18 | **v1.2.2:** datos del responsable autorizados (nombre, domicilio, correo), `url` del API `https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current`, `effectiveAt` mediante `E015_EFFECTIVE_AT` validado por prueba y `content` final de **6761 bytes** SHA-256 `68f1052a.05c9`. Se registra que la página pública es de otro integrante y puede citar infraestructura obsoleta; no se modifica ni se usa como fuente contractual | **PROPUESTO** |
