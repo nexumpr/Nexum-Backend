@@ -1899,3 +1899,14 @@ La regla `terraform *` -> `deny` y `terraform apply*` -> `deny` bloqueaban tambi
 - **Aceptacion Android**: no confirmada por el equipo movil. `ANDROID_READY` se declara tecnicamente (endpoints publicados y funcionales), no como aceptacion.
 - Versionar la politica de permisos de Terraform mediante RFC/PR propio.
 - E012 y siguientes: `NOT_AUTHORIZED`.
+
+### H08-E / Oleada 1 — checkpoint de implementación (2026-11-18)
+
+- **Gobierno:** `APRUEBO_GATE_OLEADA_1_...` concedido; PR #81 MERGED en `main` `d062fb7c24cb06d8f9141b870e9d0fcb0e20bc2b`; CI de main Go `44321249447` y SDD `44321249370` SUCCESS.
+- **Andamiaje #82:** HEAD `7a2b4b6` (ETag fuerte, rechazo de `W/"vN"` con 412), registro determinista de 15 IDs, helpers, caché pública y `time/tzdata`; 13/13 CI.
+- **Endpoints implementados (15):** E012 #83, E013 #90, E015 #91 (draft, bloqueado), E016 #92, E017 #97, E018 #93, E019 #96, E022 #84, E023 #86, E024 #94, E025 #95, E068 #85, E069 #87, E070 #88, E071 #89. Un PR por endpoint, sin stubs.
+- **RFC-020 v1.1.0 aplicada:** OpenAPI YAML/JSON con 9 valores en `Frequency.id`, `Income.frequency` e `IncomeUpdate.frequency`; E023 emite 7 canónicos; E025 normaliza `biweekly`/`yearly`. Checksum de publicación I-150 actualizado (`240753...1ddc`).
+- **Integración conjunta:** PR #98 (draft, no merge) con #82 + 15 endpoints; `TestIntegracionOleada1QuinceRutas` exige exactamente 15 rutas, sin duplicados y resueltas por el router; **13/13 CI PASS**.
+- **E015:** contenido `2026-11-v2` (6158 bytes, SHA `29b27611...8a06`) embebido; `effectiveAt` vacío hasta aprobación; handler 503 fail-closed sin fecha; PR draft #91. Bloqueo: identidad/domicilio, canal de privacidad y fecha real.
+- **Pruebas:** `go build`/`go vet` PASS en integración; CI Linux ejecuta la suite completa. Host Windows bloquea binarios de prueba por Application Control (`BLOCKED_POLICY_APPLICATION_CONTROL`), no se declara PASS local global.
+- **Estado:** 0/15 fusionados, 0/15 desplegados, `AWS_NOT_RUN`. No se ha ejecutado Terraform, S3 ni instance refresh. Pendiente: Gates de merge agrupados y release AWS.
