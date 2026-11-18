@@ -225,16 +225,15 @@ Detalles vinculantes:
   fija la marca UTC y se conserva mientras siga `done=true`.
 - `preferencesPatchRequest`: si `timezone` y `timeZone` llegan con valores distintos → 422; si sólo
   llega uno, se aplica; si ninguno, el PATCH no cambia zona.
-- `privacyNoticeResponse.RequiresAcceptance` se emite siempre (false incluido). `Content` se emite
-  sólo cuando la versión aprobada incluya texto completo; si no existe, E015 falla cerrado (503) y
-  no llega a serializar.
+- `privacyNoticeResponse.RequiresAcceptance` se emite siempre. `Content` se emite siempre con el
+  texto íntegro de la versión aprobada; no hay camino 503 ni texto provisional.
 - `incomeUpdateRequest`: los tres campos son requeridos; un `null` o ausencia → 422.
 
 Las páginas usan `items` siempre (array no nulo) y `nextCursor,omitempty`.
 
-### 3.1 E015 — proveedor de contenido fail-closed
+### 3.1 E015 — aviso servido por la API (sin web ni repositorio externo)
 
-`internal/application/privacy` define:
+`internal/application/privacy` contiene el aviso versionado como recurso del backend:
 
 ```go
 type Notice struct {
@@ -246,19 +245,22 @@ type Notice struct {
     RequiresAcceptance bool
 }
 
-var ErrContenidoNoAprobado = errors.New("contenido del aviso no aprobado")
-
-type NoticeProvider interface {
-    Current(ctx context.Context) (Notice, error)
-}
+func AvisoVigente() Notice
 ```
 
-- No existe contenido por defecto ni texto inventado en el binario.
-- El proveedor sólo se configura cuando el responsable aprueba una versión (D-E015 opción A o B).
-- Sin proveedor aprobado, el handler responde **503 `CONTENT_NOT_AVAILABLE`**; no devuelve 200.
-- La prueba de contrato verifica el 503 y que no se filtre ningún texto provisional.
-- La corrección del aviso publicado en `nexumpr/nexum-privacidad` requiere autorización específica
-  para ese repositorio; este Gate no la concede.
+- Archivo embebido: `internal/application/privacy/aviso_2026_11_v2.txt` con `//go:embed`.
+  Contenido exacto: **5921 bytes UTF-8**, salto de línea final, SHA-256
+  `27037a1a78b0b86c640fd7fbf0a455826699eadfdd7f55112086bfd6dd187b13`.
+- `Version = "2026-11-v2"`; `URL = "https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current"`;
+  `RequiresAcceptance = true`; `EffectiveAt` se fija en el release que publica la versión (UTC, no
+  retroactiva).
+- `Text` es el resumen aprobado en el Gate; `Content` es el archivo embebido.
+- Prueba obligatoria `TestE015ContenidoSHA`: recalcula el SHA del archivo y falla si no coincide
+  con el valor aprobado. Prueba de contrato: 200 con los seis campos, sin 503.
+- **No hay dependencia de `nexumpr/nexum-privacidad`**, no se crea web ni landing y no se modifica
+  ningún repositorio ajeno.
+- La **adopción del texto** exige la frase separada de D-E015; sin ella el PR de E015 no se fusiona.
+  El desarrollo (handler, DTO, pruebas) no se bloquea.
 
 ## 4. Atributos DynamoDB
 
@@ -347,9 +349,9 @@ línea (E013 de E012, E019 de E018, E017 de E016, E025 de E024, E069 de E068), l
 desde la anterior **o** se rebasa sobre `main` cuando la anterior ya está fusionada; nunca se
 duplica el código base.
 
-E015 se implementa fail-closed y **no** se cuenta como funcional hasta que el responsable apruebe
-una versión de contenido (D-E015). El PR de E015 puede existir con el handler 503 y sus pruebas;
-el Gate de despliegue lo excluye del contador si sigue bloqueado.
+E015 se sirve desde el backend con el aviso embebido y probado por SHA. **No** se cuenta como
+funcional hasta que el responsable apruebe el contenido con la frase de D-E015; si no lo aprueba,
+el PR de E015 no se fusiona y el contador máximo es 25/75. No hay 503 ni texto provisional.
 
 ## 9. Pruebas compartidas mínimas
 

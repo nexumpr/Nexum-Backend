@@ -3,11 +3,11 @@
 | Campo | Valor |
 |---|---|
 | Documento | `sdd/_control/H08/GATE_H08E_OLEADA_1.md` |
-| Versión | 1.0.0 |
+| Versión | 1.2.0 |
 | Fecha | 2026-11-18 |
 | Base de trabajo | `main` `88ef920f74da375b588f3e850a760aa0530df050` (PR #80 fusionado) |
 | Baseline funcional vigente | `v0.15.0+8f13c86d2ca0` · E001–E011 verificados |
-| Instrumento de gobierno | `RFC-019-OLEADA_E007_E011.md` (excepción reutilizable E-1/E-2) y `RFC-020-FRECUENCIAS_E023_E024_E025.md` (propuesta incluida en este Gate) |
+| Instrumento de gobierno | `RFC-019-OLEADA_E007_E011.md` (excepción reutilizable E-1/E-2) y `RFC-020-FRECUENCIAS_E023_E024_E025.md` v1.1.0 (propuesta incluida en este Gate) |
 | Estado | **PROPUESTO — pendiente de la frase humana de §15** |
 | Aprobador | Responsable de Nexum-Backend |
 
@@ -106,8 +106,9 @@ Reglas de convivencia:
   para rebajar controles, desactivar escáneres o silenciar hallazgos.
 - Ninguna aprobación es implícita: cada merge exige su frase por SHA40 y cada operación AWS su Gate.
 - Máximo 8 endpoints en desarrollo/CI activo; el resto permanece en cola dentro de su línea.
-- **E015** se implementa fail-closed y permanece `BLOCKED_CONTENIDO_EXTERNO` hasta decisión de
-  contenido separada; no se cuenta como funcional mientras no haya versión aprobada.
+- **E015** se sirve desde el backend (sin web ni repositorio externo). Su contenido íntegro tiene
+  SHA-256 propio y requiere aprobación separada; si no se aprueba, el PR de E015 no se fusiona y
+  el contador máximo es 25/75. Los otros 14 endpoints no se bloquean.
 
 ## 5. Preflight verificado (2026-11-18, solo lectura)
 
@@ -141,43 +142,96 @@ formato inválido → **400**; versión distinta de la persistida → **412**. S
 versión incrementada y ETag `"v<version>"`. Perfil ausente → **404**. Conflicto de transacción
 agotados los reintentos → **409**. `{}` sin cambios → 200 sin escritura (misma versión).
 
-### D-E015 — Aviso de privacidad vigente (`BLOCKED_CONTENIDO_EXTERNO`)
+### D-E015 — Aviso de privacidad servido por la API
 
-**Fuente publicada confirmada (solo lectura):** repositorio público `nexumpr/nexum-privacidad`,
-archivo `index.html`, publicado en `https://nexumpr.github.io/nexum-privacidad/`. La página declara
-`Identificador de Versión: 2026-11-v1` y `Publicación y Entrada en Vigor: 02 de noviembre de 2026`.
-No se modificó ese repositorio.
+**Decisión de arquitectura:** Nexum **no tendrá aplicación web ni portal de privacidad**. La única
+web es la landing publicitaria, ajena a este backend. E015 se sirve desde el propio backend Go en
+`GET /api/v1/privacy/notices/current`; Android muestra el aviso dentro de su interfaz y registra la
+versión aceptada mediante E017. El repositorio `nexumpr/nexum-privacidad` pertenece a otro
+integrante: **no se modifica, no se usa como dependencia y no bloquea esta oleada**.
 
-**Contradicciones técnicas verificadas entre el aviso publicado y la configuración real:**
+**Respuesta contractual:**
 
-| Riesgo | Declaración publicada | Configuración real verificable |
-|---|---|---|
-| R-E015-01 | Sección 6: “Google Cloud Platform (GCP)” y “MongoDB Atlas” | AWS `us-east-2`, EC2, ALB, CloudFront, DynamoDB `NEXUM_CORE_H08I`, ElastiCache Redis |
-| R-E015-02 | Sección 10: copias de respaldo purgadas “en un plazo no mayor a 30 días naturales” | PITR de DynamoDB con ventana de **35 días** (valor nativo del servicio) |
-| R-E015-03 | Sección 7: comunicaciones “TLS 1.3” | CloudFront con certificado por defecto fija la security policy en **TLSv1** (riesgo H-01, abierto) |
+| Campo | Valor |
+|---|---|
+| `version` | `2026-11-v2` |
+| `effectiveAt` | fecha UTC del release que publique por primera vez esta versión (no anterior a la aprobación; no retroactiva) |
+| `text` | resumen legible (abajo) |
+| `url` | `https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current` |
+| `content` | texto íntegro versionado (abajo) |
+| `requiresAcceptance` | `true` |
 
-**Decisión:** `E015_CONTENIDO = BLOCKED_CONTENIDO_EXTERNO`. El endpoint **no se declara
-funcional** ni cuenta para 26/75 mientras el contenido no sea autorizado. No se sirve un texto
-inventado, no se ocultan proveedores y no se acepta automáticamente un documento incorrecto.
+**Texto de `text` (resumen):**
+> Nexum trata tu nombre, correo y contraseña (hash Argon2id) para autenticarte; tus datos
+> financieros autodeclarados (ingreso, compromisos, presupuestos, movimientos y metas) para
+> calcular tu dinero disponible y proyecciones; y datos técnicos de sesión para proteger tu cuenta.
+> La infraestructura es AWS `us-east-2`; no vendemos tus datos ni los cedemos a redes
+> publicitarias. Puedes ejercer tus derechos y solicitar la eliminación desde la sección Ayuda de
+> la app. El aviso íntegro, con finalidades, proveedores, seguridad, conservación y versiones, está
+> en el campo `content` y en la URL de este endpoint.
 
-**Implementación permitida (fail-closed):** el handler y el proveedor de contenido pueden
-escribirse, pero sin una versión aprobada el endpoint responde **503 `CONTENT_NOT_AVAILABLE`** y
-no emite `200` con texto provisional. La prueba de contrato verifica ese fallo cerrado.
+**Texto íntegro de `content` (aprobación separada):** el bloque siguiente es el contenido exacto
+que se incorporará como recurso versionado del backend. Se medirá en UTF-8 con salto de línea
+final; **5921 bytes**; SHA-256
+**`27037a1a78b0b86c640fd7fbf0a455826699eadfdd7f55112086bfd6dd187b13`**. Una prueba de contrato
+recalculará el SHA y fallará si el texto cambia.
 
-**Salidas posibles, cada una con autorización humana separada:**
+```text
+Aviso de Privacidad de Nexum
 
-1. **A — Corrección externa:** el propietario corrige `nexumpr/nexum-privacidad` (autorización
-   específica para ese repositorio), se verifica la publicación y el responsable aprueba la nueva
-   versión, `effectiveAt`, `text` y `url`. Frase propuesta una vez exista la corrección:
-   `APRUEBO_CONTENIDO_E015_AVISO_CORREGIDO_VERSION_<VERSION>`.
-2. **B — Contenido servido por el Backend:** el responsable autoriza una versión de contenido
-   propia con texto exacto y acepta por escrito el riesgo de que la URL pública difiera. Frase:
-   `APRUEBO_CONTENIDO_E015_VERSION_<VERSION>_SHA256_<SHA256_DEL_TEXTO>`.
-3. **C — Bloqueo:** E015 permanece `BLOCKED_CONTENIDO_EXTERNO` y se excluye del contador hasta
-   resolverse.
+1. Quién trata tus datos
+El responsable del tratamiento es el proyecto Nexum, operado por su equipo de desarrollo. Nexum es una aplicación Android de gestión de finanzas personales. No es un banco, institución de crédito ni entidad financiera; no se conecta a cuentas bancarias ni solicita claves interbancarias, números de tarjeta o contraseñas bancarias. Los importes y proyecciones que muestra son estimaciones calculadas a partir de los datos que tú declaras.
 
-La aprobación de §15 **no** incluye ninguna de estas tres salidas: sólo autoriza el alcance de
-desarrollo. La decisión de contenido se solicita por separado.
+2. Qué datos tratamos
+- Identificación y cuenta: nombre o nombre visible, correo electrónico, contraseña almacenada como hash Argon2id, estado de verificación del correo, estado de la cuenta, versiones de avisos aceptadas, preferencias de idioma y zona horaria, y progreso de configuración inicial.
+- Datos financieros autodeclarados: ingreso habitual (importe, moneda y frecuencia), compromisos de pago recurrentes (concepto, importe, categoría y frecuencia), presupuestos, movimientos de gasto e ingreso, metas de ahorro y aportaciones. Los importes se almacenan en centavos enteros para evitar errores de redondeo.
+- Datos técnicos y de sesión: dirección IP, marcas de tiempo, identificadores opacos de sesión, tokens de acceso y renovación, y datos opcionales del dispositivo (por ejemplo, plataforma o identificador de dispositivo) cuando el cliente los envía. Si habilitas notificaciones, se almacenará un token de dispositivo para enviarlas.
+- No recogemos datos bancarios, números de tarjeta, identificadores oficiales, datos biométricos, contactos, ubicación precisa ni audio almacenado en servidores.
+
+3. Para qué usamos tus datos
+- Finalidades primarias: crear y autenticar tu cuenta; calcular tu dinero disponible, presupuestos, metas y proyecciones; sincronizar tus datos entre tus dispositivos; proteger la cuenta y prevenir abuso o fraude; atender derechos de privacidad y eliminación; cumplir obligaciones legales.
+- Finalidades secundarias opcionales: enviar recordatorios o alertas si concedes notificaciones; generar análisis o patrones de consumo. Puedes revocar estas finalidades desde la app o desde los ajustes del sistema operativo.
+- No vendemos, alquilamos ni cedemos tus datos a terceros comerciales ni los usamos para publicidad de terceros.
+
+4. Consentimiento y versiones
+No marcamos consentimientos por omisión. Cada decisión de consentimiento se registra con la versión del aviso, la finalidad, la decisión (concedido o denegado) y la fecha UTC. Puedes consultar tu historial y revocar consentimientos desde la app. Cuando publiquemos una versión sustancialmente nueva del aviso, la app solicitará tu aceptación y registrará la versión aceptada.
+
+5. Proveedores e infraestructura
+Nexum se aloja en Amazon Web Services (AWS), región us-east-2 (Ohio, Estados Unidos). Los servicios utilizados son: EC2 (cómputo), Application Load Balancer y CloudFront (entrega HTTPS), DynamoDB (base de datos), ElastiCache Redis (caché y control de cuotas), S3 (artefactos y copias de estado de infraestructura), SES (envío de correos de verificación y recuperación) y CloudWatch (registros y métricas). AWS actúa como encargado del tratamiento por instrucción de Nexum. No utilizamos Google Cloud Platform ni MongoDB Atlas. No transferimos tus datos a redes publicitarias.
+
+6. Seguridad
+Aplicamos controles técnicos y organizativos: comunicaciones HTTPS; tokens JWT firmados con RS256 y vida corta; renovación de sesión con rotación y detección de reutilización; contraseñas con Argon2id; revocación de sesiones; permisos IAM de mínimo privilegio; cifrado en reposo en DynamoDB, S3 y ElastiCache; y registros que omiten contraseñas, tokens e importes financieros. Ningún sistema es infalible; si detectamos un incidente que afecte tus datos, lo comunicaremos por los canales de la app y, cuando corresponda, a las autoridades.
+
+7. Conservación y eliminación
+Conservamos los datos de tu cuenta mientras esté activa y mientras sean necesarios para las finalidades descritas. Si solicitas la eliminación de tu cuenta, revocamos tus sesiones y suprimimos tu perfil y tus datos financieros de los entornos de producción. La base de datos mantiene una ventana técnica de recuperación de hasta 35 días como máximo; esas copias no se usan para operación normal ni para elaborar perfiles. Las copias de estado de la infraestructura en S3 se conservan hasta 30 días por versionado y no contienen datos de usuario. Estos plazos son técnicos y no sustituyen una política general de retención.
+
+8. Tus derechos
+Puedes ejercer los derechos de acceso, rectificación, cancelación, oposición y portabilidad sobre tus datos. Desde la app puedes consultar y corregir tu perfil, ingreso y preferencias, y consultar tu historial de consentimientos. Para solicitar la eliminación de tu cuenta o el ejercicio de cualquier derecho, usa la sección Ayuda de la aplicación o el canal de privacidad que el responsable publique. Responderemos por el mismo canal y verificaremos tu identidad antes de ejecutar cambios sensibles.
+
+9. Permisos del dispositivo
+El micrófono y las notificaciones son opcionales. Si usas el registro por voz, el reconocimiento se realiza en el dispositivo y el backend no recibe ni almacena audio; sólo recibe el texto que confirmes. Si niegas un permiso, puedes seguir usando el registro manual y el resto de la app.
+
+10. Versión y cambios
+Este aviso tiene un identificador de versión y una fecha de entrada en vigor. La versión vigente y su contenido íntegro están disponibles en este endpoint. Si cambiamos el aviso de forma sustancial, publicaremos una nueva versión y solicitaremos tu aceptación. El historial de consentimientos conserva la versión que aceptaste.
+
+11. Contacto
+Para dudas, solicitudes o quejas relacionadas con tus datos, usa la sección Ayuda de la aplicación. El responsable responderá por ese canal.
+```
+
+**Hechos deliberadamente no afirmados:** no se citan GCP ni MongoDB Atlas; no se afirma TLS 1.3
+(riesgo H-01 sigue abierto y se registra aparte); no se confunde la ventana de recuperación de 35
+días con una política general de retención; no se inventan domicilio, razón social ni correo de
+privacidad. El canal de derechos es la sección Ayuda de la app.
+
+**Aprobación de contenido:** el desarrollo de E015 (handler, proveedor, DTO y pruebas) queda
+autorizado con el Gate de §15, pero **la adopción del texto** requiere la frase separada:
+
+```
+APRUEBO_CONTENIDO_E015_VERSION_2026_11_V2_SHA256_27037a1a78b0b86c640fd7fbf0a455826699eadfdd7f55112086bfd6dd187b13
+```
+
+Si el responsable no aprueba el contenido, el PR de E015 no se fusiona y el endpoint no se
+despliega; los otros 14 endpoints no se bloquean. No se sirve un 503 ni un texto provisional.
 
 ### D-E016 — Historial de consentimientos
 `Query` sobre `PK=USER#<sub>` con `begins_with(SK, "CONSENT#")`, sin `Scan`, orden descendente por
@@ -360,9 +414,9 @@ Sólo tras el Gate de despliegue:
 - Gate de apply con SHA-256 completo del `.tfplan`;
 - un único `instance refresh` con `MinHealthyPercentage=100`; capacidad transitoria declarada;
 - verificación HTTPS **individual** de los endpoints desplegados y regresión E001–E011;
-- contador oficial sólo con evidencia: 11 → **26/75** si los 15 están funcionales; si E015 sigue
-  `BLOCKED_CONTENIDO_EXTERNO`, el contador máximo verificable es **25/75** y se declara así, sin
-  redondear ni contar el 503.
+- contador oficial sólo con evidencia: 11 → **26/75** si los 15 están funcionales; si el contenido
+  de E015 no se aprueba, el contador máximo verificable es **25/75** y se declara así, sin
+  redondear ni contar un 503.
 - **No se declara 26/75** hasta completar prueba HTTP y persistencia real de cada endpoint.
 
 Riesgos de release declarados: capacidad `t4g.micro` en `us-east-2b` (procedimiento documentado
@@ -405,8 +459,8 @@ La frase siguiente aprueba **conjuntamente**: (a) este Gate de alcance; (b) el u
 su forma reutilizable E-1/E-2 para esta oleada; y (c) `RFC-020` v1.1.0 con la ampliación aditiva
 del enum de frecuencias (9 valores publicados, 7 canónicos emitidos).
 
-**No** aprueba el contenido de E015 ni acepta el aviso externo incorrecto. Esa decisión se
-solicita por separado según D-E015 (opciones A/B/C).
+**No** aprueba el contenido de E015. Esa adopción se solicita por separado con la frase de D-E015:
+`APRUEBO_CONTENIDO_E015_VERSION_2026_11_V2_SHA256_27037a1a78b0b86c640fd7fbf0a455826699eadfdd7f55112086bfd6dd187b13`.
 
 ```
 APRUEBO_GATE_OLEADA_1_RFC019_E012_E013_E015_E016_E017_E018_E019_E022_E023_E024_E025_E068_E069_E070_E071
@@ -423,7 +477,7 @@ Se actualiza en cada checkpoint; nunca se adelanta un estado.
 |---|---|---|---|---|---|---|---|
 | E012 | NOT_STARTED | — | — | — | — | — | — |
 | E013 | NOT_STARTED | — | — | — | — | — | — |
-| E015 | BLOCKED_CONTENIDO_EXTERNO | — | — | — | — | — | — |
+| E015 | CONTENIDO_PENDIENTE_APROBACION | — | — | — | — | — | — |
 | E016 | NOT_STARTED | — | — | — | — | — | — |
 | E017 | NOT_STARTED | — | — | — | — | — | — |
 | E018 | NOT_STARTED | — | — | — | — | — | — |
@@ -442,4 +496,5 @@ Se actualiza en cada checkpoint; nunca se adelanta un estado.
 | Fecha | Cambio | Estado |
 |---|---|---|
 | 2026-11-18 | Creación del Gate de Oleada 1, preflight verificado y 15 endpoints declarados | PROPUESTO |
-| 2026-11-18 | **v1.1.0:** corrige RFC-020 (9 valores publicados, sin eliminar `biweekly`/`yearly`), separa el contenido de E015 del alcance y registra `BLOCKED_CONTENIDO_EXTERNO` con R-E015-01/02/03; FinOps incremental estimado en lugar de `0.0000`; disponibilidad AZ declarada `NOT_VERIFIED` | **PROPUESTO** |
+| 2026-11-18 | **v1.1.0:** corrige RFC-020 (9 valores publicados, sin eliminar `biweekly`/`yearly`), separa el contenido de E015 del alcance y registra `BLOCKED_CONTENIDO_EXTERNO` con R-E015-01/02/03; FinOps incremental estimado en lugar de `0.0000`; disponibilidad AZ declarada `NOT_VERIFIED` | PROPUESTO |
+| 2026-11-18 | **v1.2.0:** E015 deja de depender de `nexumpr/nexum-privacidad`; el aviso se sirve desde la API (`/api/v1/privacy/notices/current`) con versión `2026-11-v2`, `content` íntegro de 5921 bytes y SHA-256 `27037a1a…7b13`. La adopción del texto exige frase separada; sin ella el PR de E015 no se fusiona. Sin web adicional ni 503 | **PROPUESTO** |
