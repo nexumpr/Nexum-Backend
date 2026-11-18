@@ -201,6 +201,94 @@ func (s *Service) Get(ctx context.Context, userID string) (*Preferences, error) 
 	return normalize(creado), nil
 }
 
+// Apply modifica las preferencias del titular con compare-and-swap por versión (E069).
+//
+// Orden de decisión:
+//  1. Item ausente: se materializan los valores por defecto antes de comparar, igual que en la
+//     lectura. Así `If-Match: "v1"` funciona sobre una cuenta que nunca consultó E068 y una
+//     versión distinta se rechaza con 412, sin crear un estado paralelo.
+//  2. La versión observada debe coincidir con la exigida por `If-Match`; si no, no se escribe
+//     nada y se devuelve ErrPreferencesVersionConflict (412).
+//  3. PATCH sin `locale` ni zona: no hay nada que aplicar. No se incrementa la versión y se
+//     devuelve el estado vigente (200), de forma idempotente.
+//  4. Con cambios, el adaptador escribe `locale`, `timezone`, `timeZone` y `updatedAt` e
+//     incrementa `version` en una única escritura condicional. El reintento y el 409 por
+//     agotamiento viven en el adaptador, que es quien observa el CAS.
+func (s *Service) Apply(ctx context.Context, cmd ApplyCommand) (*Preferences, error) {
+	if !s.Disponible() {
+		return nil, ErrPreferencesUnavailable
+	}
+	userID := strings.TrimSpace(cmd.UserID)
+	if userID == "" {
+		return nil, ErrPreferencesUnauthorized
+	}
+	if cmd.ExpectedVersion < 1 {
+		return nil, ErrPreferencesInvalidRequest
+	}
+
+	actual, err := s.store.LoadPreferences(ctx, userID)
+	if err != nil {
+		return nil, ErrPreferencesUnavailable
+	}
+	if actual == nil {
+		creado, errCreacion := s.store.CreatePreferences(ctx, userID, Defaults(), s.now().UTC())
+		if errCreacion != nil {
+			if errors.Is(errCreacion, ErrPreferencesUnavailable) || errors.Is(errCreacion, ErrPreferencesConflict) {
+				return nil, errCreacion
+			}
+			return nil, ErrPreferencesUnavailable
+		}
+		if creado == nil {
+			return nil, ErrPreferencesUnavailable
+		}
+		actual = creado
+	}
+
+	actual = normalize(actual)
+	if cmd.ExpectedVersion != actual.Version {
+		return nil, ErrPreferencesVersionConflict
+	}
+
+	resultante := *actual
+	if cmd.HasLocale {
+		resultante.Locale = strings.TrimSpace(cmd.Locale)
+	}
+	if cmd.HasTimezone {
+		resultante.Timezone = strings.TrimSpace(cmd.Timezone)
+	}
+
+	if !cmd.HasLocale && !cmd.HasTimezone {
+		// PATCH vacío o idéntico al contrato: no se escribe y la versión no cambia.
+		return &resultante, nil
+	}
+
+	updateStore, ok := s.store.(UpdateStore)
+	if !ok {
+		// Sin escritura condicional no se puede prometer el CAS: fallo cerrado.
+		return nil, ErrPreferencesUnavailable
+	}
+
+	actualizado, errUpdate := updateStore.UpdatePreferences(ctx, userID, Update{
+		Locale:          resultante.Locale,
+		Timezone:        resultante.Timezone,
+		ExpectedVersion: actual.Version,
+		HasVersion:      actual.HasVersion,
+		Now:             s.now().UTC(),
+	})
+	if errUpdate != nil {
+		if errors.Is(errUpdate, ErrPreferencesUnavailable) ||
+			errors.Is(errUpdate, ErrPreferencesVersionConflict) ||
+			errors.Is(errUpdate, ErrPreferencesConflict) {
+			return nil, errUpdate
+		}
+		return nil, ErrPreferencesUnavailable
+	}
+	if actualizado == nil {
+		return nil, ErrPreferencesUnavailable
+	}
+	return normalize(actualizado), nil
+}
+
 // normalize garantiza que la respuesta cumple el contrato (`locale` y `timezone` no vacíos y
 // `version >= 1`) ante un item histórico incoherente, sin inventar escrituras: la corrección
 // es sólo de lectura y el siguiente PATCH persiste el estado con el CAS correspondiente.

@@ -248,3 +248,346 @@ func TestE068NormalizaItemIncoherente(t *testing.T) {
 		t.Fatal("normalizar la lectura no debe escribir")
 	}
 }
+
+// ---------- E069: modificacion de preferencias ----------
+
+// e069Store extiende el doble de E068 con la escritura condicional por version. La comprobacion
+// del CAS se hace bajo el mismo mutex que la lectura, como en el adaptador real.
+type e069Store struct {
+	*e068Store
+	actualizaciones int
+	falloUpdate     error
+	ultimaUpdate    appPreferences.Update
+}
+
+func newE069Store() *e069Store {
+	return &e069Store{e068Store: newE068Store()}
+}
+
+func (s *e069Store) UpdatePreferences(_ context.Context, userID string, update appPreferences.Update) (*appPreferences.Preferences, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.actualizaciones++
+	s.ultimaUpdate = update
+	if s.falloUpdate != nil {
+		return nil, s.falloUpdate
+	}
+	item, ok := s.items[userID]
+	if !ok {
+		return nil, appPreferences.ErrPreferencesConflict
+	}
+	observada := item.Version
+	if !item.HasVersion {
+		observada = appPreferences.DefaultVersion
+	}
+	if observada != update.ExpectedVersion {
+		return nil, appPreferences.ErrPreferencesVersionConflict
+	}
+	item.Locale = update.Locale
+	item.Timezone = update.Timezone
+	item.Version = observada + 1
+	item.HasVersion = true
+	s.items[userID] = item
+	copia := item
+	return &copia, nil
+}
+
+func servicioE069(store appPreferences.Store) *appPreferences.Service {
+	return appPreferences.NewService(store).WithClock(func() time.Time { return e068Ahora })
+}
+
+// TestE069AplicaCambioParcialConCAS: un PATCH de locale conserva la zona y devuelve la version
+// incrementada, con la version esperada recibida de If-Match.
+func TestE069AplicaCambioParcialConCAS(t *testing.T) {
+	store := newE069Store()
+	store.items[e068Usuario] = appPreferences.Preferences{
+		Locale:     "es-MX",
+		Timezone:   "America/Mexico_City",
+		Version:    3,
+		HasVersion: true,
+	}
+
+	prefs, err := servicioE069(store).Apply(context.Background(), appPreferences.ApplyCommand{
+		UserID:          e068Usuario,
+		Locale:          "en-US",
+		HasLocale:       true,
+		ExpectedVersion: 3,
+	})
+	if err != nil {
+		t.Fatalf("PATCH valido fallo: %v", err)
+	}
+	if prefs.Locale != "en-US" || prefs.Timezone != "America/Mexico_City" || prefs.Version != 4 {
+		t.Fatalf("resultado inesperado: %+v", prefs)
+	}
+	if store.actualizaciones != 1 {
+		t.Fatalf("debe escribirse una vez, hubo %d", store.actualizaciones)
+	}
+	if store.ultimaUpdate.ExpectedVersion != 3 || store.ultimaUpdate.Locale != "en-US" || store.ultimaUpdate.Timezone != "America/Mexico_City" {
+		t.Fatalf("la escritura debe llevar el estado resultante completo: %+v", store.ultimaUpdate)
+	}
+	if !store.ultimaUpdate.Now.Equal(e068Ahora) {
+		t.Fatalf("la marca debe venir del reloj inyectado: %v", store.ultimaUpdate.Now)
+	}
+}
+
+// TestE069AceptaSoloZona: un PATCH de zona conserva el idioma vigente.
+func TestE069AceptaSoloZona(t *testing.T) {
+	store := newE069Store()
+	store.items[e068Usuario] = appPreferences.Preferences{
+		Locale:     "en-US",
+		Timezone:   "America/New_York",
+		Version:    2,
+		HasVersion: true,
+	}
+
+	prefs, err := servicioE069(store).Apply(context.Background(), appPreferences.ApplyCommand{
+		UserID:          e068Usuario,
+		Timezone:        "Europe/Madrid",
+		HasTimezone:     true,
+		ExpectedVersion: 2,
+	})
+	if err != nil {
+		t.Fatalf("PATCH de zona fallo: %v", err)
+	}
+	if prefs.Locale != "en-US" || prefs.Timezone != "Europe/Madrid" || prefs.Version != 3 {
+		t.Fatalf("resultado inesperado: %+v", prefs)
+	}
+}
+
+// TestE069PatchVacioNoEscribe: sin campos no hay escritura ni cambio de version (200
+// idempotente), tal como declara el ejemplo `{}` del contrato.
+func TestE069PatchVacioNoEscribe(t *testing.T) {
+	store := newE069Store()
+	store.items[e068Usuario] = appPreferences.Preferences{
+		Locale:     "es-MX",
+		Timezone:   "America/Mexico_City",
+		Version:    2,
+		HasVersion: true,
+	}
+
+	prefs, err := servicioE069(store).Apply(context.Background(), appPreferences.ApplyCommand{
+		UserID:          e068Usuario,
+		ExpectedVersion: 2,
+	})
+	if err != nil {
+		t.Fatalf("PATCH vacio fallo: %v", err)
+	}
+	if prefs.Version != 2 || prefs.Locale != "es-MX" || prefs.Timezone != "America/Mexico_City" {
+		t.Fatalf("un PATCH vacio debe devolver el estado vigente: %+v", prefs)
+	}
+	if store.actualizaciones != 0 {
+		t.Fatalf("un PATCH vacio no debe escribir, escrituras=%d", store.actualizaciones)
+	}
+}
+
+// TestE069MaterializaDefaultsAntesDeComparar: una cuenta sin item admite `If-Match: "v1"`; los
+// defaults se persisten antes de aplicar el cambio y la version avanza a 2.
+func TestE069MaterializaDefaultsAntesDeComparar(t *testing.T) {
+	store := newE069Store()
+
+	prefs, err := servicioE069(store).Apply(context.Background(), appPreferences.ApplyCommand{
+		UserID:          e068Usuario,
+		Locale:          "en-US",
+		HasLocale:       true,
+		ExpectedVersion: appPreferences.DefaultVersion,
+	})
+	if err != nil {
+		t.Fatalf("materializacion con CAS fallo: %v", err)
+	}
+	if prefs.Locale != "en-US" || prefs.Timezone != "America/Mexico_City" || prefs.Version != 2 {
+		t.Fatalf("resultado inesperado: %+v", prefs)
+	}
+	if store.creaciones != 1 {
+		t.Fatalf("debe materializarse una vez, creaciones=%d", store.creaciones)
+	}
+	if store.actualizaciones != 1 || store.ultimaUpdate.ExpectedVersion != appPreferences.DefaultVersion {
+		t.Fatalf("el CAS debe comparar contra la version materializada: %+v", store.ultimaUpdate)
+	}
+	if !store.ultimaUpdate.Now.Equal(e068Ahora) {
+		t.Fatalf("la escritura debe usar el reloj inyectado: %v", store.ultimaUpdate.Now)
+	}
+}
+
+// TestE069MaterializaYRechazaVersionDistinta: aunque el item se materialice, una version que no
+// es la inicial se rechaza con 412 y no se aplica ningun cambio.
+func TestE069MaterializaYRechazaVersionDistinta(t *testing.T) {
+	store := newE069Store()
+
+	_, err := servicioE069(store).Apply(context.Background(), appPreferences.ApplyCommand{
+		UserID:          e068Usuario,
+		Locale:          "en-US",
+		HasLocale:       true,
+		ExpectedVersion: 7,
+	})
+	if !errors.Is(err, appPreferences.ErrPreferencesVersionConflict) {
+		t.Fatalf("version distinta debe ser conflicto, obtenido %v", err)
+	}
+	if store.actualizaciones != 0 {
+		t.Fatal("un 412 no puede escribir")
+	}
+	if store.items[e068Usuario].Version != appPreferences.DefaultVersion {
+		t.Fatalf("el item materializado debe conservar la version inicial: %+v", store.items[e068Usuario])
+	}
+}
+
+// TestE069VersionDesactualizadaSinEscritura: una version observada distinta de If-Match no
+// llega al almacen.
+func TestE069VersionDesactualizadaSinEscritura(t *testing.T) {
+	store := newE069Store()
+	store.items[e068Usuario] = appPreferences.Preferences{
+		Locale:     "es-MX",
+		Timezone:   "America/Mexico_City",
+		Version:    5,
+		HasVersion: true,
+	}
+
+	_, err := servicioE069(store).Apply(context.Background(), appPreferences.ApplyCommand{
+		UserID:          e068Usuario,
+		Timezone:        "Europe/Madrid",
+		HasTimezone:     true,
+		ExpectedVersion: 4,
+	})
+	if !errors.Is(err, appPreferences.ErrPreferencesVersionConflict) {
+		t.Fatalf("esperado conflicto de version, obtenido %v", err)
+	}
+	if store.actualizaciones != 0 {
+		t.Fatal("no debe intentarse la escritura con una version desactualizada")
+	}
+}
+
+// TestE069ConflictoDeReintentoSePropaga: cuando el adaptador agota el CAS, el 409 llega intacto.
+func TestE069ConflictoDeReintentoSePropaga(t *testing.T) {
+	store := newE069Store()
+	store.items[e068Usuario] = appPreferences.Preferences{
+		Locale:     "es-MX",
+		Timezone:   "America/Mexico_City",
+		Version:    1,
+		HasVersion: true,
+	}
+	store.falloUpdate = appPreferences.ErrPreferencesConflict
+
+	_, err := servicioE069(store).Apply(context.Background(), appPreferences.ApplyCommand{
+		UserID:          e068Usuario,
+		Locale:          "en-US",
+		HasLocale:       true,
+		ExpectedVersion: 1,
+	})
+	if !errors.Is(err, appPreferences.ErrPreferencesConflict) {
+		t.Fatalf("el conflicto debe propagarse, obtenido %v", err)
+	}
+}
+
+// TestE069SinUpdateStoreFallaCerrado: con un almacen de solo lectura no se finge una escritura.
+func TestE069SinUpdateStoreFallaCerrado(t *testing.T) {
+	store := newE068Store()
+	store.items[e068Usuario] = appPreferences.Preferences{
+		Locale:     "es-MX",
+		Timezone:   "America/Mexico_City",
+		Version:    1,
+		HasVersion: true,
+	}
+
+	_, err := servicioE069(store).Apply(context.Background(), appPreferences.ApplyCommand{
+		UserID:          e068Usuario,
+		Locale:          "en-US",
+		HasLocale:       true,
+		ExpectedVersion: 1,
+	})
+	if !errors.Is(err, appPreferences.ErrPreferencesUnavailable) {
+		t.Fatalf("sin escritura condicional debe fallar cerrado, obtenido %v", err)
+	}
+}
+
+// TestE069SinAlmacenYTitularVacio: sin persistencia es 503 y sin `sub` es 401; ninguno toca el
+// almacen.
+func TestE069SinAlmacenYTitularVacio(t *testing.T) {
+	cmd := appPreferences.ApplyCommand{UserID: e068Usuario, Locale: "en-US", HasLocale: true, ExpectedVersion: 1}
+	if _, err := appPreferences.NewService(nil).Apply(context.Background(), cmd); !errors.Is(err, appPreferences.ErrPreferencesUnavailable) {
+		t.Fatalf("sin almacen debe fallar cerrado, obtenido %v", err)
+	}
+
+	store := newE069Store()
+	cmd.UserID = "   "
+	if _, err := servicioE069(store).Apply(context.Background(), cmd); !errors.Is(err, appPreferences.ErrPreferencesUnauthorized) {
+		t.Fatalf("titular vacio debe ser no autorizado, obtenido %v", err)
+	}
+	if store.lecturas != 0 || store.actualizaciones != 0 {
+		t.Fatal("sin titular no debe tocarse la persistencia")
+	}
+
+	cmd.UserID = e068Usuario
+	cmd.ExpectedVersion = 0
+	if _, err := servicioE069(store).Apply(context.Background(), cmd); !errors.Is(err, appPreferences.ErrPreferencesInvalidRequest) {
+		t.Fatalf("version no valida debe ser solicitud invalida, obtenido %v", err)
+	}
+}
+
+// TestE069ConcurrenciaSoloUnCASGana: escrituras simultaneas con la misma version esperada
+// producen un solo exito y el resto 412; la version final es unica.
+func TestE069ConcurrenciaSoloUnCASGana(t *testing.T) {
+	store := newE069Store()
+	store.items[e068Usuario] = appPreferences.Preferences{
+		Locale:     "es-MX",
+		Timezone:   "America/Mexico_City",
+		Version:    1,
+		HasVersion: true,
+	}
+	servicio := servicioE069(store)
+
+	const escritores = 10
+	var wg sync.WaitGroup
+	errores := make([]error, escritores)
+	for i := 0; i < escritores; i++ {
+		wg.Add(1)
+		go func(indice int) {
+			defer wg.Done()
+			_, errores[indice] = servicio.Apply(context.Background(), appPreferences.ApplyCommand{
+				UserID:          e068Usuario,
+				Locale:          "en-US",
+				HasLocale:       true,
+				ExpectedVersion: 1,
+			})
+		}(i)
+	}
+	wg.Wait()
+
+	exitos := 0
+	for i := 0; i < escritores; i++ {
+		switch {
+		case errores[i] == nil:
+			exitos++
+		case errors.Is(errores[i], appPreferences.ErrPreferencesVersionConflict):
+		default:
+			t.Fatalf("escritor %d: error inesperado %v", i, errores[i])
+		}
+	}
+	if exitos != 1 {
+		t.Fatalf("solo un CAS puede ganar, ganaron %d", exitos)
+	}
+	if store.items[e068Usuario].Version != 2 {
+		t.Fatalf("la version final debe ser 2: %+v", store.items[e068Usuario])
+	}
+}
+
+// TestE069PatchVacioMaterializa: un PATCH vacio sobre una cuenta sin item persiste los defaults
+// (version 1) y los devuelve, sin una segunda escritura.
+func TestE069PatchVacioMaterializa(t *testing.T) {
+	store := newE069Store()
+
+	prefs, err := servicioE069(store).Apply(context.Background(), appPreferences.ApplyCommand{
+		UserID:          e068Usuario,
+		ExpectedVersion: appPreferences.DefaultVersion,
+	})
+	if err != nil {
+		t.Fatalf("PATCH vacio sobre item ausente fallo: %v", err)
+	}
+	if prefs.Locale != appPreferences.DefaultLocale || prefs.Timezone != appPreferences.DefaultTimezone || prefs.Version != appPreferences.DefaultVersion {
+		t.Fatalf("deben devolverse los defaults materializados: %+v", prefs)
+	}
+	if store.creaciones != 1 {
+		t.Fatalf("debe materializarse una vez, creaciones=%d", store.creaciones)
+	}
+	if store.actualizaciones != 0 {
+		t.Fatalf("un PATCH vacio no debe actualizar, actualizaciones=%d", store.actualizaciones)
+	}
+}
