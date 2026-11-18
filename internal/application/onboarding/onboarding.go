@@ -1,5 +1,6 @@
-// Package onboarding implementa el estado de onboarding del propio usuario
-// (E018 `GET /api/v1/users/me/onboarding`).
+// Package onboarding implementa el estado de onboarding del propio usuario:
+// E018 (`GET /api/v1/users/me/onboarding`) y E019
+// (`PATCH /api/v1/users/me/onboarding`, ver patch.go).
 //
 // Reglas de esta capa:
 //   - La identidad llega exclusivamente del claim `sub` verificado; el cliente
