@@ -157,6 +157,10 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	montarE006(router, clienteDynamo, clienteRedis, cfgDeps.TablaDynamoDB, logger)
 	// E010: montaje de la oleada E007-E011 (RFC-019).
 	montarE010(router, clienteDynamo, clienteRedis, cfgDeps.TablaDynamoDB, logger)
+	// E009: montaje de la oleada E007-E011 (RFC-019).
+	montarE009(router, clienteDynamo, verificadorTokens, logoutStore, cfgDeps.TablaDynamoDB, logger)
+	// E008: montaje de la oleada E007-E011 (RFC-019).
+	montarE008(router, clienteDynamo, cfgDeps.TablaDynamoDB, logger)
 	// E007: montaje de la oleada E007-E011 (RFC-019).
 	montarE007(router, clienteDynamo, clienteRedis, cfgDeps.TablaDynamoDB, logger)
 

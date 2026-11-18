@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 
@@ -10,14 +11,105 @@ import (
 )
 
 // Router gestiona el enrutamiento versionado de la API (/api/v1) y códigos de estado REST (A-030 §2.1, AC-A-030-01).
+//
+// Soporta dos clases de ruta, con prioridad absoluta de la literal:
+//   - literal: coincidencia exacta de `r.URL.Path` (comportamiento heredado de A-030);
+//   - plantilla: segmentos con `{nombre}`, donde cada parámetro casa exactamente UN segmento
+//     no vacío. El valor decodificado se expone al handler con `r.SetPathValue`.
+//
+// Una ruta literal siempre gana a una plantilla, de modo que registrar
+// `/api/v1/auth/sessions/{sessionId}` no altera ninguna ruta existente.
 type Router struct {
 	mu        sync.RWMutex
 	routes    map[string]map[string]http.Handler // [path][method]handler
+	templates []*routeTemplate                   // plantillas con parámetros, en orden de registro
 	isReady   bool
 	probeMux  *http.ServeMux
 	apiPrefix string
 	health    *HealthRegistry
 	metrics   *telemetry.Metrics
+}
+
+// routeTemplate es una ruta registrada con al menos un parámetro `{nombre}`.
+type routeTemplate struct {
+	template string
+	segments []routeSegment
+	methods  map[string]http.Handler
+}
+
+// routeSegment es un segmento de plantilla: o literal exacto, o parámetro nombrado.
+type routeSegment struct {
+	literal string
+	param   string
+}
+
+// match comprueba si la ruta concreta casa con la plantilla y devuelve los parámetros
+// extraídos. Un parámetro nunca cruza `/` ni acepta el segmento vacío.
+func (t *routeTemplate) match(path string) (map[string]string, bool) {
+	segmentos := splitPath(path)
+	if len(segmentos) != len(t.segments) {
+		return nil, false
+	}
+	valores := make(map[string]string, len(t.segments))
+	for i, segmento := range t.segments {
+		actual := segmentos[i]
+		if segmento.param == "" {
+			if actual != segmento.literal {
+				return nil, false
+			}
+			continue
+		}
+		if actual == "" {
+			return nil, false
+		}
+		decodificado, err := url.PathUnescape(actual)
+		if err != nil || decodificado == "" || strings.Contains(decodificado, "/") {
+			// Un segmento manipulado (`%2F`) no se acepta como valor de parámetro: se evita
+			// que un identificador con barra codificada se interprete como dos segmentos.
+			return nil, false
+		}
+		valores[segmento.param] = decodificado
+	}
+	return valores, true
+}
+
+// splitPath divide una ruta absoluta en segmentos no vacíos, ignorando la barra inicial.
+func splitPath(path string) []string {
+	limpio := strings.TrimPrefix(path, "/")
+	if limpio == "" {
+		return nil
+	}
+	return strings.Split(limpio, "/")
+}
+
+// parseTemplate convierte un patrón con `{param}` en segmentos. Devuelve false si el patrón
+// no es válido (paréntesis sin cerrar, parámetro vacío o parámetro con `/`).
+func parseTemplate(pattern string) ([]routeSegment, bool) {
+	segmentos := splitPath(pattern)
+	if len(segmentos) == 0 {
+		return nil, false
+	}
+	resultado := make([]routeSegment, 0, len(segmentos))
+	for _, segmento := range segmentos {
+		if !strings.Contains(segmento, "{") {
+			if strings.Contains(segmento, "}") {
+				return nil, false
+			}
+			resultado = append(resultado, routeSegment{literal: segmento})
+			continue
+		}
+		// Sólo se admite la forma completa `{nombre}`: un prefijo literal dentro del mismo
+		// segmento haría ambiguo el reparto y no lo necesita ninguna ruta del contrato.
+		if len(segmento) < 3 || segmento[0] != '{' || segmento[len(segmento)-1] != '}' {
+			return nil, false
+		}
+		nombre := segmento[1 : len(segmento)-1]
+		if nombre == "" || strings.ContainsAny(nombre, "/{}") {
+			return nil, false
+		}
+		resultado = append(resultado, routeSegment{param: nombre})
+	}
+	return resultado, true
 }
 
 // NewRouter crea un enrutador con soporte estricto de métodos, 404 no enumerable y 405 Method Not Allowed.
@@ -73,6 +165,13 @@ func (rt *Router) TemplateFor(path string) string {
 	if _, existe := rt.routes[path]; existe {
 		return path
 	}
+	// Las rutas con parámetros devuelven SIEMPRE la plantilla registrada, nunca el valor
+	// concreto: la etiqueta de métrica no puede convertirse en un identificador de sesión.
+	for _, plantilla := range rt.templates {
+		if _, ok := plantilla.match(path); ok {
+			return plantilla.template
+		}
+	}
 	return "/unknown"
 }
 
@@ -98,6 +197,9 @@ func (rt *Router) SetReady(ready bool) {
 }
 
 // HandleFunc registra un handler para un método y ruta específicos bajo /api/v1.
+//
+// Si el patrón contiene `{param}`, se registra como plantilla parametrizada. Una ruta literal
+// registrada con el mismo texto siempre tiene prioridad en la resolución.
 func (rt *Router) HandleFunc(method, pattern string, handler http.HandlerFunc) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
@@ -107,10 +209,42 @@ func (rt *Router) HandleFunc(method, pattern string, handler http.HandlerFunc) {
 		cleanPattern = rt.apiPrefix + cleanPattern
 	}
 
-	if _, ok := rt.routes[cleanPattern]; !ok {
-		rt.routes[cleanPattern] = make(map[string]http.Handler)
+	if !strings.Contains(cleanPattern, "{") {
+		if _, ok := rt.routes[cleanPattern]; !ok {
+			rt.routes[cleanPattern] = make(map[string]http.Handler)
+		}
+		rt.routes[cleanPattern][strings.ToUpper(method)] = handler
+		return
 	}
-	rt.routes[cleanPattern][strings.ToUpper(method)] = handler
+
+	segmentos, ok := parseTemplate(cleanPattern)
+	if !ok {
+		// Patrón inválido: se ignora el registro en lugar de crear una ruta ambigua. La ruta
+		// responderá 404, que es el fallo cerrado correcto.
+		return
+	}
+	for _, plantilla := range rt.templates {
+		if plantilla.template == cleanPattern {
+			plantilla.methods[strings.ToUpper(method)] = handler
+			return
+		}
+	}
+	rt.templates = append(rt.templates, &routeTemplate{
+		template: cleanPattern,
+		segments: segmentos,
+		methods:  map[string]http.Handler{strings.ToUpper(method): handler},
+	})
+}
+
+// matchTemplate busca la primera plantilla registrada que case con la ruta. Devuelve los
+// métodos disponibles y los parámetros extraídos.
+func (rt *Router) matchTemplate(path string) (map[string]http.Handler, map[string]string) {
+	for _, plantilla := range rt.templates {
+		if valores, ok := plantilla.match(path); ok {
+			return plantilla.methods, valores
+		}
+	}
+	return nil, nil
 }
 
 // ServeHTTP implementa http.Handler resolviendo rutas, 405 y 404.
@@ -146,6 +280,15 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	rt.mu.RLock()
 	methodsMap, pathExists := rt.routes[path]
+	var (
+		templateMethods map[string]http.Handler
+		templateValues  map[string]string
+	)
+	if !pathExists {
+		// Prioridad absoluta de la ruta literal: la plantilla sólo se evalúa si no existe
+		// una ruta literal con ese texto exacto.
+		templateMethods, templateValues = rt.matchTemplate(path)
+	}
 	rt.mu.RUnlock()
 
 	// 2. Si la ruta existe, validar el método solicitado (AC-A-030-01)
@@ -163,6 +306,26 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Allow", strings.Join(allowedMethods, ", "))
 		httputil.WriteError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "el metodo HTTP no esta permitido para este recurso")
+		return
+	}
+
+	// 2 bis. Ruta parametrizada: mismo tratamiento de 405 y `Allow`, y los valores del
+	// path se exponen al handler mediante `SetPathValue` (nunca por query ni por cabecera).
+	if templateMethods != nil {
+		handler, methodAllowed := templateMethods[r.Method]
+		if !methodAllowed {
+			var allowedMethods []string
+			for m := range templateMethods {
+				allowedMethods = append(allowedMethods, m)
+			}
+			w.Header().Set("Allow", strings.Join(allowedMethods, ", "))
+			httputil.WriteError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "el metodo HTTP no esta permitido para este recurso")
+			return
+		}
+		for nombre, valor := range templateValues {
+			r.SetPathValue(nombre, valor)
+		}
+		handler.ServeHTTP(w, r)
 		return
 	}
 

@@ -36,6 +36,22 @@ type OpaqueCursor struct {
 	Signature string        `json:"s"`
 }
 
+// DeriveCursorKey deriva una clave de firma de cursores independiente a partir de un secreto
+// base ya existente, mediante HMAC-SHA256 con separación de dominio (A-040 §2.3).
+//
+// Motivo: la firma de cursores necesita una clave propia, pero el proyecto no dispone de un
+// secreto dedicado en el bundle RFC-004 para cada recurso. Derivar con HMAC evita reutilizar
+// literalmente la clave base (por ejemplo la de cuotas de login) y evita introducir un secreto
+// nuevo sin Gate de infraestructura. Dos dominios distintos producen claves distintas.
+func DeriveCursorKey(base []byte, domain string) []byte {
+	if len(base) == 0 {
+		return nil
+	}
+	mac := hmac.New(sha256.New, base)
+	mac.Write([]byte("nexum:cursor:v1:" + domain))
+	return mac.Sum(nil)
+}
+
 // GenerateCursor crea y firma un cursor opaco codificado en Base64 URL-safe.
 func GenerateCursor(secret []byte, userID, sortBy, lastID string, ts time.Time, ttl time.Duration) (string, error) {
 	if len(secret) == 0 {
