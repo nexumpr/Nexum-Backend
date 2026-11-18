@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | `sdd/_control/H08/GATE_H08E_OLEADA_1.md` |
-| Versión | 1.2.1 |
+| Versión | 1.2.2 |
 | Fecha | 2026-11-18 |
 | Base de trabajo | `main` `88ef920f74da375b588f3e850a760aa0530df050` (PR #80 fusionado) |
 | Baseline funcional vigente | `v0.15.0+8f13c86d2ca0` · E001–E011 verificados |
@@ -134,7 +134,8 @@ verificados. Se serializa un DTO cerrado con `id`, `email`, `displayName`, `emai
 `createdAt`, `version`; nunca `passwordHash`, `sessionEpoch`, `status` ni atributos internos.
 
 ### D-E013 — Modificación de perfil
-`If-Match` obligatorio con formato ETag `"v<version>"` (se acepta `W/"vN"`). Ausente → **428**;
+`If-Match` obligatorio con ETag **fuerte** `"v<version>"`. Un validador débil `W/"vN"` se rechaza
+con **412** (RFC 9110 exige comparación fuerte para If-Match). Ausente → **428**;
 formato inválido → **400**; versión distinta de la persistida → **412**. Sólo `displayName`
 (1–100 runes, sin recortar el valor salvo espacios de borde), `unknown fields` → **400**.
 `UpdateItem` condicional `attribute_exists(PK) AND #version = :expected` con
@@ -155,11 +156,33 @@ integrante: **no se modifica, no se usa como dependencia y no bloquea esta olead
 | Campo | Valor |
 |---|---|
 | `version` | `2026-11-v2` |
-| `effectiveAt` | fecha UTC del release que publique por primera vez esta versión (no anterior a la aprobación; no retroactiva) |
+| `effectiveAt` | Variable inmutable `E015_EFFECTIVE_AT` del bundle RFC-004, configurada al preparar el release; RFC3339, UTC, no anterior a `2026-11-18T00:00:00Z`; misma en ambas EC2 y validada por smoke test |
 | `text` | resumen legible (abajo) |
 | `url` | `https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current` |
 | `content` | texto íntegro versionado (abajo) |
 | `requiresAcceptance` | `true` |
+
+**Datos del responsable (autorizados por el responsable del proyecto):** Leonardo Isaac Barrera
+Tejeda, Carretera Tula Tepeji 7, Localidad El Sesenta y Dos, C.P. 42836, Tula de Allende, Hidalgo,
+México; canal de privacidad y derechos ARCO: `nexumproyectomov@gmail.com`.
+
+**Página pública de privacidad:** `https://nexumpr.github.io/nexum-privacidad/` pertenece a otro
+integrante y se usa para Google Play. Se verificó que está publicada, pero su contenido cita
+GCP/MongoDB, eliminación automática y plazos obsoletos. **No se modifica ese repositorio ni se usa
+como `url` de E015 mientras sea contradictorio**: la URL contractual es el propio endpoint HTTPS
+de la API. La fuente contractual es el `content` versionado.
+
+**Mensaje de coordinación para el integrante responsable (breve):**
+> El backend ya sirve el aviso en `https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current`.
+> La página `nexum-privacidad` aún cita GCP/MongoDB (el backend usa AWS/DynamoDB), eliminación
+> automática (E014 no está implementado), plazos de respaldo no verificados y una versión/fecha
+> distinta. Por favor actualiza la página pública para que coincida con el aviso `2026-11-v2`
+> (SHA-256 `68f1052a…05c9`) y el correo `nexumproyectomov@gmail.com`; cuando esté publicado y sea
+> consistente, cambiaremos el campo `url` por la página pública. No modificamos tu repositorio.
+
+**Comprobación humana pendiente:** confirmar que `nexumproyectomov@gmail.com` recibe solicitudes
+(correo de prueba controlado). No bloquea las pruebas técnicas ni el merge del backend; se registra
+como dependencia operativa.
 
 **Texto de `text` (resumen):**
 > Nexum trata tu nombre, correo y contraseña (hash Argon2id) para autenticarte; tu ingreso base y
@@ -172,46 +195,50 @@ integrante: **no se modifica, no se usa como dependencia y no bloquea esta olead
 
 **Texto íntegro de `content` (aprobación separada):** el bloque siguiente es el contenido exacto
 que se incorporará como recurso versionado del backend. Se medirá en UTF-8 con salto de línea
-final; **6158 bytes**; SHA-256
-**`29b27611c6127e85ec3aca7601e38dec1fc188f305ffee6109d71e9cf1218a06`**. Una prueba de contrato
+final; **6761 bytes**; SHA-256
+**`68f1052a4bcab70a6d8803552dccc67d8b5a23c5b383b5480a83f31e408505c9`**. Una prueba de contrato
 recalculará el SHA y fallará si el texto cambia.
 
 ```text
 Aviso de Privacidad de Nexum
 
-Versión del aviso: 2026-11-v2. La fecha de entrada en vigor se publica en el campo effectiveAt de este endpoint.
+Versión: 2026-11-v2. La fecha de entrada en vigor se publica en el campo effectiveAt de este endpoint.
 
-1. Responsable y naturaleza del servicio
-El responsable del tratamiento es el proyecto Nexum, operado por su equipo de desarrollo. Nexum es una aplicación Android de finanzas personales. No es un banco, entidad financiera ni sociedad fintech; no se conecta a cuentas bancarias ni solicita claves interbancarias, números de tarjeta o contraseñas bancarias. Los importes y proyecciones que muestra son estimaciones basadas en los datos que tú declaras.
+1. Responsable del tratamiento
+El responsable del tratamiento es Leonardo Isaac Barrera Tejeda, con domicilio en Carretera Tula Tepeji 7, Localidad El Sesenta y Dos, C.P. 42836, Tula de Allende, Hidalgo, México. Para asuntos de privacidad y derechos ARCO puede contactarse el correo nexumproyectomov@gmail.com.
+
+Nexum es una aplicación Android de gestión de finanzas personales. No es un banco, entidad financiera ni sociedad fintech; no se conecta a cuentas bancarias ni solicita claves interbancarias, números de tarjeta o contraseñas bancarias. Los importes y proyecciones que muestra son estimaciones calculadas a partir de los datos que el usuario declara.
 
 2. Datos que trata Nexum
-2.1 Funciones disponibles actualmente (registro, autenticación, sesión, perfil, consentimientos, onboarding, ingreso base, preferencias y contenido de ayuda):
-- Identificación y cuenta: nombre visible, correo electrónico, hash Argon2id de la contraseña, estado de verificación del correo, estado de la cuenta, versiones de avisos aceptadas, preferencias de idioma y zona horaria, y progreso de onboarding.
+2.1 Funciones disponibles actualmente (registro, autenticación, sesión, perfil, consentimientos, configuración inicial, ingreso base, preferencias y contenido de ayuda):
+- Identificación y cuenta: nombre visible, correo electrónico, hash Argon2id de la contraseña, estado de verificación del correo, estado de la cuenta, versiones de avisos aceptadas, preferencias de idioma y zona horaria, y progreso de configuración inicial.
 - Ingreso base: importe, moneda y frecuencia.
 - Compromisos de pago recurrentes declarados en el registro: concepto, importe, categoría y frecuencia.
 - Datos técnicos de sesión: dirección IP, marcas de tiempo, identificadores opacos de sesión, tokens de acceso y renovación, y datos opcionales del dispositivo cuando el cliente los envía.
-2.2 Funciones previstas que aún no están disponibles: movimientos, presupuestos, metas de ahorro y aportaciones, exportación de datos, eliminación automática de cuenta, notificaciones push y análisis de patrones. Cuando se habiliten, este aviso se actualizará y se solicitará la aceptación correspondiente. Nexum no recoge hoy esos datos a través de la app y no se describen como si ya existieran.
+2.2 Funciones previstas que aún no están disponibles: movimientos, presupuestos, metas de ahorro y aportaciones, exportación de datos, eliminación automática de cuenta, notificaciones push, análisis de patrones y registro por voz. Cuando se habiliten, este aviso se actualizará y se solicitará la aceptación correspondiente. Nexum no recoge hoy esos datos a través de la app y no se describen como si ya existieran.
 - No se recogen datos bancarios, números de tarjeta, identificadores oficiales, datos biométricos, contactos, ubicación precisa ni audio almacenado en servidores.
 
 3. Finalidades
-- Primarias: crear y autenticar la cuenta; mantener la sesión y permitir su cierre y revocación; calcular y mostrar el ingreso base y su equivalente mensual; registrar consentimientos y onboarding; aplicar preferencias; proteger la cuenta y prevenir abuso; atender solicitudes de derechos; cumplir obligaciones legales.
+- Primarias: crear y autenticar la cuenta; mantener la sesión y permitir su cierre y revocación; calcular y mostrar el ingreso base y su equivalente mensual; registrar consentimientos y configuración inicial; aplicar preferencias; proteger la cuenta y prevenir abuso; atender solicitudes de derechos; cumplir obligaciones legales.
 - Secundarias opcionales: notificaciones y análisis. Aún no están disponibles; cuando se habiliten, requerirán consentimiento y podrán revocarse.
 - No se venden, alquilan ni ceden datos a terceros comerciales ni se usan para publicidad de terceros.
 
 4. Consentimiento y versiones
-No se marcan consentimientos por omisión. Cada decisión se registra con la versión del aviso, la finalidad, la decisión y la fecha UTC. Puedes consultar el historial y revocar consentimientos desde la app. Una versión sustancialmente nueva requerirá aceptación.
+No se marcan consentimientos por omisión. Cada decisión se registra con la versión del aviso, la finalidad, la decisión y la fecha UTC. El usuario puede consultar el historial y revocar consentimientos desde la app. Una versión sustancialmente nueva requerirá aceptación.
 
 5. Infraestructura y proveedores
 Nexum se aloja en Amazon Web Services (AWS), región us-east-2 (Ohio, Estados Unidos). Servicios utilizados: EC2 (cómputo), Application Load Balancer y CloudFront (entrega HTTPS), DynamoDB (base de datos), ElastiCache Redis (caché y control de cuotas), S3 (artefactos y estado de infraestructura), SES (correos de verificación y recuperación) y CloudWatch (registros y métricas). AWS actúa como encargado del tratamiento por instrucción de Nexum. No se utiliza Google Cloud Platform ni MongoDB Atlas. No se transfieren datos a redes publicitarias.
 
 6. Seguridad
-Medidas verificables en el código y la configuración: HTTPS; contraseñas con Argon2id; JWT RS256 de vida corta; rotación de tokens de renovación con detección de reutilización; revocación de sesiones; permisos IAM acotados; y registros que omiten contraseñas y tokens. La configuración de cifrado en reposo y de copias de seguridad depende de los servicios de AWS y se revisa en la operación; este aviso no promete controles que no estén verificados. Ningún sistema es infalible; si se detecta un incidente que afecte tus datos, se comunicará por los canales disponibles y, cuando corresponda, a las autoridades.
+Medidas verificables en el código y la configuración: comunicaciones HTTPS; contraseñas con Argon2id; JWT RS256 de vida corta; rotación de tokens de renovación con detección de reutilización; revocación de sesiones; permisos IAM acotados; y registros que omiten contraseñas y tokens. La configuración de cifrado en reposo y de copias de seguridad depende de los servicios de AWS y se revisa en la operación; este aviso no promete controles que no estén verificados. Ningún sistema es infalible; si se detecta un incidente que afecte los datos, se comunicará por los canales disponibles y, cuando corresponda, a las autoridades.
 
-7. Conservación
-Los datos de la cuenta se conservan mientras esté activa y sean necesarios para las finalidades descritas. No se publica un plazo único de conservación porque depende del tipo de dato y del servicio. Las copias técnicas de recuperación y los registros operativos se rigen por la configuración de AWS y los procedimientos de operación; no se usan para operación normal ni para elaborar perfiles. Cuando se habilite la eliminación de cuenta, se publicará el procedimiento y los plazos aplicables. Este aviso no promete purgas automáticas que no estén verificadas.
+7. Conservación y eliminación
+Los datos de la cuenta se conservan mientras esté activa y sean necesarios para las finalidades descritas y las obligaciones aplicables. No se publica un plazo único de conservación porque depende del tipo de dato y del servicio. No se mantiene un historial comercial de datos de usuario. La configuración de recuperación de la base de datos y los registros operativos se define en la operación de AWS; no se usan para operación normal ni para elaborar perfiles.
 
-8. Derechos
-Puedes ejercer acceso, rectificación, cancelación, oposición y portabilidad. Desde la app puedes consultar y corregir tu perfil, ingreso y preferencias, y consultar tu historial de consentimientos. La eliminación automática de la cuenta aún no está disponible; cuando se habilite, se publicará en la app. Para solicitar la eliminación o ejercer derechos, utiliza el canal de contacto que el responsable habilite y publique en la app. Mientras ese canal no esté publicado, este aviso no promete un medio específico.
+La eliminación automática de la cuenta desde la app aún no está disponible. Para solicitar la eliminación de la cuenta y de los datos asociados, el titular puede escribir a nexumproyectomov@gmail.com. La solicitud se registra, se verifica la identidad del titular, se revocan las sesiones activas y se ejecuta el procedimiento de supresión aplicable. Los datos no se consideran eliminados hasta que el responsable confirme la ejecución; este aviso no promete purgas automáticas que no estén verificadas.
+
+8. Derechos de los titulares
+El titular puede ejercer los derechos de acceso, rectificación, cancelación, oposición y portabilidad sobre sus datos. Desde la app puede consultar y corregir su perfil, ingreso y preferencias, y consultar su historial de consentimientos. Para el resto de solicitudes puede escribir a nexumproyectomov@gmail.com. El responsable responderá por ese canal y podrá solicitar información adicional para verificar la identidad antes de ejecutar cambios sensibles.
 
 9. Permisos del dispositivo
 El micrófono y las notificaciones son opcionales. El registro por voz aún no está disponible; cuando se habilite, el reconocimiento se realizará en el dispositivo y el backend no almacenará audio. Si se niega un permiso, la función correspondiente no se habilita; las demás funciones disponibles siguen operativas.
@@ -220,7 +247,7 @@ El micrófono y las notificaciones son opcionales. El registro por voz aún no e
 Este aviso tiene un identificador de versión y una fecha de entrada en vigor. La versión vigente y su contenido íntegro están disponibles en este endpoint. Si se cambia el aviso de forma sustancial, se publicará una nueva versión y se solicitará la aceptación. El historial de consentimientos conserva la versión aceptada.
 
 11. Contacto
-El responsable habilitará un canal de contacto para privacidad y lo publicará en la app. Este aviso no publica un correo ni un domicilio que no estén confirmados. Las solicitudes se atenderán por el canal que se publique.
+Para dudas, solicitudes o quejas relacionadas con los datos personales, el canal de privacidad es nexumproyectomov@gmail.com. El responsable responderá por ese canal.
 ```
 
 **Hechos deliberadamente no afirmados y pendientes:**
@@ -229,22 +256,26 @@ El responsable habilitará un canal de contacto para privacidad y lo publicará 
 - No se afirma TLS 1.3 (riesgo H-01 sigue abierto y se registra aparte); sólo se declara HTTPS.
 - No se afirma que la eliminación automática de cuenta ya exista: E014 no está implementado y el
   texto lo declara como función prevista.
-- No se afirma que la sección Ayuda permita contactar al responsable: sólo existe FAQ pública
-  (E070), sin canal de contacto funcional.
+- No se afirma que la sección Ayuda permita contactar al responsable: el canal es el correo de
+  privacidad autorizado, no la FAQ.
 - No se afirman plazos concretos de conservación, purgas automáticas ni cifrado de todos los
   servicios. Se describen únicamente medidas verificables en código/configuración y se remite la
   configuración de cifrado y copias a la operación de AWS.
-- No se inventan domicilio, razón social ni correo de privacidad.
-- **PENDIENTE_DECISION_HUMANA:** canal de contacto de privacidad efectivo y su publicación. Hasta
-  que exista, el aviso no promete un medio específico y E015 no se declara funcional.
-- **effectiveAt:** se fijará como constante en el release que publique la versión; no se calcula con
-  `time.Now()` por petición ni se fija retroactivamente.
+- **Datos del responsable autorizados:** nombre, domicilio y correo de privacidad constan en el
+  aviso; no son datos inventados.
+- **PENDIENTE_DECISION_HUMANA:** aprobación expresa de este texto (SHA-256) y del mecanismo
+  `E015_EFFECTIVE_AT`; la fecha concreta se fija al preparar el release. Hasta esa frase, el PR
+  #91 no se fusiona.
+- **effectiveAt:** se lee una sola vez de `E015_EFFECTIVE_AT` (bundle RFC-004) al arrancar; no se
+  calcula con `time.Now()` por petición. Se valida RFC3339, UTC y no anterior a
+  `2026-11-18T00:00:00Z`; el smoke test exige HTTP 200 antes de promover y bloquea la release si
+  falta la variable.
 
 **Aprobación de contenido:** el desarrollo de E015 (handler, proveedor, DTO y pruebas) queda
 autorizado con el Gate de §15, pero **la adopción del texto** requiere la frase separada:
 
 ```
-APRUEBO_CONTENIDO_E015_VERSION_2026_11_V2_SHA256_29b27611c6127e85ec3aca7601e38dec1fc188f305ffee6109d71e9cf1218a06
+APRUEBO_CONTENIDO_E015_VERSION_2026_11_V2_SHA256_68f1052a4bcab70a6d8803552dccc67d8b5a23c5b383b5480a83f31e408505c9
 ```
 
 Si el responsable no aprueba el contenido, el PR de E015 no se fusiona y el endpoint no se
@@ -477,7 +508,7 @@ su forma reutilizable E-1/E-2 para esta oleada; y (c) `RFC-020` v1.1.0 con la am
 del enum de frecuencias (9 valores publicados, 7 canónicos emitidos).
 
 **No** aprueba el contenido de E015. Esa adopción se solicita por separado con la frase de D-E015:
-`APRUEBO_CONTENIDO_E015_VERSION_2026_11_V2_SHA256_29b27611c6127e85ec3aca7601e38dec1fc188f305ffee6109d71e9cf1218a06`.
+`APRUEBO_CONTENIDO_E015_VERSION_2026_11_V2_SHA256_68f1052a4bcab70a6d8803552dccc67d8b5a23c5b383b5480a83f31e408505c9`.
 
 ```
 APRUEBO_GATE_OLEADA_1_RFC019_E012_E013_E015_E016_E017_E018_E019_E022_E023_E024_E025_E068_E069_E070_E071
@@ -515,4 +546,5 @@ Se actualiza en cada checkpoint; nunca se adelanta un estado.
 | 2026-11-18 | Creación del Gate de Oleada 1, preflight verificado y 15 endpoints declarados | PROPUESTO |
 | 2026-11-18 | **v1.1.0:** corrige RFC-020 (9 valores publicados, sin eliminar `biweekly`/`yearly`), separa el contenido de E015 del alcance y registra `BLOCKED_CONTENIDO_EXTERNO` con R-E015-01/02/03; FinOps incremental estimado en lugar de `0.0000`; disponibilidad AZ declarada `NOT_VERIFIED` | PROPUESTO |
 | 2026-11-18 | **v1.2.0:** E015 deja de depender de `nexumpr/nexum-privacidad`; el aviso se sirve desde la API (`/api/v1/privacy/notices/current`) con versión `2026-11-v2`. La adopción del texto exige frase separada; sin ella el PR de E015 no se fusiona. Sin web adicional ni 503 | PROPUESTO |
-| 2026-11-18 | **v1.2.1:** aviso corregido para no afirmar funciones no implementadas (eliminación automática, notificaciones, analítica, voz), no prometer canal de Ayuda ni plazos de conservación no verificados y no afirmar TLS 1.3. `content` de **6158 bytes** UTF-8, SHA-256 `29b27611…8a06`; canal de contacto y `effectiveAt` quedan como decisiones humanas del release | **PROPUESTO** |
+| 2026-11-18 | **v1.2.1:** aviso corregido para no afirmar funciones no implementadas (eliminación automática, notificaciones, analítica, voz), no prometer canal de Ayuda ni plazos de conservación no verificados y no afirmar TLS 1.3. `content` de **6761 bytes** UTF-8, SHA-256 `68f1052a…05c9`; canal de contacto y `effectiveAt` quedan como decisiones humanas del release | **PROPUESTO** |
+| 2026-11-18 | **v1.2.2:** datos del responsable autorizados (nombre, domicilio, correo), `url` del API `https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current`, `effectiveAt` mediante `E015_EFFECTIVE_AT` validado por prueba y `content` final de **6761 bytes** SHA-256 `68f1052a.05c9`. Se registra que la página pública es de otro integrante y puede citar infraestructura obsoleta; no se modifica ni se usa como fuente contractual | **PROPUESTO** |

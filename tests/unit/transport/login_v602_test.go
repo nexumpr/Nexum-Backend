@@ -111,7 +111,12 @@ func TestKeyringRSA(t *testing.T) {
 	if len(partes) != 3 {
 		t.Fatalf("token inesperado: %q", token)
 	}
-	alterado := partes[0] + "." + partes[1] + "." + partes[2][:len(partes[2])-2] + "AA"
+	firma := partes[2]
+	primera := byte('A')
+	if firma[0] == 'A' {
+		primera = 'B'
+	}
+	alterado := partes[0] + "." + partes[1] + "." + string(primera) + firma[1:]
 	if _, err := proveedor.ValidateAccessToken(ctx, alterado); err == nil {
 		t.Fatal("una firma alterada debe rechazarse")
 	}
