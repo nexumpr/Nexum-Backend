@@ -152,12 +152,13 @@ func (s *IncomeStore) ProfileExists(ctx context.Context, userID string) (bool, e
 //   - versión esperada == 1: `attribute_not_exists(PK) OR attribute_not_exists(#version) OR
 //     #version = :expected`. Con ETag `"v1"` se CREA el item cuando no existe (E025 §3) y se
 //     actualiza cuando ya está en la versión 1. La rama `attribute_not_exists(#version)`
-//     cubre un item heredado sin versión, que E001 no produce, para que no quede bloqueado
-//     en 412 de forma permanente.
+//     cubre el item que E001 V6.0.2 escribe sin `version`, de modo que el primer PUT no queda
+//     bloqueado en 412.
 //
-// La expresión usa `ADD #version :one`, de modo que el alta crea `version = 1` y una
-// actualización incrementa la versión existente. Todos los valores de expresión declarados
-// se usan en la condición o en la actualización: DynamoDB rechaza valores no utilizados.
+// La expresión fija `#version = :next` con `:next = expected + 1`. No usa `ADD :one`: con
+// `ADD`, dos escritores que leyeron la versión 1 podían aplicar ambos (1 + 1 = 2) y perder
+// una actualización. Todos los valores de expresión declarados se usan en la condición o en
+// la actualización: DynamoDB rechaza valores no utilizados.
 func (s *IncomeStore) StoreIncome(ctx context.Context, write appIdentity.IncomeStoreWrite) (*appIdentity.IncomeSnapshot, error) {
 	if s == nil || s.client == nil || s.table == "" {
 		return nil, appIdentity.ErrIncomeUnavailable
@@ -174,7 +175,7 @@ func (s *IncomeStore) StoreIncome(ctx context.Context, write appIdentity.IncomeS
 	}
 
 	const actualizacion = "SET amountCents = :amount, currency = :currency, frequency = :frequency, " +
-		"monthlyEquivalentCents = :monthly, updatedAt = :updated ADD #version :one"
+		"monthlyEquivalentCents = :monthly, updatedAt = :updated, #version = :next"
 
 	out, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(s.table),
@@ -193,7 +194,7 @@ func (s *IncomeStore) StoreIncome(ctx context.Context, write appIdentity.IncomeS
 			":frequency": stringAttr(write.Frequency.String()),
 			":monthly":   numberAttr(write.MonthlyEquivalentCents),
 			":updated":   stringAttr(write.Now.UTC().Format(time.RFC3339)),
-			":one":       numberAttr(1),
+			":next":      numberAttr(write.ExpectedVersion + 1),
 			":expected":  numberAttr(write.ExpectedVersion),
 		},
 		ReturnValues: types.ReturnValueAllNew,
