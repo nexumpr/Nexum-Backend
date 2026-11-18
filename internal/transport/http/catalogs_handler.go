@@ -33,13 +33,14 @@ type CargadorCatalogoPublico func(
 // Códigos contemplados: 200, 429 (si hay limitador distribuido), 500 y 503. El contrato no
 // declara `ETag` ni parámetros de paginación: la página es única y no se emite `nextCursor`.
 type CatalogHandler struct {
-	payload  []byte
-	cacheKey string
-	ttl      time.Duration
-	maxAge   int64
-	cargar   CargadorCatalogoPublico
-	logger   *slog.Logger
-	entrada  http.Handler
+	payload    []byte
+	cacheKey   string
+	ttl        time.Duration
+	maxAge     int64
+	camposItem []string
+	cargar     CargadorCatalogoPublico
+	logger     *slog.Logger
+	entrada    http.Handler
 }
 
 // NewCategoriesHandler construye el handler de `GET /api/v1/catalogs/categories` (E022).
@@ -64,8 +65,38 @@ func NewCategoriesHandler(
 		catalogs.CategoriesCacheKey,
 		catalogs.CacheTTL,
 		pageOfCategoriesResponse{Items: items},
+		camposCategoria,
 		limitador,
 		"e022",
+		cargar,
+		logger,
+	)
+}
+
+// NewFrequenciesHandler construye el handler de `GET /api/v1/catalogs/frequencies` (E023).
+//
+// Emite exclusivamente los siete valores canónicos del catálogo: los alias heredados
+// `biweekly` y `yearly` siguen en el enum del esquema publicado por compatibilidad, pero
+// no se listan (RFC-020 §2). `limitador` puede ser nil: la cuota se omite en ese caso.
+func NewFrequenciesHandler(
+	limitador LimitadorRuta,
+	cargar CargadorCatalogoPublico,
+	logger *slog.Logger,
+) *CatalogHandler {
+	items := make([]frequencyResponse, 0, len(catalogs.Frequencies()))
+	for _, frecuencia := range catalogs.Frequencies() {
+		items = append(items, frequencyResponse{
+			ID:    frecuencia.ID,
+			Label: frecuencia.Label,
+		})
+	}
+	return nuevoCatalogoHandler(
+		catalogs.FrequenciesCacheKey,
+		catalogs.CacheTTL,
+		pageOfFrequenciesResponse{Items: items},
+		camposFrecuencia,
+		limitador,
+		"e023",
 		cargar,
 		logger,
 	)
@@ -79,18 +110,43 @@ type categoryResponse struct {
 	Type string `json:"type"`
 }
 
+// frequencyResponse es el objeto `Frequency` del contrato (`additionalProperties: false`):
+// exactamente `id` y `label`.
+type frequencyResponse struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+// pageOfFrequenciesResponse es `PageOfFrequency`: `items` siempre presente (array no
+// nulo). El contrato no ofrece paginación para este catálogo, así que no se emite
+// `nextCursor`.
+type pageOfFrequenciesResponse struct {
+	Items []frequencyResponse `json:"items"`
+}
+
 // pageOfCategoriesResponse es `PageOfCategory`: `items` siempre presente (array no nulo).
 // El contrato no ofrece paginación para este catálogo, así que no se emite `nextCursor`.
 type pageOfCategoriesResponse struct {
 	Items []categoryResponse `json:"items"`
 }
 
+// Campos exactos de cada ítem, tal como los declara el contrato
+// (`additionalProperties: false`). Se usan para validar una entrada de caché antes de
+// servirla: un catálogo cacheado con otra forma —o perteneciente al otro catálogo— se
+// descarta y se sirve el contenido de memoria.
+var (
+	camposCategoria  = []string{"id", "name", "type"}
+	camposFrecuencia = []string{"id", "label"}
+)
+
 // nuevoCatalogoHandler comparte la construcción de los dos catálogos públicos. `contenido`
-// es el DTO exacto del contrato; se serializa aquí una sola vez.
+// es el DTO exacto del contrato; se serializa aquí una sola vez. `camposItem` son los
+// campos exactos de cada ítem del catálogo y acotan qué entrada de caché es aceptable.
 func nuevoCatalogoHandler(
 	clave string,
 	ttl time.Duration,
 	contenido any,
+	camposItem []string,
 	limitador LimitadorRuta,
 	clase string,
 	cargar CargadorCatalogoPublico,
@@ -103,17 +159,19 @@ func nuevoCatalogoHandler(
 		ttl = catalogs.CacheTTL
 	}
 	h := &CatalogHandler{
-		cacheKey: clave,
-		ttl:      ttl,
-		maxAge:   int64(ttl / time.Second),
-		cargar:   cargar,
-		logger:   logger,
+		cacheKey:   clave,
+		ttl:        ttl,
+		maxAge:     int64(ttl / time.Second),
+		camposItem: camposItem,
+		cargar:     cargar,
+		logger:     logger,
 	}
-	if datos, err := json.Marshal(contenido); err == nil && validoCatalogo(datos) {
+	if datos, err := json.Marshal(contenido); err == nil && validoCatalogo(datos, camposItem) {
 		h.payload = datos
 	} else {
-		// Sólo puede ocurrir por un error de serialización del DTO estático: se falla
-		// cerrado (503) en lugar de servir un cuerpo incompleto.
+		// Sólo puede ocurrir por un error de serialización del DTO estático o por una
+		// lista de campos incoherente: se falla cerrado (503) en lugar de servir un
+		// cuerpo incompleto.
 		logger.Error("catalogo: no se pudo serializar el contenido",
 			slog.String("clave", clave),
 			slog.String("error_class", "catalogo_serializacion"))
@@ -143,7 +201,7 @@ func (h *CatalogHandler) serve(w http.ResponseWriter, r *http.Request) {
 	if h.cargar != nil && h.cacheKey != "" {
 		if cacheados, err := h.cargar(r.Context(), h.cacheKey, h.ttl, func() ([]byte, error) {
 			return h.payload, nil
-		}); err == nil && validoCatalogo(cacheados) {
+		}); err == nil && validoCatalogo(cacheados, h.camposItem) {
 			datos = cacheados
 		}
 	}
@@ -160,18 +218,37 @@ func (h *CatalogHandler) serve(w http.ResponseWriter, r *http.Request) {
 }
 
 // validoCatalogo comprueba que un JSON conserva la forma del contrato antes de servirlo:
-// válido, objeto con `items` como array y —si aparece— `nextCursor` como cadena. Protege
-// frente a una entrada de caché corrupta o ajena sin aceptar como catálogo cualquier JSON.
-func validoCatalogo(datos []byte) bool {
-	if len(datos) == 0 || !json.Valid(datos) {
+// objeto con `items` como array no vacío de objetos que contienen EXACTAMENTE los campos
+// declarados del ítem, todos como cadena. Protege frente a una entrada de caché corrupta o
+// perteneciente a otro catálogo (E022 frente a E023) sin aceptar como catálogo cualquier
+// JSON. Si no es válido, el llamador sirve el contenido serializado en memoria.
+func validoCatalogo(datos []byte, camposItem []string) bool {
+	if len(datos) == 0 || len(camposItem) == 0 || !json.Valid(datos) {
 		return false
 	}
 	var forma struct {
-		Items      json.RawMessage `json:"items"`
-		NextCursor *string         `json:"nextCursor"`
+		Items []map[string]json.RawMessage `json:"items"`
 	}
 	if err := json.Unmarshal(datos, &forma); err != nil {
 		return false
 	}
-	return len(forma.Items) > 0 && forma.Items[0] == '['
+	if len(forma.Items) == 0 {
+		return false
+	}
+	for _, item := range forma.Items {
+		if len(item) != len(camposItem) {
+			return false
+		}
+		for _, campo := range camposItem {
+			valor, existe := item[campo]
+			if !existe {
+				return false
+			}
+			var texto string
+			if err := json.Unmarshal(valor, &texto); err != nil {
+				return false
+			}
+		}
+	}
+	return true
 }
