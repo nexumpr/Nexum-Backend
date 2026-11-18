@@ -250,7 +250,7 @@ func ingresoEvaluarCondicion(expr string, item map[string]types.AttributeValue, 
 	if texto == "" {
 		return false, fmt.Errorf("%w: condicion vacia", errIngresoGramatica)
 	}
-	if strings.Contains(texto, "(") || strings.Contains(texto, ")") || strings.Contains(texto, " AND ") {
+	if strings.Contains(texto, " AND ") {
 		return false, fmt.Errorf("%w: %q", errIngresoGramatica, texto)
 	}
 	for _, alternativa := range strings.Split(texto, " OR ") {
