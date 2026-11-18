@@ -20,7 +20,10 @@ const Version = "2026-11-v1"
 
 // Claves de cache publica. No llevan identidad: el mismo contenido se sirve a
 // cualquier visitante y nunca se mezcla con datos de usuario.
-const CacheKeyFAQ = "nexum:v1:content:faq:" + Version
+const (
+	CacheKeyFAQ  = "nexum:v1:content:faq:" + Version
+	CacheKeyTips = "nexum:v1:content:tips:" + Version
+)
 
 // CacheTTL es el tiempo de vida de la copia en Redis. Coincide con el max-age
 // anunciado a los clientes para no servir dos antiguedades distintas.
@@ -38,6 +41,18 @@ type Faq struct {
 // declara parametros de paginacion: el contenido completo cabe en una respuesta.
 type FaqPage struct {
 	Items []Faq `json:"items"`
+}
+
+// Tip es una entrada del contrato PageOfTip (E071).
+type Tip struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	Text  string `json:"text"`
+}
+
+// TipPage es la respuesta de E071, tampoco paginada.
+type TipPage struct {
+	Items []Tip `json:"items"`
 }
 
 // faqs es el contenido curado de E070: diez preguntas sobre los flujos que el
@@ -140,4 +155,72 @@ func FAQs() []Faq {
 // cache publica no tiene la entrada; el resultado es determinista.
 func FAQPayload() ([]byte, error) {
 	return json.Marshal(FaqPage{Items: FAQs()})
+}
+
+// tips es el contenido curado de E071: ocho consejos generales de finanzas
+// personales. Son educativos, no personalizados y no recomiendan productos ni
+// inversiones concretas.
+var tips = []Tip{
+	{
+		ID:    "tip-01",
+		Title: "Anota el gasto el mismo día",
+		Text: "Registrar el movimiento cuando ocurre toma segundos y evita reconstruir el mes de memoria. " +
+			"Los gastos pequeños que se olvidan son los que más distorsionan el disponible.",
+	},
+	{
+		ID:    "tip-02",
+		Title: "Separa lo fijo de lo variable",
+		Text: "Clasifica primero los compromisos fijos: renta, servicios, transporte y pagos recurrentes. " +
+			"Saber cuánto está comprometido antes de empezar el mes deja claro qué margen real queda para el resto.",
+	},
+	{
+		ID:    "tip-03",
+		Title: "Anticipa las fechas de cobro",
+		Text: "Revisa en qué día del mes se cobran tus compromisos y comprueba que el saldo alcance para todos. " +
+			"Adelantar un pago unos días cuando hay margen evita cargos por falta de fondos.",
+	},
+	{
+		ID:    "tip-04",
+		Title: "Construye un colchón para imprevistos",
+		Text: "Antes de metas grandes, separa un fondo para emergencias. Un punto de partida frecuente es cubrir " +
+			"entre tres y seis meses de gastos fijos; ajusta la cifra a tu situación y revísala cada trimestre.",
+	},
+	{
+		ID:    "tip-05",
+		Title: "Pon límites por categoría",
+		Text: "Un límite mensual por categoría convierte un deseo difuso en una cifra comprobable. Revisa el avance " +
+			"a mitad de mes: corregir a tiempo es más fácil que justificar el exceso al final.",
+	},
+	{
+		ID:    "tip-06",
+		Title: "Define metas con monto y fecha",
+		Text: "Una meta sirve cuando tiene monto objetivo y fecha. Divide el total entre las aportaciones que puedes " +
+			"sostener y, si un mes no llegas, ajusta la fecha en lugar de cubrir el hueco con deuda cara.",
+	},
+	{
+		ID:    "tip-07",
+		Title: "Revisa suscripciones y cargos recurrentes",
+		Text: "Los cobros automáticos pasan desapercibidos. Una vez al mes revisa tus suscripciones y cancela las que " +
+			"no usas: liberan dinero cada mes sin cambiar tu día a día.",
+	},
+	{
+		ID:    "tip-08",
+		Title: "Mide tu avance cada mes",
+		Text: "Compara lo gastado con lo que ingresó y con lo presupuestado. Un mes cerrado con números claros es el " +
+			"mejor punto de partida para el siguiente. Estos consejos son generales y educativos: no sustituyen " +
+			"asesoría financiera personalizada ni constituyen una recomendación de inversión.",
+	},
+}
+
+// Tips devuelve una copia del contenido de E071, por la misma razón que FAQs: el
+// contenido compartido del proceso no debe ser modificable por un llamador.
+func Tips() []Tip {
+	copia := make([]Tip, len(tips))
+	copy(copia, tips)
+	return copia
+}
+
+// TipsPayload serializa la respuesta completa de E071.
+func TipsPayload() ([]byte, error) {
+	return json.Marshal(TipPage{Items: Tips()})
 }
