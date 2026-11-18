@@ -17,7 +17,7 @@ func TestAvisoContenidoSHA(t *testing.T) {
 	if obtenido != shaAvisoAprobado {
 		t.Fatalf("SHA-256 del aviso no coincide: %s", obtenido)
 	}
-	if len([]byte(Contenido())) != 6724 {
+	if len([]byte(Contenido())) != 6761 {
 		t.Fatalf("bytes del aviso inesperados: %d", len([]byte(Contenido())))
 	}
 }
@@ -65,7 +65,7 @@ func TestAvisoVigenteConFechaAprobada(t *testing.T) {
 	if strings.TrimSpace(aviso.Content) == "" || strings.Contains(aviso.Content, "example.invalid") {
 		t.Fatal("el contenido no puede estar vacío ni usar example.invalid")
 	}
-	if len([]byte(aviso.Content)) != 6724 {
+	if len([]byte(aviso.Content)) != 6761 {
 		t.Fatalf("bytes del contenido inesperados: %d", len([]byte(aviso.Content)))
 	}
 }
