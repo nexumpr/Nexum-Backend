@@ -18,3 +18,4 @@
 *.tftpl text eol=lf
 *.sh text eol=lf
 *.example text eol=lf
+.semgrepignore text eol=lf
