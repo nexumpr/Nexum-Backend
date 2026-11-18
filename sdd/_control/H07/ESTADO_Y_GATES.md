@@ -62,3 +62,11 @@ VPC Origin → ALB interno HTTP:80 → 2 instancias Go. **No** autoriza Terrafor
   `APRUEBO_APPLY_BOOTSTRAP_SHA256_57C195AD…874C`. `terraform apply` sigue **denegado** en
   `opencode.json`; la excepción mínima está descrita en el Gate y en RFC-002.
 - Sin recursos AWS creados (`AWS_NOT_RUN`), sin migración de state y sin cambios de plan Free.
+
+## Oleada E007-E011 y hotfix E003 (2026-11-18)
+
+- **Baseline funcional: v0.15.0+8f13c86d2ca0**; main 8f13c86d2ca04159e32b734a6f96aa47c82d79ec; CI Go 44227645609 y SDD 44227646178 SUCCESS.
+- PR #73 (RFC-019 y Gate de oleada), #74 E007, #76 E008, #78 E009, #75 E010, #77 E011 y #79 hotfix E003: todos MERGED.
+- **IMPLEMENTED = TRUE · MERGED = TRUE · DEPLOYED = TRUE · FUNCTIONAL_VERIFIED = TRUE** para E001-E011 sobre v0.15.0.
+- Registro completo en sdd/_control/H08/GATE_H08E_E007_E011_DESPLIEGUE_AWS.md.
+- Rollback disponible en v0.14.0+7869b1b96648. Aceptacion Android NO confirmada. E012+ NOT_AUTHORIZED.

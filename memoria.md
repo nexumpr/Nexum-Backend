@@ -1816,3 +1816,86 @@
 **Causa raiz de gitleaks: aun no identificada.** El CI escanea 285 commits (todas las refs) y reporta 3 hallazgos; el clon local `--single-branch` con el mismo comando reporta 0. La instrumentacion es precisamente lo que permitira atribuirlos sin suposiciones. No se modifico `.gitleaks.toml` ni el baseline en esta unidad.
 
 **Siguiente accion exacta al restablecerse la red:** `git push` del commit `15d5313` a `docs/h08e-rfc019-oleada-e007-e011`, esperar el run, leer el paso "Diagnostico de hallazgos", corregir los tres hallazgos exactos, retirar la instrumentacion antes del merge y solicitar `APRUEBO_MERGE_PR_73_SHA_<HEAD>`.
+
+### CIERRE E001-E011 - oleada publicada y verificada en AWS (2026-11-18)
+
+**Baseline funcional vigente: `v0.15.0+8f13c86d2ca0`** · `main` `8f13c86d2ca04159e32b734a6f96aa47c82d79ec`.
+
+#### Gobierno y merges
+
+| PR | Contenido | Resultado |
+|---|---|---|
+| #73 | RFC-019 (concurrencia de specs y release agrupado), Gate de oleada, validador sin `.worktrees/` | MERGED `7dcdeb8` |
+| #74 | E007 cambio de contrasena | MERGED `dc383c5` |
+| #76 | E008 listado de sesiones | MERGED `3df17dc` |
+| #78 | E009 revocacion + router `{param}` | MERGED `994cfc7` |
+| #75 | E010 solicitud de verificacion | MERGED `78f3ccb` |
+| #77 | E011 confirmacion de verificacion | MERGED `7869b1b` |
+| #79 | Hotfix E003 (503 en rotacion) | MERGED `8f13c86` |
+
+RFC-019 queda **APPROVED** (`APRUEBO_RFC_019_OLEADA_E007_E011`) y reutilizable para oleadas posteriores con Gate propio por oleada.
+
+#### CI: causa raiz del bloqueo de Gitleaks
+
+El escaneo de CI recorre **todas las refs** (`fetch-depth: 0`), no solo la rama del PR. Los tres hallazgos eran el mismo falso positivo en `tests/unit/application/email_verification_request_test.go:113`, presente en commits historicos de las ramas E010/E011: el literal de caracteres no-hex de una asercion `ContainsAny` y el literal `"0123456789abcdef"` dentro de `strings.Trim`. Ninguno era una credencial. Se resolvio con dos allowlists **dentro de la regla**, con archivo exacto y forma exacta de la llamada. El arbol se sustituyo por validacion estricta con `strings.Trim`. La allowlist global con `targetRules` se probo y se descarto.
+
+Instrumentacion temporal del job de secretos (solo metadatos: `RuleID | File | StartLine | Commit | Fingerprint`) para atribuir los hallazgos; retirada antes del merge, dejando el paso `gitleaks` byte a byte como estaba.
+
+#### Publicacion v0.14.0
+
+- Release `v0.14.0+7869b1b96648`: binario 20 431 290 B, SHA-256 `4baadf0b032259a2fbbd0f2ae8eebc3d73229c21146640960752fb3a7895e7bc`; unidad `6fa4d5fb...05cc`.
+- Publicado en `s3://nexum-h08i-artefactos-713797602090/releases/v0.14.0+7869b1b96648/` con rol `nexum-h08i-artefactos-publicador`, `If-None-Match: *`, SSE `AES256` y checksum SHA256.
+- Plan `612E6C13...CB79` (0 add / 4 change / 0 destroy) aplicado: **LT v9**, ASG 2/2/2.
+
+#### Hotfix E003 - causa raiz demostrada
+
+`POST /auth/refresh` devolvia **503** con token valido y **401** con token invalido, de forma reproducible y tambien con cuentas nuevas.
+
+Causa: el `ConditionCheck` sobre `USER#<id>/PROFILE` declaraba `ExpressionAttributeValues[":zero"]`, pero la expresion `condicionEpoca` solo usa `:active` y `:epoch`. DynamoDB rechaza con **`ValidationException`** cualquier valor de expresion no utilizado; el adaptador traducia ese error a `ErrRefreshUnavailable` -> 503 en **todas** las rotaciones.
+
+Regresion introducida por A6/RFC-018 (E006) al anadir el ConditionCheck de epoca; E003 se acepto el 2026-11-13, antes de ese cambio, y no se revalido en AWS despues.
+
+Correccion: eliminar `:zero`. No se toco ninguna condicion, ni la atomicidad, ni el consumo de un solo uso, ni el aislamiento por usuario, ni la epoca. Prueba de regresion `TestRotateRefreshNoDeclaraValoresDeExpresionSinUsar` que recorre la transaccion emitida y exige que cada valor declarado aparezca en su expresion.
+
+#### Publicacion v0.15.0 y despliegue
+
+- Release `v0.15.0+8f13c86d2ca0`: binario 20 432 570 B, SHA-256 `0b66779e5394a454ba588963cfe634009bb04251a9ada773e1ba0d501a8dbf19`; checksum S3 `C2Z3nlOUpFS6WIljz+Y0AJuwQlGpradz4boNUBqNvxk=`.
+- Plan `05C2116A4BEE24AC6DDA921FD6E26AE4EF576C68BDDC51934A363CC77485FC97` (0 add / 4 change / 0 destroy), aplicado con Gate `APRUEBO_APPLY_LT_IAM_E003_SHA256_05C2116A...FC97`. Resultado real: `0 added, 4 changed, 0 destroyed`. **LT v10**.
+- Instance refresh `62ec1db0-3d44-400a-966e-45a950820fe9` **Successful 100 %**.
+- Instancias finales `i-0665404e779ef7902` e `i-0a5dd963809ed3c2c`, ambas **LT v10**, `InService`/`Healthy`; ASG **2/2/2** con las dos subredes restauradas; **dos targets healthy**.
+
+#### Capacidad EC2 en us-east-2b
+
+Primer refresh (E007-E011) bloqueado en 0 % durante 12 min: `t4g.micro` sin capacidad en `us-east-2b`, reintentando cada 2 min, sin caida de servicio. Recuperacion aplicada: cancelar refresh, restringir el ASG al subnet de `us-east-2a`, nuevo refresh, y restaurar despues ambas subredes y la capacidad 2/2/2. En el hotfix se aplico la restriccion de AZ de forma **preventiva** y el refresh completo al primer intento.
+
+#### Verificacion funcional real (sobre v0.15.0)
+
+| Endpoint | Evidencia |
+|---|---|
+| E001 | registro 201 |
+| E002 | login 200 |
+| E003 | refresh 200 · tokens nuevos distintos · access nuevo usable 200 · replay del anterior 409 · refresh posterior 401 (familia revocada) |
+| E004 | logout 204 sin cuerpo · access posterior 401 · refresh posterior 401 |
+| E005 | recuperacion 202 · SES acepto (`MessageId` registrado, estado `ENVIADO`, 0 reintentos) |
+| E006 | restablecimiento 200 · replay del codigo 409 |
+| E007 | cambio 200 · token previo 401 · login con la nueva 200 · login con la anterior 401 |
+| E008 | listado 200 · cinco campos exactos · `current` correcto |
+| E009 | revocacion 204 · `revoked=true` · token revocado 401 · inexistente 404 |
+| E010 | solicitud 202 con destinatario verificado en SES |
+| E011 | confirmacion 200 · `emailVerified=true` persistido (`emailVerifiedAt` 2026-11-18T01:32:00Z) · replay 409 · login refleja `emailVerified=True` |
+
+Nota: E010 devolvio 503 con un correo `@example.invalid` **no verificado en SES sandbox**. No es un defecto: el endpoint falla cerrado cuando SES no acepta el envio. Con identidad verificada responde 202. La cuenta SES tiene `ProductionAccessEnabled: false`; solo tres identidades verificadas.
+
+#### Permisos de OpenCode
+
+La regla `terraform *` -> `deny` y `terraform apply*` -> `deny` bloqueaban tambien `apply <archivo>.tfplan` (la denegacion prevalece sobre el `ask` posterior). Politica reestructurada: `plan`/`show`/`validate`/`fmt`/`init -backend` -> ask; `apply <archivo.tfplan>` -> ask; `apply` sin plan, `apply -auto-approve*`, `destroy`, `import`, `state` -> deny; cualquier otro `terraform ...` -> ask. Respaldo del archivo previo en `C:\Nexum-Custodia\H08E-E007-E011-20261117\opencode.json.bak`. **La politica esta aplicada en local y pendiente de versionar mediante RFC/PR propio**; no se incluye en este cierre documental.
+
+#### Rollback
+
+`v0.14.0+7869b1b96648` y todos los releases anteriores siguen publicados y sus ARN permanecen en la politica IAM del runtime (20 objetos). Revertir consiste en apuntar el Launch Template a la ruta anterior mediante su propio plan y Gate.
+
+#### Pendientes reales
+
+- **Aceptacion Android**: no confirmada por el equipo movil. `ANDROID_READY` se declara tecnicamente (endpoints publicados y funcionales), no como aceptacion.
+- Versionar la politica de permisos de Terraform mediante RFC/PR propio.
+- E012 y siguientes: `NOT_AUTHORIZED`.
