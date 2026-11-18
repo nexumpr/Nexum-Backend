@@ -23,7 +23,7 @@ func avisoValido() appPrivacy.Notice {
 		Version:            "2026-11-v2",
 		EffectiveAt:        time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC),
 		Text:               "resumen",
-		URL:                "https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current",
+		URL:                "https://nexumpr.github.io/nexum-privacidad/",
 		Content:            "contenido",
 		RequiresAcceptance: true,
 	}
@@ -60,7 +60,7 @@ func TestPrivacyNoticeHandlerPublico200(t *testing.T) {
 }
 
 func TestPrivacyNoticeHandlerSinFechaFallaCerrado(t *testing.T) {
-	handler := NewPrivacyNoticeHandler(appPrivacy.Proveedor{}, nil)
+	handler := NewPrivacyNoticeHandler(proveedorAvisoFalso{err: appPrivacy.ErrFechaEfectivaNoAprobada}, nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/privacy/notices/current", nil))
 	if rec.Code != http.StatusServiceUnavailable {
