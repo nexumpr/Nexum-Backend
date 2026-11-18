@@ -20,6 +20,7 @@ import (
 type PreferencesAPI interface {
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
+	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
 }
 
 const (
@@ -89,20 +90,29 @@ func (s *PreferencesStore) LoadPreferences(ctx context.Context, userID string) (
 	if entity := stringAttribute(out.Item["entityType"]); entity != "" && entity != preferencesEntityType {
 		return nil, nil
 	}
+	return preferencesFromItem(out.Item), nil
+}
 
+// preferencesFromItem interpreta un item de la tabla como preferencias. Devuelve nil sólo si el
+// mapa está vacío. `version` se declara observada únicamente cuando es un número >= 1: un item
+// histórico sin el atributo no puede habilitar un CAS que nunca existió.
+func preferencesFromItem(item map[string]types.AttributeValue) *appPreferences.Preferences {
+	if len(item) == 0 {
+		return nil
+	}
 	prefs := &appPreferences.Preferences{
-		Locale:   stringAttribute(out.Item["locale"]),
-		Timezone: stringAttribute(out.Item["timezone"]),
+		Locale:   stringAttribute(item["locale"]),
+		Timezone: stringAttribute(item["timezone"]),
 	}
 	if prefs.Timezone == "" {
 		// Compatibilidad con un item que sólo guardara el alias A8.
-		prefs.Timezone = stringAttribute(out.Item["timeZone"])
+		prefs.Timezone = stringAttribute(item["timeZone"])
 	}
-	if version, ok := attributeInt(out.Item["version"]); ok && version >= 1 {
+	if version, ok := attributeInt(item["version"]); ok && version >= 1 {
 		prefs.Version = version
 		prefs.HasVersion = true
 	}
-	return prefs, nil
+	return prefs
 }
 
 // CreatePreferences materializa los valores por defecto con un `PutItem` condicional
@@ -173,4 +183,116 @@ func (s *PreferencesStore) CreatePreferences(ctx context.Context, userID string,
 		return nil, appPreferences.ErrPreferencesConflict
 	}
 	return existente, nil
+}
+
+// UpdateAttempts acota los reintentos del compare-and-swap de E069. Se exporta para que las
+// pruebas verifiquen el agotamiento (409) sin duplicar el número.
+const UpdateAttempts = 3
+
+// UpdatePreferences aplica una modificación con compare-and-swap por `version` (E069).
+//
+// Una única escritura condicional por intento:
+//
+//	SET locale, timezone, timeZone, updatedAt  ADD version :one
+//	Condición: #version = :expected (o attribute_not_exists(#version) en un item histórico)
+//	ReturnValues: ALL_NEW
+//
+// Los cuatro valores y el alias se escriben juntos para que `timezone` y `timeZone` no puedan
+// desalinearse. Si la condición falla, se relee con consistencia fuerte: una versión distinta
+// de la esperada es un 412 (If-Match desactualizado) y no se escribe nada; si el item sigue en
+// la versión esperada se reintenta el CAS y, agotados los intentos, se devuelve 409. Cualquier
+// otro error de DynamoDB falla cerrado con ErrPreferencesUnavailable.
+func (s *PreferencesStore) UpdatePreferences(ctx context.Context, userID string, update appPreferences.Update) (*appPreferences.Preferences, error) {
+	if s == nil || s.client == nil || s.table == "" {
+		return nil, appPreferences.ErrPreferencesUnavailable
+	}
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, appPreferences.ErrPreferencesUnavailable
+	}
+
+	locale := strings.TrimSpace(update.Locale)
+	if locale == "" {
+		locale = appPreferences.DefaultLocale
+	}
+	timezone := strings.TrimSpace(update.Timezone)
+	if timezone == "" {
+		timezone = appPreferences.DefaultTimezone
+	}
+	expected := update.ExpectedVersion
+	if expected < 1 {
+		expected = appPreferences.DefaultVersion
+	}
+	nowISO := update.Now.UTC().Format(time.RFC3339)
+	hasVersion := update.HasVersion
+
+	pk, sk := preferencesKeys(userID)
+	for intento := 0; intento < UpdateAttempts; intento++ {
+		condicion := "attribute_not_exists(#version)"
+		valores := map[string]types.AttributeValue{
+			":locale":    stringAttr(locale),
+			":timezone":  stringAttr(timezone),
+			":timeZone":  stringAttr(timezone),
+			":updatedAt": stringAttr(nowISO),
+			":one":       numberAttr(1),
+		}
+		if hasVersion {
+			condicion = "#version = :expected"
+			// Sólo se declara el valor que la condición usa: DynamoDB rechaza
+			// ExpressionAttributeValues no referenciados (ValidationException).
+			valores[":expected"] = numberAttr(expected)
+		}
+
+		salida, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+			TableName: aws.String(s.table),
+			Key: map[string]types.AttributeValue{
+				"PK": stringAttr(pk),
+				"SK": stringAttr(sk),
+			},
+			UpdateExpression:    aws.String("SET #locale = :locale, #timezone = :timezone, #timeZone = :timeZone, #updatedAt = :updatedAt ADD #version :one"),
+			ConditionExpression: aws.String(condicion),
+			ExpressionAttributeNames: map[string]string{
+				"#locale":    "locale",
+				"#timezone":  "timezone",
+				"#timeZone":  "timeZone",
+				"#updatedAt": "updatedAt",
+				"#version":   "version",
+			},
+			ExpressionAttributeValues: valores,
+			ReturnValues:              types.ReturnValueAllNew,
+		})
+		if err == nil {
+			if salida == nil {
+				return nil, appPreferences.ErrPreferencesUnavailable
+			}
+			actualizado := preferencesFromItem(salida.Attributes)
+			if actualizado == nil || !actualizado.HasVersion {
+				return nil, appPreferences.ErrPreferencesUnavailable
+			}
+			return actualizado, nil
+		}
+
+		var condicional *types.ConditionalCheckFailedException
+		if !errors.As(err, &condicional) {
+			return nil, appPreferences.ErrPreferencesUnavailable
+		}
+
+		// La condición falló: la lectura consistente decide entre 412 y reintento.
+		actual, errLectura := s.LoadPreferences(ctx, userID)
+		if errLectura != nil {
+			return nil, appPreferences.ErrPreferencesUnavailable
+		}
+		if actual == nil {
+			return nil, appPreferences.ErrPreferencesConflict
+		}
+		observada := actual.Version
+		if !actual.HasVersion {
+			observada = appPreferences.DefaultVersion
+		}
+		if observada != expected {
+			return nil, appPreferences.ErrPreferencesVersionConflict
+		}
+		hasVersion = actual.HasVersion
+	}
+	return nil, appPreferences.ErrPreferencesConflict
 }
