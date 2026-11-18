@@ -1,0 +1,44 @@
+Aviso de Privacidad de Nexum
+
+Versión del aviso: 2026-11-v2. La fecha de entrada en vigor se publica en el campo effectiveAt de este endpoint.
+
+1. Responsable y naturaleza del servicio
+El responsable del tratamiento es el proyecto Nexum, operado por su equipo de desarrollo. Nexum es una aplicación Android de finanzas personales. No es un banco, entidad financiera ni sociedad fintech; no se conecta a cuentas bancarias ni solicita claves interbancarias, números de tarjeta o contraseñas bancarias. Los importes y proyecciones que muestra son estimaciones basadas en los datos que tú declaras.
+
+2. Datos que trata Nexum
+2.1 Funciones disponibles actualmente (registro, autenticación, sesión, perfil, consentimientos, onboarding, ingreso base, preferencias y contenido de ayuda):
+- Identificación y cuenta: nombre visible, correo electrónico, hash Argon2id de la contraseña, estado de verificación del correo, estado de la cuenta, versiones de avisos aceptadas, preferencias de idioma y zona horaria, y progreso de onboarding.
+- Ingreso base: importe, moneda y frecuencia.
+- Compromisos de pago recurrentes declarados en el registro: concepto, importe, categoría y frecuencia.
+- Datos técnicos de sesión: dirección IP, marcas de tiempo, identificadores opacos de sesión, tokens de acceso y renovación, y datos opcionales del dispositivo cuando el cliente los envía.
+2.2 Funciones previstas que aún no están disponibles: movimientos, presupuestos, metas de ahorro y aportaciones, exportación de datos, eliminación automática de cuenta, notificaciones push y análisis de patrones. Cuando se habiliten, este aviso se actualizará y se solicitará la aceptación correspondiente. Nexum no recoge hoy esos datos a través de la app y no se describen como si ya existieran.
+- No se recogen datos bancarios, números de tarjeta, identificadores oficiales, datos biométricos, contactos, ubicación precisa ni audio almacenado en servidores.
+
+3. Finalidades
+- Primarias: crear y autenticar la cuenta; mantener la sesión y permitir su cierre y revocación; calcular y mostrar el ingreso base y su equivalente mensual; registrar consentimientos y onboarding; aplicar preferencias; proteger la cuenta y prevenir abuso; atender solicitudes de derechos; cumplir obligaciones legales.
+- Secundarias opcionales: notificaciones y análisis. Aún no están disponibles; cuando se habiliten, requerirán consentimiento y podrán revocarse.
+- No se venden, alquilan ni ceden datos a terceros comerciales ni se usan para publicidad de terceros.
+
+4. Consentimiento y versiones
+No se marcan consentimientos por omisión. Cada decisión se registra con la versión del aviso, la finalidad, la decisión y la fecha UTC. Puedes consultar el historial y revocar consentimientos desde la app. Una versión sustancialmente nueva requerirá aceptación.
+
+5. Infraestructura y proveedores
+Nexum se aloja en Amazon Web Services (AWS), región us-east-2 (Ohio, Estados Unidos). Servicios utilizados: EC2 (cómputo), Application Load Balancer y CloudFront (entrega HTTPS), DynamoDB (base de datos), ElastiCache Redis (caché y control de cuotas), S3 (artefactos y estado de infraestructura), SES (correos de verificación y recuperación) y CloudWatch (registros y métricas). AWS actúa como encargado del tratamiento por instrucción de Nexum. No se utiliza Google Cloud Platform ni MongoDB Atlas. No se transfieren datos a redes publicitarias.
+
+6. Seguridad
+Medidas verificables en el código y la configuración: HTTPS; contraseñas con Argon2id; JWT RS256 de vida corta; rotación de tokens de renovación con detección de reutilización; revocación de sesiones; permisos IAM acotados; y registros que omiten contraseñas y tokens. La configuración de cifrado en reposo y de copias de seguridad depende de los servicios de AWS y se revisa en la operación; este aviso no promete controles que no estén verificados. Ningún sistema es infalible; si se detecta un incidente que afecte tus datos, se comunicará por los canales disponibles y, cuando corresponda, a las autoridades.
+
+7. Conservación
+Los datos de la cuenta se conservan mientras esté activa y sean necesarios para las finalidades descritas. No se publica un plazo único de conservación porque depende del tipo de dato y del servicio. Las copias técnicas de recuperación y los registros operativos se rigen por la configuración de AWS y los procedimientos de operación; no se usan para operación normal ni para elaborar perfiles. Cuando se habilite la eliminación de cuenta, se publicará el procedimiento y los plazos aplicables. Este aviso no promete purgas automáticas que no estén verificadas.
+
+8. Derechos
+Puedes ejercer acceso, rectificación, cancelación, oposición y portabilidad. Desde la app puedes consultar y corregir tu perfil, ingreso y preferencias, y consultar tu historial de consentimientos. La eliminación automática de la cuenta aún no está disponible; cuando se habilite, se publicará en la app. Para solicitar la eliminación o ejercer derechos, utiliza el canal de contacto que el responsable habilite y publique en la app. Mientras ese canal no esté publicado, este aviso no promete un medio específico.
+
+9. Permisos del dispositivo
+El micrófono y las notificaciones son opcionales. El registro por voz aún no está disponible; cuando se habilite, el reconocimiento se realizará en el dispositivo y el backend no almacenará audio. Si se niega un permiso, la función correspondiente no se habilita; las demás funciones disponibles siguen operativas.
+
+10. Versión y cambios
+Este aviso tiene un identificador de versión y una fecha de entrada en vigor. La versión vigente y su contenido íntegro están disponibles en este endpoint. Si se cambia el aviso de forma sustancial, se publicará una nueva versión y se solicitará la aceptación. El historial de consentimientos conserva la versión aceptada.
+
+11. Contacto
+El responsable habilitará un canal de contacto para privacidad y lo publicará en la app. Este aviso no publica un correo ni un domicilio que no estén confirmados. Las solicitudes se atenderán por el canal que se publique.
