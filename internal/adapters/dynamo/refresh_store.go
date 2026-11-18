@@ -242,9 +242,11 @@ func (s *RefreshStore) RotateRefresh(ctx context.Context, rotation appIdentity.R
 				"#status": "status",
 				"#epoch":  "sessionEpoch",
 			},
+			// Solo se declaran los valores que la expresion usa: DynamoDB rechaza con
+			// ValidationException cualquier valor de expresion no utilizado, y ese error
+			// se traducia a 503 en TODAS las rotaciones de refresh.
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":active": stringAttr(appIdentity.StatusActive),
-				":zero":   numberAttr(0),
 				":epoch":  numberAttr(rotation.SessionEpoch),
 			},
 		}},
