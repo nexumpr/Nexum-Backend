@@ -11007,8 +11007,13 @@ components:
           example: monthly
           enum:
           - weekly
-          - biweekly
+          - fortnightly
           - monthly
+          - bimonthly
+          - quarterly
+          - semiannual
+          - annual
+          - biweekly
           - yearly
         label:
           type: string
@@ -11036,8 +11041,13 @@ components:
           example: monthly
           enum:
           - weekly
-          - biweekly
+          - fortnightly
           - monthly
+          - bimonthly
+          - quarterly
+          - semiannual
+          - annual
+          - biweekly
           - yearly
         version:
           type: integer
@@ -11068,8 +11078,13 @@ components:
           example: monthly
           enum:
           - weekly
-          - biweekly
+          - fortnightly
           - monthly
+          - bimonthly
+          - quarterly
+          - semiannual
+          - annual
+          - biweekly
           - yearly
       required:
       - amount
