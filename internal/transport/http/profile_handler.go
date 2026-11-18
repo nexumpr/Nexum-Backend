@@ -1,6 +1,8 @@
 package http
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -13,18 +15,18 @@ import (
 	"github.com/nexumpr/Nexum-Backend/pkg/httputil"
 )
 
-// ProfileHandler expone `GET /api/v1/users/me` (E012). En su extensión E013 añade
-// `PATCH /api/v1/users/me`; el router registra cada método por separado, de modo que un
-// montaje sin E013 no habilita escritura.
+// ProfileHandler expone `GET /api/v1/users/me` (E012) y `PATCH /api/v1/users/me` (E013). El
+// router registra cada método por separado, de modo que un montaje sin E013 no habilita
+// escritura.
 //
 // La ruta está protegida por JWT RS256 y por la sesión autoritativa en DynamoDB: la
 // identidad se deriva exclusivamente de `sub` y `sid` verificados. El cliente no puede
 // elegir el usuario por query, cuerpo ni cabecera.
 //
 // Contrato: 200 con `UserProfile` y `Cache-Control: private, no-store`; en error, el sobre
-// canónico `ErrorEnvelope`. Códigos contemplados: 200, 400, 401, 403, 404, 429, 500 y 503
-// (429 no se emite en este recorte: la cuota distribuida exige Redis y pertenece a una
-// unidad con Gate propio; no se simula).
+// canónico `ErrorEnvelope`. Códigos contemplados: 200, 400, 401, 403, 404, 412, 422, 428,
+// 429, 500 y 503 (429 no se emite en este recorte: la cuota distribuida exige Redis y
+// pertenece a una unidad con Gate propio; no se simula).
 type ProfileHandler struct {
 	service   *appProfile.Service
 	logger    *slog.Logger
@@ -45,13 +47,14 @@ func NewProfileHandler(
 	}
 	h := &ProfileHandler{service: service, logger: logger}
 	if service != nil && tokens != nil && sessions != nil {
-		h.protected = middleware.AuthenticateBearerWithSession(tokens, sessions)(http.HandlerFunc(h.serve))
+		h.protected = middleware.AuthenticateBearerWithSession(tokens, sessions)(http.HandlerFunc(h.dispatch))
 	}
 	return h
 }
 
 // ServeHTTP fija la cabecera de caché antes de cualquier decisión y delega en la cadena
-// autenticada. Sólo GET está implementado en esta unidad.
+// autenticada. GET y PATCH están implementados; cualquier otro verbo responde 405 aunque el
+// handler se montara por error con él.
 func (h *ProfileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Información de identidad y de cuenta: nunca cacheable por proxies ni por el cliente.
 	w.Header().Set("Cache-Control", "private, no-store")
@@ -62,19 +65,28 @@ func (h *ProfileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
-	case http.MethodGet:
+	case http.MethodGet, http.MethodPatch:
 		h.protected.ServeHTTP(w, r)
 	default:
-		// El router sólo registra GET en esta unidad; esta guarda evita servir un método
-		// no previsto si el handler se montara por error con otro verbo.
-		w.Header().Set("Allow", http.MethodGet)
+		w.Header().Set("Allow", http.MethodGet+", "+http.MethodPatch)
 		writeRegisterError(w, r, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "el metodo HTTP no esta permitido para este recurso", nil)
 	}
 }
 
-// serve se ejecuta dentro de la cadena autenticada: `sub` ya está verificado y la sesión es
-// ACTIVE, no expirada y con la época vigente.
-func (h *ProfileHandler) serve(w http.ResponseWriter, r *http.Request) {
+// dispatch reparte el método ya autenticado. Sólo puede llegar GET o PATCH: `ServeHTTP`
+// rechaza el resto antes de entrar en la cadena protegida.
+func (h *ProfileHandler) dispatch(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPatch:
+		h.servePatch(w, r)
+	default:
+		h.serveGet(w, r)
+	}
+}
+
+// serveGet se ejecuta dentro de la cadena autenticada: `sub` ya está verificado y la sesión
+// es ACTIVE, no expirada y con la época vigente.
+func (h *ProfileHandler) serveGet(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || strings.TrimSpace(userID) == "" {
 		// Defensa en profundidad: el middleware ya exige `sub`.
@@ -87,6 +99,98 @@ func (h *ProfileHandler) serve(w http.ResponseWriter, r *http.Request) {
 		h.writeServiceError(w, r, err)
 		return
 	}
+	h.writeProfile(w, r, perfil)
+}
+
+// ProfilePatchMaxRequestBodyBytes acota el cuerpo de E013: un único nombre de hasta 100
+// runes no necesita más de unos pocos cientos de bytes.
+const ProfilePatchMaxRequestBodyBytes int64 = 8 * 1024
+
+// ProfilePatchRequest es el DTO estricto de E013 (OpenAPI `ProfilePatch`).
+//
+// `additionalProperties: false`: `BindJSONLimit` rechaza cualquier propiedad desconocida y
+// un JSON concatenado. Un puntero nulo en el borde (cuerpo `null`) no es un objeto y se
+// rechaza; `displayName` distingue campo ausente (`{}`) de cadena vacía, que es una
+// violación de dominio, y de `null`, que no es un `string` válido. No se admiten `id`,
+// `email`, `version` ni ningún otro campo del perfil: la identidad viene del claim `sub` y
+// la versión de `If-Match`.
+type ProfilePatchRequest struct {
+	DisplayName patchDisplayName `json:"displayName"`
+}
+
+// patchDisplayName distingue tres situaciones que el contrato separa: campo ausente (no-op),
+// cadena válida y `null` (rechazado: `ProfilePatch.displayName` es `type: string`).
+type patchDisplayName struct {
+	Presente bool
+	Valor    string
+}
+
+// UnmarshalJSON implementa la distinción; un valor que no sea una cadena produce 400.
+func (n *patchDisplayName) UnmarshalJSON(datos []byte) error {
+	if string(bytes.TrimSpace(datos)) == "null" {
+		return errors.New("displayName no admite null")
+	}
+	var valor string
+	if err := json.Unmarshal(datos, &valor); err != nil {
+		return err
+	}
+	n.Presente = true
+	n.Valor = valor
+	return nil
+}
+
+// servePatch aplica `PATCH /api/v1/users/me` (E013).
+//
+// Orden de decisiones: identidad verificada → `If-Match` obligatorio (428 si falta, 400 si
+// está mal formado) → cuerpo estricto (400) → caso de uso (412/404/409/422/503). La
+// respuesta es `UserProfile` con `ETag: "v<version>"`, de modo que el cliente puede
+// encadenar una segunda modificación sin releer.
+func (h *ProfileHandler) servePatch(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		// Defensa en profundidad: el middleware ya exige `sub`.
+		writeRegisterError(w, r, http.StatusUnauthorized, "UNAUTHORIZED", "sesion no valida", nil)
+		return
+	}
+
+	version, errIfMatch := ParseIfMatchVersion(r.Header.Get("If-Match"))
+	if errIfMatch != nil {
+		if errors.Is(errIfMatch, ErrIfMatchRequerido) {
+			writeRegisterError(w, r, http.StatusPreconditionRequired, "PRECONDITION_REQUIRED", "solicitud no completada", nil)
+			return
+		}
+		if errors.Is(errIfMatch, ErrIfMatchDebil) {
+			// RFC 9110: un validador debil no satisface If-Match.
+			writeRegisterError(w, r, http.StatusPreconditionFailed, "VERSION_CONFLICT", "solicitud no completada", nil)
+			return
+		}
+		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+			{Field: "If-Match", Reason: "invalid_etag"},
+		})
+		return
+	}
+
+	var request *ProfilePatchRequest
+	if err := BindJSONLimit(w, r, &request, ProfilePatchMaxRequestBodyBytes); err != nil || request == nil {
+		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+			{Field: "body", Reason: "invalid_json"},
+		})
+		return
+	}
+
+	var patch appProfile.Patch
+	if request.DisplayName.Presente {
+		nombre := request.DisplayName.Valor
+		patch.DisplayName = &nombre
+	}
+
+	perfil, err := h.service.Update(r.Context(), userID, version, patch)
+	if err != nil {
+		h.writeServiceError(w, r, err)
+		return
+	}
+	// ETag de salida: misma forma que exige `If-Match` en la siguiente petición.
+	w.Header().Set("ETag", FormatETag(perfil.Version))
 	h.writeProfile(w, r, perfil)
 }
 
