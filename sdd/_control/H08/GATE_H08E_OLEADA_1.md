@@ -184,8 +184,8 @@ externa, sin bloquear la disponibilidad del API.
 
 **Texto íntegro de `content` (aprobación separada):** el bloque siguiente es el contenido exacto
 que se incorporará como recurso versionado del backend. Se medirá en UTF-8 con salto de línea
-final; **6724 bytes**; SHA-256
-**`ddfb0b1865e0e77a47f74c025e36bdbc102c6d424fc137c703f4316d69b66380`**. Una prueba de contrato
+final; **6761 bytes**; SHA-256
+**`68f1052a4bcab70a6d8803552dccc67d8b5a23c5b383b5480a83f31e408505c9`**. Una prueba de contrato
 recalculará el SHA y fallará si el texto cambia.
 
 ```text
@@ -222,7 +222,7 @@ Nexum se aloja en Amazon Web Services (AWS), región us-east-2 (Ohio, Estados Un
 Medidas verificables en el código y la configuración: comunicaciones HTTPS; contraseñas con Argon2id; JWT RS256 de vida corta; rotación de tokens de renovación con detección de reutilización; revocación de sesiones; permisos IAM acotados; y registros que omiten contraseñas y tokens. La configuración de cifrado en reposo y de copias de seguridad depende de los servicios de AWS y se revisa en la operación; este aviso no promete controles que no estén verificados. Ningún sistema es infalible; si se detecta un incidente que afecte los datos, se comunicará por los canales disponibles y, cuando corresponda, a las autoridades.
 
 7. Conservación y eliminación
-Los datos de la cuenta se conservan mientras esté activa y sean necesarios para las finalidades descritas y las obligaciones aplicables. No se publica un plazo único de conservación porque depende del tipo de dato y del servicio. Las copias técnicas de recuperación y los registros operativos se rigen por la configuración de AWS y los procedimientos de operación; no se usan para operación normal ni para elaborar perfiles.
+Los datos de la cuenta se conservan mientras esté activa y sean necesarios para las finalidades descritas y las obligaciones aplicables. No se publica un plazo único de conservación porque depende del tipo de dato y del servicio. No se mantiene un historial comercial de datos de usuario. La configuración de recuperación de la base de datos y los registros operativos se define en la operación de AWS; no se usan para operación normal ni para elaborar perfiles.
 
 La eliminación automática de la cuenta desde la app aún no está disponible. Para solicitar la eliminación de la cuenta y de los datos asociados, el titular puede escribir a nexumproyectomov@gmail.com. La solicitud se registra, se verifica la identidad del titular, se revocan las sesiones activas y se ejecuta el procedimiento de supresión aplicable. Los datos no se consideran eliminados hasta que el responsable confirme la ejecución; este aviso no promete purgas automáticas que no estén verificadas.
 
@@ -262,7 +262,7 @@ Para dudas, solicitudes o quejas relacionadas con los datos personales, el canal
 autorizado con el Gate de §15, pero **la adopción del texto** requiere la frase separada:
 
 ```
-APRUEBO_CONTENIDO_E015_VERSION_2026_11_V2_SHA256_ddfb0b1865e0e77a47f74c025e36bdbc102c6d424fc137c703f4316d69b66380
+APRUEBO_CONTENIDO_E015_VERSION_2026_11_V2_SHA256_68f1052a4bcab70a6d8803552dccc67d8b5a23c5b383b5480a83f31e408505c9
 ```
 
 Si el responsable no aprueba el contenido, el PR de E015 no se fusiona y el endpoint no se
@@ -495,7 +495,7 @@ su forma reutilizable E-1/E-2 para esta oleada; y (c) `RFC-020` v1.1.0 con la am
 del enum de frecuencias (9 valores publicados, 7 canónicos emitidos).
 
 **No** aprueba el contenido de E015. Esa adopción se solicita por separado con la frase de D-E015:
-`APRUEBO_CONTENIDO_E015_VERSION_2026_11_V2_SHA256_ddfb0b1865e0e77a47f74c025e36bdbc102c6d424fc137c703f4316d69b66380`.
+`APRUEBO_CONTENIDO_E015_VERSION_2026_11_V2_SHA256_68f1052a4bcab70a6d8803552dccc67d8b5a23c5b383b5480a83f31e408505c9`.
 
 ```
 APRUEBO_GATE_OLEADA_1_RFC019_E012_E013_E015_E016_E017_E018_E019_E022_E023_E024_E025_E068_E069_E070_E071
@@ -533,5 +533,5 @@ Se actualiza en cada checkpoint; nunca se adelanta un estado.
 | 2026-11-18 | Creación del Gate de Oleada 1, preflight verificado y 15 endpoints declarados | PROPUESTO |
 | 2026-11-18 | **v1.1.0:** corrige RFC-020 (9 valores publicados, sin eliminar `biweekly`/`yearly`), separa el contenido de E015 del alcance y registra `BLOCKED_CONTENIDO_EXTERNO` con R-E015-01/02/03; FinOps incremental estimado en lugar de `0.0000`; disponibilidad AZ declarada `NOT_VERIFIED` | PROPUESTO |
 | 2026-11-18 | **v1.2.0:** E015 deja de depender de `nexumpr/nexum-privacidad`; el aviso se sirve desde la API (`/api/v1/privacy/notices/current`) con versión `2026-11-v2`. La adopción del texto exige frase separada; sin ella el PR de E015 no se fusiona. Sin web adicional ni 503 | PROPUESTO |
-| 2026-11-18 | **v1.2.1:** aviso corregido para no afirmar funciones no implementadas (eliminación automática, notificaciones, analítica, voz), no prometer canal de Ayuda ni plazos de conservación no verificados y no afirmar TLS 1.3. `content` de **6724 bytes** UTF-8, SHA-256 `29b27611…8a06`; canal de contacto y `effectiveAt` quedan como decisiones humanas del release | **PROPUESTO** |
-| 2026-11-18 | **v1.2.2:** datos del responsable autorizados (nombre, domicilio, correo), `url` pública `https://nexumpr.github.io/nexum-privacidad/`, `effectiveAt` inmutable `2026-11-20T00:00:00Z` validado por prueba y `content` final de **6724 bytes** SHA-256 `ddfb0b18.6380`. Se registra que la página pública es de otro integrante y puede citar infraestructura obsoleta; no se modifica ni se usa como fuente contractual | **PROPUESTO** |
+| 2026-11-18 | **v1.2.1:** aviso corregido para no afirmar funciones no implementadas (eliminación automática, notificaciones, analítica, voz), no prometer canal de Ayuda ni plazos de conservación no verificados y no afirmar TLS 1.3. `content` de **6761 bytes** UTF-8, SHA-256 `68f1052a…05c9`; canal de contacto y `effectiveAt` quedan como decisiones humanas del release | **PROPUESTO** |
+| 2026-11-18 | **v1.2.2:** datos del responsable autorizados (nombre, domicilio, correo), `url` pública `https://nexumpr.github.io/nexum-privacidad/`, `effectiveAt` inmutable `2026-11-20T00:00:00Z` validado por prueba y `content` final de **6761 bytes** SHA-256 `68f1052a.05c9`. Se registra que la página pública es de otro integrante y puede citar infraestructura obsoleta; no se modifica ni se usa como fuente contractual | **PROPUESTO** |
