@@ -435,7 +435,7 @@ func TestE069HTTPIfMatchRequerido(t *testing.T) {
 
 // TestE069HTTPIfMatchInvalido: un ETag mal formado es 400 INVALID_REQUEST.
 func TestE069HTTPIfMatchInvalido(t *testing.T) {
-	for _, valor := range []string{"v3", "abc", `"v0"`, `"vx"`, `W/"nope"`} {
+	for _, valor := range []string{"v3", "abc", `"v0"`, `"vx"`} {
 		t.Run(valor, func(t *testing.T) {
 			store := newE068HTTPStore()
 			sembrarPreferenciasHTTP(store, 1, "es-MX", "America/Mexico_City")
@@ -454,6 +454,21 @@ func TestE069HTTPIfMatchInvalido(t *testing.T) {
 				t.Fatal("un If-Match invalido no puede escribir")
 			}
 		})
+	}
+}
+
+// TestE069HTTPIfMatchDebil: RFC 9110 exige comparacion fuerte; W/"vN" es 412.
+func TestE069HTTPIfMatchDebil(t *testing.T) {
+	store := newE068HTTPStore()
+	sembrarPreferenciasHTTP(store, 3, "es-MX", "America/Mexico_City")
+
+	rec := httptest.NewRecorder()
+	e069HTTPHandler(store).ServeHTTP(rec, e069Peticion(`{"locale":"en-US"}`, `W/"v3"`))
+	if rec.Code != http.StatusPreconditionFailed {
+		t.Fatalf("esperado 412, obtenido %d (%s)", rec.Code, rec.Body.String())
+	}
+	if store.actualizaciones != 0 {
+		t.Fatal("un validador debil no puede escribir")
 	}
 }
 
