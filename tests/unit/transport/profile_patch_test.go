@@ -270,7 +270,7 @@ func TestE013HTTPActualizaYDevuelveETag(t *testing.T) {
 	handler := e013HTTPHandler(store, newE004Sesiones())
 
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, e013Peticion(`W/"v3"`, `{"displayName":"Nombre Nuevo"}`))
+	handler.ServeHTTP(rec, e013Peticion(`"v3"`, `{"displayName":"Nombre Nuevo"}`))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("esperado 200, obtenido %d (%s)", rec.Code, rec.Body.String())
 	}
@@ -303,6 +303,23 @@ func TestE013HTTPActualizaYDevuelveETag(t *testing.T) {
 	}
 	if len(store.escrituras) != 1 || store.escrituras[0].ExpectedVersion != 3 {
 		t.Fatalf("debe escribirse una vez con la version de If-Match: %v", store.escrituras)
+	}
+}
+
+// TestE013HTTPIfMatchDebilRechazado verifica RFC 9110: W/"vN" no satisface If-Match.
+func TestE013HTTPIfMatchDebilRechazado(t *testing.T) {
+	store := &e013HTTPStore{registros: map[string]*appProfile.Record{
+		e004HTTPUsuario: e013HTTPRegistro(e004HTTPUsuario, 3),
+	}}
+	handler := e013HTTPHandler(store, newE004Sesiones())
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, e013Peticion(`W/"v3"`, `{"displayName":"Nombre Nuevo"}`))
+	if rec.Code != http.StatusPreconditionFailed {
+		t.Fatalf("un ETag debil debe responder 412, obtuvo %d (%s)", rec.Code, rec.Body.String())
+	}
+	if len(store.escrituras) != 0 {
+		t.Fatalf("un ETag debil no debe escribir: %v", store.escrituras)
 	}
 }
 

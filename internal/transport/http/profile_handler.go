@@ -159,6 +159,11 @@ func (h *ProfileHandler) servePatch(w http.ResponseWriter, r *http.Request) {
 			writeRegisterError(w, r, http.StatusPreconditionRequired, "PRECONDITION_REQUIRED", "solicitud no completada", nil)
 			return
 		}
+		if errors.Is(errIfMatch, ErrIfMatchDebil) {
+			// RFC 9110: un validador debil no satisface If-Match.
+			writeRegisterError(w, r, http.StatusPreconditionFailed, "VERSION_CONFLICT", "solicitud no completada", nil)
+			return
+		}
 		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
 			{Field: "If-Match", Reason: "invalid_etag"},
 		})
