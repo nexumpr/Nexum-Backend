@@ -16,10 +16,11 @@ const (
 	// VersionAviso es el identificador contractual de la versión.
 	VersionAviso = "2026-11-v2"
 
-	// URLAnuncio es la URL pública aprobada del aviso (repositorio de privacidad
-	// del equipo). El contenido contractual se sirve desde este endpoint; no se
-	// consulta la página externa en cada petición.
-	URLAnuncio = "https://nexumpr.github.io/nexum-privacidad/"
+	// URLAnuncio es la URL pública de este endpoint. Mientras la página externa
+	// del equipo de privacidad no tenga contenido consistente, se usa la API para
+	// no dirigir al usuario a información contradictoria. El handler no consulta
+	// la página externa en cada petición.
+	URLAnuncio = "https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current"
 
 	// TextoResumen es el resumen legible que acompaña al contenido íntegro.
 	TextoResumen = "Nexum trata tu nombre, correo y contraseña (hash Argon2id) para autenticarte; " +
@@ -38,8 +39,9 @@ var ErrFechaEfectivaNoAprobada = errors.New("fecha efectiva del aviso no aprobad
 
 // effectiveAtAviso es la fecha de entrada en vigor de esta versión. Es una
 // configuración inmutable por versión, no se calcula por petición ni se
-// retrotrae. Se valida en pruebas y en el Gate de release antes de promover.
-var effectiveAtAviso = "2026-11-20T00:00:00Z"
+// retrotrae. Se fija a la primera publicación autorizada (2026-11-18) y el
+// Gate de publicación la valida antes de promover.
+var effectiveAtAviso = "2026-11-18T00:00:00Z"
 
 // Notice es el aviso vigente servido por la API.
 type Notice struct {

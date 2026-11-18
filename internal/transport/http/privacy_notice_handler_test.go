@@ -23,7 +23,7 @@ func avisoValido() appPrivacy.Notice {
 		Version:            "2026-11-v2",
 		EffectiveAt:        time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC),
 		Text:               "resumen",
-		URL:                "https://nexumpr.github.io/nexum-privacidad/",
+		URL:                "https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current",
 		Content:            "contenido",
 		RequiresAcceptance: true,
 	}

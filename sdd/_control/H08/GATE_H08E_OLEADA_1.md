@@ -156,9 +156,9 @@ integrante: **no se modifica, no se usa como dependencia y no bloquea esta olead
 | Campo | Valor |
 |---|---|
 | `version` | `2026-11-v2` |
-| `effectiveAt` | `2026-11-20T00:00:00Z` (fecha propuesta de entrada en vigor; se valida en el Gate de release y no se calcula por petición) |
+| `effectiveAt` | `2026-11-18T00:00:00Z` (fecha propuesta de entrada en vigor; se valida en el Gate de release y no se calcula por petición) |
 | `text` | resumen legible (abajo) |
-| `url` | `https://nexumpr.github.io/nexum-privacidad/` |
+| `url` | `https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current` |
 | `content` | texto íntegro versionado (abajo) |
 | `requiresAcceptance` | `true` |
 
@@ -167,11 +167,22 @@ Tejeda, Carretera Tula Tepeji 7, Localidad El Sesenta y Dos, C.P. 42836, Tula de
 México; canal de privacidad y derechos ARCO: `nexumproyectomov@gmail.com`.
 
 **Página pública de privacidad:** `https://nexumpr.github.io/nexum-privacidad/` pertenece a otro
-integrante y se usa como URL pública para Google Play. Se verificó que está publicada, pero su
-contenido puede citar infraestructura o plazos obsoletos (GCP/MongoDB, 30 días). **No se modifica
-ese repositorio ni se presenta su contenido como aprobado**: la fuente contractual es el `content`
-versionado de E015. La coordinación con el integrante responsable queda registrada como dependencia
-externa, sin bloquear la disponibilidad del API.
+integrante y se usa para Google Play. Se verificó que está publicada, pero su contenido cita
+GCP/MongoDB, eliminación automática y plazos obsoletos. **No se modifica ese repositorio ni se usa
+como `url` de E015 mientras sea contradictorio**: la URL contractual es el propio endpoint HTTPS
+de la API. La fuente contractual es el `content` versionado.
+
+**Mensaje de coordinación para el integrante responsable (breve):**
+> El backend ya sirve el aviso en `https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current`.
+> La página `nexum-privacidad` aún cita GCP/MongoDB (el backend usa AWS/DynamoDB), eliminación
+> automática (E014 no está implementado), plazos de respaldo no verificados y una versión/fecha
+> distinta. Por favor actualiza la página pública para que coincida con el aviso `2026-11-v2`
+> (SHA-256 `68f1052a…05c9`) y el correo `nexumproyectomov@gmail.com`; cuando esté publicado y sea
+> consistente, cambiaremos el campo `url` por la página pública. No modificamos tu repositorio.
+
+**Comprobación humana pendiente:** confirmar que `nexumproyectomov@gmail.com` recibe solicitudes
+(correo de prueba controlado). No bloquea las pruebas técnicas ni el merge del backend; se registra
+como dependencia operativa.
 
 **Texto de `text` (resumen):**
 > Nexum trata tu nombre, correo y contraseña (hash Argon2id) para autenticarte; tu ingreso base y
@@ -253,8 +264,8 @@ Para dudas, solicitudes o quejas relacionadas con los datos personales, el canal
 - **Datos del responsable autorizados:** nombre, domicilio y correo de privacidad constan en el
   aviso; no son datos inventados.
 - **PENDIENTE_DECISION_HUMANA:** aprobación expresa de este texto (SHA-256) y de la fecha
-  `2026-11-20T00:00:00Z`. Hasta esa frase, el PR #91 no se fusiona.
-- **effectiveAt:** constante inmutable por versión `2026-11-20T00:00:00Z`; no se calcula con
+  `2026-11-18T00:00:00Z`. Hasta esa frase, el PR #91 no se fusiona.
+- **effectiveAt:** constante inmutable por versión `2026-11-18T00:00:00Z`; no se calcula con
   `time.Now()` por petición ni se fija retroactivamente. El Gate de release la valida antes de
   promover.
 
@@ -534,4 +545,4 @@ Se actualiza en cada checkpoint; nunca se adelanta un estado.
 | 2026-11-18 | **v1.1.0:** corrige RFC-020 (9 valores publicados, sin eliminar `biweekly`/`yearly`), separa el contenido de E015 del alcance y registra `BLOCKED_CONTENIDO_EXTERNO` con R-E015-01/02/03; FinOps incremental estimado en lugar de `0.0000`; disponibilidad AZ declarada `NOT_VERIFIED` | PROPUESTO |
 | 2026-11-18 | **v1.2.0:** E015 deja de depender de `nexumpr/nexum-privacidad`; el aviso se sirve desde la API (`/api/v1/privacy/notices/current`) con versión `2026-11-v2`. La adopción del texto exige frase separada; sin ella el PR de E015 no se fusiona. Sin web adicional ni 503 | PROPUESTO |
 | 2026-11-18 | **v1.2.1:** aviso corregido para no afirmar funciones no implementadas (eliminación automática, notificaciones, analítica, voz), no prometer canal de Ayuda ni plazos de conservación no verificados y no afirmar TLS 1.3. `content` de **6761 bytes** UTF-8, SHA-256 `68f1052a…05c9`; canal de contacto y `effectiveAt` quedan como decisiones humanas del release | **PROPUESTO** |
-| 2026-11-18 | **v1.2.2:** datos del responsable autorizados (nombre, domicilio, correo), `url` pública `https://nexumpr.github.io/nexum-privacidad/`, `effectiveAt` inmutable `2026-11-20T00:00:00Z` validado por prueba y `content` final de **6761 bytes** SHA-256 `68f1052a.05c9`. Se registra que la página pública es de otro integrante y puede citar infraestructura obsoleta; no se modifica ni se usa como fuente contractual | **PROPUESTO** |
+| 2026-11-18 | **v1.2.2:** datos del responsable autorizados (nombre, domicilio, correo), `url` pública `https://nexumpr.github.io/nexum-privacidad/`, `effectiveAt` inmutable `2026-11-18T00:00:00Z` validado por prueba y `content` final de **6761 bytes** SHA-256 `68f1052a.05c9`. Se registra que la página pública es de otro integrante y puede citar infraestructura obsoleta; no se modifica ni se usa como fuente contractual | **PROPUESTO** |

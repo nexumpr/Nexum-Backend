@@ -251,9 +251,9 @@ func AvisoVigente() Notice
 - Archivo embebido: `internal/application/privacy/aviso_2026_11_v2.txt` con `//go:embed`.
   Contenido exacto: **6761 bytes UTF-8**, salto de línea final, SHA-256
   `68f1052a4bcab70a6d8803552dccc67d8b5a23c5b383b5480a83f31e408505c9`.
-- `Version = "2026-11-v2"`; `URL = "https://nexumpr.github.io/nexum-privacidad/"`;
+- `Version = "2026-11-v2"`; `URL = "https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current"`;
   `RequiresAcceptance = true`.
-- `EffectiveAt = "2026-11-20T00:00:00Z"` es una **constante inmutable por versión**, no se calcula
+- `EffectiveAt = "2026-11-18T00:00:00Z"` es una **constante inmutable por versión**, no se calcula
   con `time.Now()` por petición ni se retrotrae. Un test verifica el valor exacto y que sea RFC3339;
   el Gate de release lo valida antes de promover.
 - `Text` es el resumen aprobado en el Gate; `Content` es el archivo embebido.
