@@ -3,6 +3,7 @@ package application_test
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -172,13 +173,22 @@ func revisarTextoPublico(t *testing.T, id, texto string) {
 	prohibidos := []string{
 		"example.invalid", "example.com", "lorem", "ipsum", "placeholder", "tbd",
 		"<", "{{", "}}", "xxx",
-		"visa", "mastercard", "amex", "paypal", "bitcoin", "ethereum", "criptomoneda",
-		"amazon", "google", "apple", "facebook", "netflix", "spotify",
 		"rendimiento garantizado", "te recomiendo invertir", "compra acciones", "invierte en",
 	}
 	for _, prohibido := range prohibidos {
 		if strings.Contains(minusculas, prohibido) {
 			t.Fatalf("%s: el contenido publico no admite %q", id, prohibido)
+		}
+	}
+	// Marcas y productos: se buscan como palabra completa para no confundir
+	// "Visa" con el verbo "revisa".
+	marcas := []string{
+		"visa", "mastercard", "amex", "paypal", "bitcoin", "ethereum", "criptomoneda",
+		"amazon", "google", "apple", "facebook", "netflix", "spotify",
+	}
+	for _, marca := range marcas {
+		if regexp.MustCompile(`\b` + regexp.QuoteMeta(marca) + `\b`).MatchString(minusculas) {
+			t.Fatalf("%s: el contenido publico no admite la marca %q", id, marca)
 		}
 	}
 }
