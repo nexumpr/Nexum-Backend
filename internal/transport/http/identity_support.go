@@ -18,6 +18,9 @@ var (
 	ErrIfMatchRequerido = errors.New("If-Match requerido")
 	// ErrIfMatchInvalido indica un ETag mal formado o una versión no válida (HTTP 400).
 	ErrIfMatchInvalido = errors.New("If-Match invalido")
+	// ErrIfMatchDebil indica un validador débil W/"vN". RFC 9110 exige comparación
+	// fuerte para If-Match: un validador débil nunca satisface la precondición (412).
+	ErrIfMatchDebil = errors.New("If-Match debil no valido para actualizacion")
 )
 
 // FormatETag devuelve el ETag fuerte del contrato: "v<version>".
@@ -27,16 +30,17 @@ func FormatETag(version int64) string {
 
 // ParseIfMatchVersion valida If-Match y extrae la versión esperada.
 //
-// Acepta `"vN"` y la forma débil `W/"vN"`. Cualquier otro formato, una versión
-// no numérica o menor que 1 produce ErrIfMatchInvalido. La ausencia de cabecera
-// produce ErrIfMatchRequerido, que los handlers traducen a 428.
+// Sólo acepta el ETag fuerte `"vN"`. Un validador débil `W/"vN"` se rechaza con
+// ErrIfMatchDebil: RFC 9110 exige comparación fuerte para If-Match y un validador
+// débil nunca satisface la precondición. La ausencia produce ErrIfMatchRequerido
+// (428); un formato mal formado produce ErrIfMatchInvalido (400).
 func ParseIfMatchVersion(valor string) (int64, error) {
 	limpio := strings.TrimSpace(valor)
 	if limpio == "" {
 		return 0, ErrIfMatchRequerido
 	}
 	if strings.HasPrefix(limpio, "W/") {
-		limpio = strings.TrimSpace(strings.TrimPrefix(limpio, "W/"))
+		return 0, ErrIfMatchDebil
 	}
 	if len(limpio) < 4 || limpio[0] != '"' || limpio[len(limpio)-1] != '"' {
 		return 0, ErrIfMatchInvalido

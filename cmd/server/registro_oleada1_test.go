@@ -71,6 +71,22 @@ func TestRegistroOleada1MontaRouter(t *testing.T) {
 	}
 }
 
+func TestRegistrarOleada1Global(t *testing.T) {
+	anterior := registroOleada1Global
+	t.Cleanup(func() { registroOleada1Global = anterior })
+	registroOleada1Global = nuevoRegistroOleada1()
+
+	registrarOleada1(montajeOleada{
+		ID:     "E012",
+		Metodo: http.MethodGet,
+		Ruta:   "/users/me",
+		Montar: func(*dependenciasOleada) {},
+	})
+	if len(registroOleada1Global.porID) != 1 {
+		t.Fatalf("el registro global debe contener 1 endpoint, contiene %d", len(registroOleada1Global.porID))
+	}
+}
+
 func TestRegistroOleada1RechazaDuplicadosYNoAutorizados(t *testing.T) {
 	casos := []struct {
 		nombre  string
