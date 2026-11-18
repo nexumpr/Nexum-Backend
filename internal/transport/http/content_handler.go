@@ -64,6 +64,11 @@ func NewFAQHandler(clienteRedis *redis.Client, logger *slog.Logger) *ContentHand
 	return nuevoContentHandler(clienteRedis, appContent.CacheKeyFAQ, appContent.CacheTTL, appContent.FAQPayload, logger)
 }
 
+// NewTipsHandler construye el handler de E071 (GET /api/v1/education/tips).
+func NewTipsHandler(clienteRedis *redis.Client, logger *slog.Logger) *ContentHandler {
+	return nuevoContentHandler(clienteRedis, appContent.CacheKeyTips, appContent.CacheTTL, appContent.TipsPayload, logger)
+}
+
 // ServeHTTP responde 200 con el JSON exacto del contrato o 500 con el sobre de
 // error canonico. La cabecera de cache se fija antes de escribir el estado para que
 // ningun middleware posterior la sustituya por no-store.
