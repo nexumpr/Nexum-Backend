@@ -491,3 +491,40 @@ func stringAttrValue(t *testing.T, values map[string]types.AttributeValue, nombr
 	t.Helper()
 	return stringAttrValueMap(values, nombre)
 }
+
+// Regresion E003 (hotfix 2026-11-18): DynamoDB rechaza con ValidationException cualquier
+// valor de ExpressionAttributeValues que no aparezca en su expresion. Ese error se
+// traducia a 503 en TODAS las rotaciones de refresh. Esta prueba recorre la transaccion
+// emitida y exige que cada valor declarado se use realmente.
+func TestRotateRefreshNoDeclaraValoresDeExpresionSinUsar(t *testing.T) {
+	fake := &fakeRefreshDynamo{}
+	store := dynamoAdapter.NewRefreshStore(fake, refreshTable)
+
+	if err := store.RotateRefresh(context.Background(), rotacionFixture()); err != nil {
+		t.Fatalf("rotacion fallo: %v", err)
+	}
+	if len(fake.transactInputs) != 1 {
+		t.Fatalf("se esperaba una transaccion, hay %d", len(fake.transactInputs))
+	}
+
+	for i, item := range fake.transactInputs[0].TransactItems {
+		var expr string
+		var valores map[string]types.AttributeValue
+		switch {
+		case item.Update != nil:
+			expr = aws.ToString(item.Update.UpdateExpression) + " " + aws.ToString(item.Update.ConditionExpression)
+			valores = item.Update.ExpressionAttributeValues
+		case item.ConditionCheck != nil:
+			expr = aws.ToString(item.ConditionCheck.ConditionExpression)
+			valores = item.ConditionCheck.ExpressionAttributeValues
+		case item.Put != nil:
+			expr = aws.ToString(item.Put.ConditionExpression)
+			valores = item.Put.ExpressionAttributeValues
+		}
+		for nombre := range valores {
+			if !strings.Contains(expr, nombre) {
+				t.Fatalf("accion %d declara %s y no se usa en la expresion %q", i, nombre, expr)
+			}
+		}
+	}
+}
