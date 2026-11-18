@@ -134,7 +134,8 @@ verificados. Se serializa un DTO cerrado con `id`, `email`, `displayName`, `emai
 `createdAt`, `version`; nunca `passwordHash`, `sessionEpoch`, `status` ni atributos internos.
 
 ### D-E013 — Modificación de perfil
-`If-Match` obligatorio con formato ETag `"v<version>"` (se acepta `W/"vN"`). Ausente → **428**;
+`If-Match` obligatorio con ETag **fuerte** `"v<version>"`. Un validador débil `W/"vN"` se rechaza
+con **412** (RFC 9110 exige comparación fuerte para If-Match). Ausente → **428**;
 formato inválido → **400**; versión distinta de la persistida → **412**. Sólo `displayName`
 (1–100 runes, sin recortar el valor salvo espacios de borde), `unknown fields` → **400**.
 `UpdateItem` condicional `attribute_exists(PK) AND #version = :expected` con

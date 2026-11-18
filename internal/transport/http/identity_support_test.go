@@ -20,8 +20,8 @@ func TestFormatYParseIfMatch(t *testing.T) {
 		ok    bool
 	}{
 		{`"v1"`, true},
-		{`W/"v12"`, true},
 		{`  "v3"  `, true},
+		{`W/"v12"`, false},
 		{``, false},
 		{`v1`, false},
 		{`"1"`, false},
@@ -43,6 +43,9 @@ func TestFormatYParseIfMatch(t *testing.T) {
 	}
 	if _, err := ParseIfMatchVersion(""); !errors.Is(err, ErrIfMatchRequerido) {
 		t.Fatalf("la ausencia debe devolver ErrIfMatchRequerido, obtuvo %v", err)
+	}
+	if _, err := ParseIfMatchVersion(`W/"v12"`); !errors.Is(err, ErrIfMatchDebil) {
+		t.Fatalf("un validador debil debe devolver ErrIfMatchDebil, obtuvo %v", err)
 	}
 	if _, err := ParseIfMatchVersion("nope"); !errors.Is(err, ErrIfMatchInvalido) {
 		t.Fatalf("el formato invalido debe devolver ErrIfMatchInvalido, obtuvo %v", err)
