@@ -2,26 +2,23 @@ package privacy
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 )
 
-// aviso_2026_11_v2.txt es el contenido íntegro aprobado por el responsable.
-// El SHA-256 se verifica en las pruebas y debe coincidir con el valor del Gate.
+// aviso_2026_11_v2.txt es el contenido íntegro propuesto. El SHA-256 se verifica
+// en las pruebas y debe coincidir con el valor del Gate y de la autorización.
 //
 //go:embed aviso_2026_11_v2.txt
 var contenidoAviso string
 
 const (
-	// VersionAviso es el identificador contractual de la versión publicada.
+	// VersionAviso es el identificador contractual de la versión.
 	VersionAviso = "2026-11-v2"
 
 	// URLAnuncio es la URL pública del propio endpoint. No es una web separada:
 	// Android consume este JSON y muestra el aviso en su interfaz.
 	URLAnuncio = "https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current"
-
-	// EffectiveAtAviso es una constante fijada en el release que publica la
-	// versión. No se calcula con time.Now() por petición ni es retroactiva.
-	EffectiveAtAviso = "2026-11-18T00:00:00Z"
 
 	// TextoResumen es el resumen legible que acompaña al contenido íntegro.
 	TextoResumen = "Nexum trata tu nombre, correo y contraseña (hash Argon2id) para autenticarte; " +
@@ -33,6 +30,16 @@ const (
 		"conservación y versiones, está en el campo content y en la URL de este endpoint."
 )
 
+// ErrFechaEfectivaNoAprobada indica que aún no existe una fecha de publicación
+// aprobada. No se inventa ni se calcula con time.Now(): el endpoint queda
+// bloqueado hasta que el responsable fije la fecha real.
+var ErrFechaEfectivaNoAprobada = errors.New("fecha efectiva del aviso no aprobada")
+
+// effectiveAtAviso se fija, en el PR de aprobación del contenido, a la fecha UTC
+// de la primera publicación real. Vacío significa "no aprobada" y el handler
+// responde 503; no se publica una fecha de ejemplo.
+var effectiveAtAviso string
+
 // Notice es el aviso vigente servido por la API.
 type Notice struct {
 	Version            string
@@ -43,14 +50,15 @@ type Notice struct {
 	RequiresAcceptance bool
 }
 
-// AvisoVigente devuelve una copia del aviso publicado. Es determinista y no
-// consulta servicios externos ni datos de usuario.
-func AvisoVigente() Notice {
-	effectiveAt, err := time.Parse(time.RFC3339, EffectiveAtAviso)
+// AvisoVigente devuelve el aviso sólo si existe una fecha efectiva aprobada.
+// No consulta servicios externos ni datos de usuario.
+func AvisoVigente() (Notice, error) {
+	if effectiveAtAviso == "" {
+		return Notice{}, ErrFechaEfectivaNoAprobada
+	}
+	effectiveAt, err := time.Parse(time.RFC3339, effectiveAtAviso)
 	if err != nil {
-		// La constante es interna y está cubierta por pruebas; si se corrompe,
-		// se devuelve la fecha cero y la prueba de contrato falla cerrada.
-		effectiveAt = time.Time{}
+		return Notice{}, ErrFechaEfectivaNoAprobada
 	}
 	return Notice{
 		Version:            VersionAviso,
@@ -59,8 +67,14 @@ func AvisoVigente() Notice {
 		URL:                URLAnuncio,
 		Content:            contenidoAviso,
 		RequiresAcceptance: true,
-	}
+	}, nil
 }
+
+// Proveedor implementa el puerto que consume el handler HTTP.
+type Proveedor struct{}
+
+// Current devuelve el aviso vigente o el error de bloqueo.
+func (Proveedor) Current() (Notice, error) { return AvisoVigente() }
 
 // Contenido expone el texto íntegro para pruebas de hash.
 func Contenido() string { return contenidoAviso }

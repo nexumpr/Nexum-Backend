@@ -2,13 +2,35 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	appPrivacy "github.com/nexumpr/Nexum-Backend/internal/application/privacy"
 )
 
+type proveedorAvisoFalso struct {
+	aviso appPrivacy.Notice
+	err   error
+}
+
+func (p proveedorAvisoFalso) Current() (appPrivacy.Notice, error) { return p.aviso, p.err }
+
+func avisoValido() appPrivacy.Notice {
+	return appPrivacy.Notice{
+		Version:            "2026-11-v2",
+		EffectiveAt:        time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC),
+		Text:               "resumen",
+		URL:                "https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current",
+		Content:            "contenido",
+		RequiresAcceptance: true,
+	}
+}
+
 func TestPrivacyNoticeHandlerPublico200(t *testing.T) {
-	handler := NewPrivacyNoticeHandler(nil)
+	handler := NewPrivacyNoticeHandler(proveedorAvisoFalso{aviso: avisoValido()}, nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/privacy/notices/current", nil))
 
@@ -37,10 +59,27 @@ func TestPrivacyNoticeHandlerPublico200(t *testing.T) {
 	}
 }
 
-func TestPrivacyNoticeHandlerSinAuth(t *testing.T) {
-	handler := NewPrivacyNoticeHandler(nil)
+func TestPrivacyNoticeHandlerSinFechaFallaCerrado(t *testing.T) {
+	handler := NewPrivacyNoticeHandler(appPrivacy.Proveedor{}, nil)
 	rec := httptest.NewRecorder()
-	// Sin cabecera Authorization: la ruta es pública y debe servir igual.
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/privacy/notices/current", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("sin fecha aprobada debe responder 503, obtuvo %d", rec.Code)
+	}
+}
+
+func TestPrivacyNoticeHandlerErrorProveedor(t *testing.T) {
+	handler := NewPrivacyNoticeHandler(proveedorAvisoFalso{err: errors.New("fallo")}, nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/privacy/notices/current", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("un error no clasificado debe ser 500, obtuvo %d", rec.Code)
+	}
+}
+
+func TestPrivacyNoticeHandlerSinAuth(t *testing.T) {
+	handler := NewPrivacyNoticeHandler(proveedorAvisoFalso{aviso: avisoValido()}, nil)
+	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/privacy/notices/current", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("la ruta publica no debe exigir JWT, obtuvo %d", rec.Code)

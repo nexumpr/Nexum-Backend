@@ -3,6 +3,7 @@ package privacy
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -20,8 +21,25 @@ func TestAvisoContenidoSHA(t *testing.T) {
 	}
 }
 
-func TestAvisoVigenteContrato(t *testing.T) {
-	aviso := AvisoVigente()
+func TestAvisoVigenteSinFechaFallaCerrado(t *testing.T) {
+	anterior := effectiveAtAviso
+	effectiveAtAviso = ""
+	t.Cleanup(func() { effectiveAtAviso = anterior })
+
+	if _, err := AvisoVigente(); !errors.Is(err, ErrFechaEfectivaNoAprobada) {
+		t.Fatalf("sin fecha aprobada debe fallar cerrado, obtuvo %v", err)
+	}
+}
+
+func TestAvisoVigenteConFechaAprobada(t *testing.T) {
+	anterior := effectiveAtAviso
+	effectiveAtAviso = "2026-11-20T00:00:00Z"
+	t.Cleanup(func() { effectiveAtAviso = anterior })
+
+	aviso, err := AvisoVigente()
+	if err != nil {
+		t.Fatalf("con fecha aprobada no debe fallar: %v", err)
+	}
 	if aviso.Version != "2026-11-v2" {
 		t.Fatalf("version inesperada: %s", aviso.Version)
 	}

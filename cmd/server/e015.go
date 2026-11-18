@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	appPrivacy "github.com/nexumpr/Nexum-Backend/internal/application/privacy"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 )
 
@@ -22,5 +23,5 @@ func montarE015(d *dependenciasOleada) {
 	if d == nil || d.Router == nil {
 		return
 	}
-	d.Router.HandleFunc(http.MethodGet, "/privacy/notices/current", nexumhttp.NewPrivacyNoticeHandler(d.Logger).ServeHTTP)
+	d.Router.HandleFunc(http.MethodGet, "/privacy/notices/current", nexumhttp.NewPrivacyNoticeHandler(appPrivacy.Proveedor{}, d.Logger).ServeHTTP)
 }
