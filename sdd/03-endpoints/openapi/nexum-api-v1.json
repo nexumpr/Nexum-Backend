@@ -16247,8 +16247,13 @@
             "example": "monthly",
             "enum": [
               "weekly",
-              "biweekly",
+              "fortnightly",
               "monthly",
+              "bimonthly",
+              "quarterly",
+              "semiannual",
+              "annual",
+              "biweekly",
               "yearly"
             ]
           },
@@ -16285,8 +16290,13 @@
             "example": "monthly",
             "enum": [
               "weekly",
-              "biweekly",
+              "fortnightly",
               "monthly",
+              "bimonthly",
+              "quarterly",
+              "semiannual",
+              "annual",
+              "biweekly",
               "yearly"
             ]
           },
@@ -16326,8 +16336,13 @@
             "example": "monthly",
             "enum": [
               "weekly",
-              "biweekly",
+              "fortnightly",
               "monthly",
+              "bimonthly",
+              "quarterly",
+              "semiannual",
+              "annual",
+              "biweekly",
               "yearly"
             ]
           }
