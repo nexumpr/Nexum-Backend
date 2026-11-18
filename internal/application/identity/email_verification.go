@@ -40,6 +40,11 @@ var (
 // EmailVerificationTokenTTL es la vigencia del token de un solo uso (30 minutos).
 const EmailVerificationTokenTTL = 30 * time.Minute
 
+// EmailVerificationSendTimeout acota la llamada sincrona a SES. Sin este limite, una
+// latencia excepcional del proveedor puede superar el idle timeout del balanceador y
+// devolver un 502 ajeno al contrato; con el, el fallo se traduce a 503.
+const EmailVerificationSendTimeout = 8 * time.Second
+
 // EmailVerificationProfile es el perfil minimo necesario para E010 y E011.
 //
 // Version/HasVersion son el CAS del perfil que usa la confirmacion (E011); la solicitud
@@ -85,13 +90,14 @@ type EmailVerificationMailer interface {
 // mensaje. Si SES falla se responde 503; el token persistido caduca por TTL y no verifica
 // nada por si mismo.
 type EmailVerificationRequestService struct {
-	store     EmailVerificationStore
-	correo    EmailVerificationMailer
-	limitador ports.Limitador
-	reloj     func() time.Time
-	ttl       time.Duration
-	logger    *slog.Logger
-	generador func(n int) ([]byte, error)
+	store        EmailVerificationStore
+	correo       EmailVerificationMailer
+	limitador    ports.Limitador
+	reloj        func() time.Time
+	ttl          time.Duration
+	timeoutEnvio time.Duration
+	logger       *slog.Logger
+	generador    func(n int) ([]byte, error)
 }
 
 // NewEmailVerificationRequestService construye el servicio. Cualquier dependencia nil deja
@@ -103,12 +109,13 @@ func NewEmailVerificationRequestService(
 	logger *slog.Logger,
 ) *EmailVerificationRequestService {
 	return &EmailVerificationRequestService{
-		store:     store,
-		correo:    correo,
-		limitador: limitador,
-		reloj:     func() time.Time { return time.Now().UTC() },
-		ttl:       EmailVerificationTokenTTL,
-		logger:    logger,
+		store:        store,
+		correo:       correo,
+		limitador:    limitador,
+		reloj:        func() time.Time { return time.Now().UTC() },
+		ttl:          EmailVerificationTokenTTL,
+		timeoutEnvio: EmailVerificationSendTimeout,
+		logger:       logger,
 		generador: func(n int) ([]byte, error) {
 			b := make([]byte, n)
 			_, err := rand.Read(b)
@@ -121,6 +128,15 @@ func NewEmailVerificationRequestService(
 func (s *EmailVerificationRequestService) WithClock(now func() time.Time) *EmailVerificationRequestService {
 	if now != nil {
 		s.reloj = now
+	}
+	return s
+}
+
+// WithSendTimeout permite acortar el limite de la llamada a SES en pruebas. Un valor
+// no positivo conserva el limite por defecto.
+func (s *EmailVerificationRequestService) WithSendTimeout(d time.Duration) *EmailVerificationRequestService {
+	if s != nil && d > 0 {
+		s.timeoutEnvio = d
 	}
 	return s
 }
@@ -195,7 +211,13 @@ func (s *EmailVerificationRequestService) Solicitar(ctx context.Context, userID 
 		return ErrEmailVerificationNoDisponible
 	}
 
-	if _, err := s.correo.EnviarVerificacion(ctx, destino, token, ahora.Add(s.ttl)); err != nil {
+	limite := s.timeoutEnvio
+	if limite <= 0 {
+		limite = EmailVerificationSendTimeout
+	}
+	envioCtx, cancelarEnvio := context.WithTimeout(ctx, limite)
+	defer cancelarEnvio()
+	if _, err := s.correo.EnviarVerificacion(envioCtx, destino, token, ahora.Add(s.ttl)); err != nil {
 		// El item persistido caduca por TTL y no verifica nada: no se responde 202 sin envio.
 		if s.logger != nil {
 			s.logger.ErrorContext(ctx, "verificacion de correo: fallo de envio",
