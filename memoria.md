@@ -1909,3 +1909,70 @@ La regla `terraform *` -> `deny` y `terraform apply*` -> `deny` bloqueaban tambi
 - **Pruebas locales:** `go build ./...` PASS; `go test ./cmd/server/... ./internal/transport/http/... ./internal/infrastructure/cache/...` PASS. `go vet` y CI pendientes de la ejecución del PR.
 - **E015:** el aviso se sirve desde la API, sin dependencia de `nexumpr/nexum-privacidad` ni web adicional. Desarrollo autorizado; merge y declaración funcional bloqueados hasta aprobación del contenido y del canal de contacto/effectiveAt.
 - **Siguiente:** PR del andamiaje, CI y Gate de merge por SHA40; en paralelo, worktrees y código real de las líneas A/B/C. Sin mutaciones AWS.
+
+### H08-E / Oleada 1 — CIERRE, MERGES Y RELEASE AWS (2026-11-18)
+
+#### Merges y `main` definitivo
+
+- **Andamiaje #82 MERGED:** `9d4468979a4cf86ef36a95f1c270fbc5c20208a1`.
+- **Quince endpoints MERGED (un PR por endpoint):**
+
+| PR | Endpoint | Merge commit |
+|---|---|---|
+| #83 | E012 | `4ac5baf8ad44c0b5e9287755d16d3f97c7d15592` |
+| #90 | E013 | `ae789cf10605238fa9392c659e6d1d301a244ff2` |
+| #91 | E015 | `1ea1232bb26a6bc447bef78db13ee90abe6b4056` |
+| #92 | E016 | `68566867d087b49b7559b6548280fbeb210d3142` |
+| #97 | E017 | `d3a9cf2e67b296e108a45383780cd477e5b0f7d9` |
+| #93 | E018 | `4c113eb7b8153aaaae0172cb9e899bb3937d2cbd` |
+| #96 | E019 | `c1b8c1051ba49082dff42022813f177544d2655c` |
+| #84 | E022 | `25bffb40cc942a84dd99033313b2929df7af1676` |
+| #86 | E023 | `7572f8c612cb63928dc3794f5c7d92ce8ecbd42f` |
+| #94 | E024 | `d06574b513c24d4c44994ba5f5659e29f92c89e2` |
+| #95 | E025 | `e3bdb2dfabc8110221d4a093bdd936ca6605fd49` |
+| #85 | E068 | `1e0c73c7db3e15baeba4565930488933a0a341da` |
+| #87 | E069 | `7ad1f4a9d6a286b8c3f05885d9a6fa9a35a09822` |
+| #88 | E070 | `e36c2872b6d84c4d27f69adcdd261a298d1c696a` |
+| #89 | E071 | `05f239dcc902eeaade4cf9766c28252040b06810` |
+
+- **`main` final:** `7ad1f4a9d6a286b8c3f05885d9a6fa9a35a09822`. CI Go Backend run **`44376582955` SUCCESS** (12 jobs; `Validacion Terraform e IaC` `skipped` por perfil `go` de RFC-008 al no cambiar `infra/`; `validate`/`plan` se ejecutaron localmente) y SDD run **`44376586446` SUCCESS**.
+- **Protección de `main`:** se guardó la configuración, se relajó temporalmente solo `required_status_checks.strict=false` con `APRUEBO_RELAJAR_STRICT_TEMPORAL_OLEADA_1`, y se **restauró `strict=true`** al terminar. Verificado por API: 13 checks, `allow_force_pushes=false`, `allow_deletions=false`. No se usó `--admin`.
+- **Conflicto resuelto sin force push:** #90 y #87 se actualizaron fusionando `main` en su rama; sus HEAD cambiaron y se renovaron los Gates por SHA. Se corrigió el flake `TestKeyringRSA` de E002 con una firma alterada determinista.
+- **E015:** contenido aprobado `2026-11-v2`, **6761 bytes**, SHA-256 `68f1052a4bcab70a6d8803552dccc67d8b5a23c5b383b5480a83f31e408505c9`; `E015_EFFECTIVE_AT` se lee del bundle RFC-004; sin la variable el endpoint responde 503 (fail-closed).
+
+#### Release `v0.16.0+7ad1f4a9d6a2` (Gates humanos concedidos)
+
+- **Gates:** `APRUEBO_PUBLICACION_S3_OLEADA_1_V0.16.0`, `APRUEBO_BUNDLE_RFC004_E015_EFFECTIVE_AT_2026_11_18T00_00_00Z`, `APRUEBO_APPLY_LT_IAM_OLEADA1_SHA256_101952B2…4444`, `APRUEBO_ASG_OLEADA1_V0.16.0_MAX3_AZ_2A`, `APRUEBO_PRUEBAS_HTTPS_OLEADA1_DATOS_SINTETICOS`.
+- **Artefacto canónico:** binario ARM64 **20 867 819 B**, SHA-256 `c4c4906856d675827d8bac3043f1da3c7ebc2737f15e011044c074c7f4074e54`; unidad `nexum-backend.service` 1 357 B, SHA-256 `6fa4d5fb051914102b1bc3b6cd2814e881bf02bb26df1d938f4f0d46e15705cc`; SBOM 88 952 B, SHA-256 `5a4ba5536d3c2ca460b111ceff52c842435edd7ad2d24c7143eca4acb7e7ada6`.
+- **Publicación S3:** prefijo `releases/v0.16.0+7ad1f4a9d6a2/` creado con `If-None-Match: *`, SSE `AES256` y checksum SHA-256. Binario `VersionId 4S0E8RMJgXURqgq.DXx3crGlLcpKsBWl`, ETag `9f4f4b87b74759652e7dc3d2b8f226da`; unidad `VersionId T2wDZ6y1OLTpInxOabV7ehqJV9tWeqfh`, ETag `40f331d10b7f4c338948d79d14f02d44`. Tamaños y MD5 locales coinciden; releases previos intactos.
+- **Bundle RFC-004:** versión anterior `jy7ZFSjyIo6l358NOlehigibwz9PZIZI` (ETag `f0b1743ae2eb8401c5cdfffd741bbaf5`); nueva versión **`8AbmzGNdInsGL0JGuRhk6ThHwmjY9fO4`** (ETag `7fe5119d4e0478234fc32c6372f44f70`), **2 960 B**, SHA-256 `e3fdcfd65085cf5f746943efaf4ea76b3fe2e8049405778571647ba6e99c76af`, 13 variables, única adición `E015_EFFECTIVE_AT=2026-11-18T00:00:00Z`; escritura condicional `If-Match`, SSE `AES256`, resto de valores idéntico.
+- **Plan Terraform:** `oleada1-lt-iam.tfplan`, 169 134 B, SHA-256 `101952B217CA2D6356C46DBC418D2D213083AD56EDE69D758018EED4931F4444`; **0 add / 4 change / 0 destroy**; `user_data` con `BINARIO_URI`, digest y unidad de v0.16.0; IAM con **22 ARN** exactos (20 previos + 2 nuevos); sin cambios en DynamoDB, Redis, VPC, SG, secretos, ALB ni CloudFront.
+- **Apply:** se aplicó el plan exacto (hash verificado antes de ejecutar): **0 added, 4 changed, 0 destroyed**. Launch Template **v11**; política `nexum-h08i-runtime-approved-data-access` con 22 ARN; invariantes de cómputo e IAM revalidadas.
+- **Instance refresh:** `d10c17c6-9bf0-4c67-9fde-9d089b146c52`, Rolling, `MinHealthyPercentage=100`, `MaxHealthyPercentage=150`, `InstanceWarmup=120` → **Successful 100 %**. Capacidad transitoria Max 3 y ASG restringido a `us-east-2a` durante el reemplazo (evidencia previa de falta de capacidad `t4g.micro` en `us-east-2b`), restaurados al final.
+- **Flota final:** `i-08ad70b58ea95f710` e `i-0a64bde8714463fb2`, ambas **LT v11**, `InService`/`Healthy` en `us-east-2a`; ASG **2/2/2** con las dos subredes originales; **2 targets healthy**. Sin refresh activo. No se declara redundancia multi-AZ efectiva mientras ambas estén en 2a.
+
+#### Verificación HTTPS real (CloudFront)
+
+- **E015:** `200`, seis campos, `version=2026-11-v2`, `effectiveAt=2026-11-18T00:00:00Z`, `content` 6761 B con SHA-256 aprobado, `url` del API y `requiresAcceptance=true`. Sin 503.
+- **Públicos:** E022 `200` (7 categorías), E023 `200` (7 frecuencias canónicas), E070 `200` (10 FAQ), E071 `200` (8 tips).
+- **Quince endpoints nuevos:** suite real **29/29 PASS** sobre una cuenta sintética existente creada el 2026-11-17, lo que acredita compatibilidad de datos previos y persistencia: E012 (perfil/version), E013 (`If-Match` `"vN"` 200, persistencia, 428 sin cabecera, 412 con versión obsoleta), E016/E017 (201 y lectura posterior), E018/E019 (persistencia), E024/E025 (200, `If-Match`, 428/412, rechazo de número flotante 400), E068/E069 (locale, 428/412), más E015/E022/E023/E070/E071. Los cambios de prueba se restauraron a sus valores originales.
+- **Regresión E001–E011:** **9 PASS + 2 PARTIAL** en esta release. PASS: E001 (201, replay 201, conflicto 409), E002 (200, `expiresIn=900`), E003 (200 rotación, access nuevo 200, replay 409, familia 401), E004 (204 sin cuerpo, refresh 401, access 401), E005 (202 `accepted`, worker `ENVIADO` con 0 reintentos), E007 (200, antigua 401, nueva 200), E008 (200, `current`), E009 (204, revocada 401, `revoked=true`), E010 (503/202). **PARTIAL:** E006 y E011 solo con token inválido en v0.16.0; sus flujos positivos constan verificados en la release E007-E011 (`v0.15.0+8f13c86d2ca0`: E006 restablecimiento 200 y replay 409; E011 confirmación 200 con `emailVerified=true` persistido), no en esta release.
+- **Hallazgo `D-OLEADA1-01` (E010) — CERRADO COMO TRANSITORIO NO REPRODUCIBLE:** la corrida de regresión registró un **502 generado por ALB/CloudFront** (`Server: awselb/2.0`, HTML, `X-Cache: Error from cloudfront`), no por la aplicación. La repetición controlada dio: destinatario **no verificado** en SES sandbox → **503 `DEPENDENCY_UNAVAILABLE` en 0,21 s** (contractual); destinatario **verificado** → **202 en 0,30 s**. El 502 no volvió a reproducirse. Causa inferida: el handler de E010 llama a SES de forma síncrona sin deadline explícito; una latencia excepcional del proveedor puede superar el idle timeout del ALB y producir un 502 ajeno a la app. No se creó hotfix especulativo en esa corrida; el riesgo residual se atendió con el **PR #100** (`fix/h08e-e010-ses-timeout`): deadline explícito de **8 s** en la llamada a SES, cancelación por contexto y pruebas de timeout/cancelación. **PR #100 MERGED** en `main` `615ac1c734f2af430447184446065e93790bc4fb` (12 checks PASS + 1 skip IaC) y **desplegado** en `v0.16.1+615ac1c734f2` (LT v12, refresh Successful, ASG 2/2/2).
+- **Cuenta existente del responsable:** prueba real ejecutada por el responsable con `Read-Host -AsSecureString`, sin archivos ni persistencia de la contraseña: **7/7 PASS** — E002 login 200, E012 perfil 200, E016 consentimientos 200, E018 onboarding 200, E024 ingreso 200, E068 preferencias 200 y consistencia de identidad 200; sin 5xx inesperados. Solo lectura: no se modificaron perfil, ingreso, preferencias, contraseña, correo, consentimientos ni sesiones. No se registran correo ni datos financieros en esta memoria.
+
+### Cierre de PR, hotfix y regresión final (2026-11-18)
+
+- **PR #100 MERGED:** `615ac1c734f2af430447184446065e93790bc4fb` (hotfix E010, deadline 8 s). **PR #98 CLOSED sin merge**: era el ensayo de integración; los 15 endpoints se fusionaron individualmente y su evidencia queda referenciada, sin incorporar commits apilados por segunda vez.
+- **PR #99:** este checkpoint; se actualizó con la prueba 7/7 de la cuenta existente, el merge de #100, el cierre de #98 y el estado real de E006/E011. Requiere Gate documental por su HEAD final.
+- **Release del hotfix DESPLEGADA:** **`v0.16.1+615ac1c734f2`**. Binario ARM64 **20 868 907 B**, SHA-256 `d86d1a1de234a42be46c0e3be20ae834c776132fb74c0468e0c5cdd172f6449d`; unidad `6fa4d5fb…05cc`; SBOM `ea40e0dc…1dd4`. S3 con `If-None-Match: *`, SSE `AES256` y checksums coincidentes (binario `VersionId cKzByxeJQmoOT.PLvHcS.BB31aEzGPjX`; unidad `C0k_ThQKA2CW20suRkZy1s0UulFKIis3`). Plan `e010-hotfix-lt-iam.tfplan` SHA-256 `B2A69209E52671D264656D5D682936B111A6F717F33BD37BAB85F385A067C401`, **0 add / 4 change / 0 destroy**; apply real **0 added, 4 changed, 0 destroyed**; **Launch Template v12**; IAM **24 ARN** (v0.16.0 conservado para rollback). Instance refresh `1a888ac0-3b9b-4b1f-9a64-f6b30ad24e41` **Successful 100 %**; instancias finales `i-0d2d27a4e52a4ce40` e `i-0e6a60fcf2749e710`, ambas **LT v12**, `InService/Healthy` en `us-east-2a`; ASG **2/2/2**, ambas subredes, **2 targets healthy**, sin refresh pendiente. Health `/api/v1/health/live` **200** y E015 **200**.
+- **Verificación post-hotfix:** E010 no verificado **503 `DEPENDENCY_UNAVAILABLE` en 0,21 s** con JSON contractual; E010 verificado **202 en 0,25 s**; sin 502 en los escenarios probados. Un 503 adicional con identidad verificada se explicó como rechazo temporal de SES por envíos seguidos (sandbox 1/s) y se recuperó a 202; no fue el deadline de 8 s. Quince endpoints de Oleada 1: **29/29 PASS** post-hotfix. Regresión crítica: E002 200, E003 rotación/replay/familia, E004 204/401, E008 200, E009 204/401/revoked, E005 202 con worker `ENVIADO`, E012 200; E011 token inválido 400. **E006/E011 positivos: PARTIAL en esta release**; evidencia positiva histórica de `v0.15.0+8f13c86d2ca0`.
+- **Dos instancias:** ambas en **LT v12** y sanas; la atribución por petición a una EC2 concreta no se demuestra (CloudFront/ALB no la exponen). El binario idéntico se acredita por el `user_data` del LT v12, el digest verificado y el bootstrap fail-closed.
+
+#### Riesgos y pendientes
+
+- `D-OLEADA1-01` **cerrado**: 502 de ALB una vez, no reproducible; hotfix #100 fusionado y **desplegado** en `v0.16.1+615ac1c734f2` con deadline de 8 s, cancelación y pruebas. Post-hotfix: 503/202 contractuales y sin 502 en los escenarios probados.
+- Ambas EC2 en `us-east-2a`; no se declara multi-AZ efectiva. Capacidad `t4g.micro` en 2b no verificada.
+- SES sandbox verificado: `SendingEnabled=true`, `ProductionAccessEnabled=false`, `EnforcementStatus=HEALTHY`, cuota 200/24 h a 1/s (9 enviados en 24 h). No se promete entrega a destinatarios no verificados; PITR no visible/no afirmado, `AWS_COST_REAL` no verificado, CD OIDC no disponible por SCP, RFC-006/007 sin cambios.
+- **E014** (`DELETE /api/v1/users/me`, 202 + `DeletionReceipt`) sigue **no implementado**; se prioriza para un Gate posterior. No confundir con E004.
+- **Oleada 2:** `NOT_AUTHORIZED`; no se inicia sin Gate propio.
+- **PR #99:** este mismo documento; el HEAD final incorpora el merge de `main` `615ac1c7`, la prueba 7/7 de la cuenta existente, la release `v0.16.1`, el cierre de #98 y el estado real de E006/E011. Requiere el Gate documental por su HEAD final, que se cita en el reporte de cierre.
