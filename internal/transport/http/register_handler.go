@@ -155,6 +155,10 @@ func (h *RegisterHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Location", result.Location)
 	}
 	w.WriteHeader(result.Status)
+	// El cuerpo es JSON serializado por json.Marshal (escapa HTML) y se sirve con
+	// Content-Type application/json; no es HTML reflejado. G705 es un falso positivo
+	// de análisis de taint sobre la respuesta de replay de E001.
+	// #nosec G705 -- JSON del servidor, no HTML construido con entrada de usuario.
 	_, _ = w.Write(result.Body)
 }
 
