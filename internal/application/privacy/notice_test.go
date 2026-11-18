@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const shaAvisoAprobado = "ddfb0b1865e0e77a47f74c025e36bdbc102c6d424fc137c703f4316d69b66380"
+const shaAvisoAprobado = "68f1052a4bcab70a6d8803552dccc67d8b5a23c5b383b5480a83f31e408505c9"
 
 func TestAvisoContenidoSHA(t *testing.T) {
 	suma := sha256.Sum256([]byte(Contenido()))

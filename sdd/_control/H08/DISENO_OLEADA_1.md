@@ -249,8 +249,8 @@ func AvisoVigente() Notice
 ```
 
 - Archivo embebido: `internal/application/privacy/aviso_2026_11_v2.txt` con `//go:embed`.
-  Contenido exacto: **6724 bytes UTF-8**, salto de línea final, SHA-256
-  `ddfb0b1865e0e77a47f74c025e36bdbc102c6d424fc137c703f4316d69b66380`.
+  Contenido exacto: **6761 bytes UTF-8**, salto de línea final, SHA-256
+  `68f1052a4bcab70a6d8803552dccc67d8b5a23c5b383b5480a83f31e408505c9`.
 - `Version = "2026-11-v2"`; `URL = "https://nexumpr.github.io/nexum-privacidad/"`;
   `RequiresAcceptance = true`.
 - `EffectiveAt = "2026-11-20T00:00:00Z"` es una **constante inmutable por versión**, no se calcula
