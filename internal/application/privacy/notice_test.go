@@ -6,9 +6,10 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
-const shaAvisoAprobado = "29b27611c6127e85ec3aca7601e38dec1fc188f305ffee6109d71e9cf1218a06"
+const shaAvisoAprobado = "ddfb0b1865e0e77a47f74c025e36bdbc102c6d424fc137c703f4316d69b66380"
 
 func TestAvisoContenidoSHA(t *testing.T) {
 	suma := sha256.Sum256([]byte(Contenido()))
@@ -16,8 +17,17 @@ func TestAvisoContenidoSHA(t *testing.T) {
 	if obtenido != shaAvisoAprobado {
 		t.Fatalf("SHA-256 del aviso no coincide: %s", obtenido)
 	}
-	if len([]byte(Contenido())) != 6158 {
+	if len([]byte(Contenido())) != 6724 {
 		t.Fatalf("bytes del aviso inesperados: %d", len([]byte(Contenido())))
+	}
+}
+
+func TestFechaEfectivaPorDefecto(t *testing.T) {
+	if effectiveAtAviso != "2026-11-20T00:00:00Z" {
+		t.Fatalf("fecha efectiva por defecto inesperada: %q", effectiveAtAviso)
+	}
+	if _, err := time.Parse(time.RFC3339, effectiveAtAviso); err != nil {
+		t.Fatalf("la fecha efectiva debe ser RFC3339: %v", err)
 	}
 }
 
@@ -46,7 +56,7 @@ func TestAvisoVigenteConFechaAprobada(t *testing.T) {
 	if aviso.EffectiveAt.IsZero() {
 		t.Fatal("effectiveAt no puede ser cero")
 	}
-	if !strings.HasPrefix(aviso.URL, "https://") || !strings.Contains(aviso.URL, "/api/v1/privacy/notices/current") {
+	if !strings.HasPrefix(aviso.URL, "https://") || !strings.Contains(aviso.URL, "nexum-privacidad") {
 		t.Fatalf("url inesperada: %s", aviso.URL)
 	}
 	if !aviso.RequiresAcceptance {
@@ -55,7 +65,7 @@ func TestAvisoVigenteConFechaAprobada(t *testing.T) {
 	if strings.TrimSpace(aviso.Content) == "" || strings.Contains(aviso.Content, "example.invalid") {
 		t.Fatal("el contenido no puede estar vacío ni usar example.invalid")
 	}
-	if len([]byte(aviso.Content)) != 6158 {
+	if len([]byte(aviso.Content)) != 6724 {
 		t.Fatalf("bytes del contenido inesperados: %d", len([]byte(aviso.Content)))
 	}
 }

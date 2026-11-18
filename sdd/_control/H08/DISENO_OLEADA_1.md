@@ -249,23 +249,25 @@ func AvisoVigente() Notice
 ```
 
 - Archivo embebido: `internal/application/privacy/aviso_2026_11_v2.txt` con `//go:embed`.
-  Contenido exacto: **6158 bytes UTF-8**, salto de línea final, SHA-256
-  `29b27611c6127e85ec3aca7601e38dec1fc188f305ffee6109d71e9cf1218a06`.
-- `Version = "2026-11-v2"`; `URL = "https://d2lpmqy5w6x9es.cloudfront.net/api/v1/privacy/notices/current"`;
+  Contenido exacto: **6724 bytes UTF-8**, salto de línea final, SHA-256
+  `ddfb0b1865e0e77a47f74c025e36bdbc102c6d424fc137c703f4316d69b66380`.
+- `Version = "2026-11-v2"`; `URL = "https://nexumpr.github.io/nexum-privacidad/"`;
   `RequiresAcceptance = true`.
-- `EffectiveAt` es una **constante** fijada en el release que publica la versión (UTC, no
-  retroactiva); nunca se calcula con `time.Now()` por petición. Un test verifica que no es cero.
+- `EffectiveAt = "2026-11-20T00:00:00Z"` es una **constante inmutable por versión**, no se calcula
+  con `time.Now()` por petición ni se retrotrae. Un test verifica el valor exacto y que sea RFC3339;
+  el Gate de release lo valida antes de promover.
 - `Text` es el resumen aprobado en el Gate; `Content` es el archivo embebido.
 - **Obligatoriedad exacta:** `version`, `effectiveAt`, `text` y `url` son requeridos y se serializan
   sin `omitempty`. `content` y `requiresAcceptance` son opcionales en OpenAPI; esta versión emite
   ambos siempre y el DTO no usa `omitempty` en ninguno, para no perder valores falsos o vacíos.
 - Prueba obligatoria `TestE015ContenidoSHA`: recalcula el SHA del archivo y falla si no coincide
-  con el valor aprobado. Prueba de contrato: 200 con los seis campos, sin 503.
-- **No hay dependencia de `nexumpr/nexum-privacidad`**, no se crea web ni landing y no se modifica
-  ningún repositorio ajeno.
-- **PENDIENTE_DECISION_HUMANA:** canal de contacto de privacidad efectivo. El texto no promete un
-  medio específico; E015 no se declara funcional hasta que el responsable publique/confirme el canal
-  y apruebe el contenido con la frase de D-E015.
+  con el valor aprobado. Prueba de contrato: 200 con los seis campos.
+- **La página pública pertenece a otro integrante**: se usa como `url` para Google Play, pero el
+  `content` contractual es el recurso embebido del backend. No hay petición de red a GitHub Pages
+  por petición ni dependencia de disponibilidad. Si la página cita infraestructura obsoleta, se
+  registra la discrepancia y se coordina, sin modificarla.
+- **Datos del responsable autorizados:** Leonardo Isaac Barrera Tejeda, domicilio y correo de
+  privacidad `nexumproyectomov@gmail.com`.
 - La **adopción del texto** exige la frase separada de D-E015; sin ella el PR de E015 no se fusiona.
   El desarrollo (handler, DTO, pruebas) no se bloquea.
 
