@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
 	dynamoAdapter "github.com/nexumpr/Nexum-Backend/internal/adapters/dynamo"
 	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
@@ -166,6 +167,17 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	montarE008(router, clienteDynamo, cfgDeps.TablaDynamoDB, logger)
 	// E007: montaje de la oleada E007-E011 (RFC-019).
 	montarE007(router, clienteDynamo, clienteRedis, cfgDeps.TablaDynamoDB, logger)
+
+	// H08-E / Oleada 1 (RFC-019 E-1): registro determinista de E012..E071.
+	// Sin endpoints registrados no añade ninguna ruta. El andamiaje es válido con
+	// cero endpoints y no contiene handlers ficticios.
+	montarOleada1(&dependenciasOleada{
+		Router: router,
+		Dynamo: clienteDynamo,
+		Redis:  clienteRedis,
+		Tabla:  cfgDeps.TablaDynamoDB,
+		Logger: logger,
+	})
 
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 

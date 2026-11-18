@@ -1899,3 +1899,13 @@ La regla `terraform *` -> `deny` y `terraform apply*` -> `deny` bloqueaban tambi
 - **Aceptacion Android**: no confirmada por el equipo movil. `ANDROID_READY` se declara tecnicamente (endpoints publicados y funcionales), no como aceptacion.
 - Versionar la politica de permisos de Terraform mediante RFC/PR propio.
 - E012 y siguientes: `NOT_AUTHORIZED`.
+
+### H08-E / Oleada 1 — Gate aprobado, PR #81 fusionado y andamiaje (2026-11-18)
+
+- **Aprobaciones humanas recibidas:** `APRUEBO_GATE_OLEADA_1_RFC019_E012_E013_E015_E016_E017_E018_E019_E022_E023_E024_E025_E068_E069_E070_E071` y `APRUEBO_MERGE_PR_81_SHA_c5370b180f410375ddd23a24174e6402563d88ee`. La aprobación del **contenido** E015 sigue pendiente; el texto propuesto es `2026-11-v2`, 6158 bytes, SHA-256 `29b27611c6127e85ec3aca7601e38dec1fc188f305ffee6109d71e9cf1218a06`, y no se adopta sin frase separada.
+- **PR #81 MERGED:** merge commit y `main` `d062fb7c24cb06d8f9141b870e9d0fcb0e20bc2b`. CI del PR 13/13; CI de `main` en curso al registrar esta línea.
+- **Alcance Oleada 1:** E012, E013, E015, E016, E017, E018, E019, E022, E023, E024, E025, E068, E069, E070, E071; RFC-019 E-1/E-2 y RFC-020 v1.1.0 (9 valores publicados, 7 canónicos emitidos, alias normalizados).
+- **Andamiaje:** rama `chore/h08e-oleada1-scaffold`; `cmd/server/registro_oleada1.go` con lista cerrada de 15 IDs, detección de ID y método+ruta duplicados, montaje ordenado y válido con cero endpoints; helpers `If-Match`/ETag, locale e IANA en `internal/transport/http/identity_support.go`; caché pública fail-open en `internal/infrastructure/cache/public_cache.go`; `time/tzdata` embebido y llamada única en `main.go`. Sin handlers ficticios.
+- **Pruebas locales:** `go build ./...` PASS; `go test ./cmd/server/... ./internal/transport/http/... ./internal/infrastructure/cache/...` PASS. `go vet` y CI pendientes de la ejecución del PR.
+- **E015:** el aviso se sirve desde la API, sin dependencia de `nexumpr/nexum-privacidad` ni web adicional. Desarrollo autorizado; merge y declaración funcional bloqueados hasta aprobación del contenido y del canal de contacto/effectiveAt.
+- **Siguiente:** PR del andamiaje, CI y Gate de merge por SHA40; en paralelo, worktrees y código real de las líneas A/B/C. Sin mutaciones AWS.
