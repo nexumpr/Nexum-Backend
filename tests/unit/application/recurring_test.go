@@ -12,7 +12,9 @@ import (
 	"time"
 
 	appRecurring "github.com/nexumpr/Nexum-Backend/internal/application/recurring"
+	domainDynamo "github.com/nexumpr/Nexum-Backend/internal/domain/dynamo"
 	domainIdentity "github.com/nexumpr/Nexum-Backend/internal/domain/identity"
+	httputil "github.com/nexumpr/Nexum-Backend/pkg/httputil"
 )
 
 // Pruebas de aplicación de E033 (`POST /api/v1/recurring-payments`): aceptación de los nueve
@@ -90,11 +92,14 @@ func (s *e033Store) List(_ context.Context, userID, startSK string, limit int, f
 	}
 	sort.Strings(claves)
 
+	// El cursor del contrato transporta la SK completa (`RECURRING#<id>`), igual que el
+	// adaptador real.
+	desde := strings.TrimPrefix(startSK, domainDynamo.PrefixRecurring)
 	salida := make([]appRecurring.Payment, 0, limit)
 	nextSK := ""
 	for _, clave := range claves {
 		pago := s.recursos[clave]
-		if startSK != "" && pago.ID <= startSK {
+		if desde != "" && pago.ID <= desde {
 			continue
 		}
 		if filter.Active != nil && pago.Active != *filter.Active {
@@ -104,7 +109,7 @@ func (s *e033Store) List(_ context.Context, userID, startSK string, limit int, f
 			continue
 		}
 		if len(salida) == limit {
-			nextSK = salida[len(salida)-1].ID
+			nextSK = domainDynamo.PrefixRecurring + salida[len(salida)-1].ID
 			break
 		}
 		salida = append(salida, pago)
@@ -633,6 +638,176 @@ func TestE034DetallePropiedadYErrores(t *testing.T) {
 		t.Fatalf("con fallo de persistencia se esperaba ErrUnavailable, obtenido %v", err)
 	}
 	if _, err := appRecurring.NewService(nil, nil).Get(context.Background(), e033Usuario, creado.ID); !errors.Is(err, appRecurring.ErrUnavailable) {
+		t.Fatalf("sin almacen se esperaba ErrUnavailable, obtenido %v", err)
+	}
+}
+
+// TestE032ListadoPaginadoYFiltros cubre E032 en la capa de aplicación: dos páginas sin
+// duplicados, filtros de servidor y límite por defecto.
+func TestE032ListadoPaginadoYFiltros(t *testing.T) {
+	store := newE033Store()
+	servicio := e033Servicio(store)
+
+	ids := make([]string, 0, 3)
+	for indice := 0; indice < 3; indice++ {
+		comando := e033Comando()
+		comando.IdempotencyKey = fmt.Sprintf("clave-listado-e032-%04d", indice)
+		comando.Name = fmt.Sprintf("Regla %d", indice)
+		if indice == 2 {
+			comando.Type = "income"
+		}
+		creado, err := servicio.Create(context.Background(), comando)
+		if err != nil {
+			t.Fatalf("alta %d: %v", indice, err)
+		}
+		ids = append(ids, creado.ID)
+	}
+
+	primera, err := servicio.List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario, Limit: 2})
+	if err != nil {
+		t.Fatalf("pagina 1: %v", err)
+	}
+	if len(primera.Items) != 2 || primera.NextCursor == "" {
+		t.Fatalf("se esperaban 2 elementos y cursor: %d / %q", len(primera.Items), primera.NextCursor)
+	}
+	if len(primera.NextCursor) < appRecurring.CursorMinLength {
+		t.Fatalf("el cursor debe respetar la longitud publicada: %q", primera.NextCursor)
+	}
+
+	segunda, err := servicio.List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario, Limit: 2, Cursor: primera.NextCursor})
+	if err != nil {
+		t.Fatalf("pagina 2: %v", err)
+	}
+	if len(segunda.Items) != 1 || segunda.NextCursor != "" {
+		t.Fatalf("la pagina 2 debe agotar la lista: %d / %q", len(segunda.Items), segunda.NextCursor)
+	}
+	vistos := map[string]bool{}
+	for _, pago := range append(append([]appRecurring.Payment{}, primera.Items...), segunda.Items...) {
+		if vistos[pago.ID] {
+			t.Fatalf("elemento duplicado entre paginas: %s", pago.ID)
+		}
+		vistos[pago.ID] = true
+	}
+	if len(vistos) != 3 {
+		t.Fatalf("se esperaban 3 reglas, obtenidas %d", len(vistos))
+	}
+
+	ingresos, err := servicio.List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario, Limit: 25, Type: "income"})
+	if err != nil {
+		t.Fatalf("filtro por tipo: %v", err)
+	}
+	if len(ingresos.Items) != 1 || ingresos.Items[0].Type != "income" {
+		t.Fatalf("el filtro por tipo debe aplicarse: %+v", ingresos.Items)
+	}
+
+	activos := true
+	soloActivos, err := servicio.List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario, Limit: 25, Active: &activos})
+	if err != nil {
+		t.Fatalf("filtro por estado: %v", err)
+	}
+	if len(soloActivos.Items) != 3 {
+		t.Fatalf("las tres reglas nacen activas, obtenido %d", len(soloActivos.Items))
+	}
+	inactivos := false
+	vacio, err := servicio.List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario, Limit: 25, Active: &inactivos})
+	if err != nil {
+		t.Fatalf("filtro por inactivas: %v", err)
+	}
+	if len(vacio.Items) != 0 {
+		t.Fatalf("no hay reglas inactivas, obtenido %d", len(vacio.Items))
+	}
+}
+
+// TestE032CursorLigadoAFiltrosYUsuario cubre T07 de E032: el cursor firmado no se puede
+// reutilizar con otros filtros, con otro usuario ni manipulado.
+func TestE032CursorLigadoAFiltrosYUsuario(t *testing.T) {
+	store := newE033Store()
+	servicio := e033Servicio(store)
+	for indice := 0; indice < 3; indice++ {
+		comando := e033Comando()
+		comando.IdempotencyKey = fmt.Sprintf("clave-cursor-e032-%04d", indice)
+		if _, err := servicio.Create(context.Background(), comando); err != nil {
+			t.Fatalf("alta %d: %v", indice, err)
+		}
+	}
+	primera, err := servicio.List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario, Limit: 2})
+	if err != nil || primera.NextCursor == "" {
+		t.Fatalf("cursor de referencia: %v / %q", err, primera.NextCursor)
+	}
+	cursor := primera.NextCursor
+
+	casos := []struct {
+		nombre string
+		query  appRecurring.ListQuery
+	}{
+		{"otro limite", appRecurring.ListQuery{UserID: e033Usuario, Limit: 25, Cursor: cursor}},
+		{"otro tipo", appRecurring.ListQuery{UserID: e033Usuario, Limit: 2, Type: "income", Cursor: cursor}},
+		{"otro usuario", appRecurring.ListQuery{UserID: e033Otro, Limit: 2, Cursor: cursor}},
+		{"manipulado", appRecurring.ListQuery{UserID: e033Usuario, Limit: 2, Cursor: cursor[:len(cursor)-2] + "AA"}},
+		{"basura", appRecurring.ListQuery{UserID: e033Usuario, Limit: 2, Cursor: "no-es-un-cursor"}},
+	}
+	for _, caso := range casos {
+		t.Run(caso.nombre, func(t *testing.T) {
+			if _, err := servicio.List(context.Background(), caso.query); !errors.Is(err, appRecurring.ErrInvalidRequest) {
+				t.Fatalf("se esperaba ErrInvalidRequest, obtenido %v", err)
+			}
+		})
+	}
+
+	// El mismo cursor, con los mismos filtros, sigue siendo valido.
+	if _, err := servicio.List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario, Limit: 2, Cursor: cursor}); err != nil {
+		t.Fatalf("el cursor original debe seguir sirviendo: %v", err)
+	}
+}
+
+// TestE032CursorVencidoYLimiteInvalido cubre la expiración y el rango de `limit`.
+func TestE032CursorVencidoYLimiteInvalido(t *testing.T) {
+	store := newE033Store()
+	base := e033Servicio(store)
+	if _, err := base.Create(context.Background(), e033Comando()); err != nil {
+		t.Fatalf("alta: %v", err)
+	}
+	otro := e033Comando()
+	otro.IdempotencyKey = "clave-vencida-e032-0001"
+	if _, err := base.Create(context.Background(), otro); err != nil {
+		t.Fatalf("alta 2: %v", err)
+	}
+
+	// La vigencia del cursor la decide `httputil` con el reloj de pared, no el reloj inyectado:
+	// se fabrica un cursor firmado con la MISMA clave y el MISMO `SortBy`, vencido en el pasado.
+	secreto := []byte("clave-de-cursor-de-prueba-e033")
+	vencido, errCursor := httputil.GenerateCursor(secreto, e033Usuario,
+		"recurring:v1:limit=1:active=all:type=all", "RECURRING#018f90ef-08e5-7a68-b09f-2b67a400000001",
+		time.Now().UTC().Add(-2*time.Hour), -time.Minute)
+	if errCursor != nil {
+		t.Fatalf("no se pudo fabricar el cursor vencido: %v", errCursor)
+	}
+	if _, err := httputil.ValidateCursor(secreto, vencido, e033Usuario); err == nil {
+		t.Fatal("el helper debe rechazar un cursor vencido")
+	}
+	servicio := appRecurring.NewService(store, secreto)
+	if _, err := servicio.List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario, Limit: 1, Cursor: vencido}); !errors.Is(err, appRecurring.ErrInvalidRequest) {
+		t.Fatalf("un cursor vencido debe ser 400, obtenido %v", err)
+	}
+
+	for _, limite := range []int{-1, 101} {
+		if _, err := servicio.List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario, Limit: limite}); !errors.Is(err, appRecurring.ErrInvalidRequest) {
+			t.Fatalf("limit %d debe rechazarse, obtenido %v", limite, err)
+		}
+	}
+	if _, err := servicio.List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario}); err != nil {
+		t.Fatalf("sin limit se aplica el valor por defecto: %v", err)
+	}
+}
+
+// TestE032FallaCerradoSinClaveDeCursor: sin clave de firma no se pagina.
+func TestE032FallaCerradoSinClaveDeCursor(t *testing.T) {
+	store := newE033Store()
+	sinClave := appRecurring.NewService(store, nil)
+	if _, err := sinClave.List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario, Limit: 25}); !errors.Is(err, appRecurring.ErrUnavailable) {
+		t.Fatalf("sin clave de cursor se esperaba ErrUnavailable, obtenido %v", err)
+	}
+	if _, err := appRecurring.NewService(nil, []byte("clave")).List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario}); !errors.Is(err, appRecurring.ErrUnavailable) {
 		t.Fatalf("sin almacen se esperaba ErrUnavailable, obtenido %v", err)
 	}
 }
