@@ -66,7 +66,7 @@ resource "terraform_data" "invariantes_computo" {
 
 resource "aws_launch_template" "backend" {
   name_prefix   = "${local.nombre}-lt-"
-  image_id      = data.aws_ssm_parameter.ami_arm64.value
+  image_id      = var.ami_id != "" ? var.ami_id : data.aws_ssm_parameter.ami_arm64.value
   instance_type = var.instance_type
 
   # Sin clave SSH: el acceso es exclusivamente por SSM en ventana.

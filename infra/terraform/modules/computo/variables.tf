@@ -185,3 +185,17 @@ variable "secretos_s3_uri" {
     error_message = "secretos_s3_uri debe ser una URI s3:// de un objeto."
   }
 }
+
+// AMI fijada por el operador. Vacio = se resuelve el parametro publico de SSM (comportamiento
+// historico). Se usa para que una release de aplicacion no cambie la AMI como efecto colateral
+// de que SSM apunte a una version mas reciente: la AMI es una decision de infraestructura.
+variable "ami_id" {
+  description = "AMI ARM64 explicita. Vacio = resolver desde ami_ssm_parameter."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.ami_id == "" || can(regex("^ami-[0-9a-f]{8,17}$", var.ami_id))
+    error_message = "ami_id debe estar vacio o ser un identificador ami- valido."
+  }
+}

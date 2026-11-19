@@ -173,6 +173,16 @@ resource "aws_elasticache_user" "default_deshabilitado" {
     },
     var.etiquetas
   )
+
+  # Deriva de representacion del proveedor AWS: la API devuelve `no-password` aunque la
+  # configuracion declarada es `no-password-required`. El control real de seguridad de este
+  # usuario es `access_string = "off ~* -@all"` (sin acceso), no el modo de autenticacion.
+  # Sin este ignore_changes, cada plan de aplicacion propondria un update de Redis ajeno a
+  # la release. Si en el futuro se cambiara el modo de autenticacion, debe hacerse con un
+  # cambio explicito de `access_string`/usuario y su propio Gate.
+  lifecycle {
+    ignore_changes = [authentication_mode]
+  }
 }
 
 resource "aws_elasticache_user_group" "aplicacion" {
