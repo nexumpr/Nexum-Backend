@@ -14,6 +14,7 @@ import (
 	appRecurring "github.com/nexumpr/Nexum-Backend/internal/application/recurring"
 	domainDynamo "github.com/nexumpr/Nexum-Backend/internal/domain/dynamo"
 	domainIdentity "github.com/nexumpr/Nexum-Backend/internal/domain/identity"
+	domainRecurring "github.com/nexumpr/Nexum-Backend/internal/domain/recurring"
 	httputil "github.com/nexumpr/Nexum-Backend/pkg/httputil"
 )
 
@@ -811,6 +812,178 @@ func TestE032FallaCerradoSinClaveDeCursor(t *testing.T) {
 		t.Fatalf("sin clave de cursor se esperaba ErrUnavailable, obtenido %v", err)
 	}
 	if _, err := appRecurring.NewService(nil, []byte("clave")).List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario}); !errors.Is(err, appRecurring.ErrUnavailable) {
+		t.Fatalf("sin almacen se esperaba ErrUnavailable, obtenido %v", err)
+	}
+}
+
+// TestE035Modificacion cubre E035 en la capa de aplicación: modificación con versión nueva,
+// no-op sin escritura, `type` inmutable, validaciones de negocio y conflictos de versión.
+func TestE035Modificacion(t *testing.T) {
+	store := newE033Store()
+	servicio := e033Servicio(store)
+	creado, err := servicio.Create(context.Background(), e033Comando())
+	if err != nil {
+		t.Fatalf("alta: %v", err)
+	}
+
+	nombre := "Renta ajustada"
+	actualizado, err := servicio.Update(context.Background(), appRecurring.PatchCommand{
+		UserID:          e033Usuario,
+		PaymentID:       creado.ID,
+		ExpectedVersion: 1,
+		Name:            &nombre,
+	})
+	if err != nil {
+		t.Fatalf("modificacion: %v", err)
+	}
+	if actualizado.Name != nombre || actualizado.Version != 2 {
+		t.Fatalf("actualizacion inesperada: %+v", actualizado)
+	}
+
+	// Mismo `type`: no-op, sin escritura ni incremento de version.
+	tipo := "expense"
+	sinCambio, err := servicio.Update(context.Background(), appRecurring.PatchCommand{
+		UserID:          e033Usuario,
+		PaymentID:       creado.ID,
+		ExpectedVersion: 2,
+		Type:            &tipo,
+	})
+	if err != nil {
+		t.Fatalf("type identico: %v", err)
+	}
+	if sinCambio.Version != 2 {
+		t.Fatalf("un no-op no incrementa la version: %d", sinCambio.Version)
+	}
+
+	// Cuerpo vacio: no-op.
+	vacio, err := servicio.Update(context.Background(), appRecurring.PatchCommand{
+		UserID:          e033Usuario,
+		PaymentID:       creado.ID,
+		ExpectedVersion: 2,
+	})
+	if err != nil {
+		t.Fatalf("patch vacio: %v", err)
+	}
+	if vacio.Version != 2 {
+		t.Fatalf("un patch vacio no incrementa la version: %d", vacio.Version)
+	}
+
+	// Fecha nueva en la cadencia: se aplica y sube la version.
+	proximo := "2026-12-05"
+	conFecha, err := servicio.Update(context.Background(), appRecurring.PatchCommand{
+		UserID:          e033Usuario,
+		PaymentID:       creado.ID,
+		ExpectedVersion: 2,
+		NextDueDate:     &proximo,
+	})
+	if err != nil {
+		t.Fatalf("nueva fecha: %v", err)
+	}
+	if conFecha.Version != 3 || domainRecurring.FormatDate(conFecha.NextDueDate) != proximo {
+		t.Fatalf("fecha inesperada: %+v", conFecha)
+	}
+
+	// Version obsoleta: 412 sin escribir.
+	if _, err := servicio.Update(context.Background(), appRecurring.PatchCommand{
+		UserID:          e033Usuario,
+		PaymentID:       creado.ID,
+		ExpectedVersion: 1,
+		Name:            &nombre,
+	}); !errors.Is(err, appRecurring.ErrVersionConflict) {
+		t.Fatalf("se esperaba conflicto de version, obtenido %v", err)
+	}
+
+	// Reglas de negocio.
+	otroTipo := "income"
+	if _, err := servicio.Update(context.Background(), appRecurring.PatchCommand{
+		UserID: e033Usuario, PaymentID: creado.ID, ExpectedVersion: 3, Type: &otroTipo,
+	}); err == nil {
+		t.Fatal("cambiar type debe rechazarse")
+	} else {
+		var violacion *appRecurring.Violation
+		if !errors.As(err, &violacion) || violacion.Field != "type" {
+			t.Fatalf("se esperaba violacion de type, obtenido %v", err)
+		}
+	}
+	cero := int64(0)
+	if _, err := servicio.Update(context.Background(), appRecurring.PatchCommand{
+		UserID: e033Usuario, PaymentID: creado.ID, ExpectedVersion: 3, AmountCents: &cero,
+	}); err == nil {
+		t.Fatal("un importe cero debe rechazarse")
+	}
+	fueraDeCadencia := "2026-12-09"
+	if _, err := servicio.Update(context.Background(), appRecurring.PatchCommand{
+		UserID: e033Usuario, PaymentID: creado.ID, ExpectedVersion: 3, NextDueDate: &fueraDeCadencia,
+	}); err == nil {
+		t.Fatal("una fecha fuera de la cadencia debe rechazarse")
+	}
+
+	// Propiedad y existencia.
+	if _, err := servicio.Update(context.Background(), appRecurring.PatchCommand{
+		UserID: e033Otro, PaymentID: creado.ID, ExpectedVersion: 3, Name: &nombre,
+	}); !errors.Is(err, appRecurring.ErrNotFound) {
+		t.Fatalf("el recurso ajeno debe ser ErrNotFound, obtenido %v", err)
+	}
+	if _, err := servicio.Update(context.Background(), appRecurring.PatchCommand{
+		UserID: e033Usuario, PaymentID: "018f90ef-08e5-7a68-b09f-2b67a4ffffffffff", ExpectedVersion: 1,
+	}); !errors.Is(err, appRecurring.ErrNotFound) {
+		t.Fatalf("el recurso inexistente debe ser ErrNotFound, obtenido %v", err)
+	}
+	if _, err := appRecurring.NewService(nil, nil).Update(context.Background(), appRecurring.PatchCommand{
+		UserID: e033Usuario, PaymentID: creado.ID, ExpectedVersion: 1,
+	}); !errors.Is(err, appRecurring.ErrUnavailable) {
+		t.Fatalf("sin almacen se esperaba ErrUnavailable, obtenido %v", err)
+	}
+}
+
+// TestE036Baja cubre E036 en la capa de aplicación: baja idempotente sin borrar, propiedad y
+// composición fail-closed.
+func TestE036Baja(t *testing.T) {
+	store := newE033Store()
+	servicio := e033Servicio(store)
+	creado, err := servicio.Create(context.Background(), e033Comando())
+	if err != nil {
+		t.Fatalf("alta: %v", err)
+	}
+
+	if err := servicio.Deactivate(context.Background(), e033Usuario, creado.ID); err != nil {
+		t.Fatalf("baja: %v", err)
+	}
+	pago, err := servicio.Get(context.Background(), e033Usuario, creado.ID)
+	if err != nil || pago == nil {
+		t.Fatalf("lectura posterior: %+v %v", pago, err)
+	}
+	if pago.Active || pago.Version != 2 {
+		t.Fatalf("la regla debe quedar inactiva en version 2: %+v", pago)
+	}
+
+	// Segunda baja: idempotente y sin incrementar version.
+	if err := servicio.Deactivate(context.Background(), e033Usuario, creado.ID); err != nil {
+		t.Fatalf("segunda baja: %v", err)
+	}
+	pago, _ = servicio.Get(context.Background(), e033Usuario, creado.ID)
+	if pago.Version != 2 {
+		t.Fatalf("una baja repetida no incrementa version: %d", pago.Version)
+	}
+
+	if err := servicio.Deactivate(context.Background(), e033Otro, creado.ID); !errors.Is(err, appRecurring.ErrNotFound) {
+		t.Fatalf("el recurso ajeno debe ser ErrNotFound, obtenido %v", err)
+	}
+	if err := servicio.Deactivate(context.Background(), e033Usuario, "018f90ef-08e5-7a68-b09f-2b67a4ffffffffff"); !errors.Is(err, appRecurring.ErrNotFound) {
+		t.Fatalf("el recurso inexistente debe ser ErrNotFound, obtenido %v", err)
+	}
+	if err := servicio.Deactivate(context.Background(), e033Usuario, " "); !errors.Is(err, appRecurring.ErrInvalidRequest) {
+		t.Fatalf("sin identificador se esperaba ErrInvalidRequest, obtenido %v", err)
+	}
+	if err := servicio.Deactivate(context.Background(), " ", creado.ID); !errors.Is(err, appRecurring.ErrUnauthorized) {
+		t.Fatalf("sin identidad se esperaba ErrUnauthorized, obtenido %v", err)
+	}
+
+	store.fallo = errors.New("dynamodb no disponible")
+	if err := servicio.Deactivate(context.Background(), e033Usuario, creado.ID); !errors.Is(err, appRecurring.ErrUnavailable) {
+		t.Fatalf("con fallo de persistencia se esperaba ErrUnavailable, obtenido %v", err)
+	}
+	if err := appRecurring.NewService(nil, nil).Deactivate(context.Background(), e033Usuario, creado.ID); !errors.Is(err, appRecurring.ErrUnavailable) {
 		t.Fatalf("sin almacen se esperaba ErrUnavailable, obtenido %v", err)
 	}
 }

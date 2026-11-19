@@ -403,7 +403,14 @@ func (s *Service) Update(ctx context.Context, command PatchCommand) (*Payment, e
 	}
 
 	// La frecuencia no cambia en E035, así que la coherencia se revalida contra la vigente.
+	//
+	// Atribución del error: si el cliente movió `nextDueDate` y NO tocó `dueDay`, el día fijo
+	// vigente deja de coincidir con la fecha nueva. El campo accionable es la fecha enviada, no
+	// un `dueDay` que el cliente no cambió, así que la violación se reporta sobre `nextDueDate`.
 	if errDueDay := domainRecurring.ValidateDueDay(propuesto.DueDay, actual.Frequency, propuesto.NextDueDate); errDueDay != nil {
+		if !command.DueDay.Present && command.NextDueDate != nil && errors.Is(errDueDay, domainRecurring.ErrIncoherentSchedule) {
+			return nil, newViolation("nextDueDate", "incoherent_schedule")
+		}
 		return nil, dueDayViolation(errDueDay)
 	}
 	if errCalendario := domainRecurring.ValidateSchedule(propuesto.StartDate, propuesto.NextDueDate, actual.Frequency); errCalendario != nil {
