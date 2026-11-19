@@ -46,6 +46,8 @@ type memoriaMetas struct {
 	forzarCancelacionIdem bool
 	consultas             int
 	ultimaQuery           *dynamodb.QueryInput
+	updates               int
+	ultimoUpdate          *dynamodb.UpdateItemInput
 	lecturaConsistente    bool
 }
 
@@ -160,6 +162,70 @@ func textoDe(valor types.AttributeValue) string {
 		return texto.Value
 	}
 	return ""
+}
+
+// UpdateItem implementa la gramática que emite E041: condiciones conjuntivas con una disyunción
+// entre paréntesis, `SET` de campos aliasados y `ADD #version :one`. Devuelve `Attributes` con
+// el item resultante cuando se pide `ALL_NEW`.
+func (m *memoriaMetas) UpdateItem(_ context.Context, params *dynamodb.UpdateItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.updates++
+	m.ultimoUpdate = params
+	if m.fallo != nil {
+		return nil, m.fallo
+	}
+
+	pk := mapaString(params.Key, "PK")
+	sk := mapaString(params.Key, "SK")
+	clave := claveDe(pk, sk)
+	existente := m.items[clave]
+
+	if condicion := aws.ToString(params.ConditionExpression); condicion != "" {
+		cumple, err := evaluarCondicion(condicion, existente, params.ExpressionAttributeNames, params.ExpressionAttributeValues)
+		if err != nil {
+			return nil, err
+		}
+		if !cumple {
+			return nil, &types.ConditionalCheckFailedException{Message: aws.String("The conditional request failed")}
+		}
+	}
+
+	item := map[string]types.AttributeValue{"PK": strAttr(pk), "SK": strAttr(sk)}
+	if existente != nil {
+		item = copiarItem(existente)
+	}
+	set, add := partirExpresion(aws.ToString(params.UpdateExpression))
+	for _, asignacion := range set {
+		partes := strings.SplitN(asignacion, " = ", 2)
+		if len(partes) != 2 {
+			continue
+		}
+		item[resolverNombre(partes[0], params.ExpressionAttributeNames)] = params.ExpressionAttributeValues[partes[1]]
+	}
+	for _, incremento := range add {
+		partes := strings.SplitN(strings.TrimSpace(incremento), " ", 2)
+		if len(partes) != 2 {
+			continue
+		}
+		nombre := resolverNombre(partes[0], params.ExpressionAttributeNames)
+		delta, okDelta := params.ExpressionAttributeValues[strings.TrimSpace(partes[1])].(*types.AttributeValueMemberN)
+		if !okDelta {
+			continue
+		}
+		var base int64
+		if actual, okActual := item[nombre].(*types.AttributeValueMemberN); okActual {
+			base, _ = strconv.ParseInt(actual.Value, 10, 64)
+		}
+		salto, _ := strconv.ParseInt(delta.Value, 10, 64)
+		item[nombre] = numAttr(base + salto)
+	}
+	m.items[clave] = item
+
+	if params.ReturnValues == types.ReturnValueAllNew {
+		return &dynamodb.UpdateItemOutput{Attributes: copiarItem(item)}, nil
+	}
+	return &dynamodb.UpdateItemOutput{}, nil
 }
 
 func (m *memoriaMetas) TransactWriteItems(_ context.Context, params *dynamodb.TransactWriteItemsInput, _ ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {

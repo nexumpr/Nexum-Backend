@@ -107,6 +107,11 @@ func (s *e039HTTPStore) AggregateUserGoals(context.Context, string) (appGoals.To
 	return appGoals.Totals{}, nil
 }
 
+// UpdateGoal completa el puerto para E041; E039 no modifica metas.
+func (s *e039HTTPStore) UpdateGoal(context.Context, appGoals.UpdateWrite) (*domainGoal.Goal, error) {
+	return nil, appGoals.ErrUnavailable
+}
+
 func e039HTTPServicio(store appGoals.Store) *appGoals.Service {
 	return appGoals.NewService(store).
 		WithClock(func() time.Time { return e039HTTPAhora }).

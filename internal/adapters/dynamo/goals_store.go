@@ -22,6 +22,7 @@ import (
 type GoalsAPI interface {
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
+	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
 	TransactWriteItems(ctx context.Context, params *dynamodb.TransactWriteItemsInput, optFns ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error)
 }
 
@@ -638,4 +639,133 @@ func (s *GoalsStore) AggregateUserGoals(ctx context.Context, userID string) (app
 	}
 
 	return appGoals.Totals{ActiveCount: activas, Saved: suma}, nil
+}
+
+// updateAttempts acota el compare-and-swap de E041. Una versión obsoleta no se reintenta (412
+// inmediato); el reintento cubre sólo una condición que falla con la versión aún vigente.
+const updateAttempts = 3
+
+// UpdateGoal aplica un patch con compare-and-swap de versión (E041).
+//
+// Una única escritura condicional por intento:
+//
+//	SET #name/#targetAmountCents/#targetDate/#status/#updatedAt  ADD #version :one
+//	Condición: attribute_exists(PK) AND #version = :expected
+//	           [AND (attribute_not_exists(savedAmountCents) OR savedAmountCents <= :newTarget)]
+//	ReturnValues: ALL_NEW
+//
+// El patch se escribe campo a campo: los que no llegan no se tocan. `openingSaved` y
+// `savedAmount` nunca forman parte de la expresión. Si la condición falla, la relectura
+// consistente decide entre 412 (versión distinta), 422 (objetivo por debajo del ahorro) y un
+// reintento; agotados los intentos se devuelve 409 sin haber escrito nada parcialmente.
+func (s *GoalsStore) UpdateGoal(ctx context.Context, write appGoals.UpdateWrite) (*domainGoal.Goal, error) {
+	if s == nil || s.client == nil || s.table == "" {
+		return nil, appGoals.ErrUnavailable
+	}
+	if strings.TrimSpace(write.UserID) == "" || strings.TrimSpace(write.GoalID) == "" {
+		return nil, appGoals.ErrUnavailable
+	}
+	if write.ExpectedVersion < 1 {
+		return nil, appGoals.ErrInvalidRequest
+	}
+	if write.Patch.Empty() {
+		return nil, appGoals.ErrInvalidRequest
+	}
+
+	pk, sk := domainDynamo.GoalKeys(write.UserID, write.GoalID)
+	nowISO := write.Now.UTC().Format(time.RFC3339)
+
+	nombres := map[string]string{
+		"#updatedAt": "updatedAt",
+		"#version":   "version",
+	}
+
+	asignaciones := make([]string, 0, 5)
+	valores := map[string]types.AttributeValue{
+		":expected":  numberAttr(write.ExpectedVersion),
+		":one":       numberAttr(1),
+		":updatedAt": stringAttr(nowISO),
+	}
+
+	if write.Patch.Name != nil {
+		asignaciones = append(asignaciones, "#name = :name")
+		nombres["#name"] = "name"
+		valores[":name"] = stringAttr(*write.Patch.Name)
+	}
+	if write.Patch.TargetCents != nil {
+		asignaciones = append(asignaciones, "#targetAmountCents = :target")
+		nombres["#targetAmountCents"] = "targetAmountCents"
+		valores[":target"] = numberAttr(*write.Patch.TargetCents)
+	}
+	if write.Patch.TargetDate != nil {
+		asignaciones = append(asignaciones, "#targetDate = :targetDate")
+		nombres["#targetDate"] = "targetDate"
+		valores[":targetDate"] = stringAttr(write.Patch.TargetDate.UTC().Format(domainGoal.DateLayout))
+	}
+	if write.Patch.Status != nil {
+		asignaciones = append(asignaciones, "#status = :status")
+		nombres["#status"] = "status"
+		valores[":status"] = stringAttr(write.Patch.Status.String())
+	}
+	asignaciones = append(asignaciones, "#updatedAt = :updatedAt")
+
+	condicion := "attribute_exists(PK) AND #version = :expected"
+	if write.Patch.TargetCents != nil {
+		// Condición atómica: una aportación concurrente que eleve `savedAmount` por encima del
+		// nuevo objetivo hace fallar la escritura en lugar de dejar la meta inconsistente.
+		condicion += " AND (attribute_not_exists(savedAmountCents) OR savedAmountCents <= :newTarget)"
+		valores[":newTarget"] = numberAttr(*write.Patch.TargetCents)
+	}
+
+	entrada := &dynamodb.UpdateItemInput{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(pk),
+			"SK": stringAttr(sk),
+		},
+		UpdateExpression:          aws.String("SET " + strings.Join(asignaciones, ", ") + " ADD #version :one"),
+		ConditionExpression:       aws.String(condicion),
+		ExpressionAttributeNames:  nombres,
+		ExpressionAttributeValues: valores,
+		ReturnValues:              types.ReturnValueAllNew,
+	}
+
+	for intento := 0; intento < updateAttempts; intento++ {
+		salida, err := s.client.UpdateItem(ctx, entrada)
+		if err == nil {
+			if salida == nil {
+				return nil, appGoals.ErrUnavailable
+			}
+			actualizada, errMapeo := goalFromItem(salida.Attributes)
+			if errMapeo != nil || actualizada == nil {
+				return nil, appGoals.ErrInconsistent
+			}
+			return actualizada, nil
+		}
+		if !esFalloDeCondicionMeta(err) {
+			return nil, appGoals.ErrUnavailable
+		}
+
+		// La condición falló: la lectura consistente decide el desenlace.
+		actual, errLectura := s.LoadGoal(ctx, write.UserID, write.GoalID)
+		if errLectura != nil {
+			return nil, errLectura
+		}
+		if actual == nil {
+			return nil, appGoals.ErrNotFound
+		}
+		if actual.Version != write.ExpectedVersion {
+			return nil, appGoals.ErrVersionConflict
+		}
+		if write.Patch.TargetCents != nil && actual.SavedAmount.Amount() > *write.Patch.TargetCents {
+			return nil, appGoals.ErrTargetBelowSaved
+		}
+	}
+	return nil, appGoals.ErrConflict
+}
+
+// esFalloDeCondicionMeta indica si DynamoDB rechazó la escritura por una condición no cumplida.
+func esFalloDeCondicionMeta(err error) bool {
+	var condicional *types.ConditionalCheckFailedException
+	return errors.As(err, &condicional)
 }
