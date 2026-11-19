@@ -473,17 +473,17 @@ func (s *DeletionStore) repararCola(ctx context.Context, control *appAccount.Pur
 	if err == nil {
 		return true, nil
 	}
-	if isConditionalCancel(err) || isConditionalCheckFailed(err) {
+	if isConditionalCancel(err) || isDeletionConditionalFailure(err) {
 		return false, nil
 	}
 	return false, appAccount.ErrDeletionUnavailable
 }
 
-// isConditionalCheckFailed distingue el fallo de condición de una operación simple
+// isDeletionConditionalFailure distingue el fallo de condición de una operación simple
 // (`PutItem`/`DeleteItem`, que lanza ConditionalCheckFailedException) del fallo de una
 // transacción (TransactionCanceledException). Sin esta distinción, una condición esperada
 // se confundiría con una caída de DynamoDB.
-func isConditionalCheckFailed(err error) bool {
+func isDeletionConditionalFailure(err error) bool {
 	var condicional *types.ConditionalCheckFailedException
 	return errors.As(err, &condicional)
 }
