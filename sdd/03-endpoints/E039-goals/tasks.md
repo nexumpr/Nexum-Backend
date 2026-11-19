@@ -31,3 +31,18 @@
 - [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
 - [ ] Cubrir con prueba positiva y negativa.
 - [ ] Verificar por HTTP real tras el despliegue autorizado.
+
+## Oleada 2 (2026-11-19) — E039 `POST /api/v1/goals`
+
+| Campo | Valor |
+|---|---|
+| Estado | IMPLEMENTED=YES · MERGED=YES · PR_OPEN=NO · CI_GREEN=YES (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #112 · HEAD `cd94cbfa31b2308e21683fa47e734e30ddf0f68f` |
+| Claves DynamoDB | USER#<id>/GOAL#<id> + IDEM# |
+| Decisiones | openingSaved y savedAmount iniciales; 0 <= initialSavedAmount <= targetAmount; Idempotency-Key por usuario; transaccion meta+registro. |
+| Errores y causa raiz | Replay chocaba con la condicion de la meta y devolvia 500; se relee el registro antes de clasificar. |
+| Pruebas | `go build`, `go vet` y suites de aplicacion/adaptador/transporte en verde; donde Windows Application Control bloqueo el binario se declara NOT_RUN_LOCAL y la autoridad es el CI Linux. |
+| Contrato Android | Ruta y esquema segun `sdd/03-endpoints/openapi/nexum-api-v1.json`; errores con `ErrorEnvelope` y `traceId`. |
+| Pendiente | Publicacion AWS, verificacion HTTP real y aceptacion posterior. |
+
+> **Registro operativo vigente (Oleada 2):** el bloque anterior de esta seccion es la evidencia de la implementacion y el merge. Las casillas `[ ]` del plan historico H06 no se marcan retroactivamente sin evidencia de ejecucion.

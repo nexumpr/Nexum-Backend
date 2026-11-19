@@ -1976,3 +1976,166 @@ La regla `terraform *` -> `deny` y `terraform apply*` -> `deny` bloqueaban tambi
 - **E014** (`DELETE /api/v1/users/me`, 202 + `DeletionReceipt`) sigue **no implementado**; se prioriza para un Gate posterior. No confundir con E004.
 - **Oleada 2:** `NOT_AUTHORIZED`; no se inicia sin Gate propio.
 - **PR #99:** este mismo documento; el HEAD final incorpora el merge de `main` `615ac1c7`, la prueba 7/7 de la cuenta existente, la release `v0.16.1`, el cierre de #98 y el estado real de E006/E011. Requiere el Gate documental por su HEAD final, que se cita en el reporte de cierre.
+
+## Oleada 2 — registro por endpoint (2026-11-19)
+Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` APPROVED; RFC-019 E-3 y RFC-021 APPROVED. Estados: IMPLEMENTED / PR_OPEN / CI_GREEN / MERGED / AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED.
+
+### E028 — `POST /api/v1/movements`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #102, HEAD `089d7e7aac35908ac209bdc16488230ae61ac6d2`.
+- Claves: USER#<id>/MOVEMENT#<occurredAt>#<id> + MOVEMENTPTR#<id> + IDEM#
+- Decisiones: Idempotency-Key obligatoria con UserIdempotencyKeys (PK por usuario); transaccion unica recurso+puntero+registro; importes int64 centimos.
+- Errores y correccion: La carrera de idempotencia se resolvia por indice de CancellationReasons; ahora el registro de idempotencia es la autoridad (commit 089d7e7).
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E027 — `GET /api/v1/movements`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #103, HEAD `3947ad82ffffd78795419d6db1bcc384c3ab3b22`.
+- Claves: USER#<id> con begins_with(MOVEMENT#)
+- Decisiones: Cursor opaco firmado (httputil) ligado a filtros y usuario; limit 1..100; filtros type/from/to en servidor; sin Scan.
+- Errores y correccion: Ninguno propio; hereda la correccion de idempotencia de E028.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E029 — `GET /api/v1/movements/{movementId}`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #104, HEAD `1c410570d881a7de8fb3148b6ce0b0c3dccb8613`.
+- Claves: MOVEMENTPTR#<id> -> MOVEMENT#<occurredAt>#<id>
+- Decisiones: Resolucion O(1) por puntero; 404 homogeneo propio/ajeno; ETag de version.
+- Errores y correccion: Ninguno propio.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E030 — `PATCH /api/v1/movements/{movementId}`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #105, HEAD `d171f00c7721c05e1e5ade689788cc0ae77fffa5`.
+- Claves: MOVEMENTPTR# + MOVEMENT# (movimiento transaccional del SK al cambiar occurredAt)
+- Decisiones: If-Match obligatorio (428/412); CAS de version; si cambia occurredAt se mueve el item en una transaccion con condicion targetSK.
+- Errores y correccion: Version obsoleta devolvia 503: se mapea ConditionalCheckFailed y Next.Version!=expected a ErrConflict (412). G705 resuelto con httputil.WriteJSONBytes.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E031 — `DELETE /api/v1/movements/{movementId}`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #106, HEAD `14d11527750bd4459f193fffedda2e8f811e1c4d`.
+- Claves: MOVEMENTPTR# + MOVEMENT#
+- Decisiones: 204 sin cuerpo; 409 si el movimiento tiene aportacion confirmada; borrado transaccional con reintento si el item se movio.
+- Errores y correccion: Ninguno propio.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E033 — `POST /api/v1/recurring-payments`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #107, HEAD `ed70d395df456c5af40822b17e43423478d22364`.
+- Claves: USER#<id>/RECURRING#<id> + IDEM#
+- Decisiones: RFC-021: acepta 9 frecuencias, persiste y emite 7 canonicas (biweekly->fortnightly, yearly->annual); Idempotency-Key por usuario; no genera pagos (E037 fuera de alcance).
+- Errores y correccion: U1000 por helper de prueba sin uso, corregido en d6294b5.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E034 — `GET /api/v1/recurring-payments/{recurringPaymentId}`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #108, HEAD `2e29d4a125de0fb5e2f9fe4536e057c861e0b8d9`.
+- Claves: USER#<id>/RECURRING#<id>
+- Decisiones: ETag y 404 homogeneo; proyeccion determinista de items heredados de E001 (startDate desde createdAt, nextDueDate calculada; D-E032-01).
+- Errores y correccion: U1000 por helper de prueba, corregido en 89a9d81.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E032 — `GET /api/v1/recurring-payments`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #109, HEAD `b9efc0297b5b14dedadb06c34f7e7a9a1140e3a1`.
+- Claves: USER#<id> con begins_with(RECURRING#)
+- Decisiones: Cursor firmado ligado a filtros active/type y usuario; paginacion sin duplicados.
+- Errores y correccion: SA4010 por slice de ids no usado (se anadio asercion) y U1000 del helper attrB, corregidos en 701f230.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E035 — `PATCH /api/v1/recurring-payments/{recurringPaymentId}`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #110, HEAD `2c76fa80abcea43a4fe5e864a3ef7044b47a77f3`.
+- Claves: USER#<id>/RECURRING#<id>
+- Decisiones: If-Match 428/412; frequency no editable (campo desconocido 400); dueDay tri-estado; type inmutable 422; no-op sin subir version.
+- Errores y correccion: NextDueDate se atribuia a dueDay no enviado; corregido en el PR.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E036 — `DELETE /api/v1/recurring-payments/{recurringPaymentId}`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #111, HEAD `39d100782e4a42938a4622eec1be6616978339e4`.
+- Claves: USER#<id>/RECURRING#<id>
+- Decisiones: 204 idempotente (segundo DELETE no sube version); condicion que alcanza items heredados sin atributo active.
+- Errores y correccion: U1000/SA4010 heredados de la linea, corregidos en 004c69d.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E039 — `POST /api/v1/goals`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #112, HEAD `cd94cbfa31b2308e21683fa47e734e30ddf0f68f`.
+- Claves: USER#<id>/GOAL#<id> + IDEM#
+- Decisiones: openingSaved y savedAmount iniciales; 0 <= initialSavedAmount <= targetAmount; Idempotency-Key por usuario; transaccion meta+registro.
+- Errores y correccion: Replay chocaba con la condicion de la meta y devolvia 500; se relee el registro antes de clasificar.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E040 — `GET /api/v1/goals/{goalId}`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #113, HEAD `f28ecbe937e20a222747118535d86ae3320f12a7`.
+- Claves: USER#<id>/GOAL#<id>
+- Decisiones: GetItem consistente; 404 propio/ajeno; ETag de version.
+- Errores y correccion: Ninguno propio.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E038 — `GET /api/v1/goals`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #114, HEAD `c07703e3e5320ac05ae39f1230e446afa95a7d5e`.
+- Claves: USER#<id> con begins_with(GOAL#)
+- Decisiones: totals{activeCount,saved} sobre la coleccion completa (no la pagina); cursor firmado ligado a limit+status; topes que fallan cerrado.
+- Errores y correccion: Ninguno propio.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E041 — `PATCH /api/v1/goals/{goalId}`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #115, HEAD `9bf19c942478dbaa468591b0862ac782e9882a2f`.
+- Claves: USER#<id>/GOAL#<id>
+- Decisiones: If-Match 428/412; CAS de version; targetAmount no puede quedar por debajo de savedAmount; transiciones de estado validas.
+- Errores y correccion: U1000 por helper de prueba, corregido en 51bc79b.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E014 — `DELETE /api/v1/users/me`
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
+- PR #116, HEAD `1539de36395ddf7bc98a7b510a03ca402fcc9567`.
+- Claves: USER#<id>/DELETION#<requestId> + QUEUE#DELETION/<requestId> + EMAIL# + REFRESH#
+- Decisiones: Bloqueo y revocacion inmediata (status DELETION_PENDING + sessionEpoch+1); worker con lease Redis, fence en DynamoDB, fases COLLECT/EXTERNAL/PARTITION/VERIFY/TERMINAL; PURGED solo tras verificacion; 503 si el worker no esta activo.
+- Errores y correccion: G101 (constante con Password), G115 (int32 sin rango), G602 (indice de slice) y U1000; colision de isConditionalCheckFailed con recurrentes resuelta renombrando en E014.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### Aprendizajes reutilizables (Oleadas 3-5)
+
+- La idempotencia financiera debe aislarse por usuario en la PK y resolver la carrera leyendo el registro, nunca por el indice de `CancellationReasons`.
+- El puntero `MOVEMENTPTR#` permite `GetItem` O(1) y mover el SK de fecha en una transaccion condicionada.
+- `strict=true` implica que cada merge invalida los HEAD posteriores: planificar la ventana de merges o una excepcion temporal autorizada.
+- gosec G101 se dispara por nombres de constantes con "Password"; G115 exige acotar el rango antes de convertir a int32; G705 exige no escribir datos del usuario directamente en `ResponseWriter`.
+- Los binarios de prueba pueden estar bloqueados por Windows Application Control: el CI Linux es la autoridad y no se declara PASS local.
+- E014: sin worker activo el endpoint debe responder 503; `PURGED` solo tras verificacion y con fencing por `owner`+`fence`.
+
+## E015 — aviso de privacidad 2026-11-v3 (propuesta congelada, 2026-11-19)
+
+- Archivo propuesto: `internal/application/privacy/aviso_2026_11_v3.txt` (8 123 bytes).
+- SHA-256: `e925596adff1b3ebb9a17064d44f5f6b84bfbdfb874396cd51efc6c0ac3f8d83`.
+- Cambios frente a `2026-11-v2`: declara movimientos, pagos recurrentes y metas; describe la eliminación desde la app con bloqueo inmediato, revocación de sesiones y purga verificable; distingue vencimiento lógico de eliminación física asíncrona del proveedor y no promete plazo de TTL; mantiene presupuestos, aportaciones, exportación, notificaciones, análisis y voz como no disponibles.
+- Estado: DRAFT congelado. NO publicado, NO embebido; el hash productivo permanece intacto.
+- Gate requerido: `APRUEBO_AVISO_PRIVACIDAD_E015_2026_11_V3_SHA256_e925596adff1b3ebb9a17064d44f5f6b84bfbdfb874396cd51efc6c0ac3f8d83`.
+- E014 no se anuncia como funcionalmente aceptado hasta este Gate y hasta la verificación HTTP real.
+
+## Oleada 2 — merges ejecutados (2026-11-19)
+
+| E-ID | PR | HEAD autorizado | Merge commit |
+|---|---|---|---|
+| E028 | #102 | `089d7e7aac35908ac209bdc16488230ae61ac6d2` | `93f646d9e6c15811afc1e702486dbf4c33d887da` |
+| E027 | #103 | `3947ad82ffffd78795419d6db1bcc384c3ab3b22` | `aeba564c9d57e7be175a7ad0fa2187e7af4f69f2` |
+| E029 | #104 | `1c410570d881a7de8fb3148b6ce0b0c3dccb8613` | `840761b7994e9c3567b0b397aca8e5f2ac06985d` |
+| E030 | #105 | `d171f00c7721c05e1e5ade689788cc0ae77fffa5` | `fd4be7c042fd2ca69f6cfbb8bdf8b8f5700c7ac0` |
+| E031 | #106 | `14d11527750bd4459f193fffedda2e8f811e1c4d` | `93744653c6ce7a57ef3b8c237ef8fe423b170091` |
+| E033 | #107 | `ed70d395df456c5af40822b17e43423478d22364` | `03244b94dfaafedc88573ebae14bc2ed8d2be4be` |
+| E034 | #108 | `2e29d4a125de0fb5e2f9fe4536e057c861e0b8d9` | `1056bda35893a52a2c7bef757a505d0829459a0e` |
+| E032 | #109 | `b9efc0297b5b14dedadb06c34f7e7a9a1140e3a1` | `147ee9bd64bfb845a31230862647e234d1711f9e` |
+| E035 | #110 | `2c76fa80abcea43a4fe5e864a3ef7044b47a77f3` | `e4b75e6d116d69db7f8f0e546adaf790a40c64f9` |
+| E036 | #111 | `39d100782e4a42938a4622eec1be6616978339e4` | `35203a7e5f8aca437c51290227e12f880b915ee1` |
+| E039 | #112 | `cd94cbfa31b2308e21683fa47e734e30ddf0f68f` | `23ad38b63ed9966ce4fc360f53728450904b32ae` |
+| E040 | #113 | `f28ecbe937e20a222747118535d86ae3320f12a7` | `917a45d910803901f4907e727146ca8b0f41a6fe` |
+| E038 | #114 | `c07703e3e5320ac05ae39f1230e446afa95a7d5e` | `d5e339263b002342c587643286d9ad73aea42dc7` |
+| E041 | #115 | `9bf19c942478dbaa468591b0862ac782e9882a2f` | `ca1c8c6550c2fc56d484aedda909609ab85ece71` |
+| E014 | #116 | `1539de36395ddf7bc98a7b510a03ca402fcc9567` | `87aac167fe28b4bbdc04235bce05b85925244373` |
+
+`main` final: `87aac167fe28b4bbdc04235bce05b85925244373`. Protección restaurada: `strict=true`, 13 checks, sin force push ni borrado.

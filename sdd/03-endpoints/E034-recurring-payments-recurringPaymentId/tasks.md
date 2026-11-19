@@ -30,3 +30,18 @@
 - [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
 - [ ] Cubrir con prueba positiva y negativa.
 - [ ] Verificar por HTTP real tras el despliegue autorizado.
+
+## Oleada 2 (2026-11-19) — E034 `GET /api/v1/recurring-payments/{recurringPaymentId}`
+
+| Campo | Valor |
+|---|---|
+| Estado | IMPLEMENTED=YES · MERGED=YES · PR_OPEN=NO · CI_GREEN=YES (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #108 · HEAD `2e29d4a125de0fb5e2f9fe4536e057c861e0b8d9` |
+| Claves DynamoDB | USER#<id>/RECURRING#<id> |
+| Decisiones | ETag y 404 homogeneo; proyeccion determinista de items heredados de E001 (startDate desde createdAt, nextDueDate calculada; D-E032-01). |
+| Errores y causa raiz | U1000 por helper de prueba, corregido en 89a9d81. |
+| Pruebas | `go build`, `go vet` y suites de aplicacion/adaptador/transporte en verde; donde Windows Application Control bloqueo el binario se declara NOT_RUN_LOCAL y la autoridad es el CI Linux. |
+| Contrato Android | Ruta y esquema segun `sdd/03-endpoints/openapi/nexum-api-v1.json`; errores con `ErrorEnvelope` y `traceId`. |
+| Pendiente | Publicacion AWS, verificacion HTTP real y aceptacion posterior. |
+
+> **Registro operativo vigente (Oleada 2):** el bloque anterior de esta seccion es la evidencia de la implementacion y el merge. Las casillas `[ ]` del plan historico H06 no se marcan retroactivamente sin evidencia de ejecucion.
