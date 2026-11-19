@@ -2139,3 +2139,27 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 | E014 | #116 | `1539de36395ddf7bc98a7b510a03ca402fcc9567` | `87aac167fe28b4bbdc04235bce05b85925244373` |
 
 `main` final: `87aac167fe28b4bbdc04235bce05b85925244373`. Protección restaurada: `strict=true`, 13 checks, sin force push ni borrado.
+
+## Hotfix E014 — invalidacion de cache sin SCAN (2026-11-19)
+
+- **Defecto real en produccion:** el trabajo de purga llegaba a `phase=TERMINAL` y quedaba en `state=RETRY` con `attempts=3`. Causa: `UserCacheInvalidator.DeletePrefix` usa `SCAN`, comando denegado por el ACL Redis de A-080 (`-scan`). El error se trataba como fallo de dependencia y bloqueaba el cierre.
+- **Correccion:** en `pasoTerminal` se distingue la denegacion por ACL (`NOPERM`) de una indisponibilidad real. Con `NOPERM` se registra `cache_invalidation_denied` y se continua con la verificacion durable; con cualquier otro error se mantiene `RETRY`. No se habilita SCAN, no se modifica el ACL, IAM ni Terraform.
+- **Justificacion:** tras el tombstone (`DELETION_PENDING` + `sessionEpoch+1`) ninguna ruta autenticada puede servir datos del usuario (el middleware exige `PROFILE ACTIVE`); las entradas de cache son inalcanzables y su TTL esta acotado (30 s en agregados). El trabajo conserva la verificacion de particion, localizadores y cola antes de `PURGED`.
+- **Pruebas:** `TestE014InvalidacionDenegadaPorACLCompletaPurga` (NOPERM -> PURGED) y `TestE014InvalidacionTransitoriaNoProducePurged` (Redis caido -> RETRY, nunca PURGED), ademas de las 11 pruebas previas del worker.
+- **Estado:** corregido en rama `fix/h08e-e014-cache-invalidation`; merge, release y verificacion AWS pendientes de sus Gates.
+
+### Precision del hotfix E014 (revision de seguridad)
+
+- La excepcion ya **no** se decide con `strings.Contains`: el adaptador Redis emite el sentinel
+  tipado `ports.ErrCacheScanDenegado` **solo** cuando el `NOPERM` corresponde al comando `SCAN`
+  (se exige `NOPERM` y `'SCAN'` en el mensaje). Un `NOPERM` de `DEL`, `KEYS` u otra operacion, un
+  timeout, un error de conexion o un error desconocido conservan `RETRY`: nunca producen `PURGED`.
+- Cobertura: `TestEsScanDenegadoDistinguenComando` (adaptador), `TestE014InvalidacionDenegadaPorACLCompletaPurga`
+  (sentinel -> PURGED), `TestE014InvalidacionTransitoriaNoProducePurged` (Redis caido -> RETRY),
+  `TestE014DelDenegadoNoProducePurged` (NOPERM de DEL -> RETRY) y
+  `TestE014ScanDenegadoSinSentinelNoProducePurged` (cadena suelta -> RETRY).
+- Alcance de la garantia de cache: los datos de usuario cacheados son los agregados del tablero
+  (TTL 30 s). Los contadores de cuota guardan solo hashes HMAC con TTL propio y no contienen
+  datos financieros. Toda ruta autenticada exige `PROFILE ACTIVE` con lectura consistente, de
+  modo que una entrada residual no es servible. La verificacion durable de DynamoDB sigue siendo
+  obligatoria antes de `PURGED`.

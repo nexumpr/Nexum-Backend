@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/redis/go-redis/v9"
+
+	"github.com/nexumpr/Nexum-Backend/internal/ports"
 )
 
 // maxLotesInvalidacion acota el número de iteraciones de SCAN. Si se supera, se devuelve
@@ -57,6 +59,12 @@ func (i *UserCacheInvalidator) DeletePrefix(ctx context.Context, prefix string) 
 	for lote := 0; lote < maxLotesInvalidacion; lote++ {
 		claves, siguiente, err := i.client.Scan(ctx, cursor, patron, i.lote).Result()
 		if err != nil {
+			if esScanDenegado(err) {
+				// Única denegación tolerable: el ACL de A-080 prohíbe SCAN. Se propaga un
+				// sentinel tipado para que el worker distinga este caso de un DEL denegado,
+				// un timeout o una indisponibilidad, que deben reintentarse.
+				return fmt.Errorf("%w: %v", ports.ErrCacheScanDenegado, err)
+			}
 			return fmt.Errorf("scan de invalidacion: %w", err)
 		}
 		if len(claves) > 0 {
@@ -70,4 +78,15 @@ func (i *UserCacheInvalidator) DeletePrefix(ctx context.Context, prefix string) 
 		}
 	}
 	return fmt.Errorf("invalidacion excedio %d lotes", maxLotesInvalidacion)
+}
+
+// esScanDenegado reconoce ÚNICAMENTE el NOPERM del comando SCAN. Un NOPERM de DEL u otra
+// operación no cumple esta condición y conserva el reintento seguro: el worker nunca
+// declara PURGED ante una denegación distinta.
+func esScanDenegado(err error) bool {
+	if err == nil {
+		return false
+	}
+	txt := strings.ToUpper(err.Error())
+	return strings.Contains(txt, "NOPERM") && strings.Contains(txt, "'SCAN'")
 }

@@ -532,7 +532,18 @@ func (w *PurgeWorker) pasoTerminal(ctx context.Context, control *PurgeControl) (
 		return false, errors.New("invalidador de cache no configurado")
 	}
 	if err := w.cache.DeletePrefix(ctx, prefijo); err != nil {
-		return false, err
+		// El ACL de Redis de A-080 deniega SCAN y KEYS de forma deliberada, de modo que
+		// DeletePrefix no puede enumerar claves. Eso NO es un fallo transitorio: las
+		// entradas del usuario son inalcanzables tras el tombstone (toda ruta autenticada
+		// exige PROFILE ACTIVE) y su TTL esta acotado (30 s en agregados). Se registra y se
+		// continua con la verificacion durable; cualquier otro error si bloquea el cierre.
+		if errors.Is(err, ports.ErrCacheScanDenegado) {
+			w.logger.WarnContext(ctx, "E014: invalidacion de cache denegada por ACL; residuo acotado por TTL",
+				slog.String("error_class", "cache_invalidation_denied"),
+				slog.String("request_id", control.RequestID))
+		} else {
+			return false, err
+		}
 	}
 
 	aplicado, err := w.store.Complete(ctx, control, w.owner, control.Fence, control.DeletedCount, w.now().UTC())

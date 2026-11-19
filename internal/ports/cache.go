@@ -12,6 +12,12 @@ var (
 
 	// ErrLockNotAcquired se produce cuando no es posible adquirir un lock distribuido antes del timeout.
 	ErrLockNotAcquired = errors.New("no se pudo adquirir el lock distribuido")
+
+	// ErrCacheScanDenegado indica que el ACL de Redis deniega exclusivamente el comando SCAN
+	// (A-080). Es la única denegación tolerable para cerrar la purga de E014: las entradas del
+	// titular son inalcanzables tras el tombstone. Un NOPERM de DEL u otra operación NO se
+	// traduce a este error y conserva el reintento seguro.
+	ErrCacheScanDenegado = errors.New("scan de cache denegado por el ACL")
 )
 
 // DistributedCache define el puerto para operaciones de caché distribuida en Redis (A-010 §2.4, GOV-05).
