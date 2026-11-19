@@ -180,8 +180,8 @@ Detalles vinculantes:
 
 **Residuos no localizables.** `RESET#<sha256(token)>` y `ONE_USE#<sha256(token)>` se indexan por
 el hash del token, que el servidor no conserva: no son enumerables por usuario sin un índice
-nuevo (prohibido). Contienen `userId` y, en el flujo de recuperación, el destinatario. Su
-tratamiento declarado:
+nuevo (prohibido). Lo mismo ocurre con `IDEM#<sha256(operación:clave)>` de E001 (24 h). Contienen
+`userId` y, en el flujo de recuperación, el destinatario. Su tratamiento declarado:
 
 - vencimiento lógico a los 30 minutos;
 - quedan **inutilizables** porque los flujos que los consumen exigen `PROFILE.status = ACTIVE`

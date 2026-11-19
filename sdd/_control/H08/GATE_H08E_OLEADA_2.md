@@ -131,9 +131,9 @@ Diseño completo en `sdd/_control/H08/DISENO_E014_PURGA.md`. Resumen vinculante:
    progreso nunca se borra. `PURGED` solo tras verificar el catálogo. Se purgan `USER#<id>`,
    `EMAIL#<sha256>`, `REFRESH#<digest>`, entradas de `QUEUE#PWRESET` del titular y caché
    (`UserCachePrefix`). Sin `BatchWriteItem` (no autorizado): `Query`/`DeleteItem` ya permitidos.
-6. Residuos no localizables (`RESET#`, `ONE_USE#`, indexados por hash de token) se declaran con
-   **vencimiento lógico**, quedan inutilizables y su eliminación física es asíncrona por TTL,
-   **sin plazo prometido**; no se declaran borrados.
+6. Residuos no localizables (`RESET#`, `ONE_USE#`, indexados por hash de token, y el `IDEM#`
+   heredado de E001) se declaran con **vencimiento lógico**, quedan inutilizables y su
+   eliminación física es asíncrona por TTL, **sin plazo prometido**; no se declaran borrados.
 7. `202 scheduled` solo es válido porque el worker existe, es durable y su progreso es observable.
 
 ### 5.4 F-04 — E015
