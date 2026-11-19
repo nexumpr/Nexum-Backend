@@ -33,6 +33,16 @@ type Store interface {
 	// ListMovements consulta la partición del titular en orden ascendente por SK. Devuelve la
 	// SK de continuación sólo cuando la persistencia confirma que hay más elementos.
 	ListMovements(ctx context.Context, query ListQuery, startSK string, limit int) ([]Movement, string, error)
+	// LoadMovement resuelve un movimiento propio por identificador mediante su localizador O(1).
+	// Devuelve (nil, nil) si no existe o pertenece a otra partición: el servicio responde 404
+	// homogéneo en ambos casos, sin revelar existencia.
+	LoadMovement(ctx context.Context, userID, movementID string) (*Movement, error)
+	// ReplaceMovement aplica una modificación con compare-and-swap por versión. Si la clave
+	// cambia, mueve el ítem y actualiza el localizador en la misma transacción.
+	ReplaceMovement(ctx context.Context, write ReplaceWrite) (*Movement, error)
+	// DeleteMovement borra el ítem principal y su localizador. Devuelve ErrConflict si el ítem
+	// cambió de posición o desapareció entre la lectura y la transacción.
+	DeleteMovement(ctx context.Context, write DeleteWrite) error
 }
 
 // CreateWrite es la escritura completa del alta de E028.
@@ -57,6 +67,25 @@ type CreateResult struct {
 	Body     []byte
 	Location string
 	Replayed bool
+}
+
+// ReplaceWrite es la escritura de E030: el estado leído (`Previous`) y el resultante (`Next`),
+// con la versión esperada como precondición.
+type ReplaceWrite struct {
+	UserID          string
+	MovementID      string
+	ExpectedVersion int64
+	Previous        Movement
+	Next            Movement
+	Now             time.Time
+}
+
+// DeleteWrite es la escritura de E031: la posición leída del ítem que se va a borrar.
+type DeleteWrite struct {
+	UserID     string
+	MovementID string
+	Previous   Movement
+	Now        time.Time
 }
 
 // Service contiene los casos de uso de movimientos. Es inmutable una vez construido: los
@@ -294,4 +323,196 @@ func FilterSignature(q ListQuery) string {
 		hasta = SortableTime(q.To)
 	}
 	return fmt.Sprintf("type=%s;from=%s;to=%s", q.Type, desde, hasta)
+}
+
+// deleteAttempts acota los reintentos de E031 cuando el ítem se movió entre la lectura y el
+// borrado (un PATCH concurrente que cambia `occurredAt`).
+const deleteAttempts = 2
+
+// Get ejecuta `GET /api/v1/movements/{movementId}` (E029).
+//
+// El identificador se valida antes de tocar la persistencia: un uuid mal formado es 400 y no un
+// 404, de modo que un error de cliente no se confunde con un recurso inexistente. Un movimiento
+// de otro titular vive en otra partición y nunca se localiza: la respuesta es 404 idéntica a la
+// de un identificador inexistente.
+func (s *Service) Get(ctx context.Context, userID, movementID string) (*Movement, error) {
+	if s == nil || s.store == nil {
+		return nil, ErrUnavailable
+	}
+	titular := strings.TrimSpace(userID)
+	if titular == "" {
+		return nil, ErrUnauthorized
+	}
+	id := strings.TrimSpace(movementID)
+	if !ValidMovementID(id) {
+		return nil, fmt.Errorf("%w: movementId", ErrInvalidRequest)
+	}
+
+	movimiento, err := s.store.LoadMovement(ctx, titular, id)
+	if err != nil {
+		return nil, err
+	}
+	if movimiento == nil {
+		return nil, ErrNotFound
+	}
+	return movimiento, nil
+}
+
+// Patch ejecuta `PATCH /api/v1/movements/{movementId}` (E030).
+//
+// Reglas aplicadas: `If-Match` ya validado por el transporte; sólo `categoryId`, `description` y
+// `occurredAt` son editables; `type`, `amount`, `currency`, `contributionId` y
+// `recurringPaymentId` no lo son, de modo que no puede alterarse un vínculo ni un importe. Una
+// petición sin campos aplicables es un no-op que devuelve el estado vigente sin subir la versión.
+func (s *Service) Patch(ctx context.Context, userID, movementID string, expectedVersion int64, patch Patch) (*Movement, error) {
+	if s == nil || s.store == nil {
+		return nil, ErrUnavailable
+	}
+	titular := strings.TrimSpace(userID)
+	if titular == "" {
+		return nil, ErrUnauthorized
+	}
+	id := strings.TrimSpace(movementID)
+	if !ValidMovementID(id) {
+		return nil, fmt.Errorf("%w: movementId", ErrInvalidRequest)
+	}
+	if expectedVersion < 1 {
+		return nil, fmt.Errorf("%w: If-Match", ErrInvalidRequest)
+	}
+
+	actual, err := s.store.LoadMovement(ctx, titular, id)
+	if err != nil {
+		return nil, err
+	}
+	if actual == nil {
+		return nil, ErrNotFound
+	}
+	if actual.Version != expectedVersion {
+		return nil, ErrVersionConflict
+	}
+
+	ahora := s.now().UTC()
+	siguiente := *actual
+	cambios := 0
+
+	if patch.CategoryID != nil {
+		categoria, err := NormalizeCategoryID(*patch.CategoryID)
+		if err != nil {
+			return nil, err
+		}
+		if categoria != siguiente.CategoryID {
+			siguiente.CategoryID = categoria
+			cambios++
+		}
+	}
+	if patch.Description != nil {
+		descripcion, err := NormalizeDescription(*patch.Description)
+		if err != nil {
+			return nil, err
+		}
+		if descripcion != siguiente.Description {
+			siguiente.Description = descripcion
+			cambios++
+		}
+	}
+	if patch.OccurredAt != nil {
+		ocurrido, err := NormalizeOccurredAt(*patch.OccurredAt, ahora)
+		if err != nil {
+			return nil, err
+		}
+		if !ocurrido.Equal(siguiente.OccurredAt) {
+			siguiente.OccurredAt = ocurrido
+			cambios++
+		}
+	}
+
+	if cambios == 0 {
+		// Nada que escribir: se devuelve el estado vigente y el ETag no cambia.
+		return actual, nil
+	}
+
+	siguiente.Version = actual.Version + 1
+	actualizado, err := s.store.ReplaceMovement(ctx, ReplaceWrite{
+		UserID:          titular,
+		MovementID:      id,
+		ExpectedVersion: expectedVersion,
+		Previous:        *actual,
+		Next:            siguiente,
+		Now:             ahora,
+	})
+	if err != nil {
+		return s.resolverConflictoReemplazo(ctx, titular, id, expectedVersion, err)
+	}
+	if actualizado == nil {
+		return nil, ErrInternal
+	}
+	return actualizado, nil
+}
+
+// resolverConflictoReemplazo distingue, tras una cancelación por condición, entre versión
+// desactualizada (412), recurso desaparecido (404) y carrera sin cambio de versión (409). No se
+// escribe nada en ninguno de los tres casos.
+func (s *Service) resolverConflictoReemplazo(ctx context.Context, userID, movementID string, esperada int64, err error) (*Movement, error) {
+	if !errors.Is(err, ErrConflict) {
+		return nil, err
+	}
+	actual, errLectura := s.store.LoadMovement(ctx, userID, movementID)
+	if errLectura != nil {
+		return nil, errLectura
+	}
+	if actual == nil {
+		return nil, ErrNotFound
+	}
+	if actual.Version != esperada {
+		return nil, ErrVersionConflict
+	}
+	return nil, ErrConflict
+}
+
+// Delete ejecuta `DELETE /api/v1/movements/{movementId}` (E031).
+//
+// Un movimiento ligado a una aportación confirmada (`contributionId` no nulo) no se borra: la
+// respuesta es 409 y la reversa corresponde a la operación de metas, no a este endpoint. Si el
+// ítem se movió entre la lectura y el borrado (un PATCH concurrente), se relee y se reintenta una
+// vez con la posición nueva.
+func (s *Service) Delete(ctx context.Context, userID, movementID string) error {
+	if s == nil || s.store == nil {
+		return ErrUnavailable
+	}
+	titular := strings.TrimSpace(userID)
+	if titular == "" {
+		return ErrUnauthorized
+	}
+	id := strings.TrimSpace(movementID)
+	if !ValidMovementID(id) {
+		return fmt.Errorf("%w: movementId", ErrInvalidRequest)
+	}
+
+	ahora := s.now().UTC()
+	for intento := 0; intento < deleteAttempts; intento++ {
+		actual, err := s.store.LoadMovement(ctx, titular, id)
+		if err != nil {
+			return err
+		}
+		if actual == nil {
+			return ErrNotFound
+		}
+		if strings.TrimSpace(actual.ContributionID) != "" {
+			return ErrContributionLinked
+		}
+		errBorrado := s.store.DeleteMovement(ctx, DeleteWrite{
+			UserID:     titular,
+			MovementID: id,
+			Previous:   *actual,
+			Now:        ahora,
+		})
+		if errBorrado == nil {
+			return nil
+		}
+		if !errors.Is(errBorrado, ErrConflict) {
+			return errBorrado
+		}
+		// El ítem se movió o cambió: se relee y se decide en la siguiente vuelta.
+	}
+	return ErrConflict
 }

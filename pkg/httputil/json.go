@@ -29,6 +29,21 @@ func WriteJSON(w http.ResponseWriter, status int, data any) error {
 	return json.NewEncoder(w).Encode(data)
 }
 
+// WriteJSONBytes envía un cuerpo JSON ya serializado con el código indicado.
+//
+// Existe para los handlers que necesitan devolver exactamente los mismos bytes en un
+// replay idempotente. La escritura ocurre aquí y no en el handler: el cuerpo ya está
+// validado y serializado por la capa de aplicación.
+func WriteJSONBytes(w http.ResponseWriter, status int, body []byte) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	if len(body) == 0 {
+		return nil
+	}
+	_, err := w.Write(body)
+	return err
+}
+
 // WriteError serializa y envía una respuesta de error JSON con el código de estado indicado.
 func WriteError(w http.ResponseWriter, status int, code, message string) {
 	_ = WriteJSON(w, status, ErrorResponse{
