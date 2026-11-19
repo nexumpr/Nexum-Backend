@@ -704,6 +704,13 @@ func (s *MovementsStore) ReplaceMovement(ctx context.Context, write appMovements
 	}
 
 	if _, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items}); err != nil {
+		// La ruta sin movimiento usa UpdateItem, que devuelve ConditionalCheckFailedException
+		// (no TransactionCanceledException). Sin este mapeo, una versión obsoleta se
+		// traduciría a 503 en lugar de 412.
+		var condicional *types.ConditionalCheckFailedException
+		if errors.As(err, &condicional) {
+			return nil, appMovements.ErrConflict
+		}
 		var cancelada *types.TransactionCanceledException
 		if !errors.As(err, &cancelada) {
 			return nil, appMovements.ErrUnavailable
