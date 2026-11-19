@@ -10,6 +10,7 @@ import (
 	"time"
 
 	appGoals "github.com/nexumpr/Nexum-Backend/internal/application/goals"
+	domainGoal "github.com/nexumpr/Nexum-Backend/internal/domain/goal"
 )
 
 // Pruebas de aplicación de E039 (`POST /api/v1/goals`): validaciones de esquema y de negocio,
@@ -89,6 +90,20 @@ func (s *e039Store) escrituras() []appGoals.CreateWrite {
 	copia := make([]appGoals.CreateWrite, len(s.creates))
 	copy(copia, s.creates)
 	return copia
+}
+
+// Los tres métodos siguientes completan el puerto `goals.Store`. E039 no los usa; las pruebas
+// de lectura viven en goals_read_test.go con su propio doble con estado.
+func (s *e039Store) LoadGoal(context.Context, string, string) (*domainGoal.Goal, error) {
+	return nil, nil
+}
+
+func (s *e039Store) ListUserGoals(context.Context, appGoals.ListStoreQuery) ([]appGoals.GoalRow, string, error) {
+	return nil, "", nil
+}
+
+func (s *e039Store) AggregateUserGoals(context.Context, string) (appGoals.Totals, error) {
+	return appGoals.Totals{}, nil
 }
 
 func e039Servicio(store appGoals.Store) *appGoals.Service {

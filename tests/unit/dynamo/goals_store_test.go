@@ -3,7 +3,9 @@ package dynamo_test
 import (
 	"context"
 	"errors"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -42,6 +44,9 @@ type memoriaMetas struct {
 	ultimos               []types.TransactWriteItem
 	fallo                 error
 	forzarCancelacionIdem bool
+	consultas             int
+	ultimaQuery           *dynamodb.QueryInput
+	lecturaConsistente    bool
 }
 
 func newMemoriaMetas() *memoriaMetas {
@@ -51,6 +56,7 @@ func newMemoriaMetas() *memoriaMetas {
 func (m *memoriaMetas) GetItem(_ context.Context, params *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.lecturaConsistente = aws.ToBool(params.ConsistentRead)
 	if m.fallo != nil {
 		return nil, m.fallo
 	}
@@ -61,6 +67,99 @@ func (m *memoriaMetas) GetItem(_ context.Context, params *dynamodb.GetItemInput,
 		return &dynamodb.GetItemOutput{}, nil
 	}
 	return &dynamodb.GetItemOutput{Item: copiarItem(item)}, nil
+}
+
+// Query implementa la gramática que emite el adaptador: `PK = :pk AND begins_with(SK, :prefix)`,
+// `Limit` sobre los ítems LEÍDOS (como DynamoDB), filtro opcional por igualdad y paginación por
+// `ExclusiveStartKey`. Si una página queda vacía por el filtro pero quedan datos, devuelve
+// `LastEvaluatedKey`, que es justo el caso que el adaptador debe saber recorrer.
+func (m *memoriaMetas) Query(_ context.Context, params *dynamodb.QueryInput, _ ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.consultas++
+	m.ultimaQuery = params
+	m.lecturaConsistente = aws.ToBool(params.ConsistentRead)
+	if m.fallo != nil {
+		return nil, m.fallo
+	}
+	condicion := aws.ToString(params.KeyConditionExpression)
+	if condicion != "PK = :pk AND begins_with(SK, :prefix)" {
+		return nil, errors.New("condicion de clave no soportada por el doble: " + condicion)
+	}
+	pk := textoDe(params.ExpressionAttributeValues[":pk"])
+	prefijo := textoDe(params.ExpressionAttributeValues[":prefix"])
+	if pk == "" || prefijo == "" {
+		return nil, errors.New("la consulta debe declarar :pk y :prefix")
+	}
+
+	type entrada struct {
+		sk   string
+		item map[string]types.AttributeValue
+	}
+	candidatos := make([]entrada, 0, len(m.items))
+	for _, item := range m.items {
+		if mapaString(item, "PK") != pk {
+			continue
+		}
+		sk := mapaString(item, "SK")
+		if !strings.HasPrefix(sk, prefijo) {
+			continue
+		}
+		candidatos = append(candidatos, entrada{sk: sk, item: copiarItem(item)})
+	}
+	sort.Slice(candidatos, func(i, j int) bool { return candidatos[i].sk < candidatos[j].sk })
+
+	inicio := 0
+	if len(params.ExclusiveStartKey) > 0 {
+		startSK := mapaString(params.ExclusiveStartKey, "SK")
+		for inicio < len(candidatos) && candidatos[inicio].sk <= startSK {
+			inicio++
+		}
+	}
+
+	limite := len(candidatos) - inicio
+	if params.Limit != nil {
+		if pedido := int(aws.ToInt32(params.Limit)); pedido < limite {
+			limite = pedido
+		}
+	}
+	fin := inicio + limite
+
+	var items []map[string]types.AttributeValue
+	filtro := aws.ToString(params.FilterExpression)
+	for _, candidato := range candidatos[inicio:fin] {
+		if filtro != "" {
+			cumple, err := evaluarCondicion(filtro, candidato.item, params.ExpressionAttributeNames, params.ExpressionAttributeValues)
+			if err != nil {
+				return nil, err
+			}
+			if !cumple {
+				continue
+			}
+		}
+		items = append(items, candidato.item)
+	}
+
+	salida := &dynamodb.QueryOutput{
+		Items:        items,
+		Count:        int32(len(items)),
+		ScannedCount: int32(fin - inicio),
+	}
+	if fin > inicio && fin < len(candidatos) {
+		salida.LastEvaluatedKey = map[string]types.AttributeValue{
+			"PK": strAttr(pk),
+			"SK": strAttr(candidatos[fin-1].sk),
+		}
+	}
+	return salida, nil
+}
+
+// textoDe extrae el valor de un atributo de texto.
+func textoDe(valor types.AttributeValue) string {
+	if texto, ok := valor.(*types.AttributeValueMemberS); ok {
+		return texto.Value
+	}
+	return ""
 }
 
 func (m *memoriaMetas) TransactWriteItems(_ context.Context, params *dynamodb.TransactWriteItemsInput, _ ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {
