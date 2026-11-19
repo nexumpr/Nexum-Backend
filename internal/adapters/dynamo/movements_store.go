@@ -177,9 +177,15 @@ func (s *MovementsStore) CreateMovement(ctx context.Context, write appMovements.
 	if !errors.As(err, &cancelada) {
 		return nil, appMovements.ErrUnavailable
 	}
-	if transactionItemFailed(err, 2) {
-		// El registro de idempotencia apareció entre la lectura y la transacción: lo escrito
-		// por el ganador es la autoridad y NO se ha creado un segundo movimiento.
+	// El registro de idempotencia es la autoridad de la carrera: si existe, otra peticion
+	// gano y esta debe recibir el replay (o el 409 si el payload difiere). No se depende
+	// del orden ni del indice de CancellationReasons: DynamoDB los reporta por elemento y
+	// el resultado debe ser identico con cualquier orden.
+	existenteCarrera, errLectura := s.leerIdempotencia(ctx, idemPK, idemSK, userID)
+	if errLectura != nil {
+		return nil, errLectura
+	}
+	if existenteCarrera != nil {
 		return s.resolverConflictoIdempotencia(ctx, idemPK, idemSK, userID, write)
 	}
 	if transactionItemFailed(err, 0) || transactionItemFailed(err, 1) {
