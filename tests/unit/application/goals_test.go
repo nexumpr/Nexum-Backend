@@ -106,6 +106,11 @@ func (s *e039Store) AggregateUserGoals(context.Context, string) (appGoals.Totals
 	return appGoals.Totals{}, nil
 }
 
+// UpdateGoal completa el puerto para E041; E039 no modifica metas.
+func (s *e039Store) UpdateGoal(context.Context, appGoals.UpdateWrite) (*domainGoal.Goal, error) {
+	return nil, appGoals.ErrUnavailable
+}
+
 func e039Servicio(store appGoals.Store) *appGoals.Service {
 	secuencia := 0
 	return appGoals.NewService(store).
