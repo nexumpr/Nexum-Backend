@@ -593,3 +593,46 @@ func TestE033FrecuenciaCanonicaCoincideConElCatalogo(t *testing.T) {
 		}
 	}
 }
+
+// TestE034DetallePropiedadYErrores cubre E034 en la capa de aplicación: el detalle propio se
+// devuelve, el de otra cuenta y el inexistente son el mismo ErrNotFound, y la falta de
+// identidad o de persistencia falla cerrada.
+func TestE034DetallePropiedadYErrores(t *testing.T) {
+	store := newE033Store()
+	servicio := e033Servicio(store)
+
+	creado, err := servicio.Create(context.Background(), e033Comando())
+	if err != nil {
+		t.Fatalf("alta: %v", err)
+	}
+
+	propio, err := servicio.Get(context.Background(), e033Usuario, creado.ID)
+	if err != nil {
+		t.Fatalf("detalle propio: %v", err)
+	}
+	if propio.ID != creado.ID || propio.Name != "Renta" || propio.Version != 1 {
+		t.Fatalf("detalle inesperado: %+v", propio)
+	}
+
+	if _, err := servicio.Get(context.Background(), e033Otro, creado.ID); !errors.Is(err, appRecurring.ErrNotFound) {
+		t.Fatalf("el recurso ajeno debe ser ErrNotFound, obtenido %v", err)
+	}
+	inexistente := "018f90ef-08e5-7a68-b09f-2b67a4ffffffffff"
+	if _, err := servicio.Get(context.Background(), e033Usuario, inexistente); !errors.Is(err, appRecurring.ErrNotFound) {
+		t.Fatalf("el recurso inexistente debe ser ErrNotFound, obtenido %v", err)
+	}
+	if _, err := servicio.Get(context.Background(), "   ", creado.ID); !errors.Is(err, appRecurring.ErrUnauthorized) {
+		t.Fatalf("sin identidad se esperaba ErrUnauthorized, obtenido %v", err)
+	}
+	if _, err := servicio.Get(context.Background(), e033Usuario, "  "); !errors.Is(err, appRecurring.ErrInvalidRequest) {
+		t.Fatalf("sin identificador se esperaba ErrInvalidRequest, obtenido %v", err)
+	}
+
+	store.fallo = errors.New("dynamodb no disponible")
+	if _, err := servicio.Get(context.Background(), e033Usuario, creado.ID); !errors.Is(err, appRecurring.ErrUnavailable) {
+		t.Fatalf("con fallo de persistencia se esperaba ErrUnavailable, obtenido %v", err)
+	}
+	if _, err := appRecurring.NewService(nil, nil).Get(context.Background(), e033Usuario, creado.ID); !errors.Is(err, appRecurring.ErrUnavailable) {
+		t.Fatalf("sin almacen se esperaba ErrUnavailable, obtenido %v", err)
+	}
+}
