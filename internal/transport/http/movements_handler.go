@@ -1,7 +1,6 @@
 package http
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -276,36 +275,8 @@ func movementsListQuery(r *http.Request, userID string) (appMovements.ListQuery,
 	return consulta, nil
 }
 
-// writeServiceError traduce los errores de aplicación a códigos del contrato. Nunca se registra
-// el `userId`, el `movementId`, el importe, la descripción ni el cursor.
+// writeServiceError delega en el mapeo compartido de la familia de movimientos para que el
+// listado, el alta y las rutas por identificador traduzcan los errores de forma idéntica.
 func (h *MovementsHandler) writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
-	var violacion *appMovements.FieldViolation
-	switch {
-	case errors.As(err, &violacion):
-		writeRegisterError(w, r, http.StatusUnprocessableEntity, "BUSINESS_RULE_VIOLATION", "solicitud no completada", []httputil.ErrorDetail{
-			{Field: violacion.Field, Reason: violacion.Reason},
-		})
-	case errors.Is(err, appMovements.ErrInvalidRequest):
-		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", nil)
-	case errors.Is(err, appMovements.ErrUnauthorized):
-		writeRegisterError(w, r, http.StatusUnauthorized, "UNAUTHORIZED", "sesion no valida", nil)
-	case errors.Is(err, appMovements.ErrNotFound):
-		writeRegisterError(w, r, http.StatusNotFound, "NOT_FOUND", "solicitud no completada", nil)
-	case errors.Is(err, appMovements.ErrVersionConflict):
-		writeRegisterError(w, r, http.StatusPreconditionFailed, "VERSION_CONFLICT", "solicitud no completada", nil)
-	case errors.Is(err, appMovements.ErrContributionLinked):
-		writeRegisterError(w, r, http.StatusConflict, "CONFLICT", "solicitud no completada", nil)
-	case errors.Is(err, appMovements.ErrConflict):
-		writeRegisterError(w, r, http.StatusConflict, "CONFLICT", "solicitud no completada", nil)
-	case errors.Is(err, appMovements.ErrUnavailable):
-		h.logger.ErrorContext(r.Context(), "movimientos: dependencia no disponible",
-			slog.String("error_class", "movements_unavailable"),
-			slog.String("trace_id", traceID(r)))
-		writeRegisterError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "servicio no disponible", nil)
-	default:
-		h.logger.ErrorContext(r.Context(), "movimientos: fallo interno",
-			slog.String("error_class", "internal_error"),
-			slog.String("trace_id", traceID(r)))
-		writeRegisterError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "error interno", nil)
-	}
+	writeMovementError(w, r, h.logger, err)
 }
