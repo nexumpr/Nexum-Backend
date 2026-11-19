@@ -27,9 +27,9 @@ const (
 	// UpdateItem: en DynamoDB la clave no es mutable.
 	PartitionQueueDeletion = "QUEUE#DELETION"
 
-	// PartitionQueuePasswordReset es la cola durable de E005/E006. El worker de E014 sólo
+	// PartitionQueueRecuperacion es la cola durable de E005/E006. El worker de E014 sólo
 	// borra las entradas cuyo `userId` es el titular: nunca vacía la partición.
-	PartitionQueuePasswordReset = "QUEUE#PWRESET"
+	PartitionQueueRecuperacion = "QUEUE#PWRESET"
 
 	// EntityControl y EntityQueue distinguen los ítems propios del flujo de eliminación.
 	EntityControl = "DELETION_CONTROL"

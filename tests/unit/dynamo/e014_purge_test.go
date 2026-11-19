@@ -57,12 +57,6 @@ func (r *relojPurga) avanzar(d time.Duration) {
 	r.t = r.t.Add(d)
 }
 
-func (r *relojPurga) fijar(t time.Time) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.t = t
-}
-
 type e014Lider struct{}
 
 func (e014Lider) Adquirir(context.Context, string, time.Duration) (bool, error) { return true, nil }
@@ -143,11 +137,11 @@ func e014SembrarCuenta(m *purgaDynamo, userID string) []string {
 		"userId":     strAttr(userID),
 		"sessionId":  strAttr("s1"),
 	})
-	m.sembrar(domainDeletion.PartitionQueuePasswordReset, "2026-11-18T10:00:00Z#propio", map[string]types.AttributeValue{
+	m.sembrar(domainDeletion.PartitionQueueRecuperacion, "2026-11-18T10:00:00Z#propio", map[string]types.AttributeValue{
 		"userId": strAttr(userID),
 		"estado": strAttr("PENDIENTE"),
 	})
-	m.sembrar(domainDeletion.PartitionQueuePasswordReset, "2026-11-18T10:00:00Z#ajeno", map[string]types.AttributeValue{
+	m.sembrar(domainDeletion.PartitionQueueRecuperacion, "2026-11-18T10:00:00Z#ajeno", map[string]types.AttributeValue{
 		"userId": strAttr(e014OtroUser),
 		"estado": strAttr("PENDIENTE"),
 	})
@@ -309,7 +303,7 @@ func TestE014PurgaCompletaTombstone(t *testing.T) {
 	if m.leer(refreshPK, refreshSK) != nil {
 		t.Fatalf("el localizador de refresh debe eliminarse")
 	}
-	colaRecuperacion := m.porParticion(domainDeletion.PartitionQueuePasswordReset)
+	colaRecuperacion := m.porParticion(domainDeletion.PartitionQueueRecuperacion)
 	if len(colaRecuperacion) != 1 || stringAttrDe(colaRecuperacion[0], "userId") != e014OtroUser {
 		t.Fatalf("solo debe sobrevivir la entrada de recuperacion del otro usuario: %v", colaRecuperacion)
 	}

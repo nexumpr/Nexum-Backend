@@ -599,7 +599,12 @@ func backoffPurga(intentos int64) time.Duration {
 	if intentos >= int64(len(pasos)) {
 		return pasos[len(pasos)-1]
 	}
-	return pasos[intentos-1]
+	indice := int(intentos - 1)
+	// Guarda explícita: el índice debe caer dentro del slice (gosec G602).
+	if indice < 0 || indice >= len(pasos) {
+		return pasos[len(pasos)-1]
+	}
+	return pasos[indice]
 }
 
 func appendUnique(valores []string, valor string) []string {

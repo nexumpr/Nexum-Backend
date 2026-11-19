@@ -841,7 +841,7 @@ func (s *DeletionStore) ListPartition(ctx context.Context, userID, startSK strin
 		},
 		ConsistentRead:   aws.Bool(true),
 		ScanIndexForward: aws.Bool(true),
-		Limit:            aws.Int32(int32(limit)),
+		Limit:            aws.Int32(limiteDynamo(limit)),
 	}
 	if strings.TrimSpace(startSK) != "" {
 		entrada.ExclusiveStartKey = map[string]types.AttributeValue{
@@ -907,15 +907,15 @@ func (s *DeletionStore) ListPasswordResetQueue(ctx context.Context, userID, star
 		KeyConditionExpression: aws.String("PK = :pk"),
 		FilterExpression:       aws.String("userId = :user"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":   stringAttr(domainDeletion.PartitionQueuePasswordReset),
+			":pk":   stringAttr(domainDeletion.PartitionQueueRecuperacion),
 			":user": stringAttr(userID),
 		},
 		ConsistentRead: aws.Bool(true),
-		Limit:          aws.Int32(int32(limit)),
+		Limit:          aws.Int32(limiteDynamo(limit)),
 	}
 	if strings.TrimSpace(startSK) != "" {
 		entrada.ExclusiveStartKey = map[string]types.AttributeValue{
-			"PK": stringAttr(domainDeletion.PartitionQueuePasswordReset),
+			"PK": stringAttr(domainDeletion.PartitionQueueRecuperacion),
 			"SK": stringAttr(startSK),
 		}
 	}
@@ -1045,4 +1045,16 @@ func controlFromItem(item map[string]types.AttributeValue) *appAccount.PurgeCont
 		}
 	}
 	return control
+}
+
+// limiteDynamo acota el tamano de pagina al rango valido de DynamoDB (1..1000) antes
+// de convertirlo a int32: evita el desbordamiento que gosec marca como G115.
+func limiteDynamo(limit int) int32 {
+	if limit <= 0 {
+		return 1
+	}
+	if limit > 1000 {
+		return 1000
+	}
+	return int32(limit)
 }
