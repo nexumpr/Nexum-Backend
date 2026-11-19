@@ -32,8 +32,8 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
-| PR | #113 · HEAD `626b9ee687e16271a2ca0fe4a7f14452a3155f1f` |
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #113 · HEAD `f28ecbe937e20a222747118535d86ae3320f12a7` |
 | Claves DynamoDB | USER#<id>/GOAL#<id> |
 | Decisiones | GetItem consistente; 404 propio/ajeno; ETag de version. |
 | Errores y causa raiz | Ninguno propio. |

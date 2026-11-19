@@ -35,8 +35,8 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
-| PR | #108 · HEAD `89a9d81725b289e988b07b89e478780e7c9b8ec1` |
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #108 · HEAD `2e29d4a125de0fb5e2f9fe4536e057c861e0b8d9` |
 | Claves DynamoDB | USER#<id>/RECURRING#<id> |
 | Decisiones | ETag y 404 homogeneo; proyeccion determinista de items heredados de E001 (startDate desde createdAt, nextDueDate calculada; D-E032-01). |
 | Errores y causa raiz | U1000 por helper de prueba, corregido en 89a9d81. |

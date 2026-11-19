@@ -36,8 +36,8 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
-| PR | #110 · HEAD `13d73e3475ec136543e8bae278e590021775a078` |
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #110 · HEAD `2c76fa80abcea43a4fe5e864a3ef7044b47a77f3` |
 | Claves DynamoDB | USER#<id>/RECURRING#<id> |
 | Decisiones | If-Match 428/412; frequency no editable (campo desconocido 400); dueDay tri-estado; type inmutable 422; no-op sin subir version. |
 | Errores y causa raiz | NextDueDate se atribuia a dueDay no enviado; corregido en el PR. |

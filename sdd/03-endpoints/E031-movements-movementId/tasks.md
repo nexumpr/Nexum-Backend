@@ -28,8 +28,8 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
-| PR | #106 · HEAD `44efebd621bd9822d7280bf5bf35294e6693dca2` |
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #106 · HEAD `14d11527750bd4459f193fffedda2e8f811e1c4d` |
 | Claves DynamoDB | MOVEMENTPTR# + MOVEMENT# |
 | Decisiones | 204 sin cuerpo; 409 si el movimiento tiene aportacion confirmada; borrado transaccional con reintento si el item se movio. |
 | Errores y causa raiz | Ninguno propio. |

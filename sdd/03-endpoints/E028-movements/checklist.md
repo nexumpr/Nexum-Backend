@@ -24,7 +24,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
 | PR | #102 · HEAD `089d7e7aac35908ac209bdc16488230ae61ac6d2` |
 | Claves DynamoDB | USER#<id>/MOVEMENT#<occurredAt>#<id> + MOVEMENTPTR#<id> + IDEM# |
 | Decisiones | Idempotency-Key obligatoria con UserIdempotencyKeys (PK por usuario); transaccion unica recurso+puntero+registro; importes int64 centimos. |

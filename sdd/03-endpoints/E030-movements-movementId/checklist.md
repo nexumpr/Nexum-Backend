@@ -24,8 +24,8 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
-| PR | #105 · HEAD `ab8b4a80b92ca83994095ace379becfa797e11f8` |
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #105 · HEAD `d171f00c7721c05e1e5ade689788cc0ae77fffa5` |
 | Claves DynamoDB | MOVEMENTPTR# + MOVEMENT# (movimiento transaccional del SK al cambiar occurredAt) |
 | Decisiones | If-Match obligatorio (428/412); CAS de version; si cambia occurredAt se mueve el item en una transaccion con condicion targetSK. |
 | Errores y causa raiz | Version obsoleta devolvia 503: se mapea ConditionalCheckFailed y Next.Version!=expected a ErrConflict (412). G705 resuelto con httputil.WriteJSONBytes. |

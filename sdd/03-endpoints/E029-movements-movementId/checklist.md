@@ -32,8 +32,8 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
-| PR | #104 · HEAD `8c021c0663bb1e83d936926675f67ff1ed7e398b` |
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #104 · HEAD `1c410570d881a7de8fb3148b6ce0b0c3dccb8613` |
 | Claves DynamoDB | MOVEMENTPTR#<id> -> MOVEMENT#<occurredAt>#<id> |
 | Decisiones | Resolucion O(1) por puntero; 404 homogeneo propio/ajeno; ETag de version. |
 | Errores y causa raiz | Ninguno propio. |

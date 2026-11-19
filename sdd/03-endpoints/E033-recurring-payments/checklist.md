@@ -32,8 +32,8 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
-| PR | #107 · HEAD `a47b0e2004a17fbc04613615880a069f02829b18` |
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #107 · HEAD `ed70d395df456c5af40822b17e43423478d22364` |
 | Claves DynamoDB | USER#<id>/RECURRING#<id> + IDEM# |
 | Decisiones | RFC-021: acepta 9 frecuencias, persiste y emite 7 canonicas (biweekly->fortnightly, yearly->annual); Idempotency-Key por usuario; no genera pagos (E037 fuera de alcance). |
 | Errores y causa raiz | U1000 por helper de prueba sin uso, corregido en d6294b5. |

@@ -24,7 +24,7 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
 | PR | #103 · HEAD `3947ad82ffffd78795419d6db1bcc384c3ab3b22` |
 | Claves DynamoDB | USER#<id> con begins_with(MOVEMENT#) |
 | Decisiones | Cursor opaco firmado (httputil) ligado a filtros y usuario; limit 1..100; filtros type/from/to en servidor; sin Scan. |

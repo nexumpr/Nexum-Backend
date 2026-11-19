@@ -24,8 +24,8 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
-| PR | #111 · HEAD `004c69ddf3025c4caf5bcd09c523d61c5a52fade` |
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #111 · HEAD `39d100782e4a42938a4622eec1be6616978339e4` |
 | Claves DynamoDB | USER#<id>/RECURRING#<id> |
 | Decisiones | 204 idempotente (segundo DELETE no sube version); condicion que alcanza items heredados sin atributo active. |
 | Errores y causa raiz | U1000/SA4010 heredados de la linea, corregidos en 004c69d. |

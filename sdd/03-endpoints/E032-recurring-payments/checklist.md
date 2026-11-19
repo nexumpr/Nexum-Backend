@@ -32,8 +32,8 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
-| PR | #109 · HEAD `701f2302794356651bd5692829116bae332bf7e2` |
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #109 · HEAD `b9efc0297b5b14dedadb06c34f7e7a9a1140e3a1` |
 | Claves DynamoDB | USER#<id> con begins_with(RECURRING#) |
 | Decisiones | Cursor firmado ligado a filtros active/type y usuario; paginacion sin duplicados. |
 | Errores y causa raiz | SA4010 por slice de ids no usado (se anadio asercion) y U1000 del helper attrB, corregidos en 701f230. |

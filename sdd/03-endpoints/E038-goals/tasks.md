@@ -36,8 +36,8 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
-| PR | #114 · HEAD `fdf147bc7a4c00e2a07932c2b359fd177467039a` |
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #114 · HEAD `c07703e3e5320ac05ae39f1230e446afa95a7d5e` |
 | Claves DynamoDB | USER#<id> con begins_with(GOAL#) |
 | Decisiones | totals{activeCount,saved} sobre la coleccion completa (no la pagina); cursor firmado ligado a limit+status; topes que fallan cerrado. |
 | Errores y causa raiz | Ninguno propio. |

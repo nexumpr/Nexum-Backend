@@ -24,8 +24,8 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
-| PR | #115 · HEAD `51bc79bb1f06831f5b5202cd2313edf34acf2965` |
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #115 · HEAD `9bf19c942478dbaa468591b0862ac782e9882a2f` |
 | Claves DynamoDB | USER#<id>/GOAL#<id> |
 | Decisiones | If-Match 428/412; CAS de version; targetAmount no puede quedar por debajo de savedAmount; transiciones de estado validas. |
 | Errores y causa raiz | U1000 por helper de prueba, corregido en 51bc79b. |
