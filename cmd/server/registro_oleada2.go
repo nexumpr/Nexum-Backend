@@ -26,6 +26,9 @@ type dependenciasOleada2 struct {
 	Logger     *slog.Logger
 	Tokens     ports.TokenProvider
 	Authorizer ports.SessionAuthorizer
+	// PurgaLista indica que el worker durable de E014 arrancó. Sin él, el endpoint
+	// responde 503: nunca se acepta una eliminación sin ejecutor.
+	PurgaLista bool
 }
 
 // montajeOleada2 declara un endpoint autorizado. La ruta es relativa a /api/v1.
