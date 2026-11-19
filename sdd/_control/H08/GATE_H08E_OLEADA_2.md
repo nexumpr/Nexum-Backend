@@ -193,6 +193,14 @@ rollback conservado.
 | R-07 | Aviso E015 desactualizado | Propuesta + Gate con hash antes de anunciar E014 |
 | R-08 | SES en sandbox | Fuera de esta sesión |
 
+### 9.1 Decisiones de implementación registradas
+
+| ID | Decisión | Motivo |
+|---|---|---|
+| D-W2-01 | `Movement.categoryId` se valida de forma **estructural** (no vacío, ≤64, sin control), no como enum del catálogo E022 | El OpenAPI no declara `enum` para `categoryId` y sus ejemplos (`food`, `transport`) no coinciden con los IDs del catálogo (`vivienda`, `transporte`…). Validar contra el catálogo rechazaría ejemplos del propio contrato. El esquema es la autoridad de transporte; una alineación de catálogo exigiría RFC propia |
+| D-W2-02 | Los ítems de movimientos usan principal `MOVEMENT#<occurredAt>#<id>` más puntero `MOVEMENTPTR#<id>` | Permite `GetItem` O(1) para E029/E030/E031 sin `Scan` ni índices nuevos, y permite mover el ítem al cambiar `occurredAt` |
+| D-W2-03 | La frecuencia de recurrentes se normaliza a los 7 canónicos antes de persistir y al serializar | RFC-021 aprobada; nunca se traduce en silencio un valor declarado por el usuario |
+
 ## 10. Prohibiciones
 
 `Scan`; mocks en producción; recursos o índices nuevos; `terraform destroy/import/state`;
