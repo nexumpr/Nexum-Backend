@@ -51,10 +51,31 @@ transacción. No se borran las sesiones en ese instante: se **revocan**.
 - **`SK = <requestId>`** (estable). `dueAt`, `state`, `fence` y `userId` son atributos.
   Se elige `SK` estable precisamente para que un reintento pueda **cambiar `dueAt` con un
   `UpdateItem`**, sin borrar y recrear la referencia (en DynamoDB la clave no es mutable).
-- Descubrimiento del worker: `Query` sobre `PK = QUEUE#DELETION` con
-  `FilterExpression: state IN (:pending,:retry,:slow) AND dueAt <= :now`, `Limit` 50,
-  `ExclusiveStartKey`. Es una consulta de partición, **no** un `Scan`; la cardinalidad es una
-  entrada por cuenta eliminada, no por usuario activo.
+- Descubrimiento del worker: `Query` sobre `PK = QUEUE#DELETION`, **sin `Scan`**, con
+  `ConsistentRead = true` y esta `FilterExpression` correctamente agrupada, que distingue
+  `dueAt` de `leaseUntil`:
+
+```text
+(#state = :pending AND #due <= :now)
+OR (#state = :retry   AND #due <= :now)
+OR (#state = :slow    AND #due <= :now)
+OR (#state = :running AND #lease  < :now)
+```
+
+  La última rama es la que hace descubrible un trabajo `RUNNING` cuyo lease venció: sin ella, la
+  reclamación de §4.2 nunca se ejecutaría sobre trabajos abandonados por una caída de EC2.
+- **Paginación obligatoria (DynamoDB `Limit` se aplica antes del filtro):** una página puede
+  devolver **cero coincidencias** y aun así tener `LastEvaluatedKey`. El worker recorre páginas
+  con `ExclusiveStartKey = LastEvaluatedKey` y **no** se detiene cuando una página no aporta
+  coincidencias; solo termina cuando `LastEvaluatedKey` es nulo.
+- **Consumo acotado y sin inanición:** por ciclo se examinan como máximo **10 páginas × 50 ítems
+  = 500**. Si se alcanza el tope con `LastEvaluatedKey` no nulo, se guarda esa clave
+  (`resumeKey`, en memoria del líder) y el ciclo siguiente **continúa desde ahí**, volviendo al
+  inicio solo al agotar la partición. Así los primeros 50 registros no pueden bloquear
+  indefinidamente a los posteriores, y el coste por ciclo está acotado.
+- Los trabajos descubiertos se procesan de uno en uno; cada uno se reclama con la condición
+  atómica de §4.2, de modo que el descubrimiento y la reclamación son independientes y seguros
+  entre nodos.
 - El ítem `USER#<id>/DELETION#<requestId>` es la **fuente de verdad** del progreso. La cola es
   solo un índice de vencimiento y puede repararse a partir del control.
 
@@ -107,6 +128,12 @@ ConditionExpression: #owner = :me AND #fence = :myFence
 Si otro nodo reclamó el trabajo (`fence` distinto), el propietario anterior recibe
 `ConditionalCheckFailed` y **aborta sin escribir**. No puede marcar `PURGED`, ni pisar el cursor,
 ni reprogramar `dueAt`. Es un fencing token verificable por DynamoDB, no una convención.
+
+**Comprobación previa a cada lote destructivo:** antes de borrar cualquier ítem, el worker relee
+el control con `ConsistentRead = true` y exige `owner = :me`, `fence = :myFence` y
+`leaseUntil > :now`. Si cualquiera falla, **aborta el lote sin borrar nada** y cede el trabajo;
+no se inicia un lote que no podría cerrar. Las escrituras condicionales de §4.3 siguen siendo la
+garantía última frente a una reclamación concurrente entre la comprobación y el borrado.
 
 ### 4.4 Transiciones
 
@@ -183,7 +210,7 @@ el hash del token, que el servidor no conserva: no son enumerables por usuario s
 nuevo (prohibido). Lo mismo ocurre con `IDEM#<sha256(operación:clave)>` de E001 (24 h). Contienen
 `userId` y, en el flujo de recuperación, el destinatario. Su tratamiento declarado:
 
-- vencimiento lógico a los 30 minutos;
+- vencimiento lógico: 30 minutos para `RESET#`/`ONE_USE#` y 24 horas para el `IDEM#` heredado;
 - quedan **inutilizables** porque los flujos que los consumen exigen `PROFILE.status = ACTIVE`
   con lectura consistente (`email_verification_confirm.go:172`) y la cuenta ya no existe;
 - eliminación física asíncrona por TTL, **sin plazo prometido**;
@@ -232,7 +259,17 @@ Tras `PURGED` el control conserva solo: `state=PURGED`, `requestId`, `completedA
     (`SK=requestId`) sin crear duplicados.
 14. **Ausencia de residuos no autorizados:** al terminar, la partición contiene solo el
     tombstone permitido y ninguna clave con datos financieros o de contacto.
-15. Prohibido usar cuentas reales. Solo cuentas sintéticas creadas para el ensayo.
+15. **Descubrimiento de `RUNNING` vencido:** un trabajo que quedó `RUNNING` con `leaseUntil`
+    expirado **aparece** en la consulta de descubrimiento (rama `#state = :running AND
+    #lease < :now`) y se completa tras una caída de EC2 simulada, sin intervención manual.
+16. **Paginación con página vacía:** la primera página devuelve 50 ítems que **no** coinciden con
+    el filtro y `LastEvaluatedKey` no nulo; el trabajo vencido está en la segunda página. El worker
+    lo encuentra: una página sin coincidencias no detiene el recorrido.
+17. **Rotación acotada:** con más páginas que el tope por ciclo, `resumeKey` hace que el ciclo
+    siguiente continúe donde quedó; ningún trabajo de páginas posteriores queda inanido.
+18. **Pérdida de propiedad antes de un lote:** si entre el latido y el lote otro nodo reclama el
+    trabajo, la comprobación previa con `ConsistentRead` aborta el lote **sin borrar nada**.
+19. Prohibido usar cuentas reales. Solo cuentas sintéticas creadas para el ensayo.
 
 ## 10. Dependencias y Gates separados
 

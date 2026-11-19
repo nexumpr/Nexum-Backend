@@ -124,7 +124,9 @@ Diseño completo en `sdd/_control/H08/DISENO_E014_PURGA.md`. Resumen vinculante:
 4. Worker real en el binario con lease en Redis (patrón de E005), reclamación atómica **que
    incluye trabajos `RUNNING` con `leaseUntil` vencido**, `fence` incremental y todas las
    escrituras de progreso/cierre condicionadas a `owner` + `fence`: el propietario anterior no
-   puede completar ni sobrescribir. Reintentos con backoff y `SLOW_RETRY` cada 24 h (nunca
+   puede completar ni sobrescribir. El descubrimiento consulta `PENDING`/`RETRY`/`SLOW_RETRY` por
+   `dueAt` **y `RUNNING` por `leaseUntil` vencido**, y pagina con `LastEvaluatedKey` aunque una
+   página no aporte coincidencias. Reintentos con backoff y `SLOW_RETRY` cada 24 h (nunca
    abandonados). No hay servicio nuevo.
 5. Purga por lotes en fases `COLLECT` → `EXTERNAL` → `PARTITION` → `VERIFY` → `TERMINAL`, con
    cursor `lastSK` persistido. El recorrido **excluye** `DELETION#<requestId>`: el control de
