@@ -121,3 +121,49 @@ condition = "AND"
 paths = ['''^tests/unit/application/email_verification_request_test\.go$''']
 regexTarget = "line"
 regexes = ['''Trim\([^)]*"0123456789abcdef"''']
+
+# Oleada 2 (2026-11-18): falso positivo en la prueba de E028. La asignacion
+# `IdempotencyKey = "otra-clave-sintetica-de-prueba-0002"` es un literal fijo de
+# prueba que nunca se envia a ningun servicio. La excepcion es minima: archivo
+# exacto y linea exacta con esa asignacion; otro valor u otro archivo siguen
+# generando hallazgo.
+[[rules.allowlists]]
+description = "Idempotency-Key sintetica de la prueba de movimientos (literal fijo, no credencial)"
+condition = "AND"
+paths = ['''^tests/unit/application/movements_test\.go$''']
+regexTarget = "line"
+regexes = ['''^\s*\w+\.IdempotencyKey\s*=\s*"otra-clave-sintetica-de-prueba-0002"\s*$''']
+
+# Oleada 2 (2026-11-18): tres falsos positivos de la linea C (commit 475d7b0).
+# Son literales fijos de prueba (una Idempotency-Key uuid y dos secretos de cursor
+# sinteticos) que no autentican contra ningun servicio. Excepcion minima: archivo
+# y linea exactos; cualquier otro valor sigue generando hallazgo.
+[[rules.allowlists]]
+description = "Idempotency-Key uuid sintetica de la prueba de metas (literal fijo)"
+condition = "AND"
+paths = ['''^tests/unit/dynamo/goals_read_test\.go$''']
+regexTarget = "line"
+regexes = ['''^\s*IdempotencyKey:\s*"018f90ef-08e5-7a68-b09f-2b67a47c"\s*\+\s*goalIDSufijo\(goalID\),\s*$''']
+
+[[rules.allowlists]]
+description = "Secreto de cursor sintetico de la prueba HTTP de metas"
+condition = "AND"
+paths = ['''^tests/unit/transport/goals_queries_test\.go$''']
+regexTarget = "line"
+regexes = ['''^\s*const e038HTTPSecreto = "secreto-de-cursores-de-prueba-32b"\s*$''']
+
+[[rules.allowlists]]
+description = "Secreto de cursor sintetico de la prueba de aplicacion de metas"
+condition = "AND"
+paths = ['''^tests/unit/application/goals_read_test\.go$''']
+regexTarget = "line"
+regexes = ['''^\s*e038Secreto = "secreto-de-cursores-de-prueba-32b"\s*$''']
+
+# Oleada 2 (2026-11-18): falso positivo de la prueba de E032. La asignacion
+# `IdempotencyKey = "clave-vencida-e032-0001"` es un literal fijo de prueba.
+[[rules.allowlists]]
+description = "Idempotency-Key sintetica de la prueba de recurrencia (literal fijo, no credencial)"
+condition = "AND"
+paths = ['''^tests/unit/application/recurring_test\.go$''']
+regexTarget = "line"
+regexes = ['''^\s*otro\.IdempotencyKey\s*=\s*"clave-vencida-e032-0001"\s*$''']
