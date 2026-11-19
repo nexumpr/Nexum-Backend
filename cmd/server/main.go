@@ -194,12 +194,13 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	// H08-E / E014: el worker de purga es requisito para aceptar solicitudes. Se arranca
 	// ANTES de montar las rutas: si no puede iniciar, E014 responde 503 en vez de emitir
 	// un 202 que nadie ejecutaria. El resto de endpoints no se ve afectado.
-	cerrarPurga, errPurga := iniciarPurgaE014(ctx, depsOleada2)
+	cerrarPurga, purgaActiva, errPurga := iniciarPurgaE014(ctx, depsOleada2)
 	if errPurga != nil {
 		logger.ErrorContext(ctx, "E014: worker de purga no iniciado; el endpoint respondera 503",
 			slog.String("error_class", "purga_no_iniciada"))
 	} else {
 		depsOleada2.PurgaLista = true
+		depsOleada2.PurgaActiva = purgaActiva
 		defer cerrarPurga()
 	}
 

@@ -29,6 +29,9 @@ type dependenciasOleada2 struct {
 	// PurgaLista indica que el worker durable de E014 arrancó. Sin él, el endpoint
 	// responde 503: nunca se acepta una eliminación sin ejecutor.
 	PurgaLista bool
+	// PurgaActiva consulta el estado vivo del worker (puede caer y reiniciarse). Si
+	// devuelve false, el endpoint responde 503 en esa petición.
+	PurgaActiva func() bool
 }
 
 // montajeOleada2 declara un endpoint autorizado. La ruta es relativa a /api/v1.
