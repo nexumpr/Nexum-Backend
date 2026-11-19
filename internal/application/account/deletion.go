@@ -27,6 +27,7 @@ import (
 //   - ErrDeletionUnavailable           -> 503 (falta persistencia o fallo de DynamoDB)
 var (
 	ErrDeletionUnauthorized      = errors.New("cuenta no autorizada para solicitar la eliminacion")
+	ErrDeletionProfileNotFound   = errors.New("perfil de cuenta inexistente")
 	ErrDeletionPasswordIncorrect = errors.New("contrasena actual incorrecta")
 	ErrDeletionConfirmation      = errors.New("confirmacion de eliminacion invalida")
 	ErrDeletionConflict          = errors.New("conflicto al registrar la solicitud de eliminacion")
@@ -193,7 +194,10 @@ func (s *DeletionService) Request(ctx context.Context, in DeleteAccountCommand) 
 		return DeletionReceipt{}, ErrDeletionUnavailable
 	}
 	if profile == nil {
-		return DeletionReceipt{}, ErrDeletionUnauthorized
+		// El perfil ya no existe (purga completada o cuenta nunca creada). El contrato
+		// admite 401/404 para este caso; se usa 404 porque la identidad autenticada es
+		// válida y lo único que falta es el recurso propio.
+		return DeletionReceipt{}, ErrDeletionProfileNotFound
 	}
 	if profile.UserID != "" && profile.UserID != userID {
 		// Defensa en profundidad: el ítem leído debe pertenecer al sujeto del token.
@@ -210,6 +214,11 @@ func (s *DeletionService) Request(ctx context.Context, in DeleteAccountCommand) 
 
 	verificada, err := s.hasher.VerifyPassword(in.CurrentPassword, profile.PasswordHash)
 	if err != nil {
+		// El hasher Argon2id real devuelve `ports.ErrInvalidPassword` cuando la contraseña no
+		// coincide. Eso es una violación de regla (422), no una caída de dependencia.
+		if errors.Is(err, ports.ErrInvalidPassword) {
+			return DeletionReceipt{}, ErrDeletionPasswordIncorrect
+		}
 		return DeletionReceipt{}, ErrDeletionUnavailable
 	}
 	if !verificada {

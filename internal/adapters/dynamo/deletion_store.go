@@ -351,6 +351,7 @@ func (s *DeletionStore) Claim(ctx context.Context, candidato appAccount.PurgeCan
 				ConditionExpression: aws.String(condicion),
 				ExpressionAttributeNames: map[string]string{
 					"#state":    "state",
+					"#due":      "dueAt",
 					"#owner":    "owner",
 					"#lease":    "leaseUntil",
 					"#phase":    "phase",
