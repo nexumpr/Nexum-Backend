@@ -210,7 +210,31 @@ jobs:
         run: |
           go run github.com/zricethezav/gitleaks/v8@v8.30.1 \
             detect --source . --config .gitleaks.toml \
-            --baseline-path .gitleaks-baseline.json --no-banner --redact --exit-code 1
+            --baseline-path .gitleaks-baseline.json --no-banner --redact \
+            --report-format json --report-path "$RUNNER_TEMP/gitleaks.json" --exit-code 1
+
+      # DIAGNOSTICO TEMPORAL: imprime solo metadatos (regla, archivo, linea, commit),
+      # nunca el secreto ni el match. Se retira antes del merge.
+      - name: Diagnostico de hallazgos (metadatos)
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/gitleaks.json" ]; then
+            python3 - <<'PY'
+          import json, os
+          p = os.path.join(os.environ["RUNNER_TEMP"], "gitleaks.json")
+          with open(p, encoding="utf-8") as f:
+              d = json.load(f)
+          print("HALLAZGOS:", len(d))
+          for x in d:
+              print(
+                  "RuleID={} File={} StartLine={} Commit={}".format(
+                      x.get("RuleID"), x.get("File"), x.get("StartLine"), (x.get("Commit") or "")[:12]
+                  )
+              )
+          PY
+          else
+            echo "sin informe de gitleaks"
+          fi
 
   iac:
     name: Validacion Terraform e IaC
