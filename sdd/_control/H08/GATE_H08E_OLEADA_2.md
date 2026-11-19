@@ -5,7 +5,7 @@
 | Documento | `sdd/_control/H08/GATE_H08E_OLEADA_2.md` |
 | Versión | 1.1.0 |
 | Fecha | 2026-11-18 |
-| Estado | **PENDING_HUMAN_APPROVAL** |
+| Estado | **APPROVED** — frases concedidas por el responsable el 2026-11-18 (registro en §12.1) |
 | Autoridad que lo motiva | Instrucción humana del 2026-11-18: «YA EMPEZAMOS OLEADA 2» |
 | Instrumento de concurrencia | **RFC-019** (cláusula **E-3**, reutilización por oleada) |
 | Instrumento contractual | **RFC-021** (frecuencias de recurrentes) — `PROPUESTO`, frase separada |
@@ -225,3 +225,13 @@ APRUEBO_RFC_021_FRECUENCIAS_RECURRENTES
 
 Ninguna de las dos autoriza merges, `terraform apply`, publicación S3 ni el cambio del texto de
 E015.
+
+### 12.1 Registro de aprobación
+
+| Frase | Estado | Fecha | Efecto |
+|---|---|---|---|
+| `APRUEBO_GATE_OLEADA_2_RFC019_E014_E027_E028_E029_E030_E031_E032_E033_E034_E035_E036_E038_E039_E040_E041` | **CONCEDIDA** | 2026-11-18 | Habilita implementación, ramas y PR de los 15 endpoints |
+| `APRUEBO_RFC_021_FRECUENCIAS_RECURRENTES` | **CONCEDIDA** | 2026-11-18 | Habilita la corrección aditiva del enum de recurrentes |
+
+Siguen requiriendo autorización propia y separada: merge de cada PR, `terraform apply`, publicación
+S3, `instance refresh` y el cambio de texto de E015.

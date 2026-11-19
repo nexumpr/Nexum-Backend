@@ -5,7 +5,7 @@
 | Documento | `sdd/_control/H08/RFC-021-FRECUENCIAS_RECURRENTES.md` |
 | Versión | 1.0.0 |
 | Fecha | 2026-11-18 |
-| Estado | **PROPUESTO — no aplicado** |
+| Estado | **APPROVED** — `APRUEBO_RFC_021_FRECUENCIAS_RECURRENTES` concedida el 2026-11-18 |
 | Aprobador | Responsable de Nexum-Backend |
 | Frase | `APRUEBO_RFC_021_FRECUENCIAS_RECURRENTES` |
 | Precedente | `RFC-020` (APROBADA en Oleada 1): 7 canónicos + 2 alias heredados |
@@ -119,3 +119,4 @@ respuesta.
 | Fecha | Cambio | Estado |
 |---|---|---|
 | 2026-11-18 | Versión 1.0.0 creada a partir del hallazgo F-01 del Gate de Oleada 2 | PROPUESTO |
+| 2026-11-18 | `APRUEBO_RFC_021_FRECUENCIAS_RECURRENTES`: aprobada; habilita la ampliación aditiva del enum y la normalización de alias | APPROVED |
