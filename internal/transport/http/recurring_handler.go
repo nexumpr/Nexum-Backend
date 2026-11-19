@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
 	appRecurring "github.com/nexumpr/Nexum-Backend/internal/application/recurring"
 	domainRecurring "github.com/nexumpr/Nexum-Backend/internal/domain/recurring"
 	"github.com/nexumpr/Nexum-Backend/internal/ports"
@@ -14,7 +15,8 @@ import (
 	"github.com/nexumpr/Nexum-Backend/pkg/httputil"
 )
 
-// Transporte de pagos recurrentes: E033 (`POST /api/v1/recurring-payments`).
+// Transporte de pagos recurrentes: E033 (`POST /api/v1/recurring-payments`) y E034
+// (`GET /api/v1/recurring-payments/{recurringPaymentId}`).
 //
 // La ruta exige `Authorization: Bearer` con JWT RS256 y estado autoritativo de la sesión en
 // DynamoDB: la identidad sale exclusivamente de `sub`/`sid` verificados y el cliente no puede
@@ -254,4 +256,98 @@ func (h *RecurringCreateHandler) serve(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Idempotent-Replay", "true")
 	}
 	escribirJSONCrudo(w, http.StatusCreated, resultado.Body)
+}
+
+// ---------------- E034: GET /api/v1/recurring-payments/{recurringPaymentId} ----------------
+
+// recurringPaymentIDFromPath extrae `recurringPaymentId` del path —el router lo expone con
+// `SetPathValue`, nunca por query ni por cabecera— y valida la representación canónica de
+// uuid que publica el contrato (`format: uuid`). Un valor ausente o mal formado se responde
+// 400 sin reflejar el valor recibido.
+func recurringPaymentIDFromPath(r *http.Request) (string, bool) {
+	valor := strings.TrimSpace(r.PathValue("recurringPaymentId"))
+	if valor == "" {
+		return "", false
+	}
+	return valor, appIdentity.IsUUID(valor)
+}
+
+// RecurringGetHandler sirve `GET /api/v1/recurring-payments/{recurringPaymentId}` (E034).
+//
+// La propiedad del recurso se resuelve por construcción: la clave es `USER#<sub>`, de modo que
+// el identificador de otra cuenta no existe en la partición del llamador y produce el mismo
+// 404 que uno inexistente (sin enumeración).
+//
+// Los ítems heredados del alta (D-E032-01) se devuelven igual que los creados por E033: la
+// proyección determinista ocurre en el adaptador y aquí no se distingue su origen.
+type RecurringGetHandler struct {
+	service   *appRecurring.Service
+	logger    *slog.Logger
+	protegido http.Handler
+}
+
+// NewRecurringGetHandler construye el handler. Sin servicio, sin proveedor de tokens o sin
+// autorizador de sesión, el endpoint responde 503 (fail-closed).
+func NewRecurringGetHandler(
+	servicio *appRecurring.Service,
+	tokens ports.TokenProvider,
+	sesiones ports.SessionAuthorizer,
+	limitador LimitadorRuta,
+	logger *slog.Logger,
+) *RecurringGetHandler {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	handler := &RecurringGetHandler{service: servicio, logger: logger}
+	handler.protegido = cadenaRecurrente(tokens, sesiones, limitador, "e034", handler.serve)
+	return handler
+}
+
+// ServeHTTP fija la cabecera de caché antes de cualquier decisión y delega en la cadena
+// autenticada.
+func (h *RecurringGetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Información financiera del titular: nunca cacheable por proxies ni por el cliente.
+	w.Header().Set("Cache-Control", "private, no-store")
+
+	if h == nil || h.service == nil || h.protegido == nil {
+		writeRegisterError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "servicio no disponible", nil)
+		return
+	}
+	h.protegido.ServeHTTP(w, r)
+}
+
+// serve se ejecuta con la sesión ya verificada.
+func (h *RecurringGetHandler) serve(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		writeRegisterError(w, r, http.StatusUnauthorized, "UNAUTHORIZED", "sesion no valida", nil)
+		return
+	}
+
+	paymentID, valido := recurringPaymentIDFromPath(r)
+	if !valido {
+		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+			{Field: "recurringPaymentId", Reason: "invalid_format"},
+		})
+		return
+	}
+
+	pago, err := h.service.Get(r.Context(), userID, paymentID)
+	if err != nil {
+		writeRecurringError(h.logger, "recurring-get", w, r, err)
+		return
+	}
+
+	cuerpo, err := pago.Body()
+	if err != nil {
+		h.logger.ErrorContext(r.Context(), "recurring-get: fallo al serializar la respuesta",
+			slog.String("error_class", "response_write"),
+			slog.String("trace_id", traceID(r)))
+		writeRegisterError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "error interno", nil)
+		return
+	}
+
+	// ETag fuerte de la versión vigente: es el validador que E035 exige en `If-Match`.
+	w.Header().Set("ETag", FormatETag(pago.Version))
+	escribirJSONCrudo(w, http.StatusOK, cuerpo)
 }
