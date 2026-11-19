@@ -121,3 +121,15 @@ condition = "AND"
 paths = ['''^tests/unit/application/email_verification_request_test\.go$''']
 regexTarget = "line"
 regexes = ['''Trim\([^)]*"0123456789abcdef"''']
+
+# Oleada 2 (2026-11-18): falso positivo en la prueba de E028. La asignacion
+# `IdempotencyKey = "otra-clave-sintetica-de-prueba-0002"` es un literal fijo de
+# prueba que nunca se envia a ningun servicio. La excepcion es minima: archivo
+# exacto y linea exacta con esa asignacion; otro valor u otro archivo siguen
+# generando hallazgo.
+[[rules.allowlists]]
+description = "Idempotency-Key sintetica de la prueba de movimientos (literal fijo, no credencial)"
+condition = "AND"
+paths = ['''^tests/unit/application/movements_test\.go$''']
+regexTarget = "line"
+regexes = ['''^\s*\w+\.IdempotencyKey\s*=\s*"otra-clave-sintetica-de-prueba-0002"\s*$''']

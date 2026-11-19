@@ -10,7 +10,7 @@
   ".github/workflows/sdd-validacion.yml": "03c7488721798eb3dbfc0983176fbb7ceea5cc353f4efec76a6e23b62312e982",
   ".gitignore": "6feeccfef1cd45775c0b1929e0375fb09891b522a002e39efb814e0e19cc32d2",
   ".gitleaks-baseline.json": "3e15607de046871215a1420a213eda1ef413c38328f8acc1d1701475cdc5b4b4",
-  ".gitleaks.toml": "e16f52db97162115c02f2074f6b4c6031c18e893f98e809d66b7b5803d0f63ef",
+  ".gitleaks.toml": "45c0edfaecbde6344e4ffb3bd755f14d12ebd2ff144b1c20e9c9a36615e29507",
   ".opencode/agents/api-contract-guardian.md": "385ef21da9692eff5f3e9ec22efd25a52134403beb1fa0ff06dc6ee86bb2a1ea",
   ".opencode/agents/aws-terraform-engineer.md": "d101b3392e49626728075828f0ff4be870659f6adf794747f4b42c9a50bccd80",
   ".opencode/agents/devsecops-security.md": "2f33d6dd423f0fc636dc2df965e73f69ce628f219eab2616b13304c2f1361bc6",
