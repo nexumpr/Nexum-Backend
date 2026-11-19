@@ -2111,11 +2111,11 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 
 ## E015 — aviso de privacidad 2026-11-v3 (propuesta congelada, 2026-11-19)
 
-- Archivo propuesto: `internal/application/privacy/aviso_2026_11_v3.txt` (7 829 bytes).
-- SHA-256: `5c5b65bdd0ecce62d004544b4702529cc51dd32c27a768294fd6285da1e317f5`.
+- Archivo propuesto: `internal/application/privacy/aviso_2026_11_v3.txt` (8 123 bytes).
+- SHA-256: `e925596adff1b3ebb9a17064d44f5f6b84bfbdfb874396cd51efc6c0ac3f8d83`.
 - Cambios frente a `2026-11-v2`: declara movimientos, pagos recurrentes y metas; describe la eliminación desde la app con bloqueo inmediato, revocación de sesiones y purga verificable; distingue vencimiento lógico de eliminación física asíncrona del proveedor y no promete plazo de TTL; mantiene presupuestos, aportaciones, exportación, notificaciones, análisis y voz como no disponibles.
 - Estado: DRAFT congelado. NO publicado, NO embebido; el hash productivo permanece intacto.
-- Gate requerido: `APRUEBO_AVISO_PRIVACIDAD_E015_2026_11_V3_SHA256_5c5b65bdd0ecce62d004544b4702529cc51dd32c27a768294fd6285da1e317f5`.
+- Gate requerido: `APRUEBO_AVISO_PRIVACIDAD_E015_2026_11_V3_SHA256_e925596adff1b3ebb9a17064d44f5f6b84bfbdfb874396cd51efc6c0ac3f8d83`.
 - E014 no se anuncia como funcionalmente aceptado hasta este Gate y hasta la verificación HTTP real.
 
 ## Oleada 2 — merges ejecutados (2026-11-19)
