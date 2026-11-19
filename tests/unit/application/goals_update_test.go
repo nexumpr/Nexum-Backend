@@ -67,8 +67,6 @@ func e041Texto(valor string) *string { return &valor }
 
 func e041Cents(valor int64) *int64 { return &valor }
 
-func e041Fecha(valor time.Time) *time.Time { return &valor }
-
 // TestE041ModificaNombreYFecha comprueba el camino feliz: importes históricos intactos, versión
 // incrementada y `updatedAt` con la hora del servidor.
 func TestE041ModificaNombreYFecha(t *testing.T) {
