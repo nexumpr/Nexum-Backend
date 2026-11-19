@@ -113,34 +113,9 @@ func (s *MovementsStore) CreateMovement(ctx context.Context, write appMovements.
 	}
 
 	// 2. Transacción atómica: recurso + registro. Nunca se confirma uno sin el otro.
-	pk, sk, gsi1pk, gsi1sk := domainDynamo.MovementKeys(userID, movimiento.ID, movimiento.Type, movimiento.OccurredAt)
+	movementItem, _, sk := movementRecord(userID, movimiento, ahora, ahora)
 	ptrPK, ptrSK := MovementPointerKeys(userID, movimiento.ID)
 	ahoraISO := ahora.Format(time.RFC3339)
-
-	movementItem := map[string]types.AttributeValue{
-		"PK":          stringAttr(pk),
-		"SK":          stringAttr(sk),
-		"entityType":  stringAttr(movementEntityType),
-		"userId":      stringAttr(userID),
-		"movementId":  stringAttr(movimiento.ID),
-		"type":        stringAttr(movimiento.Type),
-		"amountCents": numberAttr(movimiento.AmountCents),
-		"currency":    stringAttr(movimiento.Currency),
-		"categoryId":  stringAttr(movimiento.CategoryID),
-		"description": stringAttr(movimiento.Description),
-		"occurredAt":  stringAttr(appMovements.SortableTime(movimiento.OccurredAt)),
-		"version":     numberAttr(movimiento.Version),
-		"createdAt":   stringAttr(ahoraISO),
-		"updatedAt":   stringAttr(ahoraISO),
-		"GSI1PK":      stringAttr(gsi1pk),
-		"GSI1SK":      stringAttr(gsi1sk),
-	}
-	if v := strings.TrimSpace(movimiento.ContributionID); v != "" {
-		movementItem["contributionId"] = stringAttr(v)
-	}
-	if v := strings.TrimSpace(movimiento.RecurringPaymentID); v != "" {
-		movementItem["recurringPaymentId"] = stringAttr(v)
-	}
 
 	pointerItem := map[string]types.AttributeValue{
 		"PK":         stringAttr(ptrPK),
@@ -490,6 +465,8 @@ func movimientoDesdeItem(item map[string]types.AttributeValue, userID string) (a
 		version = 1
 	}
 
+	creado, _ := attributeISOTime(item["createdAt"])
+
 	return appMovements.Movement{
 		ID:                 id,
 		Type:               tipo,
@@ -501,6 +478,7 @@ func movimientoDesdeItem(item map[string]types.AttributeValue, userID string) (a
 		Version:            version,
 		ContributionID:     stringAttribute(item["contributionId"]),
 		RecurringPaymentID: stringAttribute(item["recurringPaymentId"]),
+		CreatedAt:          creado,
 	}, true
 }
 
@@ -522,4 +500,276 @@ func occurredAtFromSK(sk string) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	return appMovements.ParseStoredOccurredAt(resto[:indice])
+}
+
+// movementRecord construye el ítem principal completo y devuelve también su PK y su SK, para que
+// el llamador referencie la posición física sin recalcularla. Es la ÚNICA definición del ítem:
+// el alta y el movimiento de E030 escriben exactamente los mismos atributos.
+func movementRecord(userID string, m appMovements.Movement, creado, actualizado time.Time) (map[string]types.AttributeValue, string, string) {
+	pk, sk, gsi1pk, gsi1sk := domainDynamo.MovementKeys(userID, m.ID, m.Type, m.OccurredAt)
+	item := map[string]types.AttributeValue{
+		"PK":          stringAttr(pk),
+		"SK":          stringAttr(sk),
+		"entityType":  stringAttr(movementEntityType),
+		"userId":      stringAttr(userID),
+		"movementId":  stringAttr(m.ID),
+		"type":        stringAttr(m.Type),
+		"amountCents": numberAttr(m.AmountCents),
+		"currency":    stringAttr(m.Currency),
+		"categoryId":  stringAttr(m.CategoryID),
+		"description": stringAttr(m.Description),
+		"occurredAt":  stringAttr(appMovements.SortableTime(m.OccurredAt)),
+		"version":     numberAttr(m.Version),
+		"createdAt":   stringAttr(creado.UTC().Format(time.RFC3339)),
+		"updatedAt":   stringAttr(actualizado.UTC().Format(time.RFC3339)),
+		"GSI1PK":      stringAttr(gsi1pk),
+		"GSI1SK":      stringAttr(gsi1sk),
+	}
+	if v := strings.TrimSpace(m.ContributionID); v != "" {
+		item["contributionId"] = stringAttr(v)
+	}
+	if v := strings.TrimSpace(m.RecurringPaymentID); v != "" {
+		item["recurringPaymentId"] = stringAttr(v)
+	}
+	return item, pk, sk
+}
+
+// getItem lee una clave exacta con consistencia fuerte. Devuelve (nil, nil) cuando no existe.
+func (s *MovementsStore) getItem(ctx context.Context, pk, sk string) (map[string]types.AttributeValue, error) {
+	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(pk),
+			"SK": stringAttr(sk),
+		},
+		ConsistentRead: aws.Bool(true),
+	})
+	if err != nil {
+		return nil, appMovements.ErrUnavailable
+	}
+	if out == nil || len(out.Item) == 0 {
+		return nil, nil
+	}
+	return out.Item, nil
+}
+
+// LoadMovement resuelve un movimiento propio con dos lecturas exactas (E029):
+//
+//	USER#<userId>/MOVEMENTPTR#<movementId>  ->  targetSK
+//	USER#<userId>/<targetSK>                ->  movimiento
+//
+// Es O(1) y nunca enumera la partición. Devuelve (nil, nil) cuando el localizador no existe, la
+// clave la ocupa otra entidad, el titular del ítem no coincide o el principal desapareció: todos
+// esos casos son indistinguibles para el cliente (404) y no revelan existencia ajena.
+func (s *MovementsStore) LoadMovement(ctx context.Context, userID, movementID string) (*appMovements.Movement, error) {
+	if s == nil || s.client == nil || s.table == "" {
+		return nil, appMovements.ErrUnavailable
+	}
+	titular := strings.TrimSpace(userID)
+	id := strings.TrimSpace(movementID)
+	if titular == "" || id == "" {
+		return nil, appMovements.ErrUnavailable
+	}
+
+	ptrPK, ptrSK := MovementPointerKeys(titular, id)
+	puntero, err := s.getItem(ctx, ptrPK, ptrSK)
+	if err != nil {
+		return nil, err
+	}
+	if puntero == nil {
+		return nil, nil
+	}
+	if entidad := stringAttribute(puntero["entityType"]); entidad != "" && entidad != movementPointerEntityType {
+		return nil, nil
+	}
+	if dueno := stringAttribute(puntero["userId"]); dueno != "" && dueno != titular {
+		return nil, nil
+	}
+	objetivo := strings.TrimSpace(stringAttribute(puntero["targetSK"]))
+	if !strings.HasPrefix(objetivo, domainDynamo.PrefixMovement) {
+		// Localizador sin destino utilizable: no se adivina la posición del ítem.
+		return nil, nil
+	}
+
+	principal, err := s.getItem(ctx, domainDynamo.PrefixUser+titular, objetivo)
+	if err != nil {
+		return nil, err
+	}
+	if principal == nil {
+		return nil, nil
+	}
+	movimiento, ok := movimientoDesdeItem(principal, titular)
+	if !ok || movimiento.ID != id {
+		return nil, nil
+	}
+	return &movimiento, nil
+}
+
+// ReplaceMovement aplica la modificación de E030 con compare-and-swap por versión.
+//
+// Dos caminos, ambos en UNA transacción (nunca hay estado intermedio visible):
+//
+//   - la SK no cambia: un único `Update` condicionado a `#version = :expected` que fija
+//     `categoryId`, `description`, `occurredAt`, `updatedAt` y la versión siguiente;
+//   - la SK cambia (`occurredAt` es parte de la clave): `Put` del ítem nuevo con
+//     `attribute_not_exists(PK)`, `Delete` del ítem viejo condicionado a la versión esperada y
+//     `Update` del puntero condicionado a que siga apuntando a la SK vieja. Si otro escritor movió
+//     el ítem, la transacción se cancela entera.
+//
+// Una cancelación por condición se traduce en ErrConflict: el servicio relee y decide entre 412,
+// 404 y 409 sin haber escrito nada.
+func (s *MovementsStore) ReplaceMovement(ctx context.Context, write appMovements.ReplaceWrite) (*appMovements.Movement, error) {
+	if s == nil || s.client == nil || s.table == "" {
+		return nil, appMovements.ErrUnavailable
+	}
+	titular := strings.TrimSpace(write.UserID)
+	id := strings.TrimSpace(write.MovementID)
+	if titular == "" || id == "" || write.ExpectedVersion < 1 {
+		return nil, appMovements.ErrUnavailable
+	}
+	anterior := write.Previous
+	siguiente := write.Next
+	if siguiente.ID != id || siguiente.Version != write.ExpectedVersion+1 {
+		// Invariante del caso de uso: nunca se escribe una versión que no sea expected+1.
+		return nil, appMovements.ErrUnavailable
+	}
+
+	ahora := write.Now.UTC()
+	creado := anterior.CreatedAt
+	if creado.IsZero() {
+		creado = ahora
+	}
+	item, _, skNueva := movementRecord(titular, siguiente, creado, ahora)
+	pk := domainDynamo.PrefixUser + titular
+	_, skVieja, _, _ := domainDynamo.MovementKeys(titular, id, anterior.Type, anterior.OccurredAt)
+	ptrPK, ptrSK := MovementPointerKeys(titular, id)
+	ahoraISO := ahora.Format(time.RFC3339)
+
+	var items []types.TransactWriteItem
+	if skVieja == skNueva {
+		items = []types.TransactWriteItem{{Update: &types.Update{
+			TableName: aws.String(s.table),
+			Key: map[string]types.AttributeValue{
+				"PK": stringAttr(pk),
+				"SK": stringAttr(skVieja),
+			},
+			UpdateExpression:    aws.String("SET categoryId = :categoria, description = :descripcion, occurredAt = :ocurrido, updatedAt = :actualizado, #version = :siguiente"),
+			ConditionExpression: aws.String("attribute_exists(PK) AND #version = :esperada"),
+			ExpressionAttributeNames: map[string]string{
+				"#version": "version",
+			},
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":categoria":   stringAttr(siguiente.CategoryID),
+				":descripcion": stringAttr(siguiente.Description),
+				":ocurrido":    stringAttr(appMovements.SortableTime(siguiente.OccurredAt)),
+				":actualizado": stringAttr(ahoraISO),
+				":siguiente":   numberAttr(siguiente.Version),
+				":esperada":    numberAttr(write.ExpectedVersion),
+			},
+		}}}
+	} else {
+		items = []types.TransactWriteItem{
+			{Put: &types.Put{
+				TableName:           aws.String(s.table),
+				Item:                item,
+				ConditionExpression: aws.String("attribute_not_exists(PK)"),
+			}},
+			{Delete: &types.Delete{
+				TableName: aws.String(s.table),
+				Key: map[string]types.AttributeValue{
+					"PK": stringAttr(pk),
+					"SK": stringAttr(skVieja),
+				},
+				ConditionExpression:      aws.String("attribute_exists(PK) AND #version = :esperada"),
+				ExpressionAttributeNames: map[string]string{"#version": "version"},
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":esperada": numberAttr(write.ExpectedVersion),
+				},
+			}},
+			{Update: &types.Update{
+				TableName: aws.String(s.table),
+				Key: map[string]types.AttributeValue{
+					"PK": stringAttr(ptrPK),
+					"SK": stringAttr(ptrSK),
+				},
+				UpdateExpression:    aws.String("SET targetSK = :nueva, updatedAt = :actualizado"),
+				ConditionExpression: aws.String("attribute_exists(PK) AND targetSK = :vieja"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":nueva":       stringAttr(skNueva),
+					":vieja":       stringAttr(skVieja),
+					":actualizado": stringAttr(ahoraISO),
+				},
+			}},
+		}
+	}
+
+	if _, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items}); err != nil {
+		var cancelada *types.TransactionCanceledException
+		if !errors.As(err, &cancelada) {
+			return nil, appMovements.ErrUnavailable
+		}
+		if isConditionalCancel(err) {
+			return nil, appMovements.ErrConflict
+		}
+		return nil, appMovements.ErrUnavailable
+	}
+
+	resultado := siguiente
+	return &resultado, nil
+}
+
+// DeleteMovement borra el ítem principal y su localizador en UNA transacción (E031).
+//
+// La condición del principal es `attribute_exists(PK)`: la posición se tomó de una lectura previa
+// y, si un PATCH concurrente movió el ítem, el borrado se cancela y el servicio relee y reintenta.
+// Si sólo falta el localizador (el principal existe pero el puntero ya no), se repite únicamente
+// el borrado del principal, que es la autoridad.
+func (s *MovementsStore) DeleteMovement(ctx context.Context, write appMovements.DeleteWrite) error {
+	if s == nil || s.client == nil || s.table == "" {
+		return appMovements.ErrUnavailable
+	}
+	titular := strings.TrimSpace(write.UserID)
+	id := strings.TrimSpace(write.MovementID)
+	if titular == "" || id == "" {
+		return appMovements.ErrUnavailable
+	}
+
+	pk := domainDynamo.PrefixUser + titular
+	_, sk, _, _ := domainDynamo.MovementKeys(titular, id, write.Previous.Type, write.Previous.OccurredAt)
+	ptrPK, ptrSK := MovementPointerKeys(titular, id)
+
+	principal := types.TransactWriteItem{Delete: &types.Delete{
+		TableName:           aws.String(s.table),
+		Key:                 map[string]types.AttributeValue{"PK": stringAttr(pk), "SK": stringAttr(sk)},
+		ConditionExpression: aws.String("attribute_exists(PK)"),
+	}}
+	puntero := types.TransactWriteItem{Delete: &types.Delete{
+		TableName: aws.String(s.table),
+		Key:       map[string]types.AttributeValue{"PK": stringAttr(ptrPK), "SK": stringAttr(ptrSK)},
+	}}
+
+	_, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{principal, puntero},
+	})
+	if err == nil {
+		return nil
+	}
+	var cancelada *types.TransactionCanceledException
+	if !errors.As(err, &cancelada) {
+		return appMovements.ErrUnavailable
+	}
+	if transactionItemFailed(err, 0) {
+		// El principal ya no está en esa posición: otra operación lo movió o lo borró.
+		return appMovements.ErrConflict
+	}
+	// Sólo falló el puntero (ya no existía): se repite el borrado del principal.
+	if _, errRetry := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{principal},
+	}); errRetry != nil {
+		if isConditionalCancel(errRetry) {
+			return appMovements.ErrConflict
+		}
+		return appMovements.ErrUnavailable
+	}
+	return nil
 }
