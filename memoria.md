@@ -1981,7 +1981,7 @@ La regla `terraform *` -> `deny` y `terraform apply*` -> `deny` bloqueaban tambi
 Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` APPROVED; RFC-019 E-3 y RFC-021 APPROVED. Estados: IMPLEMENTED / PR_OPEN / CI_GREEN / MERGED / AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED.
 
 ### E028 — `POST /api/v1/movements`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #102, HEAD `089d7e7aac35908ac209bdc16488230ae61ac6d2`.
 - Claves: USER#<id>/MOVEMENT#<occurredAt>#<id> + MOVEMENTPTR#<id> + IDEM#
 - Decisiones: Idempotency-Key obligatoria con UserIdempotencyKeys (PK por usuario); transaccion unica recurso+puntero+registro; importes int64 centimos.
@@ -1989,7 +1989,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E027 — `GET /api/v1/movements`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #103, HEAD `3947ad82ffffd78795419d6db1bcc384c3ab3b22`.
 - Claves: USER#<id> con begins_with(MOVEMENT#)
 - Decisiones: Cursor opaco firmado (httputil) ligado a filtros y usuario; limit 1..100; filtros type/from/to en servidor; sin Scan.
@@ -1997,7 +1997,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E029 — `GET /api/v1/movements/{movementId}`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #104, HEAD `1c410570d881a7de8fb3148b6ce0b0c3dccb8613`.
 - Claves: MOVEMENTPTR#<id> -> MOVEMENT#<occurredAt>#<id>
 - Decisiones: Resolucion O(1) por puntero; 404 homogeneo propio/ajeno; ETag de version.
@@ -2005,7 +2005,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E030 — `PATCH /api/v1/movements/{movementId}`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #105, HEAD `d171f00c7721c05e1e5ade689788cc0ae77fffa5`.
 - Claves: MOVEMENTPTR# + MOVEMENT# (movimiento transaccional del SK al cambiar occurredAt)
 - Decisiones: If-Match obligatorio (428/412); CAS de version; si cambia occurredAt se mueve el item en una transaccion con condicion targetSK.
@@ -2013,7 +2013,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E031 — `DELETE /api/v1/movements/{movementId}`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #106, HEAD `14d11527750bd4459f193fffedda2e8f811e1c4d`.
 - Claves: MOVEMENTPTR# + MOVEMENT#
 - Decisiones: 204 sin cuerpo; 409 si el movimiento tiene aportacion confirmada; borrado transaccional con reintento si el item se movio.
@@ -2021,7 +2021,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E033 — `POST /api/v1/recurring-payments`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #107, HEAD `ed70d395df456c5af40822b17e43423478d22364`.
 - Claves: USER#<id>/RECURRING#<id> + IDEM#
 - Decisiones: RFC-021: acepta 9 frecuencias, persiste y emite 7 canonicas (biweekly->fortnightly, yearly->annual); Idempotency-Key por usuario; no genera pagos (E037 fuera de alcance).
@@ -2029,7 +2029,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E034 — `GET /api/v1/recurring-payments/{recurringPaymentId}`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #108, HEAD `2e29d4a125de0fb5e2f9fe4536e057c861e0b8d9`.
 - Claves: USER#<id>/RECURRING#<id>
 - Decisiones: ETag y 404 homogeneo; proyeccion determinista de items heredados de E001 (startDate desde createdAt, nextDueDate calculada; D-E032-01).
@@ -2037,7 +2037,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E032 — `GET /api/v1/recurring-payments`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #109, HEAD `b9efc0297b5b14dedadb06c34f7e7a9a1140e3a1`.
 - Claves: USER#<id> con begins_with(RECURRING#)
 - Decisiones: Cursor firmado ligado a filtros active/type y usuario; paginacion sin duplicados.
@@ -2045,7 +2045,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E035 — `PATCH /api/v1/recurring-payments/{recurringPaymentId}`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #110, HEAD `2c76fa80abcea43a4fe5e864a3ef7044b47a77f3`.
 - Claves: USER#<id>/RECURRING#<id>
 - Decisiones: If-Match 428/412; frequency no editable (campo desconocido 400); dueDay tri-estado; type inmutable 422; no-op sin subir version.
@@ -2053,7 +2053,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E036 — `DELETE /api/v1/recurring-payments/{recurringPaymentId}`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #111, HEAD `39d100782e4a42938a4622eec1be6616978339e4`.
 - Claves: USER#<id>/RECURRING#<id>
 - Decisiones: 204 idempotente (segundo DELETE no sube version); condicion que alcanza items heredados sin atributo active.
@@ -2061,7 +2061,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E039 — `POST /api/v1/goals`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #112, HEAD `cd94cbfa31b2308e21683fa47e734e30ddf0f68f`.
 - Claves: USER#<id>/GOAL#<id> + IDEM#
 - Decisiones: openingSaved y savedAmount iniciales; 0 <= initialSavedAmount <= targetAmount; Idempotency-Key por usuario; transaccion meta+registro.
@@ -2069,7 +2069,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E040 — `GET /api/v1/goals/{goalId}`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #113, HEAD `f28ecbe937e20a222747118535d86ae3320f12a7`.
 - Claves: USER#<id>/GOAL#<id>
 - Decisiones: GetItem consistente; 404 propio/ajeno; ETag de version.
@@ -2077,7 +2077,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E038 — `GET /api/v1/goals`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #114, HEAD `c07703e3e5320ac05ae39f1230e446afa95a7d5e`.
 - Claves: USER#<id> con begins_with(GOAL#)
 - Decisiones: totals{activeCount,saved} sobre la coleccion completa (no la pagina); cursor firmado ligado a limit+status; topes que fallan cerrado.
@@ -2085,7 +2085,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E041 — `PATCH /api/v1/goals/{goalId}`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #115, HEAD `9bf19c942478dbaa468591b0862ac782e9882a2f`.
 - Claves: USER#<id>/GOAL#<id>
 - Decisiones: If-Match 428/412; CAS de version; targetAmount no puede quedar por debajo de savedAmount; transiciones de estado validas.
@@ -2093,7 +2093,7 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
 
 ### E014 — `DELETE /api/v1/users/me`
-- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED (ver tabla de merges) · AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED = NO.
+- Estado: IMPLEMENTED=YES, MERGED=YES, PR_OPEN=NO, CI_GREEN=YES; AWS_DEPLOYED=NO, HTTPS_VERIFIED=NO, FUNCTIONAL_VERIFIED=NO.
 - PR #116, HEAD `1539de36395ddf7bc98a7b510a03ca402fcc9567`.
 - Claves: USER#<id>/DELETION#<requestId> + QUEUE#DELETION/<requestId> + EMAIL# + REFRESH#
 - Decisiones: Bloqueo y revocacion inmediata (status DELETION_PENDING + sessionEpoch+1); worker con lease Redis, fence en DynamoDB, fases COLLECT/EXTERNAL/PARTITION/VERIFY/TERMINAL; PURGED solo tras verificacion; 503 si el worker no esta activo.

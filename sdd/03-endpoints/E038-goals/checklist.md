@@ -32,11 +32,13 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| Estado | IMPLEMENTED=YES · MERGED=YES · PR_OPEN=NO · CI_GREEN=YES (12/12) · MERGED=YES · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
 | PR | #114 · HEAD `c07703e3e5320ac05ae39f1230e446afa95a7d5e` |
 | Claves DynamoDB | USER#<id> con begins_with(GOAL#) |
 | Decisiones | totals{activeCount,saved} sobre la coleccion completa (no la pagina); cursor firmado ligado a limit+status; topes que fallan cerrado. |
 | Errores y causa raiz | Ninguno propio. |
 | Pruebas | `go build`, `go vet` y suites de aplicacion/adaptador/transporte en verde; donde Windows Application Control bloqueo el binario se declara NOT_RUN_LOCAL y la autoridad es el CI Linux. |
 | Contrato Android | Ruta y esquema segun `sdd/03-endpoints/openapi/nexum-api-v1.json`; errores con `ErrorEnvelope` y `traceId`. |
-| Pendiente | Merge autorizado, release agrupada y verificacion HTTP real. |
+| Pendiente | Publicacion AWS, verificacion HTTP real y aceptacion posterior. |
+
+> **Registro operativo vigente (Oleada 2):** el bloque anterior de esta seccion es la evidencia de la implementacion y el merge. Las casillas `[ ]` del plan historico H06 no se marcan retroactivamente sin evidencia de ejecucion.
