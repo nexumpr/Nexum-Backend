@@ -5,6 +5,8 @@ import (
 	"time"
 
 	domainGoal "github.com/nexumpr/Nexum-Backend/internal/domain/goal"
+	"github.com/nexumpr/Nexum-Backend/internal/domain/money"
+	"github.com/nexumpr/Nexum-Backend/pkg/httputil"
 )
 
 // Store es el puerto de persistencia de los casos de uso de metas. El adaptador real es
@@ -27,7 +29,54 @@ type Store interface {
 	// falla porque otra petición ganó la carrera, devuelve el replay almacenado (mismo
 	// payload) o ErrConflict (payload distinto).
 	CreateGoal(ctx context.Context, write CreateWrite) (*StoredResponse, error)
+
+	// LoadGoal lee una meta del titular con consistencia fuerte. Devuelve (nil, nil) cuando la
+	// clave no existe o la ocupa otra entidad: el servicio responde 404 en ambos casos para no
+	// enumerar recursos ajenos.
+	LoadGoal(ctx context.Context, userID, goalID string) (*domainGoal.Goal, error)
+
+	// ListUserGoals devuelve una página de metas del titular y la `SK` desde la que continuar
+	// (vacía cuando no hay más). `HasStatus` activa el filtro por estado en la propia consulta.
+	ListUserGoals(ctx context.Context, query ListStoreQuery) ([]GoalRow, string, error)
+
+	// AggregateUserGoals recorre TODA la colección de metas del titular y devuelve el número
+	// de metas activas y la suma de su ahorro. El resultado no depende de la página solicitada
+	// (A8 de RFC-016).
+	AggregateUserGoals(ctx context.Context, userID string) (Totals, error)
 }
+
+// ListStoreQuery es la consulta paginada que recibe la persistencia.
+type ListStoreQuery struct {
+	UserID    string
+	Status    domainGoal.Status
+	HasStatus bool
+	StartSK   string
+	Limit     int
+}
+
+// GoalRow es una meta leída de la partición junto a su `SK` completa. La `SK` es lo único que
+// se codifica en el cursor: nunca viaja el identificador de usuario en claro.
+type GoalRow struct {
+	Goal    domainGoal.Goal
+	SortKey string
+}
+
+// Totals es el agregado de la colección completa: metas en estado `active` y suma exacta de su
+// ahorro, en céntimos.
+type Totals struct {
+	ActiveCount int
+	Saved       money.Money
+}
+
+// Límites de página del contrato de E038. Viven junto al puerto porque los comparten el
+// adaptador (validación de la consulta), el caso de uso y el transporte.
+const (
+	// DefaultListLimit es el tamaño de página por defecto del contrato (25).
+	DefaultListLimit = httputil.DefaultPageLimit
+
+	// MaxListLimit es el tamaño de página máximo admitido por el contrato (100).
+	MaxListLimit = httputil.MaxPageLimit
+)
 
 // IdempotencyRecord es el registro persistido de una operación idempotente.
 type IdempotencyRecord struct {

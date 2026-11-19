@@ -12,6 +12,7 @@ import (
 	"time"
 
 	appGoals "github.com/nexumpr/Nexum-Backend/internal/application/goals"
+	domainGoal "github.com/nexumpr/Nexum-Backend/internal/domain/goal"
 	internalhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 )
 
@@ -90,6 +91,20 @@ func (s *e039HTTPStore) escrituras() []appGoals.CreateWrite {
 	copia := make([]appGoals.CreateWrite, len(s.creates))
 	copy(copia, s.creates)
 	return copia
+}
+
+// Los tres métodos siguientes completan el puerto `goals.Store`. E039 no los usa; las pruebas
+// de E038/E040 viven en goals_queries_test.go con su propio doble con estado.
+func (s *e039HTTPStore) LoadGoal(context.Context, string, string) (*domainGoal.Goal, error) {
+	return nil, nil
+}
+
+func (s *e039HTTPStore) ListUserGoals(context.Context, appGoals.ListStoreQuery) ([]appGoals.GoalRow, string, error) {
+	return nil, "", nil
+}
+
+func (s *e039HTTPStore) AggregateUserGoals(context.Context, string) (appGoals.Totals, error) {
+	return appGoals.Totals{}, nil
 }
 
 func e039HTTPServicio(store appGoals.Store) *appGoals.Service {

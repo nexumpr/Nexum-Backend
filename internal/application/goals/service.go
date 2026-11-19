@@ -168,10 +168,12 @@ func hashCreatePayload(name string, targetCents, openingCents int64, currency, t
 
 // Service orquesta los casos de uso de metas.
 type Service struct {
-	store    Store
-	now      func() time.Time
-	newID    func() (string, error)
-	location func(goalID string) string
+	store        Store
+	now          func() time.Time
+	newID        func() (string, error)
+	location     func(goalID string) string
+	cursorSecret []byte
+	cursorTTL    time.Duration
 }
 
 // NewService construye el servicio. Sin almacén todas las llamadas fallan cerrado con
@@ -184,7 +186,29 @@ func NewService(store Store) *Service {
 		location: func(goalID string) string {
 			return "/api/v1/goals/" + strings.TrimSpace(goalID)
 		},
+		cursorTTL: httputil.DefaultCursorTTL,
 	}
+}
+
+// WithCursorSecret configura la clave HMAC con la que se firman los cursores de E038. Sin ella
+// el listado falla cerrado (503): nunca se emite un cursor sin firma. La clave se deriva con
+// separación de dominio de un secreto ya existente (A-040 §2.3), de modo que no se introduce un
+// secreto nuevo en el bundle.
+func (s *Service) WithCursorSecret(secret []byte) *Service {
+	if len(secret) > 0 {
+		copia := make([]byte, len(secret))
+		copy(copia, secret)
+		s.cursorSecret = copia
+	}
+	return s
+}
+
+// WithCursorTTL permite acortar la vigencia del cursor en pruebas.
+func (s *Service) WithCursorTTL(ttl time.Duration) *Service {
+	if ttl != 0 {
+		s.cursorTTL = ttl
+	}
+	return s
 }
 
 // WithClock permite inyectar un reloj determinista en pruebas.
