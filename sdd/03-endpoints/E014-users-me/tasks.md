@@ -53,3 +53,19 @@
 - **Justificacion:** tras el tombstone (`DELETION_PENDING` + `sessionEpoch+1`) ninguna ruta autenticada puede servir datos del usuario (el middleware exige `PROFILE ACTIVE`); las entradas de cache son inalcanzables y su TTL esta acotado (30 s en agregados). El trabajo conserva la verificacion de particion, localizadores y cola antes de `PURGED`.
 - **Pruebas:** `TestE014InvalidacionDenegadaPorACLCompletaPurga` (NOPERM -> PURGED) y `TestE014InvalidacionTransitoriaNoProducePurged` (Redis caido -> RETRY, nunca PURGED), ademas de las 11 pruebas previas del worker.
 - **Estado:** corregido en rama `fix/h08e-e014-cache-invalidation`; merge, release y verificacion AWS pendientes de sus Gates.
+
+### Precision del hotfix E014 (revision de seguridad)
+
+- La excepcion ya **no** se decide con `strings.Contains`: el adaptador Redis emite el sentinel
+  tipado `ports.ErrCacheScanDenegado` **solo** cuando el `NOPERM` corresponde al comando `SCAN`
+  (se exige `NOPERM` y `'SCAN'` en el mensaje). Un `NOPERM` de `DEL`, `KEYS` u otra operacion, un
+  timeout, un error de conexion o un error desconocido conservan `RETRY`: nunca producen `PURGED`.
+- Cobertura: `TestEsScanDenegadoDistinguenComando` (adaptador), `TestE014InvalidacionDenegadaPorACLCompletaPurga`
+  (sentinel -> PURGED), `TestE014InvalidacionTransitoriaNoProducePurged` (Redis caido -> RETRY),
+  `TestE014DelDenegadoNoProducePurged` (NOPERM de DEL -> RETRY) y
+  `TestE014ScanDenegadoSinSentinelNoProducePurged` (cadena suelta -> RETRY).
+- Alcance de la garantia de cache: los datos de usuario cacheados son los agregados del tablero
+  (TTL 30 s). Los contadores de cuota guardan solo hashes HMAC con TTL propio y no contienen
+  datos financieros. Toda ruta autenticada exige `PROFILE ACTIVE` con lectura consistente, de
+  modo que una entrada residual no es servible. La verificacion durable de DynamoDB sigue siendo
+  obligatoria antes de `PURGED`.

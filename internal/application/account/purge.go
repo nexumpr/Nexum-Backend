@@ -537,7 +537,7 @@ func (w *PurgeWorker) pasoTerminal(ctx context.Context, control *PurgeControl) (
 		// entradas del usuario son inalcanzables tras el tombstone (toda ruta autenticada
 		// exige PROFILE ACTIVE) y su TTL esta acotado (30 s en agregados). Se registra y se
 		// continua con la verificacion durable; cualquier otro error si bloquea el cierre.
-		if permisoDenegadoRedis(err) {
+		if errors.Is(err, ports.ErrCacheScanDenegado) {
 			w.logger.WarnContext(ctx, "E014: invalidacion de cache denegada por ACL; residuo acotado por TTL",
 				slog.String("error_class", "cache_invalidation_denied"),
 				slog.String("request_id", control.RequestID))
@@ -637,15 +637,4 @@ func nuevoOwner() string {
 		return "purga-e014"
 	}
 	return "purga-e014-" + hex.EncodeToString(b)
-}
-
-// permisoDenegadoRedis distingue la denegacion del comando SCAN/KEYS por el ACL de A-080
-// de una indisponibilidad real de Redis. Solo la primera permite cerrar el trabajo: la
-// segunda debe reintentarse y nunca producir un PURGED falso.
-func permisoDenegadoRedis(err error) bool {
-	if err == nil {
-		return false
-	}
-	txt := strings.ToUpper(err.Error())
-	return strings.Contains(txt, "NOPERM") || strings.Contains(txt, "NO PERMISSIONS")
 }
