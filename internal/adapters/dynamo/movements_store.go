@@ -629,9 +629,14 @@ func (s *MovementsStore) ReplaceMovement(ctx context.Context, write appMovements
 	}
 	anterior := write.Previous
 	siguiente := write.Next
-	if siguiente.ID != id || siguiente.Version != write.ExpectedVersion+1 {
-		// Invariante del caso de uso: nunca se escribe una versión que no sea expected+1.
+	if siguiente.ID != id {
+		// Invariante del caso de uso: el identificador no cambia en una edición.
 		return nil, appMovements.ErrUnavailable
+	}
+	if siguiente.Version != write.ExpectedVersion+1 {
+		// La versión esperada por el cliente ya no es la vigente: es un conflicto de
+		// versión (412), no un fallo de dependencia.
+		return nil, appMovements.ErrConflict
 	}
 
 	ahora := write.Now.UTC()
