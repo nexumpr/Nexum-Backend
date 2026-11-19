@@ -158,3 +158,12 @@ condition = "AND"
 paths = ['''^tests/unit/application/goals_read_test\.go$''']
 regexTarget = "line"
 regexes = ['''^\s*e038Secreto = "secreto-de-cursores-de-prueba-32b"\s*$''']
+
+# Oleada 2 (2026-11-18): falso positivo de la prueba de E032. La asignacion
+# `IdempotencyKey = "clave-vencida-e032-0001"` es un literal fijo de prueba.
+[[rules.allowlists]]
+description = "Idempotency-Key sintetica de la prueba de recurrencia (literal fijo, no credencial)"
+condition = "AND"
+paths = ['''^tests/unit/application/recurring_test\.go$''']
+regexTarget = "line"
+regexes = ['''^\s*otro\.IdempotencyKey\s*=\s*"clave-vencida-e032-0001"\s*$''']
