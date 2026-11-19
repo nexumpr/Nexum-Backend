@@ -27,3 +27,16 @@
 - [ ] Se consulta en el detalle y en el listado con el mismo tipo y formato.
 - [ ] Se puede editar (si aplica) y la edicion se refleja al releer.
 - [ ] Validacion negativa devuelve 422 sin filtrar datos internos.
+
+## Oleada 2 (2026-11-19) — E014 `DELETE /api/v1/users/me`
+
+| Campo | Valor |
+|---|---|
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #116 · HEAD `ea38d23` |
+| Claves DynamoDB | USER#<id>/DELETION#<requestId> + QUEUE#DELETION/<requestId> + EMAIL# + REFRESH# |
+| Decisiones | Bloqueo y revocacion inmediata (status DELETION_PENDING + sessionEpoch+1); worker con lease Redis, fence en DynamoDB, fases COLLECT/EXTERNAL/PARTITION/VERIFY/TERMINAL; PURGED solo tras verificacion; 503 si el worker no esta activo. |
+| Errores y causa raiz | G101 (constante con Password), G115 (int32 sin rango), G602 (indice de slice) y U1000; colision de isConditionalCheckFailed con recurrentes resuelta renombrando en E014. |
+| Pruebas | `go build`, `go vet` y suites de aplicacion/adaptador/transporte en verde; donde Windows Application Control bloqueo el binario se declara NOT_RUN_LOCAL y la autoridad es el CI Linux. |
+| Contrato Android | Ruta y esquema segun `sdd/03-endpoints/openapi/nexum-api-v1.json`; errores con `ErrorEnvelope` y `traceId`. |
+| Pendiente | Merge autorizado, release agrupada y verificacion HTTP real. |

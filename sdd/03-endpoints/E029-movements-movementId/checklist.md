@@ -27,3 +27,16 @@
 - [ ] Se consulta en el detalle y en el listado con el mismo tipo y formato.
 - [ ] Se puede editar (si aplica) y la edicion se refleja al releer.
 - [ ] Validacion negativa devuelve 422 sin filtrar datos internos.
+
+## Oleada 2 (2026-11-19) — E029 `GET /api/v1/movements/{movementId}`
+
+| Campo | Valor |
+|---|---|
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #104 · HEAD `8c021c0663bb1e83d936926675f67ff1ed7e398b` |
+| Claves DynamoDB | MOVEMENTPTR#<id> -> MOVEMENT#<occurredAt>#<id> |
+| Decisiones | Resolucion O(1) por puntero; 404 homogeneo propio/ajeno; ETag de version. |
+| Errores y causa raiz | Ninguno propio. |
+| Pruebas | `go build`, `go vet` y suites de aplicacion/adaptador/transporte en verde; donde Windows Application Control bloqueo el binario se declara NOT_RUN_LOCAL y la autoridad es el CI Linux. |
+| Contrato Android | Ruta y esquema segun `sdd/03-endpoints/openapi/nexum-api-v1.json`; errores con `ErrorEnvelope` y `traceId`. |
+| Pendiente | Merge autorizado, release agrupada y verificacion HTTP real. |

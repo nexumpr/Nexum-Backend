@@ -27,3 +27,16 @@
 - [ ] Se consulta en el detalle y en el listado con el mismo tipo y formato.
 - [ ] Se puede editar (si aplica) y la edicion se refleja al releer.
 - [ ] Validacion negativa devuelve 422 sin filtrar datos internos.
+
+## Oleada 2 (2026-11-19) — E032 `GET /api/v1/recurring-payments`
+
+| Campo | Valor |
+|---|---|
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #109 · HEAD `701f2302794356651bd5692829116bae332bf7e2` |
+| Claves DynamoDB | USER#<id> con begins_with(RECURRING#) |
+| Decisiones | Cursor firmado ligado a filtros active/type y usuario; paginacion sin duplicados. |
+| Errores y causa raiz | SA4010 por slice de ids no usado (se anadio asercion) y U1000 del helper attrB, corregidos en 701f230. |
+| Pruebas | `go build`, `go vet` y suites de aplicacion/adaptador/transporte en verde; donde Windows Application Control bloqueo el binario se declara NOT_RUN_LOCAL y la autoridad es el CI Linux. |
+| Contrato Android | Ruta y esquema segun `sdd/03-endpoints/openapi/nexum-api-v1.json`; errores con `ErrorEnvelope` y `traceId`. |
+| Pendiente | Merge autorizado, release agrupada y verificacion HTTP real. |

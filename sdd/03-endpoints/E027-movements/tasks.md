@@ -24,3 +24,16 @@
 - [ ] `E027-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E027-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
 - [ ] `E027-CT07` Paginación 25/100, filtro modificado con cursor antiguo -> 400, lectura sin Scan, sin duplicados en páginas.
+
+## Oleada 2 (2026-11-19) — E027 `GET /api/v1/movements`
+
+| Campo | Valor |
+|---|---|
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #103 · HEAD `3947ad82ffffd78795419d6db1bcc384c3ab3b22` |
+| Claves DynamoDB | USER#<id> con begins_with(MOVEMENT#) |
+| Decisiones | Cursor opaco firmado (httputil) ligado a filtros y usuario; limit 1..100; filtros type/from/to en servidor; sin Scan. |
+| Errores y causa raiz | Ninguno propio; hereda la correccion de idempotencia de E028. |
+| Pruebas | `go build`, `go vet` y suites de aplicacion/adaptador/transporte en verde; donde Windows Application Control bloqueo el binario se declara NOT_RUN_LOCAL y la autoridad es el CI Linux. |
+| Contrato Android | Ruta y esquema segun `sdd/03-endpoints/openapi/nexum-api-v1.json`; errores con `ErrorEnvelope` y `traceId`. |
+| Pendiente | Merge autorizado, release agrupada y verificacion HTTP real. |

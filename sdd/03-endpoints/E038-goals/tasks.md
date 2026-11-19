@@ -31,3 +31,16 @@
 - [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
 - [ ] Cubrir con prueba positiva y negativa.
 - [ ] Verificar por HTTP real tras el despliegue autorizado.
+
+## Oleada 2 (2026-11-19) — E038 `GET /api/v1/goals`
+
+| Campo | Valor |
+|---|---|
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #114 · HEAD `fdf147bc7a4c00e2a07932c2b359fd177467039a` |
+| Claves DynamoDB | USER#<id> con begins_with(GOAL#) |
+| Decisiones | totals{activeCount,saved} sobre la coleccion completa (no la pagina); cursor firmado ligado a limit+status; topes que fallan cerrado. |
+| Errores y causa raiz | Ninguno propio. |
+| Pruebas | `go build`, `go vet` y suites de aplicacion/adaptador/transporte en verde; donde Windows Application Control bloqueo el binario se declara NOT_RUN_LOCAL y la autoridad es el CI Linux. |
+| Contrato Android | Ruta y esquema segun `sdd/03-endpoints/openapi/nexum-api-v1.json`; errores con `ErrorEnvelope` y `traceId`. |
+| Pendiente | Merge autorizado, release agrupada y verificacion HTTP real. |

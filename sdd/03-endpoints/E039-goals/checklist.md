@@ -27,3 +27,16 @@
 - [ ] Se consulta en el detalle y en el listado con el mismo tipo y formato.
 - [ ] Se puede editar (si aplica) y la edicion se refleja al releer.
 - [ ] Validacion negativa devuelve 422 sin filtrar datos internos.
+
+## Oleada 2 (2026-11-19) — E039 `POST /api/v1/goals`
+
+| Campo | Valor |
+|---|---|
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #112 · HEAD `c81c532517770ae5b333f60e5937798879bdb59f` |
+| Claves DynamoDB | USER#<id>/GOAL#<id> + IDEM# |
+| Decisiones | openingSaved y savedAmount iniciales; 0 <= initialSavedAmount <= targetAmount; Idempotency-Key por usuario; transaccion meta+registro. |
+| Errores y causa raiz | Replay chocaba con la condicion de la meta y devolvia 500; se relee el registro antes de clasificar. |
+| Pruebas | `go build`, `go vet` y suites de aplicacion/adaptador/transporte en verde; donde Windows Application Control bloqueo el binario se declara NOT_RUN_LOCAL y la autoridad es el CI Linux. |
+| Contrato Android | Ruta y esquema segun `sdd/03-endpoints/openapi/nexum-api-v1.json`; errores con `ErrorEnvelope` y `traceId`. |
+| Pendiente | Merge autorizado, release agrupada y verificacion HTTP real. |

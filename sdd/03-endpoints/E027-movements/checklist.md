@@ -19,3 +19,16 @@
 - [ ] Dependencias del cliente Mobile nunca constituyen Gate del Backend.
 
 **Criterio de cierre:** ninguna casilla operativa se marca por generar este documento; la documentación contractual se valida con el auditor del ZIP y queda REVIEW hasta aprobación.
+
+## Oleada 2 (2026-11-19) — E027 `GET /api/v1/movements`
+
+| Campo | Valor |
+|---|---|
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #103 · HEAD `3947ad82ffffd78795419d6db1bcc384c3ab3b22` |
+| Claves DynamoDB | USER#<id> con begins_with(MOVEMENT#) |
+| Decisiones | Cursor opaco firmado (httputil) ligado a filtros y usuario; limit 1..100; filtros type/from/to en servidor; sin Scan. |
+| Errores y causa raiz | Ninguno propio; hereda la correccion de idempotencia de E028. |
+| Pruebas | `go build`, `go vet` y suites de aplicacion/adaptador/transporte en verde; donde Windows Application Control bloqueo el binario se declara NOT_RUN_LOCAL y la autoridad es el CI Linux. |
+| Contrato Android | Ruta y esquema segun `sdd/03-endpoints/openapi/nexum-api-v1.json`; errores con `ErrorEnvelope` y `traceId`. |
+| Pendiente | Merge autorizado, release agrupada y verificacion HTTP real. |

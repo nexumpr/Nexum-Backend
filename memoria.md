@@ -1976,3 +1976,144 @@ La regla `terraform *` -> `deny` y `terraform apply*` -> `deny` bloqueaban tambi
 - **E014** (`DELETE /api/v1/users/me`, 202 + `DeletionReceipt`) sigue **no implementado**; se prioriza para un Gate posterior. No confundir con E004.
 - **Oleada 2:** `NOT_AUTHORIZED`; no se inicia sin Gate propio.
 - **PR #99:** este mismo documento; el HEAD final incorpora el merge de `main` `615ac1c7`, la prueba 7/7 de la cuenta existente, la release `v0.16.1`, el cierre de #98 y el estado real de E006/E011. Requiere el Gate documental por su HEAD final, que se cita en el reporte de cierre.
+
+## Oleada 2 — registro por endpoint (2026-11-19)
+Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` APPROVED; RFC-019 E-3 y RFC-021 APPROVED. Estados: IMPLEMENTED / PR_OPEN / CI_GREEN / MERGED / AWS_DEPLOYED / HTTPS_VERIFIED / FUNCTIONAL_VERIFIED.
+
+### E028 — `POST /api/v1/movements`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #102, HEAD `089d7e7aac35908ac209bdc16488230ae61ac6d2`.
+- Claves: USER#<id>/MOVEMENT#<occurredAt>#<id> + MOVEMENTPTR#<id> + IDEM#
+- Decisiones: Idempotency-Key obligatoria con UserIdempotencyKeys (PK por usuario); transaccion unica recurso+puntero+registro; importes int64 centimos.
+- Errores y correccion: La carrera de idempotencia se resolvia por indice de CancellationReasons; ahora el registro de idempotencia es la autoridad (commit 089d7e7).
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E027 — `GET /api/v1/movements`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #103, HEAD `3947ad82ffffd78795419d6db1bcc384c3ab3b22`.
+- Claves: USER#<id> con begins_with(MOVEMENT#)
+- Decisiones: Cursor opaco firmado (httputil) ligado a filtros y usuario; limit 1..100; filtros type/from/to en servidor; sin Scan.
+- Errores y correccion: Ninguno propio; hereda la correccion de idempotencia de E028.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E029 — `GET /api/v1/movements/{movementId}`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #104, HEAD `8c021c0663bb1e83d936926675f67ff1ed7e398b`.
+- Claves: MOVEMENTPTR#<id> -> MOVEMENT#<occurredAt>#<id>
+- Decisiones: Resolucion O(1) por puntero; 404 homogeneo propio/ajeno; ETag de version.
+- Errores y correccion: Ninguno propio.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E030 — `PATCH /api/v1/movements/{movementId}`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #105, HEAD `ab8b4a80b92ca83994095ace379becfa797e11f8`.
+- Claves: MOVEMENTPTR# + MOVEMENT# (movimiento transaccional del SK al cambiar occurredAt)
+- Decisiones: If-Match obligatorio (428/412); CAS de version; si cambia occurredAt se mueve el item en una transaccion con condicion targetSK.
+- Errores y correccion: Version obsoleta devolvia 503: se mapea ConditionalCheckFailed y Next.Version!=expected a ErrConflict (412). G705 resuelto con httputil.WriteJSONBytes.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E031 — `DELETE /api/v1/movements/{movementId}`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #106, HEAD `44efebd621bd9822d7280bf5bf35294e6693dca2`.
+- Claves: MOVEMENTPTR# + MOVEMENT#
+- Decisiones: 204 sin cuerpo; 409 si el movimiento tiene aportacion confirmada; borrado transaccional con reintento si el item se movio.
+- Errores y correccion: Ninguno propio.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E033 — `POST /api/v1/recurring-payments`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #107, HEAD `a47b0e2004a17fbc04613615880a069f02829b18`.
+- Claves: USER#<id>/RECURRING#<id> + IDEM#
+- Decisiones: RFC-021: acepta 9 frecuencias, persiste y emite 7 canonicas (biweekly->fortnightly, yearly->annual); Idempotency-Key por usuario; no genera pagos (E037 fuera de alcance).
+- Errores y correccion: U1000 por helper de prueba sin uso, corregido en d6294b5.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E034 — `GET /api/v1/recurring-payments/{recurringPaymentId}`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #108, HEAD `89a9d81725b289e988b07b89e478780e7c9b8ec1`.
+- Claves: USER#<id>/RECURRING#<id>
+- Decisiones: ETag y 404 homogeneo; proyeccion determinista de items heredados de E001 (startDate desde createdAt, nextDueDate calculada; D-E032-01).
+- Errores y correccion: U1000 por helper de prueba, corregido en 89a9d81.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E032 — `GET /api/v1/recurring-payments`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #109, HEAD `701f2302794356651bd5692829116bae332bf7e2`.
+- Claves: USER#<id> con begins_with(RECURRING#)
+- Decisiones: Cursor firmado ligado a filtros active/type y usuario; paginacion sin duplicados.
+- Errores y correccion: SA4010 por slice de ids no usado (se anadio asercion) y U1000 del helper attrB, corregidos en 701f230.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E035 — `PATCH /api/v1/recurring-payments/{recurringPaymentId}`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #110, HEAD `13d73e3475ec136543e8bae278e590021775a078`.
+- Claves: USER#<id>/RECURRING#<id>
+- Decisiones: If-Match 428/412; frequency no editable (campo desconocido 400); dueDay tri-estado; type inmutable 422; no-op sin subir version.
+- Errores y correccion: NextDueDate se atribuia a dueDay no enviado; corregido en el PR.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E036 — `DELETE /api/v1/recurring-payments/{recurringPaymentId}`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #111, HEAD `004c69ddf3025c4caf5bcd09c523d61c5a52fade`.
+- Claves: USER#<id>/RECURRING#<id>
+- Decisiones: 204 idempotente (segundo DELETE no sube version); condicion que alcanza items heredados sin atributo active.
+- Errores y correccion: U1000/SA4010 heredados de la linea, corregidos en 004c69d.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E039 — `POST /api/v1/goals`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #112, HEAD `c81c532517770ae5b333f60e5937798879bdb59f`.
+- Claves: USER#<id>/GOAL#<id> + IDEM#
+- Decisiones: openingSaved y savedAmount iniciales; 0 <= initialSavedAmount <= targetAmount; Idempotency-Key por usuario; transaccion meta+registro.
+- Errores y correccion: Replay chocaba con la condicion de la meta y devolvia 500; se relee el registro antes de clasificar.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E040 — `GET /api/v1/goals/{goalId}`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #113, HEAD `626b9ee687e16271a2ca0fe4a7f14452a3155f1f`.
+- Claves: USER#<id>/GOAL#<id>
+- Decisiones: GetItem consistente; 404 propio/ajeno; ETag de version.
+- Errores y correccion: Ninguno propio.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E038 — `GET /api/v1/goals`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #114, HEAD `fdf147bc7a4c00e2a07932c2b359fd177467039a`.
+- Claves: USER#<id> con begins_with(GOAL#)
+- Decisiones: totals{activeCount,saved} sobre la coleccion completa (no la pagina); cursor firmado ligado a limit+status; topes que fallan cerrado.
+- Errores y correccion: Ninguno propio.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E041 — `PATCH /api/v1/goals/{goalId}`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #115, HEAD `51bc79bb1f06831f5b5202cd2313edf34acf2965`.
+- Claves: USER#<id>/GOAL#<id>
+- Decisiones: If-Match 428/412; CAS de version; targetAmount no puede quedar por debajo de savedAmount; transiciones de estado validas.
+- Errores y correccion: U1000 por helper de prueba, corregido en 51bc79b.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### E014 — `DELETE /api/v1/users/me`
+- Estado: IMPLEMENTED, PR_OPEN, CI_GREEN; MERGED/AWS/HTTPS/FUNCTIONAL = NO.
+- PR #116, HEAD `ea38d23718fe3d2681dc9131141f9fcea237cad6`.
+- Claves: USER#<id>/DELETION#<requestId> + QUEUE#DELETION/<requestId> + EMAIL# + REFRESH#
+- Decisiones: Bloqueo y revocacion inmediata (status DELETION_PENDING + sessionEpoch+1); worker con lease Redis, fence en DynamoDB, fases COLLECT/EXTERNAL/PARTITION/VERIFY/TERMINAL; PURGED solo tras verificacion; 503 si el worker no esta activo.
+- Errores y correccion: G101 (constante con Password), G115 (int32 sin rango), G602 (indice de slice) y U1000; colision de isConditionalCheckFailed con recurrentes resuelta renombrando en E014.
+- Pruebas: build/vet y suites de aplicacion/adaptador/transporte; bloqueo local de Windows se declara NOT_RUN_LOCAL, autoridad CI Linux.
+
+### Aprendizajes reutilizables (Oleadas 3-5)
+
+- La idempotencia financiera debe aislarse por usuario en la PK y resolver la carrera leyendo el registro, nunca por el indice de `CancellationReasons`.
+- El puntero `MOVEMENTPTR#` permite `GetItem` O(1) y mover el SK de fecha en una transaccion condicionada.
+- `strict=true` implica que cada merge invalida los HEAD posteriores: planificar la ventana de merges o una excepcion temporal autorizada.
+- gosec G101 se dispara por nombres de constantes con "Password"; G115 exige acotar el rango antes de convertir a int32; G705 exige no escribir datos del usuario directamente en `ResponseWriter`.
+- Los binarios de prueba pueden estar bloqueados por Windows Application Control: el CI Linux es la autoridad y no se declara PASS local.
+- E014: sin worker activo el endpoint debe responder 503; `PURGED` solo tras verificacion y con fencing por `owner`+`fence`.
+
+## E015 — aviso de privacidad 2026-11-v3 (propuesta congelada, 2026-11-19)
+
+- Archivo propuesto: `internal/application/privacy/aviso_2026_11_v3.txt` (7 829 bytes).
+- SHA-256: `5c5b65bdd0ecce62d004544b4702529cc51dd32c27a768294fd6285da1e317f5`.
+- Cambios frente a `2026-11-v2`: declara movimientos, pagos recurrentes y metas; describe la eliminación desde la app con bloqueo inmediato, revocación de sesiones y purga verificable; distingue vencimiento lógico de eliminación física asíncrona del proveedor y no promete plazo de TTL; mantiene presupuestos, aportaciones, exportación, notificaciones, análisis y voz como no disponibles.
+- Estado: DRAFT congelado. NO publicado, NO embebido; el hash productivo permanece intacto.
+- Gate requerido: `APRUEBO_AVISO_PRIVACIDAD_E015_2026_11_V3_SHA256_5c5b65bdd0ecce62d004544b4702529cc51dd32c27a768294fd6285da1e317f5`.
+- E014 no se anuncia como funcionalmente aceptado hasta este Gate y hasta la verificación HTTP real.

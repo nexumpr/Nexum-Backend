@@ -27,3 +27,16 @@
 - [ ] Se consulta en el detalle y en el listado con el mismo tipo y formato.
 - [ ] Se puede editar (si aplica) y la edicion se refleja al releer.
 - [ ] Validacion negativa devuelve 422 sin filtrar datos internos.
+
+## Oleada 2 (2026-11-19) — E035 `PATCH /api/v1/recurring-payments/{recurringPaymentId}`
+
+| Campo | Valor |
+|---|---|
+| Estado | IMPLEMENTED · PR_OPEN · CI_GREEN (12/12) · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| PR | #110 · HEAD `13d73e3475ec136543e8bae278e590021775a078` |
+| Claves DynamoDB | USER#<id>/RECURRING#<id> |
+| Decisiones | If-Match 428/412; frequency no editable (campo desconocido 400); dueDay tri-estado; type inmutable 422; no-op sin subir version. |
+| Errores y causa raiz | NextDueDate se atribuia a dueDay no enviado; corregido en el PR. |
+| Pruebas | `go build`, `go vet` y suites de aplicacion/adaptador/transporte en verde; donde Windows Application Control bloqueo el binario se declara NOT_RUN_LOCAL y la autoridad es el CI Linux. |
+| Contrato Android | Ruta y esquema segun `sdd/03-endpoints/openapi/nexum-api-v1.json`; errores con `ErrorEnvelope` y `traceId`. |
+| Pendiente | Merge autorizado, release agrupada y verificacion HTTP real. |
