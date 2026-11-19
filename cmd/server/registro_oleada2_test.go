@@ -129,3 +129,25 @@ func exigirPanic(t *testing.T, fn func()) {
 	}()
 	fn()
 }
+
+// TestRegistrarOleada2GlobalValida cubre el punto de entrada que usan los init() de
+// cada endpoint: un ID fuera del Gate debe abortar el arranque.
+func TestRegistrarOleada2GlobalValida(t *testing.T) {
+	exigirPanic(t, func() {
+		registrarOleada2(montajeOleada2{
+			ID: "E037", Metodo: http.MethodPost, Ruta: "/no-autorizado",
+			Montar: func(*dependenciasOleada2) {},
+		})
+	})
+}
+
+// TestOleada2DynamoClienteFallaCerrado comprueba que los endpoints reciben ok=false
+// cuando no hay cliente, para responder 503 en vez de operar sobre nil.
+func TestOleada2DynamoClienteFallaCerrado(t *testing.T) {
+	if _, ok := oleada2DynamoCliente(nil); ok {
+		t.Fatal("con dependencias nulas no debe haber cliente")
+	}
+	if _, ok := oleada2DynamoCliente(&dependenciasOleada2{}); ok {
+		t.Fatal("con Dynamo nulo no debe haber cliente")
+	}
+}
