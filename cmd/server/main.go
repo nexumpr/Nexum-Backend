@@ -181,7 +181,7 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 
 	// H08-E / Oleada 2 (RFC-019 E-3, Gate H08E_OLEADA_2 aprobado): 15 endpoints.
 	// El registro es cerrado y falla en el arranque si un ID no esta autorizado.
-	montarOleada2(&dependenciasOleada2{
+	depsOleada2 := &dependenciasOleada2{
 		Router:     router,
 		Dynamo:     dynamoAPI,
 		Redis:      clienteRedis,
@@ -189,7 +189,20 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 		Logger:     logger,
 		Tokens:     verificadorTokens,
 		Authorizer: logoutStore,
-	})
+	}
+	montarOleada2(depsOleada2)
+
+	// H08-E / E014: worker durable de purga de cuentas. Sin el, el 202 de
+	// DELETE /users/me seria una promesa sin ejecutor. Se arranca con el contexto
+	// del proceso y se detiene en el apagado controlado.
+	if cerrarPurga, errPurga := iniciarPurgaE014(ctx, depsOleada2); errPurga != nil {
+		// La cuenta queda bloqueada y el trabajo persistido: se reintenta en el
+		// siguiente arranque con Redis/Dynamo disponibles. No se degrada el endpoint.
+		logger.ErrorContext(ctx, "E014: worker de purga no iniciado; los trabajos quedaran pendientes",
+			slog.String("error_class", "purga_no_iniciada"))
+	} else {
+		defer cerrarPurga()
+	}
 
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
