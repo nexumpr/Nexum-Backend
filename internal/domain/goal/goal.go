@@ -307,3 +307,89 @@ func New(
 	}
 	return goal, nil
 }
+
+// Patch es una modificación parcial de una meta (E041). Los punteros distinguen «campo ausente»
+// de «campo presente con valor»: un PATCH no enviado no se toca, y no existe forma de vaciar un
+// campo obligatorio.
+//
+// `openingSaved` y `savedAmount` NO forman parte del Patch: el primero es historia del alta (A7)
+// y el segundo sólo cambia con aportaciones confirmadas, que son otro endpoint. Este contrato
+// tampoco permite cambiar `currency`: el enum publicado es `[MXN]`.
+type Patch struct {
+	Name        *string
+	TargetCents *int64
+	TargetDate  *time.Time
+	Status      *Status
+}
+
+// Empty indica que la modificación no contiene ningún campo aplicable.
+func (p Patch) Empty() bool {
+	return p.Name == nil && p.TargetCents == nil && p.TargetDate == nil && p.Status == nil
+}
+
+// Apply valida la modificación contra la meta vigente y devuelve el agregado resultante.
+//
+// Reglas (documentadas porque el contrato no las enumera campo a campo):
+//   - `name` se normaliza (recorte de espacios, 1..120 caracteres).
+//   - `targetAmount` debe ser positivo y NO puede quedar por debajo del ahorro ya acumulado: la
+//     persistencia vuelve a imponerlo con una condición atómica para que una aportación
+//     concurrente no pueda saltárselo.
+//   - `status` sólo admite el enum y transiciones coherentes (`Status.CanTransitionTo`).
+//   - `version` se incrementa siempre en 1 y `updatedAt` pasa a la hora del servidor.
+func (p Patch) Apply(current Goal, now time.Time) (Goal, error) {
+	if p.Empty() {
+		return Goal{}, ErrEmptyPatch
+	}
+	if err := current.Validate(); err != nil {
+		return Goal{}, ErrInconsistent
+	}
+
+	actualizado := current
+
+	if p.Name != nil {
+		clean, err := NormalizeName(*p.Name)
+		if err != nil {
+			return Goal{}, err
+		}
+		actualizado.Name = clean
+	}
+
+	if p.TargetCents != nil {
+		if err := ValidateTargetAmountCents(*p.TargetCents); err != nil {
+			return Goal{}, err
+		}
+		if *p.TargetCents < current.SavedAmount.Amount() {
+			return Goal{}, ErrTargetBelowSaved
+		}
+		target, err := money.New(*p.TargetCents, current.TargetAmount.Currency())
+		if err != nil {
+			return Goal{}, ErrCurrencyInvalid
+		}
+		actualizado.TargetAmount = target
+	}
+
+	if p.TargetDate != nil {
+		if err := ValidateTargetDate(*p.TargetDate); err != nil {
+			return Goal{}, err
+		}
+		actualizado.TargetDate = p.TargetDate.UTC()
+	}
+
+	if p.Status != nil {
+		next := *p.Status
+		if _, err := ParseStatus(next.String()); err != nil {
+			return Goal{}, ErrStatusInvalid
+		}
+		if !current.Status.CanTransitionTo(next) {
+			return Goal{}, ErrTransitionInvalid
+		}
+		actualizado.Status = next
+	}
+
+	actualizado.Version = current.Version + 1
+	actualizado.UpdatedAt = now.UTC()
+	if err := actualizado.Validate(); err != nil {
+		return Goal{}, ErrInconsistent
+	}
+	return actualizado, nil
+}

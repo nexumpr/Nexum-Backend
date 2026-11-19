@@ -43,6 +43,12 @@ type Store interface {
 	// de metas activas y la suma de su ahorro. El resultado no depende de la página solicitada
 	// (A8 de RFC-016).
 	AggregateUserGoals(ctx context.Context, userID string) (Totals, error)
+
+	// UpdateGoal aplica una modificación con compare-and-swap por versión (E041). Debe
+	// imponer además, de forma atómica, que el nuevo monto objetivo no quede por debajo del
+	// ahorro acumulado. Un fallo de la condición se traduce en ErrVersionConflict (412),
+	// ErrTargetBelowSaved (422) o ErrConflict (409) tras agotar los reintentos.
+	UpdateGoal(ctx context.Context, write UpdateWrite) (*domainGoal.Goal, error)
 }
 
 // ListStoreQuery es la consulta paginada que recibe la persistencia.
