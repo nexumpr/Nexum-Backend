@@ -179,6 +179,18 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 		Logger: logger,
 	})
 
+	// H08-E / Oleada 2 (RFC-019 E-3, Gate H08E_OLEADA_2 aprobado): 15 endpoints.
+	// El registro es cerrado y falla en el arranque si un ID no esta autorizado.
+	montarOleada2(&dependenciasOleada2{
+		Router:     router,
+		Dynamo:     dynamoAPI,
+		Redis:      clienteRedis,
+		Tabla:      cfgDeps.TablaDynamoDB,
+		Logger:     logger,
+		Tokens:     verificadorTokens,
+		Authorizer: logoutStore,
+	})
+
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
 	// Start bloquea hasta que el listener falla o se cierra; el canal transporta

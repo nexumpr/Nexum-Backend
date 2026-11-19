@@ -107,8 +107,29 @@ func RefreshKeys(tokenDigest string) (pk, sk string) {
 // IdempotencyKeys genera PK y SK para un registro de idempotencia. La clave incluye
 // la operación y la Idempotency-Key original, pero solo se persiste su SHA-256 para
 // no almacenar el valor crudo del cliente (A-040 §2.5, A-070 §2.7).
+//
+// Se conserva intacta para E001, ya publicado. Los endpoints financieros de la Oleada 2
+// usan UserIdempotencyKeys: esta forma no incluye el usuario y dos cuentas con la misma
+// clave compartirían registro (hallazgo F-02 del Gate de Oleada 2).
 func IdempotencyKeys(operation, idempotencyKey string) (pk, sk string) {
 	normalized := strings.TrimSpace(operation) + ":" + strings.TrimSpace(idempotencyKey)
 	hash := sha256.Sum256([]byte(normalized))
 	return PrefixIdempotency + hex.EncodeToString(hash[:]), "RECORD"
+}
+
+// UserIdempotencyKeys aísla la idempotencia financiera por usuario dentro de su propia
+// partición (Gate Oleada 2 §5.2). Dos cuentas que envíen la misma Idempotency-Key nunca
+// comparten registro, y el prefijo PK `USER#*` ya está autorizado por IAM: no requiere
+// cambio de política ni tabla nueva.
+//
+//	PK = USER#<userID>
+//	SK = IDEM#<operación>#<sha256(operación:clave)>
+//
+// El SK no persiste la clave cruda del cliente. El llamador debe guardar además el
+// payloadHash para distinguir un replay legítimo (200/201 idéntico) de una reutilización
+// con contenido distinto (409).
+func UserIdempotencyKeys(userID, operation, idempotencyKey string) (pk, sk string) {
+	normalized := strings.TrimSpace(operation) + ":" + strings.TrimSpace(idempotencyKey)
+	hash := sha256.Sum256([]byte(normalized))
+	return PrefixUser + strings.TrimSpace(userID), PrefixIdempotency + strings.TrimSpace(operation) + "#" + hex.EncodeToString(hash[:])
 }
