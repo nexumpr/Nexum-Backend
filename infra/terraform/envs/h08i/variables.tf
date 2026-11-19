@@ -228,3 +228,16 @@ variable "principal_operador_arn" {
     error_message = "principal_operador_arn no puede ser un ARN STS de sesión; use el ARN IAM del rol real."
   }
 }
+
+// AMI fijada para la release. Vacio = resolver la ultima del parametro SSM publico.
+// Se pasa al modulo de computo para que un despliegue de aplicacion no cambie la AMI.
+variable "ami_id" {
+  description = "AMI ARM64 explicita para el Launch Template. Vacio = ultima de SSM."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.ami_id == "" || can(regex("^ami-[0-9a-f]{8,17}$", var.ami_id))
+    error_message = "ami_id debe estar vacio o ser un identificador ami- valido."
+  }
+}

@@ -113,6 +113,7 @@ module "computo" {
   artefacto_sha256          = var.artefacto_sha256
   unidad_s3_uri             = var.unidad_s3_uri
   unidad_sha256             = var.unidad_sha256
+  ami_id                    = var.ami_id
 }
 
 output "asg_name" {
