@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 
@@ -92,7 +94,19 @@ func montarE014(d *dependenciasOleada2) {
 	}
 
 	handler := nexumhttp.NewDeleteAccountHandler(servicio, tokens, autorizador, logger)
-	d.Router.HandleFunc(http.MethodDelete, "/users/me", handler.ServeHTTP)
+	// El estado del worker se consulta por petición: un worker caído no debe dejar el
+	// endpoint aceptando trabajos que nadie ejecutará.
+	protegido := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if d.PurgaActiva != nil && !d.PurgaActiva() {
+			logger.ErrorContext(r.Context(), "E014: worker de purga inactivo; se rechaza la solicitud",
+				slog.String("error_class", "purga_inactiva"))
+			_ = httputil.WriteErrorEnvelope(w, http.StatusServiceUnavailable,
+				"DEPENDENCY_UNAVAILABLE", "servicio no disponible", r.Header.Get("X-Trace-ID"), nil)
+			return
+		}
+		handler.ServeHTTP(w, r)
+	})
+	d.Router.HandleFunc(http.MethodDelete, "/users/me", protegido)
 }
 
 // iniciarPurgaE014 arranca el worker durable de purga y devuelve la función de cierre.
@@ -104,16 +118,16 @@ func montarE014(d *dependenciasOleada2) {
 //
 // La función de cierre cancela el contexto, espera a que la goroutine termine y es
 // idempotente: se puede invocar más de una vez sin bloquear.
-func iniciarPurgaE014(ctx context.Context, d *dependenciasOleada2) (func(), error) {
+func iniciarPurgaE014(ctx context.Context, d *dependenciasOleada2) (func(), func() bool, error) {
 	if d == nil {
-		return nil, errors.New("E014: dependencias nulas")
+		return nil, nil, errors.New("E014: dependencias nulas")
 	}
 	cliente, ok := d.Dynamo.(*dynamodb.Client)
 	if !ok || cliente == nil || strings.TrimSpace(d.Tabla) == "" {
-		return nil, errors.New("E014: sin cliente DynamoDB o tabla; la purga no puede arrancar")
+		return nil, nil, errors.New("E014: sin cliente DynamoDB o tabla; la purga no puede arrancar")
 	}
 	if d.Redis == nil {
-		return nil, errors.New("E014: sin Redis; la purga no puede coordinarse")
+		return nil, nil, errors.New("E014: sin Redis; la purga no puede coordinarse")
 	}
 
 	logger := d.Logger
@@ -125,7 +139,7 @@ func iniciarPurgaE014(ctx context.Context, d *dependenciasOleada2) (func(), erro
 	invalidador := cacheinfra.NewUserCacheInvalidator(d.Redis)
 	lider, err := cacheinfra.NewWorkerElector(d.Redis, claveLiderPurga)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	worker := appAccount.NewPurgeWorker(store, invalidador, lider, logger).
@@ -133,9 +147,32 @@ func iniciarPurgaE014(ctx context.Context, d *dependenciasOleada2) (func(), erro
 
 	runCtx, cancel := context.WithCancel(ctx)
 	terminado := make(chan struct{})
+	var activa atomic.Bool
+
+	// Supervisión mínima: si Run termina sin que el proceso se esté apagando, se reinicia
+	// con espera acotada. `activa` refleja el estado real en cada petición, de modo que una
+	// caída del worker no deja una bandera de disponibilidad permanentemente incorrecta.
 	go func() {
 		defer close(terminado)
-		worker.Run(runCtx)
+		defer activa.Store(false)
+		for {
+			if runCtx.Err() != nil {
+				return
+			}
+			activa.Store(true)
+			worker.Run(runCtx)
+			activa.Store(false)
+			if runCtx.Err() != nil {
+				return
+			}
+			logger.Error("E014: worker de purga termino inesperadamente; se reinicia",
+				slog.String("error_class", "purga_reinicio"))
+			select {
+			case <-runCtx.Done():
+				return
+			case <-time.After(5 * time.Second):
+			}
+		}
 	}()
 
 	var unaVez sync.Once
@@ -145,5 +182,5 @@ func iniciarPurgaE014(ctx context.Context, d *dependenciasOleada2) (func(), erro
 			<-terminado
 		})
 	}
-	return cerrar, nil
+	return cerrar, activa.Load, nil
 }
