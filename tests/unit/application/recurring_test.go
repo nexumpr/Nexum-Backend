@@ -663,6 +663,9 @@ func TestE032ListadoPaginadoYFiltros(t *testing.T) {
 		}
 		ids = append(ids, creado.ID)
 	}
+	if len(ids) != 3 {
+		t.Fatalf("se esperaban 3 altas, hay %d", len(ids))
+	}
 
 	primera, err := servicio.List(context.Background(), appRecurring.ListQuery{UserID: e033Usuario, Limit: 2})
 	if err != nil {

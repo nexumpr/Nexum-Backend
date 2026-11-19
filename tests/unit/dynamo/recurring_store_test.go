@@ -45,7 +45,6 @@ func attrS(valor string) types.AttributeValue { return &types.AttributeValueMemb
 func attrN(valor int64) types.AttributeValue {
 	return &types.AttributeValueMemberN{Value: strconv.FormatInt(valor, 10)}
 }
-func attrB(valor bool) types.AttributeValue { return &types.AttributeValueMemberBOOL{Value: valor} }
 
 // memoriaRecurrentes implementa `dynamoAdapter.RecurringAPI` con estado.
 type memoriaRecurrentes struct {
