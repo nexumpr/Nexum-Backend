@@ -16,6 +16,7 @@ import (
 	cacheinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/cache"
 	"github.com/nexumpr/Nexum-Backend/internal/infrastructure/security"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
+	"github.com/nexumpr/Nexum-Backend/pkg/httputil"
 )
 
 // claveLiderPurga es la clave de liderazgo del worker en Redis. No es una autoridad de
@@ -50,6 +51,18 @@ func montarE014(d *dependenciasOleada2) {
 	logger := d.Logger
 	if logger == nil {
 		logger = slog.Default()
+	}
+
+	// Sin worker arrancado no se acepta la solicitud: 202 sin ejecutor seria una promesa
+	// falsa. El endpoint responde 503 y el resto de rutas sigue operativo.
+	if !d.PurgaLista {
+		logger.Error("E014: worker de purga no disponible; el endpoint respondera 503",
+			slog.String("motivo", "purga_no_iniciada"))
+		d.Router.HandleFunc(http.MethodDelete, "/users/me", func(w http.ResponseWriter, r *http.Request) {
+			_ = httputil.WriteErrorEnvelope(w, http.StatusServiceUnavailable,
+				"DEPENDENCY_UNAVAILABLE", "servicio no disponible", r.Header.Get("X-Trace-ID"), nil)
+		})
+		return
 	}
 
 	var cliente *dynamodb.Client
