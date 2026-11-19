@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
@@ -15,7 +16,8 @@ import (
 	"github.com/nexumpr/Nexum-Backend/pkg/httputil"
 )
 
-// Transporte de pagos recurrentes: E033 (`POST /api/v1/recurring-payments`) y E034
+// Transporte de pagos recurrentes: E032 (`GET /api/v1/recurring-payments`), E033
+// (`POST /api/v1/recurring-payments`) y E034
 // (`GET /api/v1/recurring-payments/{recurringPaymentId}`).
 //
 // La ruta exige `Authorization: Bearer` con JWT RS256 y estado autoritativo de la sesión en
@@ -256,6 +258,152 @@ func (h *RecurringCreateHandler) serve(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Idempotent-Replay", "true")
 	}
 	escribirJSONCrudo(w, http.StatusCreated, resultado.Body)
+}
+
+// ---------------- E032: GET /api/v1/recurring-payments ----------------
+
+// parseRecurringLimit valida el parámetro `limit` (entero 1..100). La ausencia devuelve 0,
+// que el servicio interpreta como el valor por defecto del contrato (25). Un valor no
+// numérico o fuera de rango se rechaza con 400: nunca se recorta en silencio.
+func parseRecurringLimit(r *http.Request) (int, error) {
+	raw := strings.TrimSpace(r.URL.Query().Get("limit"))
+	if raw == "" {
+		return 0, nil
+	}
+	valor, err := strconv.Atoi(raw)
+	if err != nil || valor < 1 || valor > appRecurring.MaxLimit {
+		return 0, errors.New("limit fuera de rango")
+	}
+	return valor, nil
+}
+
+// parseRecurringActive valida `active` como booleano del contrato. Sólo se aceptan las dos
+// formas canónicas (`true`/`false`); `1`, `0`, `si` o cualquier otra se rechazan con 400 en
+// lugar de adivinarse.
+func parseRecurringActive(r *http.Request) (*bool, error) {
+	raw := strings.TrimSpace(r.URL.Query().Get("active"))
+	switch raw {
+	case "":
+		return nil, nil
+	case "true":
+		valor := true
+		return &valor, nil
+	case "false":
+		valor := false
+		return &valor, nil
+	default:
+		return nil, errors.New("active no es un booleano del contrato")
+	}
+}
+
+// RecurringListHandler sirve `GET /api/v1/recurring-payments` (E032).
+//
+// Lista las REGLAS configuradas por el titular, no los pagos ejecutados. La consulta es un
+// `Query` por partición con los filtros aplicados en el servidor y un cursor opaco firmado,
+// ligado a la identidad y al conjunto de filtros.
+type RecurringListHandler struct {
+	service   *appRecurring.Service
+	logger    *slog.Logger
+	protegido http.Handler
+}
+
+// NewRecurringListHandler construye el handler. Sin servicio, sin proveedor de tokens, sin
+// autorizador de sesión o sin clave de firma de cursor, el endpoint responde 503
+// (fail-closed): nunca se pagina con un cursor sin firmar.
+func NewRecurringListHandler(
+	servicio *appRecurring.Service,
+	tokens ports.TokenProvider,
+	sesiones ports.SessionAuthorizer,
+	limitador LimitadorRuta,
+	logger *slog.Logger,
+) *RecurringListHandler {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	handler := &RecurringListHandler{service: servicio, logger: logger}
+	handler.protegido = cadenaRecurrente(tokens, sesiones, limitador, "e032", handler.serve)
+	return handler
+}
+
+// ServeHTTP fija la cabecera de caché antes de cualquier decisión y delega en la cadena
+// autenticada.
+func (h *RecurringListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Información financiera del titular: nunca cacheable por proxies ni por el cliente.
+	w.Header().Set("Cache-Control", "private, no-store")
+
+	if h == nil || h.service == nil || h.protegido == nil {
+		writeRegisterError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "servicio no disponible", nil)
+		return
+	}
+	h.protegido.ServeHTTP(w, r)
+}
+
+// serve se ejecuta con la sesión ya verificada.
+//
+// Orden de decisión: identidad → parámetros de consulta (400) → listado (200). El cursor lo
+// verifica el servicio: firma, expiración, pertenencia y filtros con los que se emitió.
+func (h *RecurringListHandler) serve(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		writeRegisterError(w, r, http.StatusUnauthorized, "UNAUTHORIZED", "sesion no valida", nil)
+		return
+	}
+
+	limit, errLimite := parseRecurringLimit(r)
+	if errLimite != nil {
+		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+			{Field: "limit", Reason: "out_of_range"},
+		})
+		return
+	}
+
+	activo, errActivo := parseRecurringActive(r)
+	if errActivo != nil {
+		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+			{Field: "active", Reason: "invalid_boolean"},
+		})
+		return
+	}
+
+	tipo := strings.TrimSpace(r.URL.Query().Get("type"))
+	if tipo != "" {
+		if _, errTipo := domainRecurring.ParseType(tipo); errTipo != nil {
+			writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+				{Field: "type", Reason: "out_of_enum"},
+			})
+			return
+		}
+	}
+
+	cursor := strings.TrimSpace(r.URL.Query().Get("cursor"))
+	if cursor != "" && (len(cursor) < appRecurring.CursorMinLength || len(cursor) > appRecurring.CursorMaxLength) {
+		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+			{Field: "cursor", Reason: "invalid_length"},
+		})
+		return
+	}
+
+	pagina, err := h.service.List(r.Context(), appRecurring.ListQuery{
+		UserID: userID,
+		Limit:  limit,
+		Cursor: cursor,
+		Active: activo,
+		Type:   tipo,
+	})
+	if err != nil {
+		writeRecurringError(h.logger, "recurring-list", w, r, err)
+		return
+	}
+
+	cuerpo, errCuerpo := appRecurring.PageBody(pagina.Items, pagina.NextCursor)
+	if errCuerpo != nil {
+		h.logger.ErrorContext(r.Context(), "recurring-list: fallo al serializar la respuesta",
+			slog.String("error_class", "response_write"),
+			slog.String("trace_id", traceID(r)))
+		writeRegisterError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "error interno", nil)
+		return
+	}
+	escribirJSONCrudo(w, http.StatusOK, cuerpo)
 }
 
 // ---------------- E034: GET /api/v1/recurring-payments/{recurringPaymentId} ----------------
