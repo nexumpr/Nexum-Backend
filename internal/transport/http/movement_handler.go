@@ -231,9 +231,7 @@ func (h *MovementHandler) writeMovement(w http.ResponseWriter, r *http.Request, 
 		h.writeServiceError(w, r, appMovements.ErrInternal)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	if _, errEscritura := w.Write(cuerpo); errEscritura != nil {
+	if errEscritura := httputil.WriteJSONBytes(w, status, cuerpo); errEscritura != nil {
 		h.logger.ErrorContext(r.Context(), "movimiento: fallo al escribir la respuesta",
 			slog.String("error_class", "response_write"),
 			slog.String("trace_id", traceID(r)))
