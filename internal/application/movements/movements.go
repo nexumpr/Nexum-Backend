@@ -125,6 +125,24 @@ type Movement struct {
 	Version            int64
 	ContributionID     string
 	RecurringPaymentID string
+	// CreatedAt es la marca de alta persistida. No forma parte del contrato de respuesta, pero
+	// E030 la conserva al mover un ítem cuya SK cambia: sin ella, una modificación reescribiría
+	// el ítem con la hora actual y perdería la fecha original.
+	CreatedAt time.Time
+}
+
+// Patch es el cuerpo de E030 (`MovementPatch`). Los tres campos son opcionales: un puntero nulo
+// significa «no enviado». `type`, `amount` y `currency` no existen aquí porque el contrato no los
+// declara editables.
+type Patch struct {
+	CategoryID  *string
+	Description *string
+	OccurredAt  *string
+}
+
+// Empty indica si el parche no contiene ningún campo aplicable.
+func (p Patch) Empty() bool {
+	return p.CategoryID == nil && p.Description == nil && p.OccurredAt == nil
 }
 
 // CreateCommand es el DTO ya deserializado del alta (E028). `Amount` llega como cadena decimal
@@ -199,33 +217,76 @@ func NormalizeCreate(cmd CreateCommand, now time.Time) (CreateCommand, error) {
 	}
 	cmd.CategoryID = categoria
 
-	descripcion := strings.TrimSpace(cmd.Description)
-	if descripcion == "" {
-		return CreateCommand{}, violacion("description", "required")
-	}
-	if utf8.RuneCountInString(descripcion) > MaxDescriptionLength {
-		return CreateCommand{}, violacion("description", "too_long")
-	}
-	cmd.Description = descripcion
-
-	ocurrido, err := ParseOccurredAt(cmd.OccurredAt)
+	descripcion, err := NormalizeDescription(cmd.Description)
 	if err != nil {
 		return CreateCommand{}, err
 	}
-	// Cota de cordura: un año absurdo rompería el orden por SK y no es un dato financiero real.
-	if ocurrido.Year() < 1970 || ocurrido.Year() > 2200 {
-		return CreateCommand{}, violacion("occurredAt", "out_of_range")
-	}
-	// No se admite un movimiento en el futuro más allá de un margen razonable de reloj.
-	if now.IsZero() {
-		now = time.Now()
-	}
-	if ocurrido.After(now.UTC().Add(24 * time.Hour)) {
-		return CreateCommand{}, violacion("occurredAt", "in_the_future")
+	cmd.Description = descripcion
+
+	ocurrido, err := NormalizeOccurredAt(cmd.OccurredAt, now)
+	if err != nil {
+		return CreateCommand{}, err
 	}
 	cmd.OccurredAt = FormatOccurredAt(ocurrido)
 
 	return cmd, nil
+}
+
+// NormalizeDescription valida y normaliza `description`: sin espacios en los extremos, no vacía y
+// como máximo `MaxDescriptionLength` code points (el `maxLength` del contrato).
+func NormalizeDescription(valor string) (string, error) {
+	limpio := strings.TrimSpace(valor)
+	if limpio == "" {
+		return "", violacion("description", "required")
+	}
+	if utf8.RuneCountInString(limpio) > MaxDescriptionLength {
+		return "", violacion("description", "too_long")
+	}
+	return limpio, nil
+}
+
+// NormalizeOccurredAt valida una marca `occurredAt` (RFC 3339) y aplica las cotas de cordura: un
+// año absurdo rompería el orden por SK y un movimiento muy futuro no es un dato financiero real.
+func NormalizeOccurredAt(valor string, now time.Time) (time.Time, error) {
+	instante, err := ParseOccurredAt(valor)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if instante.Year() < 1970 || instante.Year() > 2200 {
+		return time.Time{}, violacion("occurredAt", "out_of_range")
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	if instante.After(now.UTC().Add(24 * time.Hour)) {
+		return time.Time{}, violacion("occurredAt", "in_the_future")
+	}
+	return instante, nil
+}
+
+// ValidMovementID comprueba la forma canónica de uuid (8-4-4-4-12, hexadecimal) que el contrato
+// declara para el parámetro de ruta. No impone una versión concreta: un identificador histórico o
+// generado por otro emisor sigue siendo válido.
+func ValidMovementID(valor string) bool {
+	limpio := strings.TrimSpace(valor)
+	if len(limpio) != 36 {
+		return false
+	}
+	for indice := 0; indice < len(limpio); indice++ {
+		caracter := limpio[indice]
+		switch indice {
+		case 8, 13, 18, 23:
+			if caracter != '-' {
+				return false
+			}
+		default:
+			esHex := (caracter >= '0' && caracter <= '9') || (caracter >= 'a' && caracter <= 'f') || (caracter >= 'A' && caracter <= 'F')
+			if !esHex {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // NormalizeType acepta exactamente el enum publicado, sin alias ni variantes de caja.
