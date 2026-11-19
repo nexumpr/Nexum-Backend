@@ -69,3 +69,19 @@
   datos financieros. Toda ruta autenticada exige `PROFILE ACTIVE` con lectura consistente, de
   modo que una entrada residual no es servible. La verificacion durable de DynamoDB sigue siendo
   obligatoria antes de `PURGED`.
+
+### Cierre Oleada 2 - release v0.18.0+9722224c15c5
+
+| Campo | Valor |
+|---|---|
+| Implementacion | CONCLUIDA |
+| PR de codigo | #116 (fusionado) |
+| CI | PASS (13/13 checks del PR) |
+| Contrato | OpenAPI 3.1 vigente, paridad JSON/YAML |
+| Publicacion AWS | DEPLOYED: release `v0.18.0+9722224c15c5`, LT v14 |
+| Verificacion HTTPS | PASS (CloudFront `d2lpmqy5w6x9es`) |
+| Persistencia DynamoDB | PASS (relecturas y consultas consistentes) |
+| Seguridad | PASS (ownership, aislamiento, revocacion) |
+| Aceptacion funcional | PASS - 202 + recibo; login/refresh 401; PURGED verificado; particion sin residuos; usuario B intacto |
+| Rollback | LT v13 / release `v0.17.0+87aac167fe28` |
+| Limitaciones | multi-AZ limitada (ambas EC2 en us-east-2a); E015 pendiente legal; SES pendiente |

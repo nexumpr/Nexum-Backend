@@ -2163,3 +2163,20 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
   datos financieros. Toda ruta autenticada exige `PROFILE ACTIVE` con lectura consistente, de
   modo que una entrada residual no es servible. La verificacion durable de DynamoDB sigue siendo
   obligatoria antes de `PURGED`.
+
+## Cierre documental Oleada 2 (2026-11-19)
+
+- **Integracion:** 15 endpoints fusionados en `main` (PR #102-#116) y PR documental #118. `strict=true` restaurado; sin force push.
+- **Correcciones de plan:** PR #119 - AMI fijada por variable (`ami-047e988c757245767`) para evitar que SSM cambiara la AMI, y `ignore_changes` de `authentication_mode` en el usuario Redis `default` deshabilitado (normalizacion del proveedor; el control real es `access_string`).
+- **Windows Application Control:** bloqueo del proveedor Terraform 5.100.0; resuelto por el entorno (el plan dejo de fallar). No se eludio la politica.
+- **Primer despliegue:** release `v0.17.0+87aac167fe28` (SHA-256 `4c0e0a3e...62f2`), plan `6957C186...C47957`, LT v13. El refresh `09921528...` se cancelo al 0 % por falta de `t4g.micro` en `us-east-2b`; la recuperacion con restriccion temporal a `us-east-2a` (`cacf8d2d...`) termino Successful 100 % y las subredes se restauraron.
+- **Defecto E014:** el trabajo de purga llegaba a `phase=TERMINAL` y quedaba en `RETRY` porque `DeletePrefix` usa `SCAN`, denegado por el ACL Redis de A-080. Reproducido en produccion (state=RETRY, attempts=3, datos ya borrados).
+- **Hotfix PR #120:** el adaptador emite `ports.ErrCacheScanDenegado` solo para NOPERM de `SCAN`; `DEL`/`KEYS`/timeout/conexion/desconocido conservan RETRY. Seis pruebas nuevas. Merge `9722224c15c5a6b8f76cbc53c699b957216082e4`.
+- **Release correctiva:** `v0.18.0+9722224c15c5` (SHA-256 `249017ee0ef828fa9316618ecea5f930cbdd15f4325c5fcb86d73cd020353e74`), S3 inmutable, plan `950D1A3E...95C016` aplicado `0 add / 4 change / 0 destroy` (LT, invariantes de computo, IAM 28 ARN, invariantes IAM), **LT v14**, refresh `faae70c4-b01a-437b-9258-cbd1fce53caa` Successful 100 %, capacidad 2/2/2 y subredes restauradas.
+- **Certificacion E014:** 42/42 PASS con dos cuentas sinteticas: alta y lectura de movimiento/recurrente/meta, aislamiento bidireccional, `DELETE` 422/202 con `requestId`, login/refresh/access posteriores 401, `PENDING/COLLECT -> RUNNING/EXTERNAL -> PURGED`, particion con solo el tombstone, reserva de correo eliminada, usuario B intacto y con alta nueva 201.
+- **Otros 14 endpoints:** evidencias HTTPS reales de `v0.17.0` vigentes; el hotfix solo modifico `purge.go`, el sentinel de `ports` y pruebas.
+- **Regresion:** en la release actual se ejecutaron health/readiness 200 y la certificacion E014; el resto conserva evidencia historica valida. E006/E011 siguen PARTIAL por SES.
+- **Estado AWS:** ASG 2/2/2, `i-037aa73e08855de59` e `i-0c8119d2bee0a85ec` en LT v14, InService/Healthy, ambas en `us-east-2a`; 2/2 targets healthy. **No se declara redundancia multi-AZ efectiva.**
+- **Rollback:** LT v13 y release `v0.17.0+87aac167fe28` conservados.
+- **Pendientes independientes:** E015 v3 (Gate legal, hash `e925596a...8d83`), SES produccion (E006/E011), recuperacion de trabajos E014 antiguos `NOT_VERIFIED` (requestId no conservados; sin Scan).
+- **Total tecnico verificado:** 41/75 (26 heredados + 15 de Oleada 2).

@@ -34,3 +34,19 @@
 | Pendiente | Publicacion AWS, verificacion HTTP real y aceptacion posterior. |
 
 > **Registro operativo vigente (Oleada 2):** el bloque anterior de esta seccion es la evidencia de la implementacion y el merge. Las casillas `[ ]` del plan historico H06 no se marcan retroactivamente sin evidencia de ejecucion.
+
+### Cierre Oleada 2 - release v0.18.0+9722224c15c5
+
+| Campo | Valor |
+|---|---|
+| Implementacion | CONCLUIDA |
+| PR de codigo | #115 (fusionado) |
+| CI | PASS (13/13 checks del PR) |
+| Contrato | OpenAPI 3.1 vigente, paridad JSON/YAML |
+| Publicacion AWS | DEPLOYED: release `v0.18.0+9722224c15c5`, LT v14 |
+| Verificacion HTTPS | PASS (CloudFront `d2lpmqy5w6x9es`) |
+| Persistencia DynamoDB | PASS (relecturas y consultas consistentes) |
+| Seguridad | PASS (ownership, aislamiento, revocacion) |
+| Aceptacion funcional | PASS - 200 v2; 412 stale; 422 target<saved |
+| Rollback | LT v13 / release `v0.17.0+87aac167fe28` |
+| Limitaciones | multi-AZ limitada (ambas EC2 en us-east-2a); E015 pendiente legal; SES pendiente |
