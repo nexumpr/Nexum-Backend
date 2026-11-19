@@ -1,6 +1,8 @@
 package http
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -17,8 +19,9 @@ import (
 )
 
 // Transporte de pagos recurrentes: E032 (`GET /api/v1/recurring-payments`), E033
-// (`POST /api/v1/recurring-payments`) y E034
-// (`GET /api/v1/recurring-payments/{recurringPaymentId}`).
+// (`POST /api/v1/recurring-payments`), E034
+// (`GET /api/v1/recurring-payments/{recurringPaymentId}`) y E035
+// (`PATCH /api/v1/recurring-payments/{recurringPaymentId}`).
 //
 // La ruta exige `Authorization: Bearer` con JWT RS256 y estado autoritativo de la sesión en
 // DynamoDB: la identidad sale exclusivamente de `sub`/`sid` verificados y el cliente no puede
@@ -498,4 +501,290 @@ func (h *RecurringGetHandler) serve(w http.ResponseWriter, r *http.Request) {
 	// ETag fuerte de la versión vigente: es el validador que E035 exige en `If-Match`.
 	w.Header().Set("ETag", FormatETag(pago.Version))
 	escribirJSONCrudo(w, http.StatusOK, cuerpo)
+}
+
+// ---------------- E035: PATCH /api/v1/recurring-payments/{recurringPaymentId} ----------------
+
+// recurringPatchMaxRequestBodyBytes acota el cuerpo de E035: siete campos opcionales de texto
+// corto no necesitan más. Un cuerpo mayor se rechaza sin procesarlo.
+const recurringPatchMaxRequestBodyBytes int64 = 16 * 1024
+
+// patchDueDay distingue las tres situaciones que `RecurringPatch.dueDay` separa:
+//
+//   - campo AUSENTE: `Presente` queda en false y el día fijo no se toca;
+//   - `null` explícito: `Presente` es true y `Valor` nulo, de modo que el día fijo se elimina;
+//   - entero: `Presente` es true y `Valor` apunta al día declarado.
+//
+// Sin esta distinción, `*int` no podría diferenciar «no enviado» de «enviado como null».
+type patchDueDay struct {
+	Presente bool
+	Valor    *int
+}
+
+// UnmarshalJSON implementa la distinción; un valor que no sea entero ni null produce 400.
+func (d *patchDueDay) UnmarshalJSON(datos []byte) error {
+	d.Presente = true
+	if string(bytes.TrimSpace(datos)) == "null" {
+		d.Valor = nil
+		return nil
+	}
+	var valor int
+	if err := json.Unmarshal(datos, &valor); err != nil {
+		return err
+	}
+	d.Valor = &valor
+	return nil
+}
+
+// recurringPatchRequest es el DTO estricto de `RecurringPatch`.
+//
+// `additionalProperties: false`: `frequency` NO existe en el contrato y se rechaza como campo
+// desconocido (400); `id`, `version`, `currency` y `userId` tampoco se admiten. La versión se
+// envía en `If-Match`, no en el cuerpo.
+type recurringPatchRequest struct {
+	Name        *string     `json:"name"`
+	Amount      *string     `json:"amount"`
+	Active      *bool       `json:"active"`
+	NextDueDate *string     `json:"nextDueDate"`
+	Type        *string     `json:"type"`
+	StartDate   *string     `json:"startDate"`
+	DueDay      patchDueDay `json:"dueDay"`
+}
+
+// Validate aplica las comprobaciones de ESQUEMA del contrato (400). La coherencia de fechas,
+// la inmutabilidad de `type` y el importe positivo son reglas de negocio y se responden 422.
+func (peticion recurringPatchRequest) Validate() error {
+	if peticion.Name != nil {
+		nombre := strings.TrimSpace(*peticion.Name)
+		if nombre == "" {
+			return errors.New("name no puede ser vacio")
+		}
+		if len([]rune(nombre)) > domainRecurring.MaxNameRunes {
+			return errors.New("name excede la longitud publicada")
+		}
+	}
+	if peticion.Amount != nil && !patronImporteRecurrente.MatchString(*peticion.Amount) {
+		return errors.New("amount debe ser una cadena decimal con dos decimales")
+	}
+	if peticion.NextDueDate != nil {
+		if err := httputil.DateOnly(*peticion.NextDueDate).Validate(); err != nil {
+			return err
+		}
+	}
+	if peticion.StartDate != nil {
+		if err := httputil.DateOnly(*peticion.StartDate).Validate(); err != nil {
+			return err
+		}
+	}
+	if peticion.DueDay.Presente && peticion.DueDay.Valor != nil {
+		if *peticion.DueDay.Valor < domainRecurring.MinDueDay || *peticion.DueDay.Valor > domainRecurring.MaxDueDay {
+			// `minimum: 1` y `maximum: 28` son restricciones de esquema del contrato.
+			return errors.New("dueDay fuera del rango publicado 1..28")
+		}
+	}
+	return nil
+}
+
+// writeRecurringPreconditionError traduce los fallos de `If-Match` al contrato: 428 si falta,
+// 412 si es un validador débil (RFC 9110 exige comparación fuerte) y 400 si está mal formado.
+func writeRecurringPreconditionError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, ErrIfMatchRequerido):
+		writeRegisterError(w, r, http.StatusPreconditionRequired, "PRECONDITION_REQUIRED", "If-Match requerido", []httputil.ErrorDetail{
+			{Field: "If-Match", Reason: "required"},
+		})
+	case errors.Is(err, errIfMatchDebil):
+		writeRegisterError(w, r, http.StatusPreconditionFailed, "VERSION_CONFLICT", "If-Match debe ser un ETag fuerte", nil)
+	default:
+		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+			{Field: "If-Match", Reason: "invalid_format"},
+		})
+	}
+}
+
+// RecurringPatchHandler sirve `PATCH /api/v1/recurring-payments/{recurringPaymentId}` (E035).
+//
+// Modificación parcial con control optimista: `If-Match` es obligatorio y la escritura sólo se
+// aplica si la versión persistida coincide. `type` es inmutable: el contrato admite el campo,
+// pero una regla no puede cambiar de naturaleza sin invalidar el historial de pagos ejecutados.
+type RecurringPatchHandler struct {
+	service   *appRecurring.Service
+	logger    *slog.Logger
+	protegido http.Handler
+}
+
+// NewRecurringPatchHandler construye el handler. Sin servicio, sin proveedor de tokens o sin
+// autorizador de sesión, el endpoint responde 503 (fail-closed).
+func NewRecurringPatchHandler(
+	servicio *appRecurring.Service,
+	tokens ports.TokenProvider,
+	sesiones ports.SessionAuthorizer,
+	limitador LimitadorRuta,
+	logger *slog.Logger,
+) *RecurringPatchHandler {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	handler := &RecurringPatchHandler{service: servicio, logger: logger}
+	handler.protegido = cadenaRecurrente(tokens, sesiones, limitador, "e035", handler.serve)
+	return handler
+}
+
+// ServeHTTP fija la cabecera de caché antes de cualquier decisión y delega en la cadena
+// autenticada.
+func (h *RecurringPatchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Información financiera del titular: nunca cacheable por proxies ni por el cliente.
+	w.Header().Set("Cache-Control", "private, no-store")
+
+	if h == nil || h.service == nil || h.protegido == nil {
+		writeRegisterError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "servicio no disponible", nil)
+		return
+	}
+	h.protegido.ServeHTTP(w, r)
+}
+
+// serve se ejecuta con la sesión ya verificada.
+//
+// Orden de decisión: identidad → identificador → `If-Match` → cuerpo estricto → caso de uso.
+// La precondición precede al cuerpo porque una escritura sin validador no debe evaluar el
+// payload (428/400/412 antes de cualquier trabajo de negocio).
+func (h *RecurringPatchHandler) serve(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		writeRegisterError(w, r, http.StatusUnauthorized, "UNAUTHORIZED", "sesion no valida", nil)
+		return
+	}
+
+	paymentID, valido := recurringPaymentIDFromPath(r)
+	if !valido {
+		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+			{Field: "recurringPaymentId", Reason: "invalid_format"},
+		})
+		return
+	}
+
+	versionEsperada, errPrecondicion := parseIfMatchFuerte(r.Header.Get("If-Match"))
+	if errPrecondicion != nil {
+		writeRecurringPreconditionError(w, r, errPrecondicion)
+		return
+	}
+
+	var peticion recurringPatchRequest
+	if err := BindJSONLimit(w, r, &peticion, recurringPatchMaxRequestBodyBytes); err != nil {
+		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+			{Field: "body", Reason: "invalid_json"},
+		})
+		return
+	}
+
+	comando := appRecurring.PatchCommand{
+		UserID:          userID,
+		PaymentID:       paymentID,
+		ExpectedVersion: versionEsperada,
+		Name:            peticion.Name,
+		Active:          peticion.Active,
+		NextDueDate:     peticion.NextDueDate,
+		Type:            peticion.Type,
+		StartDate:       peticion.StartDate,
+		DueDay:          appRecurring.DueDayPatch{Present: peticion.DueDay.Presente, Value: peticion.DueDay.Valor},
+	}
+	if peticion.Amount != nil {
+		importe, errImporte := httputil.ParseDecimalToCents(*peticion.Amount)
+		if errImporte != nil {
+			// Defensa en profundidad: `Validate` ya aplicó el patrón publicado.
+			writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+				{Field: "amount", Reason: "invalid_format"},
+			})
+			return
+		}
+		comando.AmountCents = &importe
+	}
+
+	pago, err := h.service.Update(r.Context(), comando)
+	if err != nil {
+		writeRecurringError(h.logger, "recurring-patch", w, r, err)
+		return
+	}
+
+	cuerpo, errCuerpo := pago.Body()
+	if errCuerpo != nil {
+		h.logger.ErrorContext(r.Context(), "recurring-patch: fallo al serializar la respuesta",
+			slog.String("error_class", "response_write"),
+			slog.String("trace_id", traceID(r)))
+		writeRegisterError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "error interno", nil)
+		return
+	}
+
+	// ETag de salida con la misma forma que exige `If-Match` en la siguiente petición.
+	w.Header().Set("ETag", FormatETag(pago.Version))
+	escribirJSONCrudo(w, http.StatusOK, cuerpo)
+}
+
+// ---------------- E036: DELETE /api/v1/recurring-payments/{recurringPaymentId} ----------------
+
+// RecurringDeleteHandler sirve `DELETE /api/v1/recurring-payments/{recurringPaymentId}` (E036).
+//
+// Da de baja la regla SIN borrar el ítem ni ningún pago ya ejecutado: el historial debe seguir
+// siendo consultable y una regla inactiva conserva su identificador. Es idempotente: repetir la
+// baja devuelve 204 sin incrementar la versión. Alcanza también a los ítems heredados del alta,
+// que no tienen atributo `active`.
+type RecurringDeleteHandler struct {
+	service   *appRecurring.Service
+	logger    *slog.Logger
+	protegido http.Handler
+}
+
+// NewRecurringDeleteHandler construye el handler. Sin servicio, sin proveedor de tokens o sin
+// autorizador de sesión, el endpoint responde 503 (fail-closed).
+func NewRecurringDeleteHandler(
+	servicio *appRecurring.Service,
+	tokens ports.TokenProvider,
+	sesiones ports.SessionAuthorizer,
+	limitador LimitadorRuta,
+	logger *slog.Logger,
+) *RecurringDeleteHandler {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	handler := &RecurringDeleteHandler{service: servicio, logger: logger}
+	handler.protegido = cadenaRecurrente(tokens, sesiones, limitador, "e036", handler.serve)
+	return handler
+}
+
+// ServeHTTP fija la cabecera de caché antes de cualquier decisión y delega en la cadena
+// autenticada.
+func (h *RecurringDeleteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// El estado de una regla del titular nunca es cacheable por proxies ni por el cliente.
+	w.Header().Set("Cache-Control", "private, no-store")
+
+	if h == nil || h.service == nil || h.protegido == nil {
+		writeRegisterError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "servicio no disponible", nil)
+		return
+	}
+	h.protegido.ServeHTTP(w, r)
+}
+
+// serve se ejecuta con la sesión ya verificada.
+func (h *RecurringDeleteHandler) serve(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || strings.TrimSpace(userID) == "" {
+		writeRegisterError(w, r, http.StatusUnauthorized, "UNAUTHORIZED", "sesion no valida", nil)
+		return
+	}
+
+	paymentID, valido := recurringPaymentIDFromPath(r)
+	if !valido {
+		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+			{Field: "recurringPaymentId", Reason: "invalid_format"},
+		})
+		return
+	}
+
+	if err := h.service.Deactivate(r.Context(), userID, paymentID); err != nil {
+		writeRecurringError(h.logger, "recurring-delete", w, r, err)
+		return
+	}
+
+	// 204 sin cuerpo: no se serializa nada, ni siquiera el recurso desactivado.
+	w.WriteHeader(http.StatusNoContent)
 }
