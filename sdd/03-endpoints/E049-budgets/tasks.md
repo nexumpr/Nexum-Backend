@@ -24,3 +24,11 @@
 - [ ] `E049-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E049-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
 - [ ] `E049-CT07` If-Match omitido -> 428; ETag viejo -> 412; carrera de versiones no pierde actualizaciones.
+
+
+## Cierre local E049 (2026-11-19)
+
+- **Implementado:** `PUT /api/v1/budgets` con `BUDGETSET#<period>`, `If-Match` `"b<period>-<version>"`, CAS, 428/412, version inicial 0, reemplazo completo de 0..50 categorias y respuesta completa sin nextCursor.
+- **Wiring:** `cmd/server/e049.go`; Bearer + sesion; mismo almacen que E048.
+- **Pruebas:** `go build`, `go vet`, `go test ./...` PASS; creacion, reemplazo, etag obsoleto, periodo distinto, duplicados, negativos, 50 categorias y concurrencia.
+- **PR:** pendiente de abrir; sin merge ni AWS.
