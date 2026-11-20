@@ -540,7 +540,7 @@ func (u usoDelLibro) LoadTimezone(context.Context, string) (string, error) {
 }
 
 func (u usoDelLibro) LoadSet(ctx context.Context, userID, periodo string) (*appBudget.Set, error) {
-	return presupuestosDelLibro{u.libro}.LoadSet(ctx, userID, periodo)
+	return presupuestosDelLibro(u).LoadSet(ctx, userID, periodo)
 }
 
 func (u usoDelLibro) AggregateExpenses(_ context.Context, userID string, desde, hasta time.Time) (map[string]int64, error) {
