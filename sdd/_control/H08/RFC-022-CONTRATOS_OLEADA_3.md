@@ -5,16 +5,16 @@
 | Documento | `sdd/_control/H08/RFC-022-CONTRATOS_OLEADA_3.md` |
 | Versión | **1.2.1** |
 | Fecha | 2026-11-19 |
-| Estado | **PROPUESTO** — no aprobado, no aplicado |
+| Estado | **APPROVED** — aprobado por el responsable el 2026-11-19 |
 | Autoridad que lo motiva | Instrucción humana de inicio de Oleada 3 y auditoría correctiva de la v1.1.0 |
 | Instrumento de concurrencia | RFC-019 (E-1, E-2, E-3) |
 | Aprobador | Responsable de Nexum-Backend |
-| Frases | §14 (dos) |
+| Frases | §14 (dos); frase de aprobación concedida: `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_1` |
 | Sustituye | v1.1.0 y v1.0.0, no aprobadas. Registro en §15 |
 
-> Este documento **no** autoriza nada por sí mismo. Mientras siga `PROPUESTO`, el contrato
-> vigente (OpenAPI + SDD aprobado) es la única autoridad. Las frases del §14 lo convierten en
-> `APPROVED` y habilitan exclusivamente los cambios descritos.
+> Esta versión está **APPROVED** desde el 2026-11-19. Habilita exclusivamente los cambios
+> descritos en los §2–§10; no autoriza merges, S3, `terraform apply`, `instance refresh` ni
+> despliegue, que conservan sus Gates propios.
 
 ## 1. Contexto y cambios de esta revisión
 
@@ -452,4 +452,4 @@ aprobadas y no se aplican.
 | 2026-11-19 | 1.0.0 | Reconciliación inicial | **NO APROBADA** |
 | 2026-11-19 | 1.1.0 | E020, E048/E049, E026, E037, E042, E043–E047, E050/E051 | **NO APROBADA** |
 | 2026-11-19 | 1.2.0 | E049 sin paginación de respuesta; E026 alternativa B; E051 sin caché; E020 garantías reales; E037 categorías del catálogo; E042 B; T-1 únicamente | **NO APROBADA** |
-| 2026-11-19 | 1.2.1 | E026 suma ahorros independientes + aportaciones activas sin doble conteo; E043 exige suma exacta y paridad con E044 | **PROPUESTO** |
+| 2026-11-19 | 1.2.1 | E026 suma ahorros independientes + aportaciones activas sin doble conteo; E043 exige suma exacta y paridad con E044 | **APPROVED** — `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_1` |

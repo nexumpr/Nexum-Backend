@@ -2206,3 +2206,12 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **E043 pendiente de correccion local:** el preview debe rechazar suma incompleta; se aplicara antes del PR individual.
 - **PR #122** actualizado con v1.2.1; CI a verificar sobre el nuevo HEAD.
 - **Merges:** politica nueva de lote unico; no se fusiona ningun PR hasta completar los 13 endpoints y sus checks.
+
+## Oleada 3 — RFC-022 v1.2.1 APROBADA (2026-11-19)
+
+- **Aprobacion humana:** `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_1`. RFC-022 v1.2.1 pasa a **APPROVED** y desbloquea E020, E026, E042, E048, E049, E050 y E051. Se autoriza el cambio fisico `BUDGET#` -> `BUDGETSET#`.
+- **Sigue prohibido:** merges, S3, Terraform apply, instance refresh y despliegue sin sus Gates. La aprobacion no autoriza merges anticipados ni releases parciales.
+- **PR #122** actualizado con la aprobacion; pendiente de commit/push y CI. **PR #123** (T-1) y **PR #124** (E037) siguen en el lote.
+- **E037:** PR #124 con wiring en `cmd/server/registro_oleada3.go` y `e037.go`; pendiente corregir U1000 de `ids()` y completar tasks/checklist.
+- **E043–E047:** commit local `b79a67e`; pendiente dividir en cinco PRs y conectar el wiring.
+- **Siguiente:** corregir #124, implementar E020/E026/E042/E048–E051, dividir aportaciones y preparar el ensayo integral. Sin merges hasta el lote completo.

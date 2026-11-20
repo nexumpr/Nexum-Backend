@@ -228,12 +228,12 @@ SES/E015. Cada PR, el release y el despliegue exigen sus Gates propios.
 
 | Frase | Estado | Fecha | Efecto |
 |---|---|---|---|
-| `APRUEBO_GATE_OLEADA_3_RFC019_E020_E026_E037_E042_E043_E044_E045_E046_E047_E048_E049_E050_E051` | **CONCEDIDA** | 2026-11-19 | Habilita implementación, ramas y PR de los 13 endpoints. RFC-022 sigue `PROPUESTO`; E020/E048/E049/E050 y las semánticas públicas quedan `CONTRACT_BLOCKED` hasta su frase propia |
+| `APRUEBO_GATE_OLEADA_3_RFC019_E020_E026_E037_E042_E043_E044_E045_E046_E047_E048_E049_E050_E051` | **CONCEDIDA** | 2026-11-19 | Habilita implementación, ramas y PR de los 13 endpoints. RFC-022 v1.2.1 **APROBADA**; E020/E026/E042/E048–E051 desbloqueados. T-1 concedido por separado |
 | `APRUEBO_RFC_022_CONTRATOS_OLEADA_3` | **RETIRADA** | 2026-11-19 | v1.0.0 no aprobada |
 | `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_1_0` | **RETIRADA** | 2026-11-19 | v1.1.0 no aprobada; sustituida por la v1.2.0 |
 | `APRUEBO_CAMBIOS_TRANSVERSALES_OLEADA_3` | **RETIRADA** | 2026-11-19 | Incluía T-2 (hooks de caché), eliminado en v1.2.0 |
 | `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_0` | **RETIRADA** | 2026-11-19 | v1.2.0 no aprobada; sustituida por la v1.2.1 |
-| `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_1` | **PENDIENTE** | — | Habilita los cambios de contrato y semánticas de RFC-022 v1.2.1 |
+| `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_1` | **CONCEDIDA** | 2026-11-19 | Habilita los cambios de contrato y semánticas de RFC-022 v1.2.1 |
 | `APRUEBO_CAMBIO_TRANSVERSAL_E030_MOVIMIENTO_APORTACION` | **PENDIENTE** | — | Habilita solo el guardo T-1 de E030 |
 
 Siguen requiriendo autorización propia y separada: merge de cada PR, publicación S3,
