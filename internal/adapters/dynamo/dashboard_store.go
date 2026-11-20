@@ -37,48 +37,61 @@ func (s *DashboardStore) ListActiveGoals(ctx context.Context, userID string, lim
 	if limit < 1 {
 		limit = appDashboard.MaxGoals
 	}
-	out, err := s.client.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String(s.table),
-		KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :prefix)"),
-		FilterExpression:       aws.String("#status = :active AND (attribute_not_exists(#deleted) OR #deleted = :false)"),
-		ExpressionAttributeNames: map[string]string{
-			"#status":  "status",
-			"#deleted": "deleted",
-		},
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":     stringAttr(domainDynamo.PrefixUser + strings.TrimSpace(userID)),
-			":prefix": stringAttr(domainDynamo.PrefixGoal),
-			":active": stringAttr("active"),
-			":false":  &types.AttributeValueMemberBOOL{Value: false},
-		},
-		Limit: aws.Int32(int32(limit)),
-	})
-	if err != nil {
-		return nil, appDashboard.ErrUnavailable
-	}
-	salida := make([]appDashboard.GoalRow, 0, len(out.Items))
-	for _, item := range out.Items {
-		goalID := stringAttribute(item["goalId"])
-		target, okTarget := attributeInt(item["targetAmountCents"])
-		saved, okSaved := attributeInt(item["savedAmountCents"])
-		opening, okOpening := attributeInt(item["openingSavedCents"])
-		version, _ := attributeInt(item["version"])
-		if goalID == "" || !okTarget || !okSaved || !okOpening {
-			return nil, appDashboard.ErrInvalid
+	salida := make([]appDashboard.GoalRow, 0, limit)
+	var start map[string]types.AttributeValue
+	for {
+		entrada := &dynamodb.QueryInput{
+			TableName:              aws.String(s.table),
+			KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :prefix)"),
+			FilterExpression:       aws.String("#status = :active AND (attribute_not_exists(#deleted) OR #deleted = :false)"),
+			ExpressionAttributeNames: map[string]string{
+				"#status":  "status",
+				"#deleted": "deleted",
+			},
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk":     stringAttr(domainDynamo.PrefixUser + strings.TrimSpace(userID)),
+				":prefix": stringAttr(domainDynamo.PrefixGoal),
+				":active": stringAttr("active"),
+				":false":  &types.AttributeValueMemberBOOL{Value: false},
+			},
+			Limit: aws.Int32(int32(limit)),
 		}
-		salida = append(salida, appDashboard.GoalRow{
-			ID:           goalID,
-			Name:         stringAttribute(item["name"]),
-			TargetCents:  target,
-			SavedCents:   saved,
-			OpeningCents: opening,
-			Currency:     stringAttribute(item["currency"]),
-			TargetDate:   stringAttribute(item["targetDate"]),
-			Status:       stringAttribute(item["status"]),
-			Version:      version,
-		})
+		if len(start) > 0 {
+			entrada.ExclusiveStartKey = start
+		}
+		out, err := s.client.Query(ctx, entrada)
+		if err != nil {
+			return nil, appDashboard.ErrUnavailable
+		}
+		for _, item := range out.Items {
+			goalID := stringAttribute(item["goalId"])
+			target, okTarget := attributeInt(item["targetAmountCents"])
+			saved, okSaved := attributeInt(item["savedAmountCents"])
+			opening, okOpening := attributeInt(item["openingSavedCents"])
+			version, _ := attributeInt(item["version"])
+			if goalID == "" || !okTarget || !okSaved || !okOpening {
+				return nil, appDashboard.ErrInvalid
+			}
+			salida = append(salida, appDashboard.GoalRow{
+				ID:           goalID,
+				Name:         stringAttribute(item["name"]),
+				TargetCents:  target,
+				SavedCents:   saved,
+				OpeningCents: opening,
+				Currency:     stringAttribute(item["currency"]),
+				TargetDate:   stringAttribute(item["targetDate"]),
+				Status:       stringAttribute(item["status"]),
+				Version:      version,
+			})
+			if len(salida) >= limit {
+				return salida, nil
+			}
+		}
+		if len(out.LastEvaluatedKey) == 0 {
+			return salida, nil
+		}
+		start = out.LastEvaluatedKey
 	}
-	return salida, nil
 }
 
 // ListLatestMovements consulta los movimientos más recientes en orden descendente.
