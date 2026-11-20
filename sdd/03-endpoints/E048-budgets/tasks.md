@@ -24,3 +24,11 @@
 - [ ] `E048-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E048-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
 - [ ] `E048-CT07` Paginación 25/100, filtro modificado con cursor antiguo -> 400, lectura sin Scan, sin duplicados en páginas.
+
+
+## Cierre local E048 (2026-11-19)
+
+- **Implementado:** `GET /api/v1/budgets` sobre `BUDGETSET#<period>` con ETag por periodo, paginacion `limit`/`cursor`, ownership y lectura sin Scan.
+- **Wiring:** `cmd/server/e048.go` sobre el registro de Oleada 3; Bearer + sesion; cursor HMAC derivado.
+- **Pruebas:** `go build`, `go vet`, `go test ./... -count=1` PASS; 0/1/25/50 categorias, periodo vacio, paginacion y sin periodo.
+- **PR:** pendiente de abrir; sin merge ni AWS.
