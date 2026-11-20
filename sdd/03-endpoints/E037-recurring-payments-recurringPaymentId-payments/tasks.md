@@ -24,3 +24,12 @@
 - [ ] `E037-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E037-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
 - [ ] `E037-CT07` Repetición idéntica de Idempotency-Key -> respuesta estable; payload diferente con misma key -> 409; carrera multiinstancia.
+
+## Cierre local E037 (2026-11-19)
+
+- **Implementado:** `POST /api/v1/recurring-payments/{recurringPaymentId}/payments` con DTO estricto, `Idempotency-Key`, transacción de 5 acciones (movimiento + puntero + `RECURRINGPAY#` + idempotencia + `ConditionCheck` de regla activa), replay y 409 por fecha local duplicada.
+- **Categorías:** `expense→otros`, `income→ingreso`, `saving→ahorro` (catálogo E022; `recurring` no existe y no se inventa). `description` = nombre de la regla y `recurringPaymentId` conserva el vínculo.
+- **Wiring:** `cmd/server/registro_oleada3.go` y `cmd/server/e037.go`; `main.go` construye `dependenciasOleada3`.
+- **Pruebas reales:** `go build ./...`, `go vet ./...`, `go test ./... -count=1` PASS en local; suites de aplicación, adaptador y transporte; prueba de categorías del catálogo.
+- **PR:** #124, HEAD `c4f7ee3dc292c91cac29ad2628c09d7401321f0d` (más la corrección U1000 y las pruebas de registro).
+- **Pendiente:** CI Linux, certificación HTTPS y despliegue. No se declara `AWS_VERIFIED`.
