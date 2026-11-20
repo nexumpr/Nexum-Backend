@@ -415,7 +415,15 @@ func (s *ExportStore) Aportaciones(ctx context.Context, userID, after string, li
 //
 // Cada `BUDGETSET#<period>` es un item único con hasta 50 categorías (RFC-022 §3.1), de modo
 // que la página puede cortarse a mitad de un periodo: la continuación es la clave sintética
-// exacta y la siguiente llamada reanuda desde el periodo correspondiente con `SK >=`.
+// exacta y la siguiente llamada reanuda dentro del periodo correspondiente.
+//
+// La reanudación NO usa un rango abierto sobre la `SK`. DynamoDB admite una sola condición de
+// rango por consulta y no permite combinar `begins_with` con `>=` sobre la misma clave; además,
+// `SK >= "BUDGETSET#<periodo>"` no se limita al prefijo de presupuestos y arrastraría todos los
+// prefijos posteriores de la partición (`CONSENT#`, `GOAL#`, `MOVEMENT#`...), que no son
+// presupuestos. Por eso la primera consulta se restringe al periodo de continuación con
+// `begins_with(SK, "BUDGETSET#<periodo>")` y, agotado ese periodo, el recorrido continúa por la
+// colección completa desde la clave del periodo siguiente.
 func (s *ExportStore) Presupuestos(ctx context.Context, userID, after string, limit int) ([]appExport.BudgetRow, string, error) {
 	if s == nil || s.cliente == nil || s.tabla == "" {
 		return nil, "", appExport.ErrUnavailable
@@ -426,33 +434,30 @@ func (s *ExportStore) Presupuestos(ctx context.Context, userID, after string, li
 	}
 
 	pk := domainDynamo.PrefixUser + userID
-	condicion := "PK = :pk AND begins_with(SK, :prefijo)"
-	valores := map[string]types.AttributeValue{
-		":pk":      stringAttr(pk),
-		":prefijo": stringAttr(appExport.PrefijoPresupuesto),
-	}
+	prefijo := appExport.PrefijoPresupuesto
+	periodoContinuacion := ""
+	var inicio map[string]types.AttributeValue
 	if after != "" {
-		periodo := periodoDeClave(after)
-		if periodo == "" {
+		periodoContinuacion = periodoDeClave(after)
+		if periodoContinuacion == "" {
 			return nil, "", appExport.ErrUnavailable
 		}
-		condicion = "PK = :pk AND SK >= :desde"
-		valores = map[string]types.AttributeValue{
-			":pk":    stringAttr(pk),
-			":desde": stringAttr(periodo),
-		}
+		// Primera consulta: sólo las filas restantes del periodo donde se cortó la página.
+		prefijo = periodoContinuacion
 	}
 
 	filas := make([]appExport.BudgetRow, 0, limit+1)
-	var inicio map[string]types.AttributeValue
 	for pagina := 0; pagina < exportPresupuestosMaxPaginas; pagina++ {
 		entrada := &dynamodb.QueryInput{
-			TableName:                 aws.String(s.tabla),
-			ConsistentRead:            aws.Bool(true),
-			KeyConditionExpression:    aws.String(condicion),
-			ExpressionAttributeValues: valores,
-			ScanIndexForward:          aws.Bool(true),
-			Limit:                     aws.Int32(int32(limit + 1)),
+			TableName:              aws.String(s.tabla),
+			ConsistentRead:         aws.Bool(true),
+			KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :prefijo)"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk":      stringAttr(pk),
+				":prefijo": stringAttr(prefijo),
+			},
+			ScanIndexForward: aws.Bool(true),
+			Limit:            aws.Int32(int32(limit + 1)),
 		}
 		if len(inicio) > 0 {
 			entrada.ExclusiveStartKey = inicio
@@ -482,8 +487,22 @@ func (s *ExportStore) Presupuestos(ctx context.Context, userID, after string, li
 			}
 		}
 		if len(salida.LastEvaluatedKey) == 0 {
+			if periodoContinuacion != "" {
+				// El periodo de continuación se agotó (o ya no existe). El recorrido sigue por
+				// la colección completa a partir del periodo siguiente; terminar aquí
+				// declararía completa una exportación que aún tiene presupuestos.
+				inicio = map[string]types.AttributeValue{
+					"PK": stringAttr(pk),
+					"SK": stringAttr(periodoContinuacion),
+				}
+				periodoContinuacion = ""
+				prefijo = appExport.PrefijoPresupuesto
+				continue
+			}
 			return filas, "", nil
 		}
+		periodoContinuacion = ""
+		prefijo = appExport.PrefijoPresupuesto
 		inicio = salida.LastEvaluatedKey
 	}
 	if len(filas) > 0 {
