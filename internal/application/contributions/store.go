@@ -45,9 +45,9 @@ type StoredResponse struct {
 
 // CreateWrite agrupa la escritura atómica de E044.
 type CreateWrite struct {
-	UserID         string
-	Contribution   Contribution
-	Movement       appMovements.Movement
+	UserID       string
+	Contribution Contribution
+	Movement     appMovements.Movement
 	// Goals es la lectura consistente previa de cada meta. El adaptador usa `TargetCents` y
 	// `Version` para construir la condición atómica de capacidad y detectar cambios
 	// concurrentes del objetivo.
