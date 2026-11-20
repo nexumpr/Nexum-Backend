@@ -871,6 +871,7 @@ func (s *GoalsStore) DeleteGoal(ctx context.Context, write appGoals.DeleteWrite)
 				":now":      stringAttr(nowISO),
 				":expected": numberAttr(actual.Version),
 				":zero":     numberAttr(0),
+				":one":      numberAttr(1),
 			},
 		}
 		_, err = s.client.UpdateItem(ctx, entrada)

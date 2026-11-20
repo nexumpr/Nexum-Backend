@@ -2224,3 +2224,9 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **E047:** 503 por `:one` usado en `ADD #version :one` y ausente en `ExpressionAttributeValues` de la actualizacion de la aportacion. Causa reproducida con una transaccion de diagnostico no destructiva; corregido y cubierto por una prueba que valida todos los marcadores de la transaccion.
 - **E014:** el 400 observado fue del runner (`Content-Type` ausente), no del endpoint; pendiente de repetir con solicitud valida.
 - **Estado:** correcciones en rama de hotfix con PR; no fusionadas ni desplegadas. AWS sigue en `v0.19.0+3baa15840a2e`. No se inicia Oleada 4.
+
+
+### Hotfix E042 — `:one` ausente en tombstone (2026-11-20)
+
+- `DeleteGoal` usaba `ADD #version :one` sin declarar `:one`; DynamoDB devolvia `ValidationException` y el endpoint respondia 503 tras revertir la aportacion.
+- Corregido con `:one` Number y prueba que valida todos los marcadores del `UpdateItemInput`. AWS pendiente de release.

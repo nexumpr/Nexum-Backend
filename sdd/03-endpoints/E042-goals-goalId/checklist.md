@@ -26,3 +26,11 @@
 - [x] Alternativa B, tombstone, wiring y pruebas locales.
 - [ ] PR y CI Linux.
 - [ ] Certificación HTTPS y despliegue AWS.
+
+
+## Hotfix 2026-11-20 — E042 `:one` en tombstone
+
+- Causa raiz confirmada en AWS: la `UpdateExpression` de `DeleteGoal` usa `ADD #version :one`, pero `ExpressionAttributeValues` no declaraba `:one`; DynamoDB devolvia `ValidationException` y el adaptador lo traducia a 503 tras la reversion de la aportacion.
+- Correccion: declarar `:one` como Number. La condicion de version y `activeContributions` se conserva.
+- Prueba de regresion: `TestE042UpdateItemDeclaraTodosLosValores` captura el `UpdateItemInput` real y exige que todos los marcadores tengan valor.
+- Estado: corregido en rama de hotfix; AWS pendiente de release y certificacion.
