@@ -33,7 +33,6 @@
   "AGENTS.md": "d2b849925e649f6e8fe5e96d2cd4564a7d889310836acd3baf52ee912c00db42",
   "README.md": "bd1f96bdfa372443de8eb1a6ca5b55943dbde8307aa71b834d4a8bab48358c4c",
   "constitution.md": "9534c9a61f94f952ee33e935cd3aeed4bfee51b36165380c52c4a24f80c72ea2",
-  "fix_openapi_e020.py": "afc7ec0cd58e5344f054d84a16da9fc5622fcd0415d84d9fc14c31e164d6b920",
   "herramientas/clasificar_contratos_e005.py": "9efe1e9c96b26f618e73fa81440df64bcc72c7ed53d597fe236dc69ab8017b29",
   "herramientas/cobertura_dominio.py": "ec03ca39eab5a4a1a94b96e1929d3cfebe30d3279eb4fa8c5fedfff84ea29edc",
   "herramientas/comparar_contrato_api.py": "98927c538d1347167f586a2eaa2469d3507b6762f7a256b8be665119f4dca507",

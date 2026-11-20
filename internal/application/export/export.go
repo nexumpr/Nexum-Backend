@@ -110,11 +110,11 @@ const (
 
 	// Nombres estables de colección que viajan en el cursor. Se codifica el NOMBRE y no un
 	// índice para que añadir una colección intermedia no invalide los cursores ya emitidos.
-	coleccionMovimientos    = "movements"
-	coleccionAportaciones   = "contributions"
-	coleccionRecurrentes    = "recurringPayments"
-	coleccionMetas          = "goals"
-	coleccionPresupuestos   = "budgets"
+	coleccionMovimientos  = "movements"
+	coleccionAportaciones = "contributions"
+	coleccionRecurrentes  = "recurringPayments"
+	coleccionMetas        = "goals"
+	coleccionPresupuestos = "budgets"
 )
 
 // periodPattern replica `^\d{4}-(0[1-9]|1[0-2])$` de `Budget.period`.

@@ -361,11 +361,11 @@ func (s *ExportStore) Aportaciones(ctx context.Context, userID, after string, li
 
 	pk := domainDynamo.PrefixUser + userID
 	entrada := &dynamodb.QueryInput{
-		TableName:      aws.String(s.tabla),
-		ConsistentRead: aws.Bool(true),
+		TableName:              aws.String(s.tabla),
+		ConsistentRead:         aws.Bool(true),
 		KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :prefijo)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":     stringAttr(pk),
+			":pk":      stringAttr(pk),
 			":prefijo": stringAttr(appExport.PrefijoAportacion),
 		},
 		ScanIndexForward: aws.Bool(true),
