@@ -2180,3 +2180,11 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Rollback:** LT v13 y release `v0.17.0+87aac167fe28` conservados.
 - **Pendientes independientes:** E015 v3 (Gate legal, hash `e925596a...8d83`), SES produccion (E006/E011), recuperacion de trabajos E014 antiguos `NOT_VERIFIED` (requestId no conservados; sin Scan).
 - **Total tecnico verificado:** 41/75 (26 heredados + 15 de Oleada 2).
+
+## Oleada 3 — Gate concedido y RFC-022 en revision (2026-11-19)
+
+- **Gate concedido:** `APRUEBO_GATE_OLEADA_3_RFC019_E020_E026_E037_E042_E043_E044_E045_E046_E047_E048_E049_E050_E051` (2026-11-19). Registro en `sdd/_control/H08/GATE_H08E_OLEADA_3.md` §12.1. Habilita implementacion, ramas y PR de los 13 endpoints.
+- **RFC-022 v1.0.0 NO aprobada.** Observaciones del responsable: E020 sin topes artificiales; E048/E049 con cambio de diseno fisico declarado y paginacion real; E026 con comparacion A-070/`CalculateAvailableV6` y distincion disponible/neto; E037 con ocurrencia, zona, frecuencia, replay, concurrencia e impacto de `recurring`; E042 con alternativas A/B; E043–E047 con historial en E027/E029/E030/E031/E026/E051 y cambios transversales delimitados; E050/E051 con ACL Redis y cache sin obsoletos.
+- **RFC-022 v1.1.0 preparada** en estado `PROPUESTO`, con matriz de decisiones y dos frases pendientes: `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_1_0` y `APRUEBO_CAMBIOS_TRANSVERSALES_OLEADA_3`.
+- **Estado del preflight:** `origin/main` = `0169f006935b825747d0508b81c6c32661027baf`; CI Go/SDD SUCCESS; ASG 2/2/2; LT v14 (`v0.18.0+9722224c15c5`); 2 targets healthy; HTTPS live 200; plan FREE/ACTIVE con 142.94 USD; `opencode.json` local preservado.
+- **Sin cambios publicos aplicados:** OpenAPI, Terraform, memoria de despliegue y endpoints anteriores intactos. `E020/E048/E049/E050` y las semanticas de RFC-022 quedan `CONTRACT_BLOCKED` hasta la frase A; T-1/T-2 hasta la frase B.
