@@ -10949,6 +10949,33 @@ components:
           items:
             $ref: '#/components/schemas/Consent'
           minItems: 0
+        income:
+          anyOf:
+          - $ref: '#/components/schemas/Income'
+          - type: 'null'
+        recurringPayments:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecurringPayment'
+          minItems: 0
+        contributions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Contribution'
+          minItems: 0
+        budgets:
+          type: array
+          items:
+            $ref: '#/components/schemas/Budget'
+          minItems: 0
+        onboarding:
+          anyOf:
+          - $ref: '#/components/schemas/Onboarding'
+          - type: 'null'
+        preferences:
+          anyOf:
+          - $ref: '#/components/schemas/UserPreferences'
+          - type: 'null'
         nextCursor:
           type: string
           example: opaque.cursor.string

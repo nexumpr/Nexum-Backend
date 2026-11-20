@@ -25,3 +25,11 @@
 - [ ] `E044-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
 - [ ] `E044-CT07` Repetición idéntica de Idempotency-Key -> respuesta estable; payload diferente con misma key -> 409; carrera multiinstancia.
 - [ ] `E044-CT08` Suma de asignaciones exacta; objetivo ajeno, metas repetidas, >12 metas, doble reversa y transacción cancelada sin efectos.
+
+
+## Cierre local E044 (2026-11-19)
+
+- **Implementado:** `POST /api/v1/goal-contributions` con DTO estricto, Idempotency-Key, suma exacta, 201 + Location, replay y 409; servicio/adapter compartidos de la fundacion #130.
+- **Wiring:** `cmd/server/e044.go`; cuota dentro de la cadena autenticada.
+- **Pruebas:** `go build`, `go vet`, `go test ./...` PASS; 201, replay, 409, 400, 401, 422, 404, 503, 429 y concurrencia.
+- **PR:** base `feat/h08e-e043-preview`; sin merge ni AWS.

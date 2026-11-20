@@ -49,6 +49,14 @@ type Store interface {
 	// ahorro acumulado. Un fallo de la condición se traduce en ErrVersionConflict (412),
 	// ErrTargetBelowSaved (422) o ErrConflict (409) tras agotar los reintentos.
 	UpdateGoal(ctx context.Context, write UpdateWrite) (*domainGoal.Goal, error)
+
+	// DeleteGoal marca la meta como borrada (E042, RFC-022 §6 alternativa B) con una escritura
+	// condicional: `deleted=true`, `status=archived`, `savedAmount=openingSaved` y `version+1`
+	// en UNA sola operación. No revierte aportaciones y NUNCA elimina el item: preserva el
+	// historial económico. Repetir el borrado sobre un tombstone es idempotente (nil), una meta
+	// inexistente o ajena devuelve ErrNotFound y una meta con aportaciones vigentes devuelve
+	// ErrGoalActiveContributions sin modificar nada.
+	DeleteGoal(ctx context.Context, write DeleteWrite) error
 }
 
 // ListStoreQuery es la consulta paginada que recibe la persistencia.
@@ -116,4 +124,14 @@ type StoredResponse struct {
 	Location   string
 	ResourceID string
 	Replayed   bool
+}
+
+// DeleteWrite es la escritura de E042 ya normalizada. No lleva la versión esperada: el
+// adaptador lee el estado vigente con consistencia fuerte, decide si procede el tombstone y
+// repite el compare-and-swap internamente, de modo que el contrato del puerto no obliga al
+// llamador a aportar un validador que el cliente no envía en este endpoint.
+type DeleteWrite struct {
+	UserID string
+	GoalID string
+	Now    time.Time
 }

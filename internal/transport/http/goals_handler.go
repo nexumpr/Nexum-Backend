@@ -204,6 +204,8 @@ func writeGoalsError(w http.ResponseWriter, r *http.Request, logger *slog.Logger
 		writeRegisterError(w, r, http.StatusNotFound, "NOT_FOUND", "recurso no encontrado", nil)
 	case errors.Is(err, appGoals.ErrConflict):
 		writeRegisterError(w, r, http.StatusConflict, "CONFLICT", "la clave de idempotencia ya se uso con otro contenido", nil)
+	case errors.Is(err, appGoals.ErrGoalActiveContributions):
+		writeRegisterError(w, r, http.StatusConflict, "CONFLICT", "la meta tiene aportaciones vigentes; revertirlas antes de borrar", nil)
 	case errors.Is(err, appGoals.ErrVersionConflict):
 		writeRegisterError(w, r, http.StatusPreconditionFailed, "VERSION_CONFLICT", "la version enviada no es la vigente", nil)
 	case errors.Is(err, appGoals.ErrTargetNotPositive):

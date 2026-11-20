@@ -23,3 +23,11 @@
 - [ ] `E046-CT04` Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
 - [ ] `E046-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E046-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
+
+
+## Cierre local E046 (2026-11-19)
+
+- **Implementado:** GET /api/v1/goal-contributions/{contributionId} con ownership, 7 campos exactos y 404 homogeneo.
+- **Wiring:** `cmd/server/e046.go`; base compartida #130.
+- **Pruebas:** `go build`, `go vet`, `go test ./...` PASS local; pruebas de transporte E046 PASS.
+- **PR:** pendiente de abrir; sin merge ni AWS.

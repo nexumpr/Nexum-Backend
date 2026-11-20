@@ -148,9 +148,17 @@ type Goal struct {
 	OpeningSaved money.Money
 	TargetDate   time.Time
 	Status       Status
-	Version      int64
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	// Deleted es el tombstone de E042 (RFC-022 §6, alternativa B). Una meta borrada deja de
+	// existir para el cliente —E040/E041 responden 404, E038/E051 la excluyen— aunque el item
+	// permanezca en la tabla para preservar el historial económico (GOV-07, R-030).
+	Deleted bool
+	// ActiveContributions cuenta las aportaciones vigentes (E044/E047). E042 sólo elimina
+	// cuando es cero: con aportaciones activas responde 409 y el cliente revierte con E047.
+	// Un item heredado sin el atributo se interpreta como cero.
+	ActiveContributions int64
+	Version             int64
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 // NormalizeName recorta espacios y valida la longitud en runas. Devuelve el nombre que debe
@@ -229,6 +237,14 @@ func (g Goal) Validate() error {
 		return ErrInconsistent
 	}
 	if _, err := ParseStatus(g.Status.String()); err != nil {
+		return ErrInconsistent
+	}
+	if g.ActiveContributions < 0 {
+		return ErrInconsistent
+	}
+	// El tombstone de E042 se escribe siempre con `status=archived` (RFC-022 §6): una fila que
+	// declara `deleted` sobre una meta en curso es incoherente y se falla cerrada.
+	if g.Deleted && g.Status != StatusArchived {
 		return ErrInconsistent
 	}
 	if err := ValidateTargetDate(g.TargetDate); err != nil {
