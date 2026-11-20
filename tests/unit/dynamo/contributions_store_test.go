@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -43,6 +44,9 @@ type memoriaAportacionesDynamo struct {
 	transacciones int
 	consultas     int
 	fallo         error
+	// ultimaTransaccion conserva la entrada exacta de TransactWriteItems para las
+	// pruebas de regresion de expresiones. No sustituye la validacion de DynamoDB.
+	ultimaTransaccion *dynamodb.TransactWriteItemsInput
 }
 
 func nuevaMemoriaAportaciones() *memoriaAportacionesDynamo {
@@ -168,6 +172,7 @@ func cumpleFiltroAporte(filtro string, item map[string]types.AttributeValue, val
 func (m *memoriaAportacionesDynamo) TransactWriteItems(_ context.Context, params *dynamodb.TransactWriteItemsInput, _ ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.ultimaTransaccion = params
 	m.transacciones++
 	if m.fallo != nil {
 		return nil, m.fallo
@@ -527,6 +532,56 @@ func TestE047StoreReversionYReplay(t *testing.T) {
 	write.PayloadHash = appContrib.ReversePayloadHash(c.ID, "Otro motivo")
 	if _, err := store.ReverseContribution(context.Background(), write); !errors.Is(err, appContrib.ErrAlreadyReversed) {
 		t.Fatalf("doble reversion debe 409, obtenido %v", err)
+	}
+}
+
+func TestE047StoreExpresionDeclaraTodosLosValores(t *testing.T) {
+	memoria := nuevaMemoriaAportaciones()
+	memoria.items[claveDe(mustGoalKeys(e04xUsuario, e04xMeta1))] = metaItem(e04xUsuario, e04xMeta1, 100000, 0, "active")
+	store := dynamoAdapter.NewContributionsStore(memoria, e04xTabla)
+	escritura := escrituraAporte(t, 100000, []appContrib.Allocation{{GoalID: e04xMeta1, AmountCents: 100000}})
+	if _, err := store.CreateContribution(context.Background(), escritura); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	c, _ := store.LoadContribution(context.Background(), e04xUsuario, e04xAporte)
+	siguiente := *c
+	siguiente.Status = appContrib.StatusReversed
+	siguiente.Version = c.Version + 1
+	siguiente.ReversedAt = e04xAhora
+	siguiente.ReverseReason = "Correccion autorizada"
+	body, _ := siguiente.Body()
+	write := appContrib.ReverseWrite{
+		UserID: e04xUsuario, Previous: *c, Next: siguiente,
+		IdempotencyKey: "idem-rev-expresion-0001", Operation: appContrib.OperationReverse,
+		PayloadHash:  appContrib.ReversePayloadHash(c.ID, siguiente.ReverseReason),
+		ResponseBody: body, Location: "/api/v1/goal-contributions/" + c.ID,
+		Now: e04xAhora, ExpiresAt: e04xAhora.Add(appContrib.IdempotencyTTL),
+	}
+	if _, err := store.ReverseContribution(context.Background(), write); err != nil {
+		t.Fatalf("reverse: %v", err)
+	}
+	if memoria.ultimaTransaccion == nil {
+		t.Fatal("no se capturo TransactWriteItems")
+	}
+	patron := regexp.MustCompile(`:[A-Za-z0-9_]+`)
+	for i, item := range memoria.ultimaTransaccion.TransactItems {
+		var expresion string
+		var valores map[string]types.AttributeValue
+		switch {
+		case item.Update != nil:
+			expresion = aws.ToString(item.Update.UpdateExpression) + " " + aws.ToString(item.Update.ConditionExpression)
+			valores = item.Update.ExpressionAttributeValues
+		case item.Put != nil:
+			expresion = aws.ToString(item.Put.ConditionExpression)
+			valores = item.Put.ExpressionAttributeValues
+		default:
+			continue
+		}
+		for _, marcador := range patron.FindAllString(expresion, -1) {
+			if _, existe := valores[marcador]; !existe {
+				t.Fatalf("item %d: el marcador %s no tiene valor en ExpressionAttributeValues (expresion %q)", i, marcador, expresion)
+			}
+		}
 	}
 }
 

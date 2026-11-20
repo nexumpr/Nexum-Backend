@@ -32,3 +32,11 @@
 - **Pruebas reales:** `go build`, `go vet`, `go test ./... -count=1` PASS; casos de ahorro independiente E028/E037, aportación activa/revertida, no doble conteo, zona horaria, periodo inválido y dos usuarios.
 - **PR:** apilado sobre #124; pendiente CI Linux y certificación HTTPS.
 - **Sin `availableEstimated`.** No se declara `AWS_VERIFIED`.
+
+
+## Hotfix 2026-11-20 — consulta DynamoDB
+
+- Causa raiz confirmada en AWS: `KeyConditionExpression` con `#sk >= :from AND #sk < :to`; DynamoDB solo admite una condicion de rango por clave (`ValidationException`), lo que producia 503.
+- Correccion: `BETWEEN :from AND :to` con descarte explicito del borde superior para conservar el intervalo `[from, to)` y paginacion por `LastEvaluatedKey`.
+- Prueba de regresion: `tests/unit/dynamo/query_condition_regression_test.go` captura la `QueryInput` efectiva, exige `BETWEEN` y comprueba que el borde superior no se contabiliza.
+- Estado: corregido en rama de hotfix; AWS pendiente de nueva release y certificacion.
