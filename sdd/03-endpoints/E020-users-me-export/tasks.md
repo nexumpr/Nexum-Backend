@@ -22,3 +22,12 @@
 - [ ] `E020-CT03` Petición sobre recurso de otro usuario no filtra existencia (404), si aplica; verificar propiedad con dos sujetos.
 - [ ] `E020-CT04` Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
 - [ ] `E020-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
+
+
+## Cierre local E020 (2026-11-19)
+
+- **Implementado:** `GET /api/v1/users/me/export` con paginacion `limit`/cursor HMAC, orden fijo movements/contributions/recurringPayments/goals/budgets, singletons profile/income/consents/onboarding/preferences y `nextCursor` solo al agotar.
+- **OpenAPI:** `UserExport` ampliado con las seis propiedades opcionales aprobadas por RFC-022 v1.2.1; JSON/YAML en paridad y `PUBLICACION_VALIDA`.
+- **Privacidad:** DTO publicos, sin hashes/tokens/secretos, sin Scan; errores 503 sin cursor.
+- **Wiring:** `cmd/server/e020.go`; pruebas de aplicacion PASS.
+- **PR:** pendiente de abrir; sin merge ni AWS.
