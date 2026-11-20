@@ -76,17 +76,17 @@ const (
 
 // Errores de aplicación. El transporte los traduce a los códigos del contrato.
 var (
-	ErrInvalidRequest  = errors.New("aportaciones: solicitud invalida")
-	ErrUnauthorized    = errors.New("aportaciones: identidad no autorizada")
-	ErrNotFound        = errors.New("aportaciones: recurso no encontrado")
-	ErrGoalNotFound    = errors.New("aportaciones: meta no encontrada")
-	ErrConflict        = errors.New("aportaciones: conflicto de idempotencia o de escritura")
-	ErrAlreadyReversed = errors.New("aportaciones: la aportacion ya esta revertida")
-	ErrGoalInactive    = errors.New("aportaciones: la meta no esta activa")
+	ErrInvalidRequest   = errors.New("aportaciones: solicitud invalida")
+	ErrUnauthorized     = errors.New("aportaciones: identidad no autorizada")
+	ErrNotFound         = errors.New("aportaciones: recurso no encontrado")
+	ErrGoalNotFound     = errors.New("aportaciones: meta no encontrada")
+	ErrConflict         = errors.New("aportaciones: conflicto de idempotencia o de escritura")
+	ErrAlreadyReversed  = errors.New("aportaciones: la aportacion ya esta revertida")
+	ErrGoalInactive     = errors.New("aportaciones: la meta no esta activa")
 	ErrCapacityExceeded = errors.New("aportaciones: la asignacion excede la capacidad de la meta")
-	ErrUnavailable     = errors.New("aportaciones: dependencia no disponible")
-	ErrInternal        = errors.New("aportaciones: fallo interno")
-	ErrIDCollision     = errors.New("aportaciones: colision de identificador")
+	ErrUnavailable      = errors.New("aportaciones: dependencia no disponible")
+	ErrInternal         = errors.New("aportaciones: fallo interno")
+	ErrIDCollision      = errors.New("aportaciones: colision de identificador")
 )
 
 // FieldViolation es una violación de regla de negocio atribuible a un campo (HTTP 422).
@@ -113,17 +113,17 @@ type Allocation struct {
 
 // Contribution es la entidad de aplicación. `Allocations` conserva el orden del request.
 type Contribution struct {
-	ID           string
-	UserID       string
-	AmountCents  int64
-	Currency     string
-	Allocations  []Allocation
-	OccurredAt   time.Time
-	Status       string
-	Version      int64
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	ReversedAt   time.Time
+	ID            string
+	UserID        string
+	AmountCents   int64
+	Currency      string
+	Allocations   []Allocation
+	OccurredAt    time.Time
+	Status        string
+	Version       int64
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	ReversedAt    time.Time
 	ReverseReason string
 }
 
@@ -159,13 +159,13 @@ type WireAllocation struct {
 
 // WireContribution es el objeto `Contribution` del contrato: exactamente siete campos.
 type WireContribution struct {
-	ID          string            `json:"id"`
-	Amount      string            `json:"amount"`
-	Currency    string            `json:"currency"`
-	Allocations []WireAllocation  `json:"allocations"`
-	OccurredAt  string            `json:"occurredAt"`
-	Status      string            `json:"status"`
-	Version     int64             `json:"version"`
+	ID          string           `json:"id"`
+	Amount      string           `json:"amount"`
+	Currency    string           `json:"currency"`
+	Allocations []WireAllocation `json:"allocations"`
+	OccurredAt  string           `json:"occurredAt"`
+	Status      string           `json:"status"`
+	Version     int64            `json:"version"`
 }
 
 // WirePreview es el objeto `ContributionPreview` del contrato.
@@ -228,15 +228,15 @@ type ReverseCommand struct {
 
 // ListQuery es la consulta de E045.
 type ListQuery struct {
-	UserID   string
-	Limit    int
-	Cursor   string
-	GoalID   string
-	From     time.Time
-	HasFrom  bool
-	To       time.Time
-	HasTo    bool
-	Status   string
+	UserID  string
+	Limit   int
+	Cursor  string
+	GoalID  string
+	From    time.Time
+	HasFrom bool
+	To      time.Time
+	HasTo   bool
+	Status  string
 }
 
 // Page es una página de aportaciones.
@@ -247,11 +247,11 @@ type Page struct {
 
 // PreviewResult es el resultado de E043.
 type PreviewResult struct {
-	AmountCents  int64
-	Currency     string
-	Allocations  []Allocation
+	AmountCents    int64
+	Currency       string
+	Allocations    []Allocation
 	RemainingCents int64
-	CanCommit    bool
+	CanCommit      bool
 }
 
 // Wire proyecta el preview al contrato.
