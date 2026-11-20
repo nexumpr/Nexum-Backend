@@ -507,7 +507,7 @@ func TestE047StoreReversionYReplay(t *testing.T) {
 	write := appContrib.ReverseWrite{
 		UserID: e04xUsuario, Previous: *c, Next: siguiente,
 		IdempotencyKey: "idem-rev-00000000001", Operation: appContrib.OperationReverse,
-		PayloadHash: appContrib.ReversePayloadHash(c.ID, siguiente.ReverseReason),
+		PayloadHash:  appContrib.ReversePayloadHash(c.ID, siguiente.ReverseReason),
 		ResponseBody: body, Location: "/api/v1/goal-contributions/" + c.ID,
 		Now: e04xAhora, ExpiresAt: e04xAhora.Add(appContrib.IdempotencyTTL),
 	}
