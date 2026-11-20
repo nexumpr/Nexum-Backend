@@ -206,6 +206,19 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 
 	montarOleada2(depsOleada2)
 
+	// Oleada 3: el registro cerrado valida IDs, métodos y rutas antes de montar. Los
+	// endpoints de esta oleada comparten las mismas dependencias reales.
+	depsOleada3 := &dependenciasOleada3{
+		Router:     router,
+		Dynamo:     dynamoAPI,
+		Redis:      clienteRedis,
+		Tabla:      cfgDeps.TablaDynamoDB,
+		Logger:     logger,
+		Tokens:     verificadorTokens,
+		Authorizer: logoutStore,
+	}
+	montarOleada3(depsOleada3)
+
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
 	// Start bloquea hasta que el listener falla o se cierra; el canal transporta
