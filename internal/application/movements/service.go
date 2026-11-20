@@ -387,6 +387,13 @@ func (s *Service) Patch(ctx context.Context, userID, movementID string, expected
 	if actual == nil {
 		return nil, ErrNotFound
 	}
+	// T-1 (RFC-022 v1.2.1 §10): un movimiento vinculado a una aportación es historia económica
+	// de esa aportación. Permitir cambiar categoría, descripción o fecha haría divergir el libro
+	// de la aportación y de las metas. La operación se rechaza con 409 sin escribir nada; la
+	// reversión explícita corresponde a E047. Los movimientos independientes no cambian.
+	if strings.TrimSpace(actual.ContributionID) != "" {
+		return nil, ErrContributionLinked
+	}
 	if actual.Version != expectedVersion {
 		return nil, ErrVersionConflict
 	}

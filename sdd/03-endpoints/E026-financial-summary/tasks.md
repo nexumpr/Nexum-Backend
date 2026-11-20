@@ -23,3 +23,12 @@
 - [ ] `E026-CT04` Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
 - [ ] `E026-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E026-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
+
+## Cierre local E026 (2026-11-19)
+
+- **Implementado:** `GET /api/v1/financial-summary` con semántica RFC-022 v1.2.1: `income`/`expenses` realizados, `savings` = movimientos `saving` independientes + aportaciones `active`, `net = income − expenses − savings`, sin `availableEstimated`.
+- **Persistencia:** `Query` por rango de SK sobre `MOVEMENT#` y `CONTRIBUTION#`, `GetItem` de `PREFERENCES`; sin `Scan`; topes de volumen que fallan cerrado (503) en lugar de sumar parcialmente.
+- **Wiring:** `cmd/server/e026.go` sobre el registro de Oleada 3; handler con Bearer + sesión, periodo por zona IANA y 400/401/503.
+- **Pruebas reales:** `go build`, `go vet`, `go test ./... -count=1` PASS; casos de ahorro independiente E028/E037, aportación activa/revertida, no doble conteo, zona horaria, periodo inválido y dos usuarios.
+- **PR:** apilado sobre #124; pendiente CI Linux y certificación HTTPS.
+- **Sin `availableEstimated`.** No se declara `AWS_VERIFIED`.
