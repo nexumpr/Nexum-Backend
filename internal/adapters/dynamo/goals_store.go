@@ -98,9 +98,13 @@ func goalItem(goal *domainGoal.Goal) map[string]types.AttributeValue {
 		"currency":          stringAttr(goal.TargetAmount.Currency()),
 		"targetDate":        stringAttr(goal.FormatTargetDate()),
 		"status":            stringAttr(goal.Status.String()),
-		"version":           numberAttr(goal.Version),
-		"createdAt":         stringAttr(goal.CreatedAt.UTC().Format(time.RFC3339)),
-		"updatedAt":         stringAttr(goal.UpdatedAt.UTC().Format(time.RFC3339)),
+		// `deleted` y `activeContributions` los consume E042/E044: se proyectan desde el
+		// agregado para que un alta quede explícitamente «no borrada, sin aportaciones».
+		"deleted":             boolAttr(goal.Deleted),
+		"activeContributions": numberAttr(goal.ActiveContributions),
+		"version":             numberAttr(goal.Version),
+		"createdAt":           stringAttr(goal.CreatedAt.UTC().Format(time.RFC3339)),
+		"updatedAt":           stringAttr(goal.UpdatedAt.UTC().Format(time.RFC3339)),
 	}
 }
 
@@ -378,6 +382,14 @@ func goalFromItem(item map[string]types.AttributeValue) (*domainGoal.Goal, error
 	if errEstado != nil {
 		return nil, appGoals.ErrInconsistent
 	}
+	deleted, errDeleted := goalDeleted(item)
+	if errDeleted != nil {
+		return nil, appGoals.ErrInconsistent
+	}
+	contribuciones, errContribuciones := goalActiveContributions(item)
+	if errContribuciones != nil {
+		return nil, appGoals.ErrInconsistent
+	}
 	createdAt, errCreado := parseGoalTime(stringAttribute(item["createdAt"]))
 	if errCreado != nil {
 		return nil, appGoals.ErrInconsistent
@@ -402,22 +414,50 @@ func goalFromItem(item map[string]types.AttributeValue) (*domainGoal.Goal, error
 	}
 
 	goal := domainGoal.Goal{
-		ID:           goalID,
-		UserID:       userID,
-		Name:         stringAttribute(item["name"]),
-		TargetAmount: target,
-		SavedAmount:  saved,
-		OpeningSaved: opening,
-		TargetDate:   targetDate.UTC(),
-		Status:       status,
-		Version:      version,
-		CreatedAt:    createdAt,
-		UpdatedAt:    updatedAt,
+		ID:                  goalID,
+		UserID:              userID,
+		Name:                stringAttribute(item["name"]),
+		TargetAmount:        target,
+		SavedAmount:         saved,
+		OpeningSaved:        opening,
+		TargetDate:          targetDate.UTC(),
+		Status:              status,
+		Version:             version,
+		CreatedAt:           createdAt,
+		UpdatedAt:           updatedAt,
+		Deleted:             deleted,
+		ActiveContributions: contribuciones,
 	}
 	if err := goal.Validate(); err != nil {
 		return nil, appGoals.ErrInconsistent
 	}
 	return &goal, nil
+}
+
+// goalDeleted lee el tombstone de E042. Ausente = false; un tipo distinto es incoherente.
+func goalDeleted(item map[string]types.AttributeValue) (bool, error) {
+	valor, ok := item["deleted"]
+	if !ok {
+		return false, nil
+	}
+	booleano, ok := valor.(*types.AttributeValueMemberBOOL)
+	if !ok {
+		return false, errors.New("deleted no booleano")
+	}
+	return booleano.Value, nil
+}
+
+// goalActiveContributions lee el contador que mantiene E044/E047. Ausente = 0.
+func goalActiveContributions(item map[string]types.AttributeValue) (int64, error) {
+	valor, ok := item["activeContributions"]
+	if !ok {
+		return 0, nil
+	}
+	numero, ok := attributeInt(valor)
+	if !ok || numero < 0 {
+		return 0, errors.New("activeContributions invalido")
+	}
+	return numero, nil
 }
 
 // parseGoalTime interpreta las marcas RFC3339 que escribe este adaptador.
@@ -528,6 +568,11 @@ func (s *GoalsStore) ListUserGoals(ctx context.Context, query appGoals.ListStore
 				return nil, "", errMapeo
 			}
 			if goal == nil {
+				continue
+			}
+			if goal.Deleted {
+				// E042: un tombstone no aparece en el listado ni siquiera si el filtro pide
+				// `archived`; el recurso se trata como inexistente.
 				continue
 			}
 			if query.HasStatus && goal.Status != query.Status {
@@ -678,6 +723,7 @@ func (s *GoalsStore) UpdateGoal(ctx context.Context, write appGoals.UpdateWrite)
 	nombres := map[string]string{
 		"#updatedAt": "updatedAt",
 		"#version":   "version",
+		"#deleted":   "deleted",
 	}
 
 	asignaciones := make([]string, 0, 5)
@@ -685,6 +731,7 @@ func (s *GoalsStore) UpdateGoal(ctx context.Context, write appGoals.UpdateWrite)
 		":expected":  numberAttr(write.ExpectedVersion),
 		":one":       numberAttr(1),
 		":updatedAt": stringAttr(nowISO),
+		":false":     &types.AttributeValueMemberBOOL{Value: false},
 	}
 
 	if write.Patch.Name != nil {
@@ -709,7 +756,7 @@ func (s *GoalsStore) UpdateGoal(ctx context.Context, write appGoals.UpdateWrite)
 	}
 	asignaciones = append(asignaciones, "#updatedAt = :updatedAt")
 
-	condicion := "attribute_exists(PK) AND #version = :expected"
+	condicion := "attribute_exists(PK) AND #version = :expected AND (attribute_not_exists(#deleted) OR #deleted = :false)"
 	if write.Patch.TargetCents != nil {
 		// Condición atómica: una aportación concurrente que eleve `savedAmount` por encima del
 		// nuevo objetivo hace fallar la escritura en lugar de dejar la meta inconsistente.
@@ -754,6 +801,9 @@ func (s *GoalsStore) UpdateGoal(ctx context.Context, write appGoals.UpdateWrite)
 		if actual == nil {
 			return nil, appGoals.ErrNotFound
 		}
+		if actual.Deleted {
+			return nil, appGoals.ErrNotFound
+		}
 		if actual.Version != write.ExpectedVersion {
 			return nil, appGoals.ErrVersionConflict
 		}
@@ -768,4 +818,69 @@ func (s *GoalsStore) UpdateGoal(ctx context.Context, write appGoals.UpdateWrite)
 func esFalloDeCondicionMeta(err error) bool {
 	var condicional *types.ConditionalCheckFailedException
 	return errors.As(err, &condicional)
+}
+
+// DeleteGoal ejecuta el tombstone de E042. Lee la meta con consistencia fuerte y aplica una
+// escritura condicionada por version, ausencia de deleted y activeContributions <= 0. Si una
+// aportación concurrente eleva el contador, la condición falla y se relee; nunca se borra una
+// meta con aportaciones vigentes. Un tombstone existente es idempotente (nil).
+func (s *GoalsStore) DeleteGoal(ctx context.Context, write appGoals.DeleteWrite) error {
+	if s == nil || s.client == nil || s.table == "" {
+		return appGoals.ErrUnavailable
+	}
+	if strings.TrimSpace(write.UserID) == "" || strings.TrimSpace(write.GoalID) == "" {
+		return appGoals.ErrUnavailable
+	}
+	for intento := 0; intento < updateAttempts; intento++ {
+		actual, err := s.LoadGoal(ctx, write.UserID, write.GoalID)
+		if err != nil {
+			return err
+		}
+		if actual == nil {
+			return appGoals.ErrNotFound
+		}
+		if actual.Deleted {
+			return nil
+		}
+		if actual.ActiveContributions > 0 {
+			return appGoals.ErrGoalActiveContributions
+		}
+		pk, sk := domainDynamo.GoalKeys(write.UserID, write.GoalID)
+		nowISO := write.Now.UTC().Format(time.RFC3339)
+		entrada := &dynamodb.UpdateItemInput{
+			TableName: aws.String(s.table),
+			Key: map[string]types.AttributeValue{
+				"PK": stringAttr(pk),
+				"SK": stringAttr(sk),
+			},
+			UpdateExpression:    aws.String("SET #deleted = :true, #status = :archived, #saved = :opening, #updatedAt = :now ADD #version :one"),
+			ConditionExpression: aws.String("attribute_exists(PK) AND #version = :expected AND (attribute_not_exists(#deleted) OR #deleted = :false) AND (attribute_not_exists(#active) OR #active <= :zero)"),
+			ExpressionAttributeNames: map[string]string{
+				"#deleted":   "deleted",
+				"#status":    "status",
+				"#saved":     "savedAmountCents",
+				"#updatedAt": "updatedAt",
+				"#version":   "version",
+				"#active":    "activeContributions",
+			},
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":true":     &types.AttributeValueMemberBOOL{Value: true},
+				":false":    &types.AttributeValueMemberBOOL{Value: false},
+				":archived": stringAttr(domainGoal.StatusArchived.String()),
+				":opening":  numberAttr(actual.OpeningSaved.Amount()),
+				":now":      stringAttr(nowISO),
+				":expected": numberAttr(actual.Version),
+				":zero":     numberAttr(0),
+			},
+		}
+		_, err = s.client.UpdateItem(ctx, entrada)
+		if err == nil {
+			return nil
+		}
+		if !esFalloDeCondicionMeta(err) {
+			return appGoals.ErrUnavailable
+		}
+		// Condición fallida: se relee y se decide en la siguiente vuelta.
+	}
+	return appGoals.ErrConflict
 }
