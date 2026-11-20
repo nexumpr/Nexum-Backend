@@ -511,7 +511,7 @@ func periodoDeClave(clave string) string {
 	return appExport.PrefijoPresupuesto + periodo
 }
 
-type allocationJSON struct {
+type exportAllocationJSON struct {
 	GoalID      string `json:"goalId"`
 	AmountCents int64  `json:"amountCents"`
 }
@@ -547,7 +547,7 @@ func contributionRowFromItem(item map[string]types.AttributeValue, userID string
 
 	asignaciones := make([]appExport.AllocationRow, 0)
 	if crudo := stringAttribute(item["allocationsJSON"]); crudo != "" {
-		var leidas []allocationJSON
+		var leidas []exportAllocationJSON
 		if err := json.Unmarshal([]byte(crudo), &leidas); err != nil {
 			return appExport.ContributionRow{}, appExport.ErrInconsistent
 		}
@@ -573,7 +573,7 @@ func contributionRowFromItem(item map[string]types.AttributeValue, userID string
 	}, nil
 }
 
-type budgetJSON struct {
+type exportBudgetJSON struct {
 	CategoryID       string `json:"categoryId"`
 	LimitAmountCents int64  `json:"limitAmountCents"`
 }
@@ -593,7 +593,7 @@ func presupuestoRowsFromItem(item map[string]types.AttributeValue, userID, perio
 	if !okVersion || version < 1 {
 		return nil, appExport.ErrInconsistent
 	}
-	var crudos []budgetJSON
+	var crudos []exportBudgetJSON
 	if err := json.Unmarshal([]byte(stringAttribute(item["itemsJSON"])), &crudos); err != nil {
 		return nil, appExport.ErrInconsistent
 	}
