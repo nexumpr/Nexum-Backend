@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | `sdd/_control/H08/GATE_H08E_OLEADA_3.md` |
-| Versión | 1.2.0 |
+| Versión | 1.2.1 |
 | Fecha | 2026-11-19 |
 | Estado | **GATE CONCEDIDO — RFC-022 v1.2.0 PENDIENTE** |
 | Autoridad que lo motiva | Instrucción humana de inicio de Oleada 3 (2026-11-19) |
@@ -113,13 +113,15 @@ una línea. B2 se integra al final de B1 en el mismo worktree. El orquestador es
    aprobación, E048/E049/E050 quedan `BLOCKED_CONTRACT`.
 3. **E026:** `FinancialSummary` no cambia. Se adopta la **alternativa B**: no se publica
    `availableEstimated` porque no existe una fuente determinista que clasifique cada
-   recurrente como fijo o variable. E026 devuelve solo `income`, `expenses`, `savings`, `net`
-   y `asOf`, con la semántica del §4 de RFC-022.
+   recurrente como fijo o variable. E026 devuelve `income`, `expenses`, `savings`, `net` y
+   `asOf`; `savings` suma movimientos `saving` independientes + aportaciones `active`, sin
+   doble conteo, con la semántica del §4 de RFC-022 v1.2.1.
 4. **E037/E042-E047/E050/E051:** semánticas internas y de borde documentadas en RFC-022
    §5-§8 (movimiento derivado y duplicado por fecha; categorías del catálogo real
    `otros`/`ingreso`/`ahorro`; tombstone de meta y 409 con aportaciones activas; claves
-   `CONTRIBUTION#<fecha>#<id>` + puntero; `remaining`/`canCommit`; reversión sin borrar el
-   movimiento; periodo por zona IANA; **E051 calcula directo desde DynamoDB, sin caché**).
+   `CONTRIBUTION#<fecha>#<id>` + puntero; `Σ allocations == amount` y paridad E043/E044;
+   `remaining`/`canCommit`; reversión sin borrar el movimiento; periodo por zona IANA;
+   **E051 calcula directo desde DynamoDB, sin caché**).
 
 ### 5.2 Decisiones de implementación sin cambio de contrato
 
@@ -207,10 +209,10 @@ Frase 1 — Gate Oleada 3:
 APRUEBO_GATE_OLEADA_3_RFC019_E020_E026_E037_E042_E043_E044_E045_E046_E047_E048_E049_E050_E051
 ```
 
-Frase 2 - contratos de Oleada 3 (v1.2.0):
+Frase 2 - contratos de Oleada 3 (v1.2.1):
 
 ```text
-APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_0
+APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_1
 ```
 
 Frase 3 - cambio transversal T-1 (solo E030):
@@ -230,7 +232,8 @@ SES/E015. Cada PR, el release y el despliegue exigen sus Gates propios.
 | `APRUEBO_RFC_022_CONTRATOS_OLEADA_3` | **RETIRADA** | 2026-11-19 | v1.0.0 no aprobada |
 | `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_1_0` | **RETIRADA** | 2026-11-19 | v1.1.0 no aprobada; sustituida por la v1.2.0 |
 | `APRUEBO_CAMBIOS_TRANSVERSALES_OLEADA_3` | **RETIRADA** | 2026-11-19 | Incluía T-2 (hooks de caché), eliminado en v1.2.0 |
-| `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_0` | **PENDIENTE** | — | Habilita los cambios de contrato y semánticas de RFC-022 v1.2.0 |
+| `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_0` | **RETIRADA** | 2026-11-19 | v1.2.0 no aprobada; sustituida por la v1.2.1 |
+| `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_1` | **PENDIENTE** | — | Habilita los cambios de contrato y semánticas de RFC-022 v1.2.1 |
 | `APRUEBO_CAMBIO_TRANSVERSAL_E030_MOVIMIENTO_APORTACION` | **PENDIENTE** | — | Habilita solo el guardo T-1 de E030 |
 
 Siguen requiriendo autorización propia y separada: merge de cada PR, publicación S3,
@@ -255,3 +258,8 @@ vinculantes de la auditoría que dio origen a la v1.2.0:
 7. **T-1** se limita a E030; E031/E027/E029 no cambian.
 8. La matriz de decisiones y las frases de la v1.2.0 se presentan en el informe de
    continuación.
+9. **E026 — ahorros realizados:** la v1.2.1 corrige `savings` para sumar movimientos `saving`
+   independientes + aportaciones `active`, sin doble conteo; el movimiento vinculado no se suma
+   y una aportación revertida no cuenta como ahorro activo.
+10. **E043 — suma exacta:** la v1.2.1 exige `Σ allocations == amount` y paridad estructural
+    con E044; el preview no puede ser más permisivo que el alta.

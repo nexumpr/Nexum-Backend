@@ -2197,3 +2197,12 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **E043–E047:** commit `8564fe26d97d7207d18689ace336387bb3fe3274` conservado; build/vet y pruebas de aplicacion/adaptador PASS. Pendientes pruebas de transporte, wiring y division en PR por E-ID.
 - **Frases pendientes:** `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_0` y `APRUEBO_CAMBIO_TRANSVERSAL_E030_MOVIMIENTO_APORTACION`. Las frases de v1.0.0, v1.1.0 y `APRUEBO_CAMBIOS_TRANSVERSALES_OLEADA_3` quedan retiradas.
 - **Sin cambios publicos aplicados:** OpenAPI, Terraform, E024/E028/E030/E031/E033–E036 y AWS intactos. `opencode.json` local preservado.
+
+## Oleada 3 — RFC-022 v1.2.1 y T-1 autorizado (2026-11-19)
+
+- **T-1 autorizado:** `APRUEBO_CAMBIO_TRANSVERSAL_E030_MOVIMIENTO_APORTACION`. PR **#123**, HEAD `727900a6b4a3c448be949906ca71af41e0cd88df`; E030 rechaza 409 los cambios de movimientos con `contributionId`; pruebas de aplicacion/transporte y `go test ./...` PASS. Sin merge.
+- **RFC-022 v1.2.1 PROPUESTA** en el PR #122: `savings` = movimientos `saving` independientes + aportaciones `active`, sin doble conteo; el movimiento vinculado no se suma y una aportacion revertida no cuenta. E043 exige `Σ allocations == amount` y paridad con E044. Se mantiene la alternativa B de E026 (sin `availableEstimated`) y E051 sin cache.
+- **Frase pendiente:** `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_1`. La frase de v1.2.0 queda retirada.
+- **E043 pendiente de correccion local:** el preview debe rechazar suma incompleta; se aplicara antes del PR individual.
+- **PR #122** actualizado con v1.2.1; CI a verificar sobre el nuevo HEAD.
+- **Merges:** politica nueva de lote unico; no se fusiona ningun PR hasta completar los 13 endpoints y sus checks.

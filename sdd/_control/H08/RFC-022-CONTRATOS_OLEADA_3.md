@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Documento | `sdd/_control/H08/RFC-022-CONTRATOS_OLEADA_3.md` |
-| Versión | **1.2.0** |
+| Versión | **1.2.1** |
 | Fecha | 2026-11-19 |
 | Estado | **PROPUESTO** — no aprobado, no aplicado |
 | Autoridad que lo motiva | Instrucción humana de inicio de Oleada 3 y auditoría correctiva de la v1.1.0 |
@@ -32,6 +32,13 @@ Correcciones obligatorias de la auditoría de la v1.1.0:
 6. **E042** mantiene la alternativa B (409 + E047), con enmienda explícita de RFC-016 §17.7.
 7. **T-1** se limita a E030: 409 cuando el movimiento está vinculado a una aportación.
    E031/E027/E029 no cambian.
+8. **E026 — ahorros realizados:** `savings` suma los movimientos `type=saving` **independientes**
+   (`contributionId` nulo) del periodo y las aportaciones `status=active`; el movimiento de una
+   aportación no se suma por separado. Una aportación revertida no cuenta como ahorro activo,
+   aunque su movimiento histórico se conserve.
+9. **E043 — suma exacta:** `Σ allocations == amount` en centavos, con las mismas reglas
+   estructurales que E044. E043 no admite un reparto incompleto; la capacidad insuficiente se
+   expresa con `canCommit=false` y `remaining` calculado, sin escribir.
 
 El comparador `COMPATIBLE` no sustituye las decisiones de comportamiento, financieras,
 DynamoDB o transversales. Cada una se registra en la matriz del §12.
@@ -190,8 +197,15 @@ existe en el repositorio. Por tanto, **se adopta B**.
   E024) no se suma para no mezclar ingreso base con ingreso efectivamente registrado; sigue
   consultable en E024.
 - `expenses` = suma de movimientos `type=expense` del periodo.
-- `savings` = suma de aportaciones `status=active` cuyo `occurredAt` cae en el periodo; las
-  revertidas no cuentan.
+- `savings` = **suma de movimientos `type=saving` independientes** (`contributionId` nulo) del
+  periodo **+ suma de aportaciones `status=active`** con `occurredAt` en el periodo.
+  - Un movimiento `saving` con `contributionId` no nulo **no se suma**: su aportación es la
+    autoridad contable.
+  - Una aportación revertida no cuenta como ahorro activo; su movimiento histórico se conserva
+    pero no aumenta `savings`.
+  - Un movimiento `saving` independiente creado por E028 o por E037 (regla recurrente `saving`)
+    cuenta una sola vez.
+  - `income` y `expense` se mantienen en sus respectivos agregados.
 - `net` = `income − expenses − savings`, exacto en centavos; puede ser negativo.
 - `asOf` = instante UTC del cálculo.
 - Periodo por defecto: mes actual en la zona IANA de las preferencias; si no hay preferencia
@@ -201,9 +215,11 @@ existe en el repositorio. Por tanto, **se adopta B**.
 
 ### 4.4 Pruebas de E026
 
-Sin datos → ceros; solo ingreso; solo gasto; aportación activa y revertida; periodo con
-cambio de mes/zona; no doble descuento (una aportación no es gasto); `net` puede ser
-negativo; el ingreso habitual no se duplica.
+Sin datos → ceros; solo ingreso; solo gasto; **ahorro directo E028**; **ahorro recurrente
+E037**; **aportación E044**; **aportación revertida E047**; combinación de los cuatro
+escenarios; ausencia de doble conteo; modificación/eliminación de movimientos independientes;
+periodo con cambio de mes/zona y dos usuarios; `net` puede ser negativo; el ingreso habitual
+no se duplica.
 
 ## 5. E037 — Pago de regla recurrente
 
@@ -296,10 +312,16 @@ USER#<id> / CONTRIBUTIONPTR#<id>
 
 ### 7.2 E043 `remaining`/`canCommit`
 
-- `remaining = max(0, amount − Σ allocations) + Σ max(0, allocation − capacidadRestante)`.
-- `canCommit = remaining == 0` y todas las metas existen, son del titular y están activas.
+- `Σ allocations == amount` en centavos, sin metas duplicadas, 1..12 metas e importes
+  positivos. Un reparto incompleto o con suma distinta es un error estructural (`422`), igual
+  que en E044. E043 no persiste nada.
+- `remaining = Σ max(0, allocation − capacidadRestante)` (con la suma ya exacta, el remanente
+  no asignado es cero). `canCommit = remaining == 0` y todas las metas existen, son del titular
+  y están activas.
 - Errores estructurales → 400/422; meta inexistente/ajena → 404; capacidad insuficiente →
-  200 con `canCommit=false`. Es el propósito del preview.
+  200 con `canCommit=false` y `remaining` calculado. Es el propósito del preview.
+- Prueba de paridad: los mismos datos deben ser aceptados o rechazados por E043 y E044 con la
+  misma regla; el preview no puede ser más permisivo que el alta.
 
 ### 7.3 Historial en E027/E029/E030/E031/E026/E051
 
@@ -309,8 +331,8 @@ USER#<id> / CONTRIBUTIONPTR#<id>
 | E029 | Devuelve el movimiento con `contributionId`; no expone el estado de la aportación. |
 | E030 | **T-1:** 409 si `contributionId` no está vacío y se intenta modificar `categoryId`, `description` u `occurredAt`. Sin el guardo, el libro diverge de la aportación. Movimientos sin vínculo no cambian. |
 | E031 | Conserva el 409 ya implementado para movimientos con `contributionId`. Prueba de regresión; sin cambio de código. |
-| E026 | `savings` desde aportaciones `status=active`; el movimiento no se suma; revertida no cuenta. |
-| E051 | Igual; `latestMovements` puede mostrar el movimiento, pero `summary.savings` usa aportaciones activas. |
+| E026 | `savings` = movimientos `saving` independientes + aportaciones `active`; el movimiento vinculado no se suma; revertida no cuenta. |
+| E051 | Igual; `latestMovements` puede mostrar el movimiento histórico, pero `summary.savings` usa la fórmula de E026. |
 | E014 | Purga genérica de la partición; se añade prueba con aportaciones y movimientos. |
 
 El movimiento histórico permanece visible aunque la aportación esté revertida; es una
@@ -347,9 +369,9 @@ inventa un campo público.
 
 | Archivo | Cambio | Clasificación | Frase |
 |---|---|---|---|
-| `nexum-api-v1.json` / `.yaml` | `UserExport`: +6 propiedades opcionales | Aditivo | RFC v1.2.0 |
-| `nexum-api-v1.json` / `.yaml` | `nexum_e048` 200: cabecera `ETag` | Aditivo | RFC v1.2.0 |
-| `nexum-api-v1.json` / `.yaml` | `nexum_e049` 200: cabecera `ETag` | Aditivo | RFC v1.2.0 |
+| `nexum-api-v1.json` / `.yaml` | `UserExport`: +6 propiedades opcionales | Aditivo | RFC v1.2.1 |
+| `nexum-api-v1.json` / `.yaml` | `nexum_e048` 200: cabecera `ETag` | Aditivo | RFC v1.2.1 |
+| `nexum-api-v1.json` / `.yaml` | `nexum_e049` 200: cabecera `ETag` | Aditivo | RFC v1.2.1 |
 | `FinancialSummary` | **Sin cambio** (B) | — | — |
 | Resto | Sin cambios de `required`, enum, códigos, rutas o parámetros | — | — |
 
@@ -379,17 +401,17 @@ propio Gate.
 
 | E-ID | PROBLEMA | DECISIÓN | CAMBIO PÚBLICO | CAMBIO INTERNO | RFC/GATE | IMPACTO ANDROID | RIESGO |
 |---|---|---|---|---|---|---|---|
-| E020 | Exportación incompleta y promesas de consistencia | +6 propiedades; cursor; garantías best-effort documentadas | Sí, aditivo | Proyección DTO | RFC v1.2.0 | Concatenar; no snapshot | Omisiones/duplicados bajo mutaciones; documentado |
-| E026 | `availableEstimated` sin fuente fija/variable | **B:** no se añade; solo campos actuales | No | Cálculo realizado | RFC v1.2.0 | Sin cambio | Proyección A-070 pendiente |
-| E037 | Categoría `recurring` inexistente | Mapeo por tipo: `expense→otros`, `income→ingreso`, `saving→ahorro` | No | Movimiento derivado | RFC v1.2.0 | Categoría genérica; vínculo por `recurringPaymentId` | Gasto recurrente bajo `otros` |
-| E042 | Reversión automática riesgosa | **B:** 409 + E047; tombstone | No | `activeContributions` | RFC v1.2.0 | Revertir antes de borrar | Cambio de flujo |
-| E043 | `remaining` ambiguo | No comprometible; `canCommit` | No | Cálculo puro | RFC v1.2.0 | Interpretar ambos | Resuelto |
-| E044 | Movimiento vs aportación | Un `saving` por total; N metas atómicas | No | `CONTRIBUTION#` + puntero | RFC v1.2.0 | Sin cambio | Límite 12 |
-| E045/E046 | Claves | `CONTRIBUTION#<fecha>#<id>` + puntero | No | Nuevas claves | RFC v1.2.0 | Sin cambio | Paginación filtrada |
-| E047 | Reversión e historial | `status=reversed`, metas decrementadas, movimiento conservado | No | CAS + idempotencia | RFC v1.2.0 | Manejar 409/replay | Movimiento sin estado visible |
-| E048/E049 | `BUDGET#` vs `BUDGETSET#`; ETag | `BUDGETSET#`; E048 pagina; E049 completo ≤50; ETag en ambos | Sí (ETag aditivo) | Diseño físico | RFC v1.2.0 | E048 todas las páginas; E049 completo | Cliente que no pagine E048 |
-| E050 | Uso presupuestal | Desde `expense`; sin futuros; sin duplicar E037 | No | Lee `BUDGETSET#` | RFC v1.2.0 | Sin cambio | Depende de E037/E028 |
-| E051 | Caché obsoleta | Cálculo directo; sin caché | No | Sin Redis | RFC v1.2.0 | Sin cambio | Latencia; se medirá |
+| E020 | Exportación incompleta y promesas de consistencia | +6 propiedades; cursor; garantías best-effort documentadas | Sí, aditivo | Proyección DTO | RFC v1.2.1 | Concatenar; no snapshot | Omisiones/duplicados bajo mutaciones; documentado |
+| E026 | `availableEstimated` sin fuente fija/variable | **B:** no se añade; solo campos actuales | No | Cálculo realizado | RFC v1.2.1 | Sin cambio | Proyección A-070 pendiente |
+| E037 | Categoría `recurring` inexistente | Mapeo por tipo: `expense→otros`, `income→ingreso`, `saving→ahorro` | No | Movimiento derivado | RFC v1.2.1 | Categoría genérica; vínculo por `recurringPaymentId` | Gasto recurrente bajo `otros` |
+| E042 | Reversión automática riesgosa | **B:** 409 + E047; tombstone | No | `activeContributions` | RFC v1.2.1 | Revertir antes de borrar | Cambio de flujo |
+| E043 | `remaining` ambiguo | No comprometible; `canCommit` | No | Cálculo puro | RFC v1.2.1 | Interpretar ambos | Resuelto |
+| E044 | Movimiento vs aportación | Un `saving` por total; N metas atómicas | No | `CONTRIBUTION#` + puntero | RFC v1.2.1 | Sin cambio | Límite 12 |
+| E045/E046 | Claves | `CONTRIBUTION#<fecha>#<id>` + puntero | No | Nuevas claves | RFC v1.2.1 | Sin cambio | Paginación filtrada |
+| E047 | Reversión e historial | `status=reversed`, metas decrementadas, movimiento conservado | No | CAS + idempotencia | RFC v1.2.1 | Manejar 409/replay | Movimiento sin estado visible |
+| E048/E049 | `BUDGET#` vs `BUDGETSET#`; ETag | `BUDGETSET#`; E048 pagina; E049 completo ≤50; ETag en ambos | Sí (ETag aditivo) | Diseño físico | RFC v1.2.1 | E048 todas las páginas; E049 completo | Cliente que no pagine E048 |
+| E050 | Uso presupuestal | Desde `expense`; sin futuros; sin duplicar E037 | No | Lee `BUDGETSET#` | RFC v1.2.1 | Sin cambio | Depende de E037/E028 |
+| E051 | Caché obsoleta | Cálculo directo; sin caché | No | Sin Redis | RFC v1.2.1 | Sin cambio | Latencia; se medirá |
 | T-1 | E030 rompe aportación | 409 si vínculo y cambio de campos | No | Guardo E030 | Frase T-1 | Manejar 409 | Cambio de comportamiento E030 |
 
 ## 13. Riesgos
@@ -410,7 +432,7 @@ propio Gate.
 **Frase A — RFC-022 v1.2.0:**
 
 ```text
-APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_0
+APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_1
 ```
 
 **Frase B — cambio transversal T-1 (solo E030):**
@@ -429,4 +451,5 @@ aprobadas y no se aplican.
 |---|---|---|---|
 | 2026-11-19 | 1.0.0 | Reconciliación inicial | **NO APROBADA** |
 | 2026-11-19 | 1.1.0 | E020, E048/E049, E026, E037, E042, E043–E047, E050/E051 | **NO APROBADA** |
-| 2026-11-19 | 1.2.0 | E049 sin paginación de respuesta; E026 alternativa B; E051 sin caché; E020 garantías reales; E037 categorías del catálogo; E042 B; T-1 únicamente | **PROPUESTO** |
+| 2026-11-19 | 1.2.0 | E049 sin paginación de respuesta; E026 alternativa B; E051 sin caché; E020 garantías reales; E037 categorías del catálogo; E042 B; T-1 únicamente | **NO APROBADA** |
+| 2026-11-19 | 1.2.1 | E026 suma ahorros independientes + aportaciones activas sin doble conteo; E043 exige suma exacta y paridad con E044 | **PROPUESTO** |
