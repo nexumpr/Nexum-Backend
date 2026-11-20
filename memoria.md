@@ -2180,3 +2180,38 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Rollback:** LT v13 y release `v0.17.0+87aac167fe28` conservados.
 - **Pendientes independientes:** E015 v3 (Gate legal, hash `e925596a...8d83`), SES produccion (E006/E011), recuperacion de trabajos E014 antiguos `NOT_VERIFIED` (requestId no conservados; sin Scan).
 - **Total tecnico verificado:** 41/75 (26 heredados + 15 de Oleada 2).
+
+## Oleada 3 — Gate concedido y RFC-022 en revision (2026-11-19)
+
+- **Gate concedido:** `APRUEBO_GATE_OLEADA_3_RFC019_E020_E026_E037_E042_E043_E044_E045_E046_E047_E048_E049_E050_E051` (2026-11-19). Registro en `sdd/_control/H08/GATE_H08E_OLEADA_3.md` §12.1. Habilita implementacion, ramas y PR de los 13 endpoints.
+- **RFC-022 v1.0.0 NO aprobada.** Observaciones del responsable: E020 sin topes artificiales; E048/E049 con cambio de diseno fisico declarado y paginacion real; E026 con comparacion A-070/`CalculateAvailableV6` y distincion disponible/neto; E037 con ocurrencia, zona, frecuencia, replay, concurrencia e impacto de `recurring`; E042 con alternativas A/B; E043–E047 con historial en E027/E029/E030/E031/E026/E051 y cambios transversales delimitados; E050/E051 con ACL Redis y cache sin obsoletos.
+- **RFC-022 v1.1.0 preparada** en estado `PROPUESTO`, con matriz de decisiones y dos frases pendientes: `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_1_0` y `APRUEBO_CAMBIOS_TRANSVERSALES_OLEADA_3`.
+- **Estado del preflight:** `origin/main` = `0169f006935b825747d0508b81c6c32661027baf`; CI Go/SDD SUCCESS; ASG 2/2/2; LT v14 (`v0.18.0+9722224c15c5`); 2 targets healthy; HTTPS live 200; plan FREE/ACTIVE con 142.94 USD; `opencode.json` local preservado.
+- **Sin cambios publicos aplicados:** OpenAPI, Terraform, memoria de despliegue y endpoints anteriores intactos. `E020/E048/E049/E050` y las semanticas de RFC-022 quedan `CONTRACT_BLOCKED` hasta la frase A; T-1/T-2 hasta la frase B.
+
+## Oleada 3 — RFC-022 v1.2.0 y auditoria correctiva (2026-11-19)
+
+- **RFC-022 v1.1.0 NO aprobada.** Auditoria del responsable con seis correcciones obligatorias.
+- **v1.2.0 PROPUESTA** en el mismo PR #122: E049 devuelve el conjunto completo (<=50) sin `nextCursor` ni `limit`/`cursor`, con ETag de respuesta; E048 conserva paginacion y ETag por periodo; E026 adopta la **alternativa B** (sin `availableEstimated` porque no hay fuente determinista fija/variable); E051 calcula directo desde DynamoDB, **sin cache** (se elimina T-2); E020 documenta garantias best-effort reales (sin snapshot ni ausencia absoluta de duplicados); E037 mapea por tipo a categorias del catalogo real (`expense->otros`, `income->ingreso`, `saving->ahorro`) porque `recurring` no existe; E042 mantiene la alternativa B con enmienda explicita de RFC-016 17.7; T-1 se limita a E030.
+- **E037 corregido:** commit `30b0da836eeaaa87f0505324ee9af2d10101512c` sobre `dca2c512`; `CategoryIDForRuleType` y prueba de categorias del catalogo; suites de aplicacion, adaptador y transporte PASS.
+- **E043–E047:** commit `8564fe26d97d7207d18689ace336387bb3fe3274` conservado; build/vet y pruebas de aplicacion/adaptador PASS. Pendientes pruebas de transporte, wiring y division en PR por E-ID.
+- **Frases pendientes:** `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_0` y `APRUEBO_CAMBIO_TRANSVERSAL_E030_MOVIMIENTO_APORTACION`. Las frases de v1.0.0, v1.1.0 y `APRUEBO_CAMBIOS_TRANSVERSALES_OLEADA_3` quedan retiradas.
+- **Sin cambios publicos aplicados:** OpenAPI, Terraform, E024/E028/E030/E031/E033–E036 y AWS intactos. `opencode.json` local preservado.
+
+## Oleada 3 — RFC-022 v1.2.1 y T-1 autorizado (2026-11-19)
+
+- **T-1 autorizado:** `APRUEBO_CAMBIO_TRANSVERSAL_E030_MOVIMIENTO_APORTACION`. PR **#123**, HEAD `727900a6b4a3c448be949906ca71af41e0cd88df`; E030 rechaza 409 los cambios de movimientos con `contributionId`; pruebas de aplicacion/transporte y `go test ./...` PASS. Sin merge.
+- **RFC-022 v1.2.1 PROPUESTA** en el PR #122: `savings` = movimientos `saving` independientes + aportaciones `active`, sin doble conteo; el movimiento vinculado no se suma y una aportacion revertida no cuenta. E043 exige `Σ allocations == amount` y paridad con E044. Se mantiene la alternativa B de E026 (sin `availableEstimated`) y E051 sin cache.
+- **Frase pendiente:** `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_1`. La frase de v1.2.0 queda retirada.
+- **E043 pendiente de correccion local:** el preview debe rechazar suma incompleta; se aplicara antes del PR individual.
+- **PR #122** actualizado con v1.2.1; CI a verificar sobre el nuevo HEAD.
+- **Merges:** politica nueva de lote unico; no se fusiona ningun PR hasta completar los 13 endpoints y sus checks.
+
+## Oleada 3 — RFC-022 v1.2.1 APROBADA (2026-11-19)
+
+- **Aprobacion humana:** `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_1`. RFC-022 v1.2.1 pasa a **APPROVED** y desbloquea E020, E026, E042, E048, E049, E050 y E051. Se autoriza el cambio fisico `BUDGET#` -> `BUDGETSET#`.
+- **Sigue prohibido:** merges, S3, Terraform apply, instance refresh y despliegue sin sus Gates. La aprobacion no autoriza merges anticipados ni releases parciales.
+- **PR #122** actualizado con la aprobacion; pendiente de commit/push y CI. **PR #123** (T-1) y **PR #124** (E037) siguen en el lote.
+- **E037:** PR #124 con wiring en `cmd/server/registro_oleada3.go` y `e037.go`; pendiente corregir U1000 de `ids()` y completar tasks/checklist.
+- **E043–E047:** commit local `b79a67e`; pendiente dividir en cinco PRs y conectar el wiring.
+- **Siguiente:** corregir #124, implementar E020/E026/E042/E048–E051, dividir aportaciones y preparar el ensayo integral. Sin merges hasta el lote completo.
