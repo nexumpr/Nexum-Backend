@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"strings"
 	"time"
 
@@ -184,14 +185,14 @@ func (s *ContributionsStore) CreateContribution(ctx context.Context, write appCo
 	ptrPK, ptrSK := ContributionPointerKeys(userID, write.Contribution.ID)
 	item := contributionItem(write.Contribution, mainPK, mainSK, now)
 	pointer := map[string]types.AttributeValue{
-		"PK":         stringAttr(ptrPK),
-		"SK":         stringAttr(ptrSK),
-		"entityType": stringAttr(contributionPointerEntityType),
-		"userId":     stringAttr(userID),
+		"PK":             stringAttr(ptrPK),
+		"SK":             stringAttr(ptrSK),
+		"entityType":     stringAttr(contributionPointerEntityType),
+		"userId":         stringAttr(userID),
 		"contributionId": stringAttr(write.Contribution.ID),
-		"targetSK":   stringAttr(mainSK),
-		"createdAt":  stringAttr(now.Format(time.RFC3339)),
-		"updatedAt":  stringAttr(now.Format(time.RFC3339)),
+		"targetSK":       stringAttr(mainSK),
+		"createdAt":      stringAttr(now.Format(time.RFC3339)),
+		"updatedAt":      stringAttr(now.Format(time.RFC3339)),
 	}
 	movementItem, _, movementSK := movementRecord(userID, write.Movement, now, now)
 	movementPK, movementPointerSK := MovementPointerKeys(userID, write.Movement.ID)
@@ -234,26 +235,26 @@ func (s *ContributionsStore) CreateContribution(ctx context.Context, write appCo
 		}
 		goalPK, goalSK := domainDynamo.GoalKeys(userID, alloc.GoalID)
 		transact = append(transact, types.TransactWriteItem{Update: &types.Update{
-			TableName: aws.String(s.table),
-			Key:       map[string]types.AttributeValue{"PK": stringAttr(goalPK), "SK": stringAttr(goalSK)},
-			UpdateExpression: aws.String("SET #saved = #saved + :alloc, #activeContrib = if_not_exists(#activeContrib, :zero) + :one, #updatedAt = :updatedAt ADD #version :one"),
+			TableName:           aws.String(s.table),
+			Key:                 map[string]types.AttributeValue{"PK": stringAttr(goalPK), "SK": stringAttr(goalSK)},
+			UpdateExpression:    aws.String("SET #saved = #saved + :alloc, #activeContrib = if_not_exists(#activeContrib, :zero) + :one, #updatedAt = :updatedAt ADD #version :one"),
 			ConditionExpression: aws.String("attribute_exists(PK) AND #status = :active AND (attribute_not_exists(#deleted) OR #deleted = :false) AND #saved <= :maxSaved AND #version = :goalVersion"),
 			ExpressionAttributeNames: map[string]string{
-				"#saved":           "savedAmountCents",
-				"#activeContrib":   "activeContributions",
-				"#updatedAt":       "updatedAt",
-				"#version":         "version",
-				"#status":          "status",
-				"#deleted":         "deleted",
+				"#saved":         "savedAmountCents",
+				"#activeContrib": "activeContributions",
+				"#updatedAt":     "updatedAt",
+				"#version":       "version",
+				"#status":        "status",
+				"#deleted":       "deleted",
 			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":alloc":    numberAttr(alloc.AmountCents),
-				":zero":     numberAttr(0),
-				":one":      numberAttr(1),
-				":updatedAt": stringAttr(now.Format(time.RFC3339)),
-				":active":   stringAttr(contributionStatusActive),
-				":false":    &types.AttributeValueMemberBOOL{Value: false},
-				":maxSaved": numberAttr(goal.TargetCents - alloc.AmountCents),
+				":alloc":       numberAttr(alloc.AmountCents),
+				":zero":        numberAttr(0),
+				":one":         numberAttr(1),
+				":updatedAt":   stringAttr(now.Format(time.RFC3339)),
+				":active":      stringAttr(contributionStatusActive),
+				":false":       &types.AttributeValueMemberBOOL{Value: false},
+				":maxSaved":    numberAttr(goal.TargetCents - alloc.AmountCents),
 				":goalVersion": numberAttr(goal.Version),
 			},
 		}})
@@ -312,7 +313,7 @@ func (s *ContributionsStore) ListContributions(ctx context.Context, query appCon
 	if s == nil || s.client == nil || s.table == "" {
 		return nil, "", appContrib.ErrUnavailable
 	}
-	if limit < 1 {
+	if limit < 1 || limit > math.MaxInt32 {
 		return nil, "", appContrib.ErrInvalidRequest
 	}
 	pk := domainDynamo.PrefixUser + strings.TrimSpace(query.UserID)
@@ -463,9 +464,9 @@ func (s *ContributionsStore) ReverseContribution(ctx context.Context, write appC
 	}
 	pk, sk := contributionKeys(userID, prev.ID, prev.OccurredAt)
 	transact := []types.TransactWriteItem{{Update: &types.Update{
-		TableName: aws.String(s.table),
-		Key:       map[string]types.AttributeValue{"PK": stringAttr(pk), "SK": stringAttr(sk)},
-		UpdateExpression: aws.String("SET #status = :reversed, #reversedAt = :now, #reverseReason = :reason, #updatedAt = :now ADD #version :one"),
+		TableName:           aws.String(s.table),
+		Key:                 map[string]types.AttributeValue{"PK": stringAttr(pk), "SK": stringAttr(sk)},
+		UpdateExpression:    aws.String("SET #status = :reversed, #reversedAt = :now, #reverseReason = :reason, #updatedAt = :now ADD #version :one"),
 		ConditionExpression: aws.String("#status = :active AND #version = :expected"),
 		ExpressionAttributeNames: map[string]string{
 			"#status":        "status",
@@ -485,9 +486,9 @@ func (s *ContributionsStore) ReverseContribution(ctx context.Context, write appC
 	for _, alloc := range prev.Allocations {
 		goalPK, goalSK := domainDynamo.GoalKeys(userID, alloc.GoalID)
 		transact = append(transact, types.TransactWriteItem{Update: &types.Update{
-			TableName: aws.String(s.table),
-			Key:       map[string]types.AttributeValue{"PK": stringAttr(goalPK), "SK": stringAttr(goalSK)},
-			UpdateExpression: aws.String("SET #saved = #saved - :alloc, #activeContrib = #activeContrib - :one, #updatedAt = :now ADD #version :one"),
+			TableName:           aws.String(s.table),
+			Key:                 map[string]types.AttributeValue{"PK": stringAttr(goalPK), "SK": stringAttr(goalSK)},
+			UpdateExpression:    aws.String("SET #saved = #saved - :alloc, #activeContrib = #activeContrib - :one, #updatedAt = :now ADD #version :one"),
 			ConditionExpression: aws.String("attribute_exists(PK) AND #status = :active AND (attribute_not_exists(#deleted) OR #deleted = :false) AND #saved >= :alloc AND #activeContrib >= :one"),
 			ExpressionAttributeNames: map[string]string{
 				"#saved":         "savedAmountCents",
@@ -498,9 +499,9 @@ func (s *ContributionsStore) ReverseContribution(ctx context.Context, write appC
 				"#deleted":       "deleted",
 			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":alloc": numberAttr(alloc.AmountCents),
-				":one":   numberAttr(1),
-				":now":   stringAttr(now.Format(time.RFC3339)),
+				":alloc":  numberAttr(alloc.AmountCents),
+				":one":    numberAttr(1),
+				":now":    stringAttr(now.Format(time.RFC3339)),
 				":active": stringAttr(contributionStatusActive),
 				":false":  &types.AttributeValueMemberBOOL{Value: false},
 			},
@@ -522,7 +523,7 @@ func (s *ContributionsStore) ReverseContribution(ctx context.Context, write appC
 			"createdAt":    stringAttr(now.Format(time.RFC3339)),
 			"expiresAt":    numberAttr(write.ExpiresAt.UTC().Unix()),
 		},
-		ConditionExpression: aws.String("(attribute_not_exists(PK) OR expiresAt < :now)"),
+		ConditionExpression:       aws.String("(attribute_not_exists(PK) OR expiresAt < :now)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{":now": numberAttr(now.Unix())},
 	}})
 
