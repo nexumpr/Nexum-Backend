@@ -19,3 +19,11 @@
 - [ ] Dependencias del cliente Mobile nunca constituyen Gate del Backend.
 
 **Criterio de cierre:** ninguna casilla operativa se marca por generar este documento; la documentación contractual se valida con el auditor del ZIP y queda REVIEW hasta aprobación.
+
+## Cierre local E051 (2026-11-19)
+
+- [x] Dashboard con `summary` de E026, metas activas y movimientos recientes; sin caché Redis.
+- [x] Wiring en el registro de Oleada 3 y pruebas de aplicación/transporte.
+- [x] `go build`, `go vet` y `go test ./... -count=1` PASS en local.
+- [ ] CI Linux verde sobre el HEAD del PR.
+- [ ] Certificación HTTPS y despliegue AWS.
