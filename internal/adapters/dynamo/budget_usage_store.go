@@ -81,18 +81,19 @@ func (s *BudgetUsageStore) AggregateExpenses(ctx context.Context, userID string,
 	}
 	pk := domainDynamo.PrefixUser + strings.TrimSpace(userID)
 	gastos := map[string]int64{}
+	hasta := "MOVEMENT#" + appMovements.SortableTime(to)
 	var start map[string]types.AttributeValue
 	for {
 		entrada := &dynamodb.QueryInput{
 			TableName:              aws.String(s.table),
-			KeyConditionExpression: aws.String("PK = :pk AND #sk >= :from AND #sk < :to"),
+			KeyConditionExpression: aws.String("PK = :pk AND #sk BETWEEN :from AND :to"),
 			ExpressionAttributeNames: map[string]string{
 				"#sk": "SK",
 			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":pk":   stringAttr(pk),
 				":from": stringAttr("MOVEMENT#" + appMovements.SortableTime(from)),
-				":to":   stringAttr("MOVEMENT#" + appMovements.SortableTime(to)),
+				":to":   stringAttr(hasta),
 			},
 			ConsistentRead: aws.Bool(true),
 		}
@@ -104,6 +105,10 @@ func (s *BudgetUsageStore) AggregateExpenses(ctx context.Context, userID string,
 			return nil, appUsage.ErrUnavailable
 		}
 		for _, item := range out.Items {
+			// BETWEEN incluye el extremo superior; el contrato es [from, to).
+			if stringAttribute(item["SK"]) >= hasta {
+				continue
+			}
 			tipo := strings.TrimSpace(stringAttribute(item["type"]))
 			centavos, ok := attributeInt(item["amountCents"])
 			if !ok || tipo == "" {

@@ -2215,3 +2215,12 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **E037:** PR #124 con wiring en `cmd/server/registro_oleada3.go` y `e037.go`; pendiente corregir U1000 de `ids()` y completar tasks/checklist.
 - **E043–E047:** commit local `b79a67e`; pendiente dividir en cinco PRs y conectar el wiring.
 - **Siguiente:** corregir #124, implementar E020/E026/E042/E048–E051, dividir aportaciones y preparar el ensayo integral. Sin merges hasta el lote completo.
+
+
+### Hotfix Oleada 3 — defectos post-despliegue v0.19.0 (2026-11-20)
+
+- **E026/E050:** 503 por `KeyConditionExpression` invalida (`#sk >= :from AND #sk < :to`); DynamoDB solo admite una condicion de rango por clave. Corregido a `BETWEEN :from AND :to` con descarte del borde superior para mantener `[from, to)` y paginacion.
+- **E051:** mismo 503 por el resumen compartido de E026; `DashboardStore` ya usaba `begins_with`. Sin cambio propio.
+- **E047:** 503 por `:one` usado en `ADD #version :one` y ausente en `ExpressionAttributeValues` de la actualizacion de la aportacion. Causa reproducida con una transaccion de diagnostico no destructiva; corregido y cubierto por una prueba que valida todos los marcadores de la transaccion.
+- **E014:** el 400 observado fue del runner (`Content-Type` ausente), no del endpoint; pendiente de repetir con solicitud valida.
+- **Estado:** correcciones en rama de hotfix con PR; no fusionadas ni desplegadas. AWS sigue en `v0.19.0+3baa15840a2e`. No se inicia Oleada 4.

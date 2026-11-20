@@ -96,6 +96,8 @@ func (m *memoriaFinanciera) Query(_ context.Context, params *dynamodb.QueryInput
 	switch {
 	case strings.Contains(condicion, "begins_with(SK, :prefix)"):
 		modo = "prefijo"
+	case strings.Contains(condicion, "#sk BETWEEN :from AND :to"):
+		modo = "rango"
 	case strings.Contains(condicion, "#sk >= :from AND #sk < :to"):
 		modo = "rango"
 	default:

@@ -26,3 +26,11 @@
 - [x] Handler, wiring y pruebas locales.
 - [ ] PR y CI Linux.
 - [ ] Certificacion HTTPS y despliegue AWS.
+
+
+## Hotfix 2026-11-20 — reversion E047
+
+- Causa raiz confirmada con una transaccion de diagnostico no destructiva contra DynamoDB: la `UpdateExpression` de la aportacion usa `:one` en `ADD #version :one`, pero `ExpressionAttributeValues` no declaraba `:one`; AWS devolvia `ValidationException` y el adaptador lo traducia a 503.
+- Correccion: declarar `:one` en la actualizacion de la aportacion. La transaccion sigue siendo atomica y condicionada.
+- Prueba de regresion: `TestE047StoreExpresionDeclaraTodosLosValores` captura `TransactWriteItemsInput` y exige que todo marcador usado en las expresiones tenga valor declarado.
+- Estado: corregido en rama de hotfix; AWS pendiente de nueva release y certificacion.

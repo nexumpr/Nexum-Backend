@@ -32,3 +32,9 @@
 - **Pruebas reales:** `go build`, `go vet`, `go test ./... -count=1` PASS; aplicación y transporte; DTO `Dashboard` con arrays no nulos.
 - **PR:** apilado sobre #125; pendiente CI Linux y certificación HTTPS.
 - **Sin `availableEstimated`.** No se declara `AWS_VERIFIED`.
+
+
+## Hotfix 2026-11-20 — diagnostico E051
+
+- El 503 de E051 provenia del resumen financiero compartido (E026) y de la misma consulta invalida; `DashboardStore` usa `begins_with` y no requiere cambio propio.
+- Sin cambio de codigo en E051. Se verificara en la certificacion posterior a la release correctiva.

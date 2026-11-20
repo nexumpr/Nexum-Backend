@@ -27,3 +27,9 @@
 - [x] `go build`, `go vet` y `go test ./... -count=1` PASS en local.
 - [ ] CI Linux verde sobre el HEAD del PR.
 - [ ] Certificación HTTPS y despliegue AWS.
+
+
+## Hotfix 2026-11-20 — diagnostico E051
+
+- El 503 de E051 provenia del resumen financiero compartido (E026) y de la misma consulta invalida; `DashboardStore` usa `begins_with` y no requiere cambio propio.
+- Sin cambio de codigo en E051. Se verificara en la certificacion posterior a la release correctiva.

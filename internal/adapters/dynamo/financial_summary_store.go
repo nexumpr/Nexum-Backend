@@ -156,7 +156,7 @@ func (s *FinancialSummaryStore) queryRange(ctx context.Context, userID, desde, h
 	for {
 		entrada := &dynamodb.QueryInput{
 			TableName:              aws.String(s.table),
-			KeyConditionExpression: aws.String("PK = :pk AND #sk >= :from AND #sk < :to"),
+			KeyConditionExpression: aws.String("PK = :pk AND #sk BETWEEN :from AND :to"),
 			ExpressionAttributeNames: map[string]string{
 				"#sk": "SK",
 			},
@@ -175,6 +175,10 @@ func (s *FinancialSummaryStore) queryRange(ctx context.Context, userID, desde, h
 			return appSummary.ErrUnavailable
 		}
 		for _, item := range out.Items {
+			// BETWEEN incluye el extremo superior; el contrato es [desde, hasta).
+			if stringAttribute(item["SK"]) >= hasta {
+				continue
+			}
 			if err := fn(item); err != nil {
 				return err
 			}

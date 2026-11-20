@@ -481,6 +481,7 @@ func (s *ContributionsStore) ReverseContribution(ctx context.Context, write appC
 			":reason":   stringAttr(write.Next.ReverseReason),
 			":active":   stringAttr(contributionStatusActive),
 			":expected": numberAttr(prev.Version),
+			":one":      numberAttr(1),
 		},
 	}}}
 	for _, alloc := range prev.Allocations {
