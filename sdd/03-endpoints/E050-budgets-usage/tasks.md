@@ -23,3 +23,11 @@
 - [ ] `E050-CT04` Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
 - [ ] `E050-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E050-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
+
+
+## Cierre local E050 (2026-11-19)
+
+- **Implementado:** `GET /api/v1/budgets/usage` con BUDGETSET del periodo y suma de movimientos expense reales por categoria; sin reglas futuras ni doble conteo de E037.
+- **Wiring:** `cmd/server/e050.go`; Bearer + sesion; Query por rango de SK sin Scan.
+- **Pruebas:** `go build`, `go vet`, `go test ./...` PASS; categoria con y sin gasto, periodo invalido y error de preferencias.
+- **PR:** pendiente de abrir; sin merge ni AWS.

@@ -421,3 +421,32 @@ func TestE031DeleteAgotaReintentos(t *testing.T) {
 		t.Fatalf("se esperaban exactamente dos intentos y hubo %d", len(store.borrados))
 	}
 }
+
+// TestE030PatchRechazaMovimientoVinculado cubre T-1: un movimiento con contributionId no puede
+// cambiar categoryId, description ni occurredAt. Un movimiento independiente conserva E030.
+func TestE030PatchRechazaMovimientoVinculado(t *testing.T) {
+	store := newMovItemStore()
+	ligado := itemMovimiento(itemMovID, movAhora.Add(-time.Hour))
+	ligado.ContributionID = itemMovIDAjeno
+	store.sembrar(movUsuario, ligado)
+	servicio := movServicio(store)
+
+	descripcion := "Otra descripcion"
+	if _, err := servicio.Patch(context.Background(), movUsuario, itemMovID, 1, appMovements.Patch{Description: &descripcion}); !errors.Is(err, appMovements.ErrContributionLinked) {
+		t.Fatalf("movimiento vinculado debe ser 409, se obtuvo %v", err)
+	}
+	store.mu.Lock()
+	if len(store.reemplazos) != 0 {
+		store.mu.Unlock()
+		t.Fatal("T-1 no puede escribir nada")
+	}
+	store.mu.Unlock()
+
+	// Movimiento independiente: el comportamiento anterior se conserva.
+	independiente := newMovItemStore()
+	independiente.sembrar(movUsuario, itemMovimiento(itemMovID, movAhora.Add(-time.Hour)))
+	servicioIndependiente := movServicio(independiente)
+	if _, err := servicioIndependiente.Patch(context.Background(), movUsuario, itemMovID, 1, appMovements.Patch{Description: &descripcion}); err != nil {
+		t.Fatalf("movimiento independiente debe poder editarse: %v", err)
+	}
+}

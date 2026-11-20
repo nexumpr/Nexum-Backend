@@ -50,3 +50,6 @@
 | Aceptacion funcional | PASS - 200 v2; 412 stale; 404 ajeno; persistencia |
 | Rollback | LT v13 / release `v0.17.0+87aac167fe28` |
 | Limitaciones | multi-AZ limitada (ambas EC2 en us-east-2a); E015 pendiente legal; SES pendiente |
+
+- [x] `E030-CT13` Movimiento vinculado a aportación: 409 sin escritura; movimiento independiente: 200 (regresión T-1).
+
