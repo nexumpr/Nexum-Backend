@@ -76,8 +76,6 @@ func writeFinancialSummaryError(w http.ResponseWriter, r *http.Request, logger *
 		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{{Field: "period", Reason: "invalid_format"}})
 	case errors.Is(err, appSummary.ErrUnauthorized):
 		writeRegisterError(w, r, http.StatusUnauthorized, "UNAUTHORIZED", "sesion no valida", nil)
-	case errors.Is(err, appSummary.ErrTooManyItems):
-		writeRegisterError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "volumen del periodo excede el limite de calculo", nil)
 	case errors.Is(err, appSummary.ErrUnavailable):
 		writeRegisterError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "servicio no disponible", nil)
 	default:

@@ -8,12 +8,16 @@
 // El movimiento vinculado a una aportación NO se suma por separado: la aportación es la
 // autoridad contable. Una aportación revertida no cuenta como ahorro activo. No se publica
 // `availableEstimated` (alternativa B de RFC-022).
+//
+// La persistencia agrega de forma incremental mientras pagina por rango de SK: no hay topes
+// artificiales, no se truncа una cuenta válida y no se guarda el periodo completo en memoria.
 package financialsummary
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -21,16 +25,8 @@ import (
 )
 
 const (
-	// CurrencyMXN es la única divisa del contrato.
-	CurrencyMXN = "MXN"
-
-	// DefaultTimezone se aplica si el titular no tiene una zona IANA válida.
+	CurrencyMXN     = "MXN"
 	DefaultTimezone = "America/Mexico_City"
-
-	// MaxMovements y MaxContributions acotan el periodo para no construir totales parciales.
-	// Al superarlos se falla cerrado (503); no se recorta la suma.
-	MaxMovements     = 10000
-	MaxContributions = 5000
 )
 
 var (
@@ -38,30 +34,31 @@ var (
 	ErrUnauthorized  = errors.New("identidad no autorizada")
 	ErrUnavailable   = errors.New("resumen financiero no disponible")
 	ErrInternal      = errors.New("fallo interno del resumen financiero")
-	ErrTooManyItems  = errors.New("volumen del periodo excede el limite de calculo")
+	ErrInconsistent  = errors.New("registro financiero inconsistente")
+	ErrOverflow      = errors.New("suma financiera desborda int64")
 )
 
-// MovementRow es la proyección mínima de un movimiento.
-type MovementRow struct {
-	Type           string
-	AmountCents    int64
-	ContributionID string
+// MovementTotals es la agregación incremental de movimientos del periodo.
+type MovementTotals struct {
+	IncomeCents             int64
+	ExpensesCents           int64
+	IndependentSavingsCents int64
 }
 
-// ContributionRow es la proyección mínima de una aportación.
-type ContributionRow struct {
-	Status      string
-	AmountCents int64
+// ContributionTotals es la agregación incremental de aportaciones del periodo.
+type ContributionTotals struct {
+	ActiveSavingsCents int64
 }
 
-// Store es el puerto de lectura. El adaptador usa Query por rango de SK; nunca Scan.
+// Store es el puerto de lectura. El adaptador pagina por rango de SK y suma en el momento;
+// nunca Scan y nunca devuelve el periodo completo en memoria.
 type Store interface {
 	LoadTimezone(ctx context.Context, userID string) (string, error)
-	ListMovements(ctx context.Context, userID string, from, to time.Time) ([]MovementRow, error)
-	ListContributions(ctx context.Context, userID string, from, to time.Time) ([]ContributionRow, error)
+	AggregateMovements(ctx context.Context, userID string, from, to time.Time) (MovementTotals, error)
+	AggregateContributions(ctx context.Context, userID string, from, to time.Time) (ContributionTotals, error)
 }
 
-// Summary es la proyección exacta de `FinancialSummary`.
+// Summary es la proyección de `FinancialSummary`.
 type Summary struct {
 	Period   string
 	Currency string
@@ -127,71 +124,62 @@ func (s *Service) Summary(ctx context.Context, userID, period string) (*Summary,
 		return nil, ErrUnauthorized
 	}
 	ahora := s.now().UTC()
-	zona := s.loadLocation(ctx, titular)
+	zona, err := s.loadLocation(ctx, titular)
+	if err != nil {
+		return nil, err
+	}
 	desde, hasta, periodo, err := periodBounds(period, ahora, zona)
 	if err != nil {
 		return nil, err
 	}
-	movimientos, err := s.store.ListMovements(ctx, titular, desde, hasta)
+	movimientos, err := s.store.AggregateMovements(ctx, titular, desde, hasta)
 	if err != nil {
 		return nil, normalize(err)
 	}
-	if len(movimientos) > MaxMovements {
-		return nil, ErrTooManyItems
-	}
-	aportaciones, err := s.store.ListContributions(ctx, titular, desde, hasta)
+	aportaciones, err := s.store.AggregateContributions(ctx, titular, desde, hasta)
 	if err != nil {
 		return nil, normalize(err)
 	}
-	if len(aportaciones) > MaxContributions {
-		return nil, ErrTooManyItems
+	savings, err := safeAdd(movimientos.IndependentSavingsCents, aportaciones.ActiveSavingsCents)
+	if err != nil {
+		return nil, err
 	}
-
-	var income, expenses, independentSavings, activeContributions int64
-	for _, m := range movimientos {
-		switch strings.TrimSpace(m.Type) {
-		case "income":
-			income += m.AmountCents
-		case "expense":
-			expenses += m.AmountCents
-		case "saving":
-			// Un movimiento vinculado a una aportación no se suma: la aportación activa es
-			// la autoridad. Un movimiento independiente (E028 o E037) sí cuenta una vez.
-			if strings.TrimSpace(m.ContributionID) == "" {
-				independentSavings += m.AmountCents
-			}
-		}
+	neto, err := safeSub(movimientos.IncomeCents, movimientos.ExpensesCents)
+	if err != nil {
+		return nil, err
 	}
-	for _, c := range aportaciones {
-		if c.Status == "active" {
-			activeContributions += c.AmountCents
-		}
+	neto, err = safeSub(neto, savings)
+	if err != nil {
+		return nil, err
 	}
-	savings := independentSavings + activeContributions
 	return &Summary{
 		Period:   periodo,
 		Currency: CurrencyMXN,
-		Income:   income,
-		Expenses: expenses,
+		Income:   movimientos.IncomeCents,
+		Expenses: movimientos.ExpensesCents,
 		Savings:  savings,
-		Net:      income - expenses - savings,
+		Net:      neto,
 		AsOf:     ahora,
 	}, nil
 }
 
-func (s *Service) loadLocation(ctx context.Context, userID string) *time.Location {
+// loadLocation diferencia: preferencia inexistente o zona IANA inválida -> fallback aprobado;
+// error real de DynamoDB -> 503. Nunca se devuelve 200 con un periodo posiblemente incorrecto
+// después de un fallo de persistencia.
+func (s *Service) loadLocation(ctx context.Context, userID string) (*time.Location, error) {
 	nombre, err := s.store.LoadTimezone(ctx, userID)
-	if err != nil || strings.TrimSpace(nombre) == "" {
-		nombre = DefaultTimezone
-	}
-	loc, err := time.LoadLocation(strings.TrimSpace(nombre))
 	if err != nil {
-		loc, _ = time.LoadLocation(DefaultTimezone)
+		return nil, normalize(err)
 	}
-	if loc == nil {
-		loc = time.UTC
+	nombre = strings.TrimSpace(nombre)
+	if nombre == "" {
+		return time.LoadLocation(DefaultTimezone)
 	}
-	return loc
+	loc, err := time.LoadLocation(nombre)
+	if err != nil {
+		return time.LoadLocation(DefaultTimezone)
+	}
+	return loc, nil
 }
 
 // periodBounds interpreta `YYYY-MM` y devuelve [desde, hasta) en UTC y el periodo canónico.
@@ -215,13 +203,33 @@ func periodBounds(period string, now time.Time, loc *time.Location) (time.Time, 
 	return desdeLocal.UTC(), hastaLocal.UTC(), fmt.Sprintf("%04d-%02d", anio, int(mes)), nil
 }
 
-// periodBounds interpreta `YYYY-MM` y devuelve [desde, hasta) en UTC y el periodo canónico.
+func safeAdd(a, b int64) (int64, error) {
+	if b > 0 && a > math.MaxInt64-b {
+		return 0, ErrOverflow
+	}
+	if b < 0 && a < math.MinInt64-b {
+		return 0, ErrOverflow
+	}
+	return a + b, nil
+}
+
+func safeSub(a, b int64) (int64, error) {
+	if b < 0 && a > math.MaxInt64+b {
+		return 0, ErrOverflow
+	}
+	if b > 0 && a < math.MinInt64+b {
+		return 0, ErrOverflow
+	}
+	return a - b, nil
+}
+
 func normalize(err error) error {
 	switch {
 	case err == nil:
 		return nil
 	case errors.Is(err, ErrInvalidPeriod), errors.Is(err, ErrUnauthorized),
-		errors.Is(err, ErrUnavailable), errors.Is(err, ErrInternal), errors.Is(err, ErrTooManyItems):
+		errors.Is(err, ErrUnavailable), errors.Is(err, ErrInternal),
+		errors.Is(err, ErrInconsistent), errors.Is(err, ErrOverflow):
 		return err
 	default:
 		return ErrUnavailable

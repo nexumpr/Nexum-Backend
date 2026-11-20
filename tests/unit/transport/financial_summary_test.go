@@ -19,15 +19,15 @@ type resumenStoreHTTP struct {
 
 func (s resumenStoreHTTP) LoadTimezone(context.Context, string) (string, error) { return "UTC", nil }
 
-func (s resumenStoreHTTP) ListMovements(context.Context, string, time.Time, time.Time) ([]appSummary.MovementRow, error) {
+func (s resumenStoreHTTP) AggregateMovements(context.Context, string, time.Time, time.Time) (appSummary.MovementTotals, error) {
 	if s.err != nil {
-		return nil, s.err
+		return appSummary.MovementTotals{}, s.err
 	}
-	return []appSummary.MovementRow{{Type: "income", AmountCents: 1000}}, nil
+	return appSummary.MovementTotals{IncomeCents: 1000}, nil
 }
 
-func (s resumenStoreHTTP) ListContributions(context.Context, string, time.Time, time.Time) ([]appSummary.ContributionRow, error) {
-	return nil, nil
+func (s resumenStoreHTTP) AggregateContributions(context.Context, string, time.Time, time.Time) (appSummary.ContributionTotals, error) {
+	return appSummary.ContributionTotals{}, nil
 }
 
 func TestE026HTTPResumen(t *testing.T) {

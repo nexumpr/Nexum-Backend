@@ -2,6 +2,7 @@ package dynamo
 
 import (
 	"context"
+	"math"
 	"strings"
 	"time"
 
@@ -20,12 +21,8 @@ type FinancialSummaryAPI interface {
 	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 }
 
-const (
-	financialSummaryPageSize = 100
-	financialSummaryMaxPages = 100
-)
-
-// FinancialSummaryStore implementa `financialsummary.Store` sobre la tabla única.
+// FinancialSummaryStore agrega mientras pagina; no guarda el periodo completo en memoria ni
+// aplica topes artificiales que conviertan una cuenta válida en 503.
 type FinancialSummaryStore struct {
 	client FinancialSummaryAPI
 	table  string
@@ -36,8 +33,8 @@ func NewFinancialSummaryStore(client FinancialSummaryAPI, table string) *Financi
 	return &FinancialSummaryStore{client: client, table: strings.TrimSpace(table)}
 }
 
-// LoadTimezone lee la zona IANA de PREFERENCES. Ausente o inválida no es error: el servicio
-// aplica America/Mexico_City.
+// LoadTimezone lee la zona IANA de PREFERENCES. Ausente -> "", nil (fallback aprobado);
+// error real de DynamoDB -> ErrUnavailable (el servicio responde 503).
 func (s *FinancialSummaryStore) LoadTimezone(ctx context.Context, userID string) (string, error) {
 	if s == nil || s.client == nil || s.table == "" {
 		return "", appSummary.ErrUnavailable
@@ -65,66 +62,98 @@ func (s *FinancialSummaryStore) LoadTimezone(ctx context.Context, userID string)
 	return strings.TrimSpace(stringAttribute(out.Item["timeZone"])), nil
 }
 
-// ListMovements consulta `[from, to)` por rango de SK. No usa Scan.
-func (s *FinancialSummaryStore) ListMovements(ctx context.Context, userID string, from, to time.Time) ([]appSummary.MovementRow, error) {
-	if s == nil || s.client == nil || s.table == "" {
-		return nil, appSummary.ErrUnavailable
-	}
-	rows, err := s.queryRange(ctx, userID,
+// AggregateMovements suma income/expense/saving independiente en una sola pasada paginada.
+func (s *FinancialSummaryStore) AggregateMovements(ctx context.Context, userID string, from, to time.Time) (appSummary.MovementTotals, error) {
+	var total appSummary.MovementTotals
+	err := s.queryRange(ctx, userID,
 		"MOVEMENT#"+appMovements.SortableTime(from),
 		"MOVEMENT#"+appMovements.SortableTime(to),
-		financialSummaryMaxPages,
-	)
-	if err != nil {
-		return nil, err
-	}
-	salida := make([]appSummary.MovementRow, 0, len(rows))
-	for _, item := range rows {
-		tipo := strings.TrimSpace(stringAttribute(item["type"]))
-		centavos, ok := attributeInt(item["amountCents"])
-		if !ok || tipo == "" {
-			continue
-		}
-		salida = append(salida, appSummary.MovementRow{
-			Type:           tipo,
-			AmountCents:    centavos,
-			ContributionID: stringAttribute(item["contributionId"]),
+		func(item map[string]types.AttributeValue) error {
+			tipo := strings.TrimSpace(stringAttribute(item["type"]))
+			centavos, ok := attributeInt(item["amountCents"])
+			if !ok || tipo == "" {
+				return appSummary.ErrInconsistent
+			}
+			if centavos < 0 {
+				return appSummary.ErrInconsistent
+			}
+			switch tipo {
+			case "income":
+				suma, err := sumar(total.IncomeCents, centavos)
+				if err != nil {
+					return err
+				}
+				total.IncomeCents = suma
+			case "expense":
+				suma, err := sumar(total.ExpensesCents, centavos)
+				if err != nil {
+					return err
+				}
+				total.ExpensesCents = suma
+			case "saving":
+				// El movimiento vinculado a una aportación no se suma por separado.
+				if strings.TrimSpace(stringAttribute(item["contributionId"])) == "" {
+					suma, err := sumar(total.IndependentSavingsCents, centavos)
+					if err != nil {
+						return err
+					}
+					total.IndependentSavingsCents = suma
+				}
+			default:
+				return appSummary.ErrInconsistent
+			}
+			return nil
 		})
+	if err != nil {
+		return appSummary.MovementTotals{}, err
 	}
-	return salida, nil
+	return total, nil
 }
 
-// ListContributions consulta `[from, to)` por rango de SK. No usa Scan.
-func (s *FinancialSummaryStore) ListContributions(ctx context.Context, userID string, from, to time.Time) ([]appSummary.ContributionRow, error) {
-	if s == nil || s.client == nil || s.table == "" {
-		return nil, appSummary.ErrUnavailable
-	}
-	rows, err := s.queryRange(ctx, userID,
+// AggregateContributions suma las aportaciones activas del periodo.
+func (s *FinancialSummaryStore) AggregateContributions(ctx context.Context, userID string, from, to time.Time) (appSummary.ContributionTotals, error) {
+	var total appSummary.ContributionTotals
+	err := s.queryRange(ctx, userID,
 		"CONTRIBUTION#"+appMovements.SortableTime(from),
 		"CONTRIBUTION#"+appMovements.SortableTime(to),
-		financialSummaryMaxPages,
-	)
+		func(item map[string]types.AttributeValue) error {
+			estado := strings.TrimSpace(stringAttribute(item["status"]))
+			centavos, ok := attributeInt(item["amountCents"])
+			if !ok || estado == "" {
+				return appSummary.ErrInconsistent
+			}
+			if centavos < 0 {
+				return appSummary.ErrInconsistent
+			}
+			switch estado {
+			case "active":
+				suma, err := sumar(total.ActiveSavingsCents, centavos)
+				if err != nil {
+					return err
+				}
+				total.ActiveSavingsCents = suma
+			case "reversed":
+				// No cuenta como ahorro activo; el movimiento histórico se conserva.
+			default:
+				return appSummary.ErrInconsistent
+			}
+			return nil
+		})
 	if err != nil {
-		return nil, err
+		return appSummary.ContributionTotals{}, err
 	}
-	salida := make([]appSummary.ContributionRow, 0, len(rows))
-	for _, item := range rows {
-		estado := strings.TrimSpace(stringAttribute(item["status"]))
-		centavos, ok := attributeInt(item["amountCents"])
-		if !ok || estado == "" {
-			continue
-		}
-		salida = append(salida, appSummary.ContributionRow{Status: estado, AmountCents: centavos})
-	}
-	return salida, nil
+	return total, nil
 }
 
-// queryRange pagina por SK entre `desde` (inclusive) y `hasta` (exclusive).
-func (s *FinancialSummaryStore) queryRange(ctx context.Context, userID, desde, hasta string, maxPages int) ([]map[string]types.AttributeValue, error) {
+// queryRange pagina con ExclusiveStartKey hasta agotar el rango. Sin Scan y sin tope de
+// páginas: una cuenta válida no se trunca. Cada ítem se agrega y se descarta.
+func (s *FinancialSummaryStore) queryRange(ctx context.Context, userID, desde, hasta string, fn func(map[string]types.AttributeValue) error) error {
+	if s == nil || s.client == nil || s.table == "" {
+		return appSummary.ErrUnavailable
+	}
 	pk := domainDynamo.PrefixUser + strings.TrimSpace(userID)
-	items := make([]map[string]types.AttributeValue, 0, financialSummaryPageSize)
 	var start map[string]types.AttributeValue
-	for pagina := 0; pagina < maxPages; pagina++ {
+	for {
 		entrada := &dynamodb.QueryInput{
 			TableName:              aws.String(s.table),
 			KeyConditionExpression: aws.String("PK = :pk AND #sk >= :from AND #sk < :to"),
@@ -137,20 +166,29 @@ func (s *FinancialSummaryStore) queryRange(ctx context.Context, userID, desde, h
 				":to":   stringAttr(hasta),
 			},
 			ConsistentRead: aws.Bool(true),
-			Limit:          aws.Int32(financialSummaryPageSize),
 		}
 		if len(start) > 0 {
 			entrada.ExclusiveStartKey = start
 		}
 		out, err := s.client.Query(ctx, entrada)
 		if err != nil {
-			return nil, appSummary.ErrUnavailable
+			return appSummary.ErrUnavailable
 		}
-		items = append(items, out.Items...)
+		for _, item := range out.Items {
+			if err := fn(item); err != nil {
+				return err
+			}
+		}
 		if len(out.LastEvaluatedKey) == 0 {
-			return items, nil
+			return nil
 		}
 		start = out.LastEvaluatedKey
 	}
-	return nil, appSummary.ErrTooManyItems
+}
+
+func sumar(a, b int64) (int64, error) {
+	if b > 0 && a > math.MaxInt64-b {
+		return 0, appSummary.ErrOverflow
+	}
+	return a + b, nil
 }
