@@ -24,3 +24,20 @@
 - [ ] `E043-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E043-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
 - [ ] `E043-CT07` Suma de asignaciones exacta; objetivo ajeno, metas repetidas, >12 metas, doble reversa y transacción cancelada sin efectos.
+
+## Oleada 3 (2026-11-19) — E043 `POST /api/v1/goal-contributions/preview`
+
+| Campo | Valor |
+|---|---|
+| Estado | IMPLEMENTED=YES · PR_OPEN=NO (pendiente de publicar) · CI_GREEN=PENDIENTE · MERGED=NO · AWS_DEPLOYED=NO · HTTPS_VERIFIED=NO · FUNCTIONAL_VERIFIED=NO |
+| Rama | `feat/h08e-e043-preview`, base `feat/h08e-contributions-foundation` (`7759eed`) |
+| Handler | `internal/transport/http/contributions_preview_handler.go` |
+| Wiring | `cmd/server/e043.go` -> `registrarOleada3` (`POST /goal-contributions/preview`) |
+| Reutilizacion | Fundacion compartida: `CadenaAportaciones`, `WriteContributionsError`, `MaxBodyAportaciones`, `CuotaAportacionesPorMinuto`. Sin duplicar el caso de uso ni el adaptador. |
+| Decisiones | DTO cerrado; Bearer RS256 + estado autoritativo de sesion; cuota por usuario 60/min DENTRO de la cadena autenticada; E043 no escribe (solo `GetItem` de las metas). |
+| Regla de suma | El servicio exige `sum allocations == amount` (`NormalizeAllocations(..., exactTotal=true)`); una meta sin capacidad devuelve `canCommit=false` con el remanente. |
+| Defecto corregido antes del primer commit | La composicion inicial aplicaba `LimitarPorUsuario` por fuera de `CadenaAportaciones`, donde aun no hay identidad en el contexto: la cuota quedaba desactivada en silencio. Ahora la cuota envuelve al handler ya autenticado. Cubierto por `TestE043HTTPPreviewCuota`. |
+| Pruebas | `go build ./...` y `go vet ./...` PASS local; `go test ./tests/unit/transport/... -run TestE043 -count=1` PASS (200 de contrato, 422 de suma/duplicado/divisa, 400 de DTO, 401 de auth, 404, 503, 429 y fail-open de Redis). |
+| Pendiente | CI del PR, Gate de merge por SHA40, publicacion y verificacion HTTPS real. |
+
+> **Registro operativo:** las casillas `[ ]` del plan historico H06 no se marcan retroactivamente; la evidencia vigente es este bloque.

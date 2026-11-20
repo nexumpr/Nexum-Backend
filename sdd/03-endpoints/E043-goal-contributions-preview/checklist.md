@@ -19,3 +19,19 @@
 - [ ] Dependencias del cliente Mobile nunca constituyen Gate del Backend.
 
 **Criterio de cierre:** ninguna casilla operativa se marca por generar este documento; la documentación contractual se valida con el auditor del ZIP y queda REVIEW hasta aprobación.
+
+## Oleada 3 (2026-11-19) — E043 `POST /api/v1/goal-contributions/preview`
+
+- [x] DTO cerrado `ContributionPreviewRequest`; campos desconocidos y JSON malformado -> 400.
+- [x] Bearer RS256 + sesion autoritativa: sin token, token invalido o sesion revocada -> 401.
+- [x] Suma exacta: `sum allocations == amount`; incumplimiento -> 422 `allocations`/`sum_mismatch`.
+- [x] Metas repetidas -> 422; meta inexistente -> 404 sin revelar datos internos.
+- [x] Sin componentes (servicio, tokens o autorizador) -> 503 `DEPENDENCY_UNAVAILABLE`.
+- [x] Cuota por usuario 60/min aplicada dentro de la cadena autenticada; agotada -> 429 con `Retry-After`; Redis caido -> fail-open.
+- [x] E043 no escribe: el doble de almacen no recibe ninguna escritura y las metas no cambian.
+- [x] Respuesta `ContributionPreview` con `amount`, `currency`, `allocations`, `remaining` y `canCommit`; `Cache-Control: private, no-store`.
+- [x] `gofmt`, `go build ./...`, `go vet ./...` y pruebas de transporte E043 PASS en local.
+- [ ] CI del PR en verde y Gate de merge por SHA40.
+- [ ] Verificacion HTTPS real en AWS (NO ejecutada).
+
+> Las casillas historicas del checklist H06 permanecen sin marcar: no hay evidencia de ejecucion para ellas.
