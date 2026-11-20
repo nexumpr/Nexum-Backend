@@ -34,6 +34,11 @@ func (s *Service) Get(ctx context.Context, userID, goalID string) (*domainGoal.G
 	if goal == nil {
 		return nil, ErrNotFound
 	}
+	// E042 marca el tombstone como `deleted=true` (RFC-022 §6): la meta borrada deja de existir
+	// para el cliente y este endpoint responde el MISMO 404 que una meta ajena o inexistente.
+	if goal.Deleted {
+		return nil, ErrNotFound
+	}
 	// El adaptador ya valida al mapear; esta comprobación es defensa en profundidad para que
 	// ninguna proyección incoherente llegue al contrato.
 	if err := goal.Validate(); err != nil {

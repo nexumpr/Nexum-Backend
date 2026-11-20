@@ -158,6 +158,7 @@ func normalizeStoreError(err error) error {
 		errors.Is(err, ErrInvalidRequest),
 		errors.Is(err, ErrNotFound),
 		errors.Is(err, ErrConflict),
+		errors.Is(err, ErrGoalActiveContributions),
 		errors.Is(err, ErrVersionConflict),
 		errors.Is(err, ErrTargetNotPositive),
 		errors.Is(err, ErrOpeningExceedsTarget),
