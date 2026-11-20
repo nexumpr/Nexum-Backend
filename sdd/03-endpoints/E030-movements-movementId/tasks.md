@@ -55,3 +55,9 @@
 | Aceptacion funcional | PASS - 200 v2; 412 stale; 404 ajeno; persistencia |
 | Rollback | LT v13 / release `v0.17.0+87aac167fe28` |
 | Limitaciones | multi-AZ limitada (ambas EC2 en us-east-2a); E015 pendiente legal; SES pendiente |
+
+## T-1 (RFC-022 v1.2.1 §10) — protección de movimientos vinculados
+
+- [x] `E030-T13` E030 rechaza con 409 cualquier cambio de `categoryId`, `description` u `occurredAt` cuando el movimiento tiene `contributionId` no vacío (autorización `APRUEBO_CAMBIO_TRANSVERSAL_E030_MOVIMIENTO_APORTACION`).
+- [x] `E030-T14` Regresión: los movimientos independientes conservan el comportamiento anterior; E031 mantiene su 409 existente.
+

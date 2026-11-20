@@ -23,3 +23,12 @@
 - [ ] `E051-CT04` Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
 - [ ] `E051-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E051-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
+
+## Cierre local E051 (2026-11-19)
+
+- **Implementado:** `GET /api/v1/dashboard` con `summary` de E026, metas activas no borradas (máx. 100) y 10 movimientos recientes; `asOf` coherente con el resumen.
+- **Sin caché Redis:** consultas directas a DynamoDB (`Query` por partición, sin `Scan`). Sin cantidades ficticias.
+- **Wiring:** `cmd/server/e051.go` sobre el registro de Oleada 3; handler con Bearer + sesión.
+- **Pruebas reales:** `go build`, `go vet`, `go test ./... -count=1` PASS; aplicación y transporte; DTO `Dashboard` con arrays no nulos.
+- **PR:** apilado sobre #125; pendiente CI Linux y certificación HTTPS.
+- **Sin `availableEstimated`.** No se declara `AWS_VERIFIED`.
