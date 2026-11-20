@@ -77,6 +77,12 @@ func (s *Service) Update(ctx context.Context, cmd UpdateCommand) (*domainGoal.Go
 	if current == nil {
 		return nil, ErrNotFound
 	}
+	// E042 deja un tombstone con `deleted=true` (RFC-022 §6): una meta borrada no se puede
+	// modificar y se responde el MISMO 404 que una inexistente. El adaptador impone además la
+	// condición `deleted = false` en la escritura para cubrir una carrera con el borrado.
+	if current.Deleted {
+		return nil, ErrNotFound
+	}
 
 	// Prevalidación con la versión leída: da el error preciso (422) sin depender del orden en
 	// que DynamoDB evalúe la condición. La autoridad final sigue siendo la condición atómica.

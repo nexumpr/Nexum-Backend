@@ -23,3 +23,12 @@
 - [ ] `E042-CT04` Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
 - [ ] `E042-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
 - [ ] `E042-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
+
+
+## Cierre local E042 (2026-11-19)
+
+- **Implementado:** `DELETE /api/v1/goals/{goalId}` con alternativa B de RFC-022 v1.2.1: 409 si `activeContributions > 0`, reversión explícita por E047, tombstone `deleted=true/status=archived/savedAmount=openingSaved/version+1`, 204 sin cuerpo e idempotencia.
+- **Integridad:** E040/E041 tratan `deleted=true` como 404; E038 excluye tombstones; E031/E027/E029 sin cambios.
+- **Wiring:** `cmd/server/e042.go`; handler DELETE; Bearer + sesión.
+- **Pruebas:** `go build`, `go vet`, `go test ./...` PASS; borrado válido, 409 con aportaciones, segundo DELETE idempotente y 404.
+- **PR:** pendiente de abrir; sin merge ni AWS.

@@ -54,6 +54,11 @@ var (
 	// conflicto de escritura que no se resolvió tras los reintentos (HTTP 409).
 	ErrConflict = errors.New("conflicto de idempotencia o de escritura")
 
+	// ErrGoalActiveContributions indica que la meta tiene aportaciones vigentes y por tanto no
+	// puede eliminarse (E042, RFC-022 §6): el cliente debe revertirlas con E047. Se responde
+	// 409 sin modificar nada; el endpoint NUNCA revierte aportaciones por su cuenta.
+	ErrGoalActiveContributions = errors.New("la meta tiene aportaciones vigentes")
+
 	// ErrVersionConflict indica que el `If-Match` no corresponde a la versión vigente: no se
 	// aplicó ninguna escritura (HTTP 412).
 	ErrVersionConflict = errors.New("version de la meta desactualizada")
