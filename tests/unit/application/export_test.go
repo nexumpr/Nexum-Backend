@@ -144,20 +144,6 @@ func e020Perfil() *appProfile.Profile {
 	}
 }
 
-func e020Meta(t *testing.T, id string, guardadoCents int64) appGoals.GoalRow {
-	t.Helper()
-	meta, err := domainGoal.New(
-		e020Usuario, id, "Meta "+id,
-		guardadoCents+10000, guardadoCents,
-		time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC),
-		e020Ahora,
-	)
-	if err != nil {
-		t.Fatalf("no se pudo construir la meta %s: %v", id, err)
-	}
-	return appGoals.GoalRow{Goal: meta, SortKey: "GOAL#" + id}
-}
-
 func e020Movimiento(id string, minuto int, centavos int64) e020Fila {
 	ocurrido := time.Date(2026, 11, 10, 12, minuto, 0, 0, time.UTC)
 	sk := "MOVEMENT#" + ocurrido.Format("2006-01-02T15:04:05.000Z") + "#" + id
