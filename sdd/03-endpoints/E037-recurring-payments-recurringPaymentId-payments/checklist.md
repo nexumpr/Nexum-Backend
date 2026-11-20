@@ -19,3 +19,11 @@
 - [ ] Dependencias del cliente Mobile nunca constituyen Gate del Backend.
 
 **Criterio de cierre:** ninguna casilla operativa se marca por generar este documento; la documentación contractual se valida con el auditor del ZIP y queda REVIEW hasta aprobación.
+
+## Cierre local E037 (2026-11-19)
+
+- [x] Implementación local con transacción DynamoDB, idempotencia y duplicado por fecha local.
+- [x] Categorías del catálogo real (`otros`/`ingreso`/`ahorro`) y wiring en el registro de Oleada 3.
+- [x] `go build`, `go vet` y `go test ./... -count=1` PASS en local.
+- [ ] CI Linux verde sobre el HEAD del PR #124.
+- [ ] Certificación HTTPS y despliegue AWS.
