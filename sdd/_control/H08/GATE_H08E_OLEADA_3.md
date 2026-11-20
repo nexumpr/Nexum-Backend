@@ -3,9 +3,9 @@
 | Campo | Valor |
 |---|---|
 | Documento | `sdd/_control/H08/GATE_H08E_OLEADA_3.md` |
-| Versión | 1.0.0 |
+| Versión | 1.2.0 |
 | Fecha | 2026-11-19 |
-| Estado | **PROPUESTO — PENDIENTE DE FRASE HUMANA** |
+| Estado | **GATE CONCEDIDO — RFC-022 v1.2.0 PENDIENTE** |
 | Autoridad que lo motiva | Instrucción humana de inicio de Oleada 3 (2026-11-19) |
 | Instrumento de concurrencia | **RFC-019** (cláusulas **E-1**, **E-2**, **E-3**) |
 | Instrumento contractual | **RFC-022** (`PROPUESTO`, frase separada) |
@@ -107,39 +107,43 @@ una línea. B2 se integra al final de B1 en el mismo worktree. El orquestador es
    en orden fijo; singletons completos en cada página; cursor firmado. Sin esta aprobación,
    E020 queda `BLOCKED_CONTRACT` y **no se mergea**.
 2. **E048/E049:** `E048?period=YYYY-MM` emite `ETag: "b<period>-<version>"`; `E049` lo exige
-   en `If-Match` (428/412); creación con `"b<period>-0"`; representación `BUDGETSET#<period>`
-   como ítem único con CAS, sin borrados multi-ítem. Sin esta aprobación, E048/E049/E050
-   quedan `BLOCKED_CONTRACT`.
-3. **E026:** `FinancialSummary` no cambia; `availableEstimated` de RFC-016 §17.7 se resuelve
-   como referencia al concepto derivado (net/savings + metas + presupuesto). E026 puede
-   implementarse con la semántica del §4 de RFC-022.
-4. **E037/E042–E047/E050/E051:** semánticas internas y de borde documentadas en RFC-022
-   §5–§8 (movimiento derivado y duplicado por fecha; tombstone de meta y 409 con
-   aportaciones activas; claves `CONTRIBUTION#<fecha>#<id>` + puntero; `remaining`/
-   `canCommit`; reversión sin borrar el movimiento; periodo por zona IANA; caché por epoch).
+   en `If-Match` (428/412) y devuelve el conjunto completo del periodo (≤50) **sin**
+   `nextCursor` ni parámetros de paginación, con `ETag` de respuesta. Creación con
+   `"b<period>-0"`; representación `BUDGETSET#<period>` como ítem único con CAS. Sin esta
+   aprobación, E048/E049/E050 quedan `BLOCKED_CONTRACT`.
+3. **E026:** `FinancialSummary` no cambia. Se adopta la **alternativa B**: no se publica
+   `availableEstimated` porque no existe una fuente determinista que clasifique cada
+   recurrente como fijo o variable. E026 devuelve solo `income`, `expenses`, `savings`, `net`
+   y `asOf`, con la semántica del §4 de RFC-022.
+4. **E037/E042-E047/E050/E051:** semánticas internas y de borde documentadas en RFC-022
+   §5-§8 (movimiento derivado y duplicado por fecha; categorías del catálogo real
+   `otros`/`ingreso`/`ahorro`; tombstone de meta y 409 con aportaciones activas; claves
+   `CONTRIBUTION#<fecha>#<id>` + puntero; `remaining`/`canCommit`; reversión sin borrar el
+   movimiento; periodo por zona IANA; **E051 calcula directo desde DynamoDB, sin caché**).
 
 ### 5.2 Decisiones de implementación sin cambio de contrato
 
 | ID | Decisión | Motivo |
 |---|---|---|
-| D-W3-01 | E037 usa `categoryId = "recurring"` y `description = name` de la regla | El contrato no publica categoría y la regla no la tiene; el valor es estable y no inventa un enum |
+| D-W3-01 | E037 mapea el tipo de la regla a una categoría del catálogo real: `expense→otros`, `income→ingreso`, `saving→ahorro`; `description = name` | El catálogo E022 no contiene `recurring`; no se inventa una categoría pública ni se atribuye una específica |
 | D-W3-02 | Duplicado de E037 por fecha local del titular | Evita dobles pagos por cambio de día UTC; la zona se obtiene de preferencias |
 | D-W3-03 | E042 no revierte aportaciones; exige E047 previo (409) | Una aportación puede repartirse entre varias metas; la reversión automática afectaría a terceras metas |
 | D-W3-04 | E044 crea **un** movimiento de ahorro por el total, no uno por meta | Evita duplicar `savings` y mantiene el vínculo `contributionId` |
 | D-W3-05 | E047 no borra el movimiento; el estado `reversed` de la aportación manda en agregados | Conserva historia financiera y evita doble conteo |
 | D-W3-06 | E051 devuelve hasta 100 metas activas y 10 movimientos recientes | El contrato no fija cardinalidad; se acota de forma determinista y documentada |
-| D-W3-07 | Caché de dashboard por epoch (`INCR`) + TTL, sin `SCAN` | Respeta el ACL Redis vigente y evita la denegación `NOPERM` de E014 |
+| D-W3-07 | E051 calcula directamente desde DynamoDB, sin caché de dashboard | No existe un mecanismo probado que garantice consistencia tras una mutación; la caché queda como optimización posterior con su propio Gate |
 | D-W3-08 | Periodo por defecto en la zona IANA del titular, `America/Mexico_City` si falta | Consistencia entre nodos y con la app |
 
 ## 6. Definition of Done por endpoint
 
 Handler real con DTO estricto y campos desconocidos rechazados; servicio de aplicación con
 reglas de dominio; importes `int64` centavos (`internal/domain/money`), nunca `float64`;
-ownership desde `sub`; recurso ajeno → 404; `Query`/`GetItem` sin `Scan`; Redis solo caché,
-cuota o epoch; `Idempotency-Key` según §5.2 del Gate de Oleada 2; `If-Match`/ETag en E049
-(428/412/200); transacciones condicionadas y sin doble escritura; pruebas de aplicación,
-adaptador y transporte; `gofmt`/`build`/`vet` limpios; sin hallazgos nuevos de
-`staticcheck`/`gosec`/`gitleaks`/Trivy; `tasks.md`/`checklist.md` con evidencia real.
+ownership desde `sub`; recurso ajeno → 404; `Query`/`GetItem` sin `Scan`; Redis solo
+sesiones, cuotas u otros usos ya publicados; E051 **sin** caché de dashboard; `Idempotency-Key`
+según §5.2 del Gate de Oleada 2; `If-Match`/ETag en E048/E049 (428/412/200); transacciones
+condicionadas y sin doble escritura; pruebas de aplicación, adaptador y transporte;
+`gofmt`/`build`/`vet` limpios; sin hallazgos nuevos de `staticcheck`/`gosec`/`gitleaks`/
+Trivy; `tasks.md`/`checklist.md` con evidencia real.
 
 Si el host bloquea la ejecución de pruebas, la autoridad es el CI Linux y se declara
 `NOT_RUN_LOCAL`, nunca PASS.
@@ -180,7 +184,7 @@ repite la matriz completa con las nuevas familias. No se declara `FUNCTIONAL_PAS
 | R-03 | RFC-022 pendiente | Frase 2; E020/E048/E049/E050 bloqueados hasta entonces |
 | R-04 | Aportaciones con muchas metas | Límite 12 por request; transacción ≤18 acciones |
 | R-05 | Meta con aportaciones activas | E042 responde 409; el cliente revierte con E047 |
-| R-06 | Caché Redis denegada por ACL | Epoch + TTL; `SCAN` prohibido; E014 conserva su sentinel |
+| R-06 | Caché de dashboard | E051 no usa caché en esta oleada; se elimina T-2 y no se amplía Redis |
 | R-07 | SES/E015/multi-AZ | Fuera de esta oleada; se reportan sin ocultarlos |
 | R-08 | Windows Application Control | `NOT_RUN_LOCAL`; CI Linux es la autoridad |
 
@@ -203,41 +207,51 @@ Frase 1 — Gate Oleada 3:
 APRUEBO_GATE_OLEADA_3_RFC019_E020_E026_E037_E042_E043_E044_E045_E046_E047_E048_E049_E050_E051
 ```
 
-Frase 2 — contratos de Oleada 3:
+Frase 2 - contratos de Oleada 3 (v1.2.0):
 
 ```text
-APRUEBO_RFC_022_CONTRATOS_OLEADA_3
+APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_0
 ```
 
-Ninguna de las dos autoriza merges, `terraform apply`, publicación S3, `instance refresh` ni
-cambios de SES/E015. Cada PR, el release y el despliegue exigen sus Gates propios.
+Frase 3 - cambio transversal T-1 (solo E030):
+
+```text
+APRUEBO_CAMBIO_TRANSVERSAL_E030_MOVIMIENTO_APORTACION
+```
+
+Ninguna autoriza merges, `terraform apply`, publicación S3, `instance refresh` ni cambios de
+SES/E015. Cada PR, el release y el despliegue exigen sus Gates propios.
 
 ### 12.1 Registro de aprobación
 
 | Frase | Estado | Fecha | Efecto |
 |---|---|---|---|
-| `APRUEBO_GATE_OLEADA_3_RFC019_E020_E026_E037_E042_E043_E044_E045_E046_E047_E048_E049_E050_E051` | **CONCEDIDA** | 2026-11-19 | Habilita implementación, ramas y PR de los 13 endpoints. RFC-022 sigue `PROPUESTO`; E020/E048/E049/E050 y las semánticas públicas de RFC-022 quedan `CONTRACT_BLOCKED` hasta su frase propia |
-| `APRUEBO_RFC_022_CONTRATOS_OLEADA_3` | **RETIRADA / NO APLICABLE** | 2026-11-19 | El responsable no aprobó la v1.0.0; se sustituye por la frase de la v1.1.0 en §12.2 |
-| `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_1_0` | **PENDIENTE** | — | Habilita los cambios de contrato y semánticas de RFC-022 v1.1.0 |
-| `APRUEBO_CAMBIOS_TRANSVERSALES_OLEADA_3` | **PENDIENTE** | — | Habilita los cambios mínimos y delimitados de RFC-022 v1.1.0 §10 sobre E030 y los hooks de epoch de caché |
+| `APRUEBO_GATE_OLEADA_3_RFC019_E020_E026_E037_E042_E043_E044_E045_E046_E047_E048_E049_E050_E051` | **CONCEDIDA** | 2026-11-19 | Habilita implementación, ramas y PR de los 13 endpoints. RFC-022 sigue `PROPUESTO`; E020/E048/E049/E050 y las semánticas públicas quedan `CONTRACT_BLOCKED` hasta su frase propia |
+| `APRUEBO_RFC_022_CONTRATOS_OLEADA_3` | **RETIRADA** | 2026-11-19 | v1.0.0 no aprobada |
+| `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_1_0` | **RETIRADA** | 2026-11-19 | v1.1.0 no aprobada; sustituida por la v1.2.0 |
+| `APRUEBO_CAMBIOS_TRANSVERSALES_OLEADA_3` | **RETIRADA** | 2026-11-19 | Incluía T-2 (hooks de caché), eliminado en v1.2.0 |
+| `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_0` | **PENDIENTE** | — | Habilita los cambios de contrato y semánticas de RFC-022 v1.2.0 |
+| `APRUEBO_CAMBIO_TRANSVERSAL_E030_MOVIMIENTO_APORTACION` | **PENDIENTE** | — | Habilita solo el guardo T-1 de E030 |
 
 Siguen requiriendo autorización propia y separada: merge de cada PR, publicación S3,
 `terraform apply` por SHA-256, `instance refresh` y cualquier contingencia de capacidad.
 
 ### 12.2 Registro de la revisión de RFC-022
 
-La v1.0.0 fue revisada por el responsable y **no aprobada**. Observaciones vinculantes:
+La v1.0.0 y la v1.1.0 fueron revisadas por el responsable y **no aprobadas**. Observaciones
+vinculantes de la auditoría que dio origen a la v1.2.0:
 
-1. E020 no puede imponer topes de 5 000/20 000 con 503; debe recorrer todo con cursores.
-2. E048/E049 debe declarar el cambio de diseño físico `BUDGETSET#` frente a `BUDGET#`, con
-   paginación real y actualización del SDD/helpers solo tras la RFC.
-3. E026 no puede declarar `net` equivalente a `availableEstimated`; debe comparar A-070,
-   RFC-016, OpenAPI y `CalculateAvailableV6`.
-4. E037 debe precisar ocurrencia, zona, frecuencia, reintentos, replay, concurrencia,
-   importe real y el impacto de la categoría `recurring`.
-5. E042 debe presentar alternativas A/B y reconocer el cambio de comportamiento frente a
-   RFC-016 §17.7.
-6. E043/E044/E047 debe definir el reflejo del historial en E027/E029/E030/E031/E026/E051 y
-   los cambios transversales mínimos.
-7. E050/E051 debe verificar el ACL de `INCR`, no ampliar permisos y evitar caché obsoleta.
-8. La matriz de decisiones y la frase de la v1.1.0 se presentan en el informe de continuación.
+1. **E049** no pagina la respuesta: devuelve el conjunto completo (≤50), sin `nextCursor` ni
+   `limit`/`cursor`; E048 conserva la paginación; ETag en E048 y E049.
+2. **E026** no publica `availableEstimated`: no hay fuente determinista fija/variable. Se
+   adopta la alternativa B.
+3. **E051** calcula directamente desde DynamoDB, sin caché; se elimina T-2 y no se amplía
+   Redis.
+4. **E020** no promete snapshot transaccional ni ausencia absoluta de duplicados; documenta
+   garantías y limitaciones reales.
+5. **E037** no usa `recurring` (no existe en el catálogo): mapea por tipo a
+   `otros`/`ingreso`/`ahorro`.
+6. **E042** mantiene la alternativa B y enmienda expresamente RFC-016 §17.7.
+7. **T-1** se limita a E030; E031/E027/E029 no cambian.
+8. La matriz de decisiones y las frases de la v1.2.0 se presentan en el informe de
+   continuación.

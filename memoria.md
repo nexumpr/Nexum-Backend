@@ -2188,3 +2188,12 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **RFC-022 v1.1.0 preparada** en estado `PROPUESTO`, con matriz de decisiones y dos frases pendientes: `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_1_0` y `APRUEBO_CAMBIOS_TRANSVERSALES_OLEADA_3`.
 - **Estado del preflight:** `origin/main` = `0169f006935b825747d0508b81c6c32661027baf`; CI Go/SDD SUCCESS; ASG 2/2/2; LT v14 (`v0.18.0+9722224c15c5`); 2 targets healthy; HTTPS live 200; plan FREE/ACTIVE con 142.94 USD; `opencode.json` local preservado.
 - **Sin cambios publicos aplicados:** OpenAPI, Terraform, memoria de despliegue y endpoints anteriores intactos. `E020/E048/E049/E050` y las semanticas de RFC-022 quedan `CONTRACT_BLOCKED` hasta la frase A; T-1/T-2 hasta la frase B.
+
+## Oleada 3 — RFC-022 v1.2.0 y auditoria correctiva (2026-11-19)
+
+- **RFC-022 v1.1.0 NO aprobada.** Auditoria del responsable con seis correcciones obligatorias.
+- **v1.2.0 PROPUESTA** en el mismo PR #122: E049 devuelve el conjunto completo (<=50) sin `nextCursor` ni `limit`/`cursor`, con ETag de respuesta; E048 conserva paginacion y ETag por periodo; E026 adopta la **alternativa B** (sin `availableEstimated` porque no hay fuente determinista fija/variable); E051 calcula directo desde DynamoDB, **sin cache** (se elimina T-2); E020 documenta garantias best-effort reales (sin snapshot ni ausencia absoluta de duplicados); E037 mapea por tipo a categorias del catalogo real (`expense->otros`, `income->ingreso`, `saving->ahorro`) porque `recurring` no existe; E042 mantiene la alternativa B con enmienda explicita de RFC-016 17.7; T-1 se limita a E030.
+- **E037 corregido:** commit `30b0da836eeaaa87f0505324ee9af2d10101512c` sobre `dca2c512`; `CategoryIDForRuleType` y prueba de categorias del catalogo; suites de aplicacion, adaptador y transporte PASS.
+- **E043–E047:** commit `8564fe26d97d7207d18689ace336387bb3fe3274` conservado; build/vet y pruebas de aplicacion/adaptador PASS. Pendientes pruebas de transporte, wiring y division en PR por E-ID.
+- **Frases pendientes:** `APRUEBO_RFC_022_CONTRATOS_OLEADA_3_V1_2_0` y `APRUEBO_CAMBIO_TRANSVERSAL_E030_MOVIMIENTO_APORTACION`. Las frases de v1.0.0, v1.1.0 y `APRUEBO_CAMBIOS_TRANSVERSALES_OLEADA_3` quedan retiradas.
+- **Sin cambios publicos aplicados:** OpenAPI, Terraform, E024/E028/E030/E031/E033–E036 y AWS intactos. `opencode.json` local preservado.
