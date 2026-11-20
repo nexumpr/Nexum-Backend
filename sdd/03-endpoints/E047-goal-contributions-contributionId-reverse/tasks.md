@@ -25,3 +25,11 @@
 - [ ] `E047-CT06` Montos exactos en centavos: 0, mínimo, máximo, decimal inválido, cambio de mes y zona IANA.
 - [ ] `E047-CT07` Repetición idéntica de Idempotency-Key -> respuesta estable; payload diferente con misma key -> 409; carrera multiinstancia.
 - [ ] `E047-CT08` Suma de asignaciones exacta; objetivo ajeno, metas repetidas, >12 metas, doble reversa y transacción cancelada sin efectos.
+
+
+## Cierre local E047 (2026-11-19)
+
+- **Implementado:** POST /api/v1/goal-contributions/{contributionId}/reverse con Idempotency-Key, 200, replay, 409 doble reversion y CAS.
+- **Wiring:** `cmd/server/e047.go`; base compartida #130.
+- **Pruebas:** `go build`, `go vet`, `go test ./...` PASS local; pruebas de transporte E047 PASS.
+- **PR:** pendiente de abrir; sin merge ni AWS.
