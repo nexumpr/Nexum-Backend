@@ -255,7 +255,7 @@ func movimientoE037Fixture(id string, ocurrido time.Time) appMovements.Movement 
 		Type:               appMovements.TypeExpense,
 		AmountCents:        1_000_00,
 		Currency:           appMovements.CurrencyMXN,
-		CategoryID:         appRecurring.CategoryIDRecurring,
+		CategoryID:         "otros",
 		Description:        "Renta",
 		OccurredAt:         ocurrido.UTC().Truncate(time.Millisecond),
 		Version:            1,
@@ -316,7 +316,7 @@ func TestE037PayPersisteMovimientoYLocalizador(t *testing.T) {
 	if _, existe := item["contributionId"]; existe {
 		t.Fatal("un pago recurrente no declara aportacion: contributionId no debe escribirse")
 	}
-	if got := stringAttribute(item["categoryId"]); got != appRecurring.CategoryIDRecurring {
+	if got := stringAttribute(item["categoryId"]); got != "otros" {
 		t.Fatalf("categoryId inesperado: %q", got)
 	}
 	if centavos, _ := attributeInt(item["amountCents"]); centavos != 1_000_00 {

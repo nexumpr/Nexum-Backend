@@ -186,7 +186,7 @@ func TestE037PagoValido(t *testing.T) {
 		"type":               appMovements.TypeExpense,
 		"amount":             "1000.00",
 		"currency":           "MXN",
-		"categoryId":         CategoryIDRecurring,
+		"categoryId":         "otros",
 		"description":        "Renta",
 		"occurredAt":         "2026-11-06T05:30:00.000Z",
 		"version":            float64(1),
@@ -219,7 +219,7 @@ func TestE037PagoValido(t *testing.T) {
 	if write.Movement.AmountCents != 1_000_00 || write.Movement.Currency != "MXN" {
 		t.Fatalf("movimiento derivado inesperado: %+v", write.Movement)
 	}
-	if write.Movement.CategoryID != CategoryIDRecurring || write.Movement.Description != "Renta" {
+	if write.Movement.CategoryID != "otros" || write.Movement.Description != "Renta" {
 		t.Fatalf("categoria o descripcion inesperadas: %+v", write.Movement)
 	}
 	if write.Movement.ContributionID != "" {
@@ -555,5 +555,25 @@ func TestE037ResolucionDeZonaDelRespaldo(t *testing.T) {
 	}
 	if got := instante.In(loadLocation(DefaultTimezone)).Format(LocalDateLayout); got != "2026-11-05" {
 		t.Fatalf("fecha civil inesperada: %q", got)
+	}
+}
+
+func TestE037CategoriasDelCatalogoReal(t *testing.T) {
+	casos := map[string]string{
+		"expense": "otros",
+		"income":  "ingreso",
+		"saving":  "ahorro",
+	}
+	for tipo, esperado := range casos {
+		got, err := CategoryIDForRuleType(tipo)
+		if err != nil {
+			t.Fatalf("%s: %v", tipo, err)
+		}
+		if got != esperado {
+			t.Fatalf("%s: esperado %q, obtenido %q", tipo, esperado, got)
+		}
+	}
+	if _, err := CategoryIDForRuleType("recurring"); err == nil {
+		t.Fatal("un tipo desconocido no debe mapearse a una categoria inventada")
 	}
 }

@@ -10,8 +10,10 @@ package recurring
 //     anticipado o tardío); sólo exige que la regla exista, sea del titular y esté activa;
 //   - el `amount` del cuerpo es el importe REALMENTE pagado y puede diferir del declarado en
 //     la regla;
-//   - el movimiento derivado usa `categoryId = "recurring"` (la regla no tiene categoría y no
-//     se inventa una ajena) y `description = name` de la regla;
+//   - el movimiento derivado usa una categoría EXISTENTE del catálogo E022 según el tipo de la
+//     regla (`expense→otros`, `income→ingreso`, `saving→ahorro`); nunca `recurring`, que no
+//     existe en el catálogo. `description = name` de la regla y `recurringPaymentId` conservan
+//     el vínculo específico;
 //   - el duplicado se controla por DÍA CIVIL en la zona IANA del titular
 //     (`PREFERENCES.timezone`, `America/Mexico_City` si falta o no es válida), de modo que un
 //     cambio de día UTC no permite un segundo pago de la misma ocurrencia. Un pago dividido el
@@ -50,11 +52,6 @@ const (
 	// registros ya escritos por este endpoint.
 	OperationPayRecurring = "E037_PAY_RECURRING"
 
-	// CategoryIDRecurring es la categoría interna y estable del movimiento derivado
-	// (Gate Oleada 3 D-W3-01). No es un valor del catálogo de E022 y no se presenta como si
-	// perteneciera a él.
-	CategoryIDRecurring = "recurring"
-
 	// PayStatusOK es el código de éxito publicado por E037 (200, no 201).
 	PayStatusOK = 200
 
@@ -70,6 +67,23 @@ const (
 	// devolver un conflicto al cliente por un fallo que no es suyo.
 	payIDAttempts = 3
 )
+
+// CategoryIDForRuleType mapea el tipo de la regla a una categoría EXISTENTE del catálogo
+// público E022. El catálogo no contiene `recurring`: inventar esa categoría falsearía la
+// clasificación. `expense` usa la categoría genérica `otros`; el vínculo específico se conserva
+// en `recurringPaymentId` y en la descripción (nombre de la regla).
+func CategoryIDForRuleType(tipo string) (string, error) {
+	switch strings.TrimSpace(tipo) {
+	case domainRecurring.TypeExpense:
+		return "otros", nil
+	case domainRecurring.TypeIncome:
+		return "ingreso", nil
+	case domainRecurring.TypeSaving:
+		return "ahorro", nil
+	default:
+		return "", ErrUnavailable
+	}
+}
 
 var (
 	// ErrRuleInactive indica que la regla existe en la partición del titular pero está dada de
@@ -267,6 +281,10 @@ func (s *PaymentService) Pay(ctx context.Context, command PayCommand) (*PayResul
 	}
 
 	payloadHash := payPayloadHash(ruleID, centavos, divisa, ocurrido)
+	categoria, errCategoria := CategoryIDForRuleType(tipo)
+	if errCategoria != nil {
+		return nil, ErrUnavailable
+	}
 
 	for intento := 0; intento < payIDAttempts; intento++ {
 		id, errID := s.newID()
@@ -279,7 +297,7 @@ func (s *PaymentService) Pay(ctx context.Context, command PayCommand) (*PayResul
 			Type:               tipo,
 			AmountCents:        centavos,
 			Currency:           divisa,
-			CategoryID:         CategoryIDRecurring,
+			CategoryID:         categoria,
 			Description:        descripcion,
 			OccurredAt:         ocurrido,
 			Version:            1,

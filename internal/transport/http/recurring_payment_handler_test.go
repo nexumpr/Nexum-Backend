@@ -223,7 +223,7 @@ func TestE037HTTP200ContratoExacto(t *testing.T) {
 		"type":               appMovements.TypeExpense,
 		"amount":             "1000.00",
 		"currency":           "MXN",
-		"categoryId":         appRecurring.CategoryIDRecurring,
+		"categoryId":         "otros",
 		"description":        "Renta",
 		"occurredAt":         "2026-11-06T05:30:00.000Z",
 		"version":            float64(1),
