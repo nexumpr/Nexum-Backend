@@ -19,3 +19,10 @@
 - [ ] Dependencias del cliente Mobile nunca constituyen Gate del Backend.
 
 **Criterio de cierre:** ninguna casilla operativa se marca por generar este documento; la documentación contractual se valida con el auditor del ZIP y queda REVIEW hasta aprobación.
+
+
+## Cierre local E049 (2026-11-19)
+
+- [x] Implementacion local, wiring y pruebas de CAS/ETag.
+- [ ] PR y CI Linux.
+- [ ] Certificacion HTTPS y despliegue AWS.
