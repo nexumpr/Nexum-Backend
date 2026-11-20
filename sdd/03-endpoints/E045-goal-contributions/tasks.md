@@ -31,3 +31,24 @@
 - [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
 - [ ] Cubrir con prueba positiva y negativa.
 - [ ] Verificar por HTTP real tras el despliegue autorizado.
+
+## Implementación local H08-E (Oleada 3) — 2026-11-19
+
+> Evidencia de la rama `feat/h08e-e045-list`. No se reescriben las casillas históricas de especificación; esta sección registra sólo lo ejecutado.
+
+| Tarea | Estado | Evidencia |
+|---|---|---|
+| `E045-T01` | HECHO | Contrato revisado: parámetros `limit`, `cursor`, `goalId`, `from`, `to` (el filtro `status` proviene de la enmienda A8) y respuesta `PageOfContribution` con `items`/`nextCursor`. |
+| `E045-T02` | HECHO | Sin cuerpo de petición; respuesta construida desde `WireContribution` (siete campos) y `nextCursor` omitido cuando no hay más páginas. |
+| `E045-T03` | HECHO | `Bearer` + estado autoritativo de sesión (`CadenaAportaciones`); `userId` derivado del sujeto; sin Bearer o sesión revocada → 401. |
+| `E045-T04` | HECHO | `Service.List`: `Query` por usuario, orden newest-first, filtros antes de paginar, cursor HMAC ligado a usuario y a la firma exacta de filtros. |
+| `E045-T05` | HECHO | Reutiliza el adaptador de la fundación (`ContributionsStore`): `Query` sobre `USER#<sub>` con `begins_with(CONTRIBUTION#)` / `BETWEEN`, sin `Scan`. |
+| `E045-T06` | HECHO | Redis se usa sólo para la cuota por usuario; ninguna decisión de privilegio o propiedad depende de caché y el fallo del limitador no autoriza de más. |
+| `E045-T07` | HECHO | `200/400/401/429/500/503`; `ETag` no aplica a un listado; sin clave de cursor → 503 (nunca paginación sin firma). |
+| `E045-T08` | HECHO | `tests/unit/transport/contributions_list_test.go` (5 pruebas): contrato, paginación, filtros, validación, auth y fallo cerrado. |
+| `E045-T09` | NOT_RUN | Requiere DynamoDB y HTTP reales: pendiente de Gate de despliegue. |
+| `E045-T10` | HECHO (local) | Negativas de auth/ownership, cursores manipulados y de otro usuario, límites 1..100, `from>to`; concurrencia multiinstancia real `NOT_RUN`. |
+| `E045-T11` | PENDIENTE_CI | `gofmt`, `go build`, `go vet` y `go test` locales PASS; el resultado de CI del PR se registra en el reporte de cierre. |
+| `E045-T12` | NOT_RUN | Sin despliegue ni release; no se declara `AWS_VERIFIED`. |
+
+**Enmienda A8 (`status`):** implementada — `NormalizeListQuery` valida `active|reversed` y el adaptador aplica `#status = :status` antes de paginar; cubierta por prueba positiva y negativa de transporte.
