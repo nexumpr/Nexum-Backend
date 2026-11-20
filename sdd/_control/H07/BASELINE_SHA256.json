@@ -510,7 +510,11 @@
   "sdd/03-endpoints/E043-goal-contributions-preview/plan.md": "0519ca6371745b55bea6737022fcc4b07e314378101d01aa44eeab41d2a4f0de",
   "sdd/03-endpoints/E043-goal-contributions-preview/spec.md": "28df0a9e7dea6901d568e6936310efca49896c7a49a125e4782c6d0ce6b06d4d",
   "sdd/03-endpoints/E043-goal-contributions-preview/tasks.md": "a96be88089dcedea19eaf9bdebdd582f7693a0a9a5ca90f193ca29545e561510",
+<<<<<<< HEAD
   "sdd/03-endpoints/E044-goal-contributions/checklist.md": "9372c02737b387a4a1ec771150f335624c0466ecc26d4dcfbdbb82a2ea569092",
+=======
+  "sdd/03-endpoints/E044-goal-contributions/checklist.md": "3fde63f1915b17ee7854b64da9e46bb3bbbc3cdb415c518f4169a4d9aa0867f7",
+>>>>>>> feat/h08e-e043-preview
   "sdd/03-endpoints/E044-goal-contributions/plan.md": "8867dd079faebfc97fe36e8cd9e148879e45b9d35844704b15bcb0f20271229a",
   "sdd/03-endpoints/E044-goal-contributions/spec.md": "9c455676bfb3955715a9f1c9aef3e871b2f97bd16b9b2e5e8550268951775097",
   "sdd/03-endpoints/E044-goal-contributions/tasks.md": "a868dc94253478d203b6ed0a24c2d1c0f81cebfb6adedd4a58d18e8ec81ff104",
