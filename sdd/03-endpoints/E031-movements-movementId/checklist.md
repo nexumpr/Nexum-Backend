@@ -50,3 +50,15 @@
 | Aceptacion funcional | PASS - 204; 404 posterior; 404 ajeno |
 | Rollback | LT v13 / release `v0.17.0+87aac167fe28` |
 | Limitaciones | multi-AZ limitada (ambas EC2 en us-east-2a); E015 pendiente legal; SES pendiente |
+
+<!-- NOTA_VIGENCIA_AUDITORIA_SEMANTICA -->
+### Nota de vigencia - auditoria semantica (2026-11-21)
+
+- Estado: `DISCREPANCIA_DOCUMENTAL_REGISTRADA`.
+- Hallazgo: `spec.md` exige soft delete o reverso auditable y la implementacion borra fisicamente el item y su puntero. Requiere RFC/decision humana; no se corrige en este PR documental.
+- Los bloques anteriores de este archivo conservan el estado historico del endpoint y no se reescriben.
+- Estado vigente segun la auditoria semantica del PR #142 (2026-11-21):
+- Evidencia funcional agregada: `sdd/_control/H08/CIERRE_OLEADA_2.md` y `memoria.md`, secciones "Oleada 2 - registro por endpoint" y "Cierre documental Oleada 2".
+- Release inicial desplegada: `v0.17.0+87aac167fe28`. Release correctiva del hotfix E014: `v0.18.0+9722224c15c5`.
+- Evidencia funcional individual por endpoint: `EVIDENCIA_FUNCIONAL_INDIVIDUAL_NO_LOCALIZADA`.
+- Cualquier contradiccion entre bloques anteriores y esta nota se resuelve a favor de esta nota.

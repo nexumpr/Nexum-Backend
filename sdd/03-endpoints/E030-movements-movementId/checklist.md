@@ -53,3 +53,15 @@
 
 - [x] `E030-CT13` Movimiento vinculado a aportación: 409 sin escritura; movimiento independiente: 200 (regresión T-1).
 
+
+<!-- NOTA_VIGENCIA_AUDITORIA_SEMANTICA -->
+### Nota de vigencia - auditoria semantica (2026-11-21)
+
+- Estado: `AUDITADA_SEMANTICA_CON_OBSERVACIONES`.
+- Hallazgo: El cuerpo `{}` se trata como no-op 200; E041 lo rechaza con 400. Asimetria registrada, sin cambio de codigo en este PR.
+- Los bloques anteriores de este archivo conservan el estado historico del endpoint y no se reescriben.
+- Estado vigente segun la auditoria semantica del PR #142 (2026-11-21):
+- Evidencia funcional agregada: `sdd/_control/H08/CIERRE_OLEADA_2.md` y `memoria.md`, secciones "Oleada 2 - registro por endpoint" y "Cierre documental Oleada 2".
+- Release inicial desplegada: `v0.17.0+87aac167fe28`. Release correctiva del hotfix E014: `v0.18.0+9722224c15c5`.
+- Evidencia funcional individual por endpoint: `EVIDENCIA_FUNCIONAL_INDIVIDUAL_NO_LOCALIZADA`.
+- Cualquier contradiccion entre bloques anteriores y esta nota se resuelve a favor de esta nota.

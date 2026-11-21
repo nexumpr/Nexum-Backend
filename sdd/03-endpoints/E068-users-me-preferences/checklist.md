@@ -27,3 +27,13 @@
 - [ ] Se consulta en el detalle y en el listado con el mismo tipo y formato.
 - [ ] Se puede editar (si aplica) y la edicion se refleja al releer.
 - [ ] Validacion negativa devuelve 422 sin filtrar datos internos.
+
+<!-- NOTA_VIGENCIA_AUDITORIA_SEMANTICA -->
+### Nota de vigencia - auditoria semantica (2026-11-21)
+
+- Estado: `AUDITADA_SEMANTICA_CON_OBSERVACIONES`.
+- Hallazgo: 429 no emitido; el GET materializa defaults (escritura) segun D-E068.
+- Los bloques anteriores de este archivo conservan el estado historico del endpoint y no se reescriben.
+- Evidencia: `memoria.md:1956-1958` (release v0.16.0) y `memoria.md:1968` (29/29 post-hotfix); Gate `GATE_H08E_OLEADA_1.md`.
+- Releases: `v0.16.0+7ad1f4a9d6a2` y hotfix `v0.16.1+615ac1c734f2`. El codigo de estos 15 endpoints no cambio desde `7ad1f4a9`.
+- Cualquier contradiccion entre bloques anteriores y esta nota se resuelve a favor de esta nota.

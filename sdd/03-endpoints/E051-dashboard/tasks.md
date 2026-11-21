@@ -44,3 +44,14 @@
 
 - Corregido y desplegado en `v0.19.2+3098f379d7ab`; HTTPS real y DynamoDB consistente.
 - Evidencia: `/health/live` 200, `/health/ready` 200; ASG 2/2/2; dos targets healthy.
+
+<!-- NOTA_VIGENCIA_AUDITORIA_SEMANTICA -->
+### Nota de vigencia - auditoria semantica (2026-11-21)
+
+- Estado: `DISCREPANCIA_DOCUMENTAL_REGISTRADA`.
+- Hallazgo: `spec.md`/`plan.md`/`tasks.md` exigen cache Redis; RFC-022 D-W3-07 y el codigo calculan directo desde DynamoDB. Discrepancia normativa registrada.
+- Los bloques anteriores de este archivo conservan el estado historico del endpoint y no se reescriben.
+- Evidencia: `memoria.md:2238` (13/13 en v0.19.2) y `GATE_H08E_OLEADA_3.md` §12.1; CI de main run 44838845962.
+- Norma aplicable: RFC-022 v1.2.1 (APPROVED). Release inicial `v0.19.0+3baa15840a2e`; release vigente `v0.19.2+3098f379d7ab`.
+- Artefacto HTTP individual por endpoint: `EVIDENCIA_FUNCIONAL_INDIVIDUAL_NO_LOCALIZADA`; la certificacion consta de forma agregada en memoria y Gate.
+- Cualquier contradiccion entre bloques anteriores y esta nota se resuelve a favor de esta nota.

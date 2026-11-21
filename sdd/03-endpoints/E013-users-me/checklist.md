@@ -19,3 +19,13 @@
 - [ ] Dependencias del cliente Mobile nunca constituyen Gate del Backend.
 
 **Criterio de cierre:** ninguna casilla operativa se marca por generar este documento; la documentación contractual se valida con el auditor del ZIP y queda REVIEW hasta aprobación.
+
+<!-- NOTA_VIGENCIA_AUDITORIA_SEMANTICA -->
+### Nota de vigencia - auditoria semantica (2026-11-21)
+
+- Estado: `AUDITADA_SEMANTICA_CON_OBSERVACIONES`.
+- Hallazgo: 429 no emitido; el ETag de respuesta no esta declarado en OpenAPI.
+- Los bloques anteriores de este archivo conservan el estado historico del endpoint y no se reescriben.
+- Evidencia: `memoria.md:1956-1958` (release v0.16.0) y `memoria.md:1968` (29/29 post-hotfix); Gate `GATE_H08E_OLEADA_1.md`.
+- Releases: `v0.16.0+7ad1f4a9d6a2` y hotfix `v0.16.1+615ac1c734f2`. El codigo de estos 15 endpoints no cambio desde `7ad1f4a9`.
+- Cualquier contradiccion entre bloques anteriores y esta nota se resuelve a favor de esta nota.

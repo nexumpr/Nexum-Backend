@@ -85,3 +85,11 @@
 | Aceptacion funcional | PASS - 202 + recibo; login/refresh 401; PURGED verificado; particion sin residuos; usuario B intacto |
 | Rollback | LT v13 / release `v0.17.0+87aac167fe28` |
 | Limitaciones | multi-AZ limitada (ambas EC2 en us-east-2a); E015 pendiente legal; SES pendiente |
+
+<!-- NOTA_VIGENCIA_AUDITORIA_SEMANTICA -->
+### Nota de vigencia - auditoria semantica (2026-11-21)
+
+- Estado: `AUDITADA_SEMANTICA_CONFORME`.
+- Hallazgo: Los bloques de tasks/checklist mezclaban AWS_DEPLOYED=NO con el cierre PASS. El cierre es autoritativo: certificacion E014 42/42 con `PURGED` en `CIERRE_OLEADA_2.md` y `memoria.md:2176`; release inicial v0.17.0, verificacion PURGED en v0.18.0/v0.19.1.
+- Los bloques anteriores conservan el estado historico y no se reescriben.
+- Cualquier contradiccion se resuelve a favor de esta nota.
