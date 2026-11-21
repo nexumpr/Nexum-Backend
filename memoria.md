@@ -2240,3 +2240,13 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Smoke Oleadas 1/2:** login 200, refresh 200, logout 204, relogin 200, E012 200, E015 200, E022 200.
 - **Rollback:** LT v16 y release `v0.19.1+ba06b833c848` conservados.
 - **Estado:** `OLEADA_3_AWS_DEPLOYED` y `OLEADA_3_FUNCTIONAL_VERIFIED` para los 13 endpoints. No se inicia Oleada 4; SES, E015 y multi-AZ intactos.
+
+
+### Matriz maestra 54/75 y límites documentales (2026-11-21)
+
+- Creada `sdd/_control/H08/MATRIZ_MAESTRA_54_ENDPOINTS.md` con los 54 E-ID implementados (E001–E020 elegibles, Oleadas 1–3), sus 75 contratos de referencia, PR, release, estado CI/AWS/HTTPS/funcional, dependencias y evidencias.
+- 54 fichas individuales: `spec.md`, `plan.md`, `tasks.md` y `checklist.md` de cada E-ID. La matriz es el índice de trazabilidad; no sustituye las fichas.
+- 13/13 endpoints de Oleada 3 verificados en `v0.19.2+3098f379d7ab`; E037 conserva evidencia positiva previa y código sin cambios. E014 `PURGED` conservado.
+- E006/E011 quedan `PARTIAL` por SES sandbox; no se declaran funcionalmente completos. E005/E010 tienen evidencia de envío, no de recepción en buzón.
+- 21 operaciones restantes (E021, E052–E067, E072–E075) no están implementadas ni documentadas como tales; Oleada 4 bloqueada.
+- Limitación multi-AZ: ambas instancias en `us-east-2a`; no se declara multi-AZ efectiva.

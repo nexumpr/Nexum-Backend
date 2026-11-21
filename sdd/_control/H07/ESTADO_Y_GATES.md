@@ -70,3 +70,11 @@ VPC Origin → ALB interno HTTP:80 → 2 instancias Go. **No** autoriza Terrafor
 - **IMPLEMENTED = TRUE · MERGED = TRUE · DEPLOYED = TRUE · FUNCTIONAL_VERIFIED = TRUE** para E001-E011 sobre v0.15.0.
 - Registro completo en sdd/_control/H08/GATE_H08E_E007_E011_DESPLIEGUE_AWS.md.
 - Rollback disponible en v0.14.0+7869b1b96648. Aceptacion Android NO confirmada. E012+ NOT_AUTHORIZED.
+
+
+## Cierre documental Oleada 3 — 2026-11-21
+
+- `v0.19.2+3098f379d7ab` desplegada; LT v17; ASG 2/2/2; 2/2 targets healthy.
+- 54/75 operaciones implementadas; matriz maestra en `sdd/_control/H08/MATRIZ_MAESTRA_54_ENDPOINTS.md`.
+- 13/13 endpoints de Oleada 3 funcionales en AWS; E014 `PURGED`; E006/E011 `PARTIAL` por SES.
+- Oleada 4 no autorizada.
