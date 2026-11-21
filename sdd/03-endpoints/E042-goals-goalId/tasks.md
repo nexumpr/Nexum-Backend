@@ -40,3 +40,9 @@
 - Correccion: declarar `:one` como Number. La condicion de version y `activeContributions` se conserva.
 - Prueba de regresion: `TestE042UpdateItemDeclaraTodosLosValores` captura el `UpdateItemInput` real y exige que todos los marcadores tengan valor.
 - Estado: corregido en rama de hotfix; AWS pendiente de release y certificacion.
+
+
+## Verificación AWS v0.19.2 (2026-11-21)
+
+- Corregido y desplegado en `v0.19.2+3098f379d7ab`; HTTPS real y DynamoDB consistente.
+- Evidencia: `/health/live` 200, `/health/ready` 200; ASG 2/2/2; dos targets healthy.

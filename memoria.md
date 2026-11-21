@@ -2230,3 +2230,13 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 
 - `DeleteGoal` usaba `ADD #version :one` sin declarar `:one`; DynamoDB devolvia `ValidationException` y el endpoint respondia 503 tras revertir la aportacion.
 - Corregido con `:one` Number y prueba que valida todos los marcadores del `UpdateItemInput`. AWS pendiente de release.
+
+
+### Cierre funcional Oleada 3 — v0.19.2+3098f379d7ab (2026-11-21)
+
+- **Release desplegada:** `v0.19.2+3098f379d7ab`; main `3098f379d7abd75499cebad71100d043005bce8b`; binario ARM64 22 081 768 B SHA-256 `acd45cf952aec89211ff92a5c5bcd3c4600ed0887d7196b134f48b34ac553213`; unidad `6fa4d5fb...05cc`; LT **v17**; ASG **2/2/2**; dos targets healthy; `/health/live` y `/health/ready` 200 con DynamoDB y Redis UP.
+- **13/13 endpoints funcionales en AWS:** E020, E026, E037, E042, E043, E044, E045, E046, E047, E048, E049, E050 y E051. Evidencia HTTPS y DynamoDB real con usuarios sintéticos; E042 204/409/404, tombstone `deleted=true`, `status=archived`, versión incrementada, aislamiento y concurrencia; E026/E050/E051 coherentes; E047 reversión/replay/409.
+- **E014:** verificado en v0.19.0/v0.19.1 con 202, `sessionsRevoked=true`, login posterior 401 y único `DELETION#` con `state=PURGED`. No se repite la eliminación.
+- **Smoke Oleadas 1/2:** login 200, refresh 200, logout 204, relogin 200, E012 200, E015 200, E022 200.
+- **Rollback:** LT v16 y release `v0.19.1+ba06b833c848` conservados.
+- **Estado:** `OLEADA_3_AWS_DEPLOYED` y `OLEADA_3_FUNCTIONAL_VERIFIED` para los 13 endpoints. No se inicia Oleada 4; SES, E015 y multi-AZ intactos.

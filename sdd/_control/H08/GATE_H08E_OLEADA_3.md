@@ -263,3 +263,11 @@ vinculantes de la auditoría que dio origen a la v1.2.0:
    y una aportación revertida no cuenta como ahorro activo.
 10. **E043 — suma exacta:** la v1.2.1 exige `Σ allocations == amount` y paridad estructural
     con E044; el preview no puede ser más permisivo que el alta.
+
+
+## Cierre funcional AWS — 2026-11-21
+
+- Release `v0.19.2+3098f379d7ab`, main `3098f379d7abd75499cebad71100d043005bce8b`, LT v17, ASG 2/2/2, dos targets healthy.
+- 13/13 endpoints de Oleada 3 verificados por HTTPS con DynamoDB real y usuarios sintéticos.
+- E014 conserva evidencia `PURGED`; no se repite.
+- `OLEADA_3_AWS_DEPLOYED` y `OLEADA_3_FUNCTIONAL_VERIFIED`. Sin Oleada 4.

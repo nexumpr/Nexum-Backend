@@ -34,3 +34,9 @@
 - Correccion: declarar `:one` en la actualizacion de la aportacion. La transaccion sigue siendo atomica y condicionada.
 - Prueba de regresion: `TestE047StoreExpresionDeclaraTodosLosValores` captura `TransactWriteItemsInput` y exige que todo marcador usado en las expresiones tenga valor declarado.
 - Estado: corregido en rama de hotfix; AWS pendiente de nueva release y certificacion.
+
+
+## Verificación AWS v0.19.2 (2026-11-21)
+
+- Corregido y desplegado en `v0.19.2+3098f379d7ab`; HTTPS real y DynamoDB consistente.
+- Evidencia: `/health/live` 200, `/health/ready` 200; ASG 2/2/2; dos targets healthy.

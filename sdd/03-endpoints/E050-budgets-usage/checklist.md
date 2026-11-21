@@ -34,3 +34,9 @@
 - Correccion: `BETWEEN :from AND :to` con descarte explicito del borde superior para conservar el intervalo `[from, to)` y paginacion por `LastEvaluatedKey`.
 - Prueba de regresion: `tests/unit/dynamo/query_condition_regression_test.go` captura la `QueryInput` efectiva, exige `BETWEEN` y comprueba que el borde superior no se contabiliza.
 - Estado: corregido en rama de hotfix; AWS pendiente de nueva release y certificacion.
+
+
+## Verificación AWS v0.19.2 (2026-11-21)
+
+- Corregido y desplegado en `v0.19.2+3098f379d7ab`; HTTPS real y DynamoDB consistente.
+- Evidencia: `/health/live` 200, `/health/ready` 200; ASG 2/2/2; dos targets healthy.

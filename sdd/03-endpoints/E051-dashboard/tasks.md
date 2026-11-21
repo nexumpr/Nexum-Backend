@@ -38,3 +38,9 @@
 
 - El 503 de E051 provenia del resumen financiero compartido (E026) y de la misma consulta invalida; `DashboardStore` usa `begins_with` y no requiere cambio propio.
 - Sin cambio de codigo en E051. Se verificara en la certificacion posterior a la release correctiva.
+
+
+## Verificación AWS v0.19.2 (2026-11-21)
+
+- Corregido y desplegado en `v0.19.2+3098f379d7ab`; HTTPS real y DynamoDB consistente.
+- Evidencia: `/health/live` 200, `/health/ready` 200; ASG 2/2/2; dos targets healthy.
