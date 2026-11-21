@@ -2250,3 +2250,12 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - E006/E011 quedan `PARTIAL` por SES sandbox; no se declaran funcionalmente completos. E005/E010 tienen evidencia de envío, no de recepción en buzón.
 - 21 operaciones restantes (E021, E052–E067, E072–E075) no están implementadas ni documentadas como tales; Oleada 4 bloqueada.
 - Limitación multi-AZ: ambas instancias en `us-east-2a`; no se declara multi-AZ efectiva.
+
+
+### Corrección de auditoría documental (2026-11-21)
+
+- La matriz maestra se corrigió para no asignar `HTTPS=YES`, `Funcional=YES`, `CI=PASS` o `AWS=YES` por defecto. Cada fila distingue `DEPLOYED`, `CI main`, `HTTPS`, `Funcional` y `Evidencia`.
+- Se añadió `MATRIZ_AUDITORIA_54_ENDPOINTS.md` con 54 filas: **14 fichas con revisión semántica profunda** (13 de Oleada 3 + E014) y **40 fichas históricas con revisión estructural/contractual**, marcadas `REVISION_SEMANTICA_PENDIENTE`.
+- **No se declara `DOCUMENTACION_COMPLETA` en sentido semántico para las 40 fichas históricas.** No se reescribieron specs aprobadas sin una discrepancia comprobada.
+- E006/E011 siguen `PARTIAL` por SES; E005/E010 tienen aceptación SES y `MessageId`, no recepción en buzón. No se modificó SES.
+- La matriz conserva v0.19.2, LT v17, ASG 2/2/2, 2/2 targets, 13/13 de Oleada 3 y E014 `PURGED`.
