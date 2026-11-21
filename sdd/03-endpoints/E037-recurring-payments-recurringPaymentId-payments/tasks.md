@@ -33,3 +33,14 @@
 - **Pruebas reales:** `go build ./...`, `go vet ./...`, `go test ./... -count=1` PASS en local; suites de aplicación, adaptador y transporte; prueba de categorías del catálogo.
 - **PR:** #124, HEAD `c4f7ee3dc292c91cac29ad2628c09d7401321f0d` (más la corrección U1000 y las pruebas de registro).
 - **Pendiente:** CI Linux, certificación HTTPS y despliegue. No se declara `AWS_VERIFIED`.
+
+<!-- NOTA_VIGENCIA_AUDITORIA_SEMANTICA -->
+### Nota de vigencia - auditoria semantica (2026-11-21)
+
+- Estado: `AUDITADA_SEMANTICA_CON_OBSERVACIONES`.
+- Hallazgo: Evidencia positiva previa no localizada como artefacto individual; el codigo no cambio en v0.19.2 y la ruta esta montada.
+- Los bloques anteriores de este archivo conservan el estado historico del endpoint y no se reescriben.
+- Evidencia: `memoria.md:2238` (13/13 en v0.19.2) y `GATE_H08E_OLEADA_3.md` §12.1; CI de main run 44838845962.
+- Norma aplicable: RFC-022 v1.2.1 (APPROVED). Release inicial `v0.19.0+3baa15840a2e`; release vigente `v0.19.2+3098f379d7ab`.
+- Artefacto HTTP individual por endpoint: `EVIDENCIA_FUNCIONAL_INDIVIDUAL_NO_LOCALIZADA`; la certificacion consta de forma agregada en memoria y Gate.
+- Cualquier contradiccion entre bloques anteriores y esta nota se resuelve a favor de esta nota.

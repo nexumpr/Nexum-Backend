@@ -43,3 +43,13 @@
   _Dos instancias **lógicas** independientes sobre el mismo almacén (`TestE004RevocacionObservableEnDosInstancias`, `TestE004HTTPRevocacionVisibleEntreInstancias`). En AWS: **dos EC2 reales en LT v5** e `InService`/`Healthy`, con la sesión en DynamoDB compartido; **no** se declara prueba cruzada instrumentada porque CloudFront/ALB no exponen qué nodo atendió cada petición._
 - [x] `E004-CT06` Revocación/rotación en nodo A persiste y es observable inmediatamente en nodo B; token reutilizado rechazado.
   _Cubierto por las pruebas anteriores más `TestE004ReplayConserva409` (replay sigue siendo 409) y `TestE004RotacionPreviaNoInvalidaAccessToken`._
+
+<!-- NOTA_VIGENCIA_AUDITORIA_SEMANTICA -->
+### Nota de vigencia - auditoria semantica (2026-11-21)
+
+- Estado: `AUDITADA_SEMANTICA_CON_OBSERVACIONES`.
+- Hallazgo: `spec.md`/`plan.md` dicen que la revocacion usa Redis y DynamoDB; el codigo decide solo DynamoDB. La cabecera del checklist decia NOT_RUN.
+- Los bloques anteriores de este archivo conservan el estado historico del endpoint y no se reescriben.
+- Evidencia: `sdd/_control/H08/GATE_H08E_E007_E011_DESPLIEGUE_AWS.md` §4 y los Gates especificos de E001-E006; `memoria.md` cierre E001/E002 y v0.15.0.
+- Release inicial: ver la matriz de auditoria del PR #142. Ultima verificacion funcional agregada: `v0.15.0+8f13c86d2ca0`.
+- Cualquier contradiccion entre bloques anteriores y esta nota se resuelve a favor de esta nota.

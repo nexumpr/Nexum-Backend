@@ -29,3 +29,13 @@ cuerpo. **AWS/HTTP público:** `NOT_RUN`. Gate: `sdd/_control/H08/GATE_H08E_E004
 
 **Criterio de cierre:** ninguna casilla se marca por escribir el documento. `IMPLEMENTED_LOCAL`
 no es `MERGED`, ni `DEPLOYED`, ni `AWS_VERIFIED`.
+
+<!-- NOTA_VIGENCIA_AUDITORIA_SEMANTICA -->
+### Nota de vigencia - auditoria semantica (2026-11-21)
+
+- Estado: `AUDITADA_SEMANTICA_CON_OBSERVACIONES`.
+- Hallazgo: `spec.md`/`plan.md` dicen que la revocacion usa Redis y DynamoDB; el codigo decide solo DynamoDB. La cabecera del checklist decia NOT_RUN.
+- Los bloques anteriores de este archivo conservan el estado historico del endpoint y no se reescriben.
+- Evidencia: `sdd/_control/H08/GATE_H08E_E007_E011_DESPLIEGUE_AWS.md` §4 y los Gates especificos de E001-E006; `memoria.md` cierre E001/E002 y v0.15.0.
+- Release inicial: ver la matriz de auditoria del PR #142. Ultima verificacion funcional agregada: `v0.15.0+8f13c86d2ca0`.
+- Cualquier contradiccion entre bloques anteriores y esta nota se resuelve a favor de esta nota.

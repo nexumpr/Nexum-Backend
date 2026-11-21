@@ -2230,3 +2230,42 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 
 - `DeleteGoal` usaba `ADD #version :one` sin declarar `:one`; DynamoDB devolvia `ValidationException` y el endpoint respondia 503 tras revertir la aportacion.
 - Corregido con `:one` Number y prueba que valida todos los marcadores del `UpdateItemInput`. AWS pendiente de release.
+
+
+### Cierre funcional Oleada 3 — v0.19.2+3098f379d7ab (2026-11-21)
+
+- **Release desplegada:** `v0.19.2+3098f379d7ab`; main `3098f379d7abd75499cebad71100d043005bce8b`; binario ARM64 22 081 768 B SHA-256 `acd45cf952aec89211ff92a5c5bcd3c4600ed0887d7196b134f48b34ac553213`; unidad `6fa4d5fb...05cc`; LT **v17**; ASG **2/2/2**; dos targets healthy; `/health/live` y `/health/ready` 200 con DynamoDB y Redis UP.
+- **13/13 endpoints funcionales en AWS:** E020, E026, E037, E042, E043, E044, E045, E046, E047, E048, E049, E050 y E051. Evidencia HTTPS y DynamoDB real con usuarios sintéticos; E042 204/409/404, tombstone `deleted=true`, `status=archived`, versión incrementada, aislamiento y concurrencia; E026/E050/E051 coherentes; E047 reversión/replay/409.
+- **E014:** verificado en v0.19.0/v0.19.1 con 202, `sessionsRevoked=true`, login posterior 401 y único `DELETION#` con `state=PURGED`. No se repite la eliminación.
+- **Smoke Oleadas 1/2:** login 200, refresh 200, logout 204, relogin 200, E012 200, E015 200, E022 200.
+- **Rollback:** LT v16 y release `v0.19.1+ba06b833c848` conservados.
+- **Estado:** `OLEADA_3_AWS_DEPLOYED` y `OLEADA_3_FUNCTIONAL_VERIFIED` para los 13 endpoints. No se inicia Oleada 4; SES, E015 y multi-AZ intactos.
+
+
+### Matriz maestra 54/75 y límites documentales (2026-11-21)
+
+- Creada `sdd/_control/H08/MATRIZ_MAESTRA_54_ENDPOINTS.md` con los 54 E-ID implementados (E001–E020 elegibles, Oleadas 1–3), sus 75 contratos de referencia, PR, release, estado CI/AWS/HTTPS/funcional, dependencias y evidencias.
+- 54 fichas individuales: `spec.md`, `plan.md`, `tasks.md` y `checklist.md` de cada E-ID. La matriz es el índice de trazabilidad; no sustituye las fichas.
+- 13/13 endpoints de Oleada 3 verificados en `v0.19.2+3098f379d7ab`; E037 conserva evidencia positiva previa y código sin cambios. E014 `PURGED` conservado.
+- E006/E011 quedan `PARTIAL` por SES sandbox; no se declaran funcionalmente completos. E005/E010 tienen evidencia de envío, no de recepción en buzón.
+- 21 operaciones restantes (E021, E052–E067, E072–E075) no están implementadas ni documentadas como tales; Oleada 4 bloqueada.
+- Limitación multi-AZ: ambas instancias en `us-east-2a`; no se declara multi-AZ efectiva.
+
+
+### Corrección de auditoría documental (2026-11-21)
+
+- La matriz maestra se corrigió para no asignar `HTTPS=YES`, `Funcional=YES`, `CI=PASS` o `AWS=YES` por defecto. Cada fila distingue `DEPLOYED`, `CI main`, `HTTPS`, `Funcional` y `Evidencia`.
+- Se añadió `MATRIZ_AUDITORIA_54_ENDPOINTS.md` con 54 filas: **14 fichas con revisión semántica profunda** (13 de Oleada 3 + E014) y **40 fichas históricas con revisión estructural/contractual**, marcadas `REVISION_SEMANTICA_PENDIENTE`.
+- **No se declara `DOCUMENTACION_COMPLETA` en sentido semántico para las 40 fichas históricas.** No se reescribieron specs aprobadas sin una discrepancia comprobada.
+- E006/E011 siguen `PARTIAL` por SES; E005/E010 tienen aceptación SES y `MessageId`, no recepción en buzón. No se modificó SES.
+- La matriz conserva v0.19.2, LT v17, ASG 2/2/2, 2/2 targets, 13/13 de Oleada 3 y E014 `PURGED`.
+### Auditoria semantica de las 54 fichas - PR #142 (2026-11-21)
+
+- **Alcance:** 54/54 fichas auditadas (11 de E001-E011, 15 de Oleada 1, 15 de Oleada 2, 13 de Oleada 3); 52 con nota de vigencia en `tasks.md`/`checklist.md`; E001 y E002 sin cambios.
+- **Herramienta:** `herramientas/verificar_auditoria_54.py` devuelve `AUDITORIA_54_PASS` (54 filas, 54 auditorias, 0 problemas). Comprueba duplicados, fichas, referencias de tests, versiones con fuente, SES y mezcla historico/vigente.
+- **Correcciones de matriz:** los PR #132, #134, #135, #136 y #137 estan CLOSED sin merge; el codigo entro por #139. Primera release de Oleada 2 = `v0.17.0+87aac167fe28`; E042 = `v0.19.2+3098f379d7ab`; E026/E047/E050/E051 = `v0.19.1+ba06b833c848`; Oleada 1 = `v0.16.0+7ad1f4a9d6a2`. Dependencias por endpoint: E020 sin Redis ni cuota; E015/E022/E023/E070/E071 sin DynamoDB.
+- **SES:** E005 y E010 quedan `PARTIAL_SES` (envio aceptado; E005 con MessageId y Delivery=1; E010 sin MessageId; recepcion no verificada). E006 y E011 no envian correo y su flujo propio esta verificado. No se modifico SES.
+- **Hallazgos semanticos nuevos, registrados y no corregidos:** E015 `NO_CONFORME_SEMANTICA` (el aviso v2 declara no disponibles funciones ya desplegadas; la v3 sigue sin Gate legal y tambien omite funciones); E070 `NO_CONFORME_SEMANTICA` (faq-06 afirma edicion de correo inexistente, faq-09 limita a cuatro frecuencias, faq-10 promete notificaciones y alertas no implementadas).
+- **Discrepancias documentales/contractuales registradas:** E002 sin 401 en OpenAPI y con 409/422 no emitidos; E005 con error envelope sin traceId y 413 no declarado; E008/E009 con 429 declarado y no emitido; E011 con token ligado solo a userId; E031 con borrado fisico frente a soft delete; E041 con `{}` 400; E051 con cache Redis exigida en spec y descartada por RFC-022 D-W3-07; D-429 sin cablear en 9 endpoints; ETag no declarado en E013/E024/E025/E069; E069 acepta UTC pese a D-E069; E025 admite `0.00` en el patron y devuelve 422.
+- **Evidencia:** E019 y E037 conservan `EVIDENCIA_FUNCIONAL_INDIVIDUAL_NO_LOCALIZADA`; Oleada 3 se acredita de forma agregada en `memoria.md:2238` y `GATE_H08E_OLEADA_3.md` §12.1, sin artefacto HTTP individual versionado.
+- **Sin cambios funcionales:** no se modifico codigo Go, tests, OpenAPI, Terraform, IAM, CI/CD, SES ni AWS. `v0.19.2+3098f379d7ab`, LT v17, ASG 2/2/2, 2/2 targets y E014 `PURGED` permanecen intactos. Oleada 4 no autorizada.

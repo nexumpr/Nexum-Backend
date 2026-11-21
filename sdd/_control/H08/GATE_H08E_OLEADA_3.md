@@ -263,3 +263,17 @@ vinculantes de la auditoría que dio origen a la v1.2.0:
    y una aportación revertida no cuenta como ahorro activo.
 10. **E043 — suma exacta:** la v1.2.1 exige `Σ allocations == amount` y paridad estructural
     con E044; el preview no puede ser más permisivo que el alta.
+
+
+## Cierre funcional AWS — 2026-11-21
+
+- Release `v0.19.2+3098f379d7ab`, main `3098f379d7abd75499cebad71100d043005bce8b`, LT v17, ASG 2/2/2, dos targets healthy.
+- 13/13 endpoints de Oleada 3 verificados por HTTPS con DynamoDB real y usuarios sintéticos.
+- E014 conserva evidencia `PURGED`; no se repite.
+- `OLEADA_3_AWS_DEPLOYED` y `OLEADA_3_FUNCTIONAL_VERIFIED`. Sin Oleada 4.
+## Nota de vigencia documental (2026-11-21)
+
+- **T-1:** el PR #123 esta MERGED (verificado con `gh`), aunque la tabla de la seccion 12.1 conserve `PENDIENTE`.
+- Los 13 endpoints estan auditados semanticamente contra codigo, contrato y tests. La evidencia funcional es agregada (`memoria.md:2238`); no existe artefacto HTTP individual versionado.
+- E026/E047/E050/E051 empiezan a tener evidencia positiva en `v0.19.1+ba06b833c848`; E042 en `v0.19.2+3098f379d7ab` (hotfix #141).
+- E051 conserva una discrepancia normativa: `spec.md`/`plan.md`/`tasks.md` exigen cache Redis y RFC-022 D-W3-07 la descarta. No se edito `spec.md`.
