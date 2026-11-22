@@ -39,8 +39,11 @@ func NewAnalyticsInsightsHandler(
 	if service == nil || tokens == nil || sessions == nil {
 		return h
 	}
-	autenticado := middleware.AuthenticateBearerWithSession(tokens, sessions)(http.HandlerFunc(h.serve))
-	h.protected = LimitarPorUsuario(limitador, "analytics", autenticado.ServeHTTP)
+	// La cuota se envuelve ANTES de la autenticación para que, cuando se ejecute, el
+	// contexto ya contenga el `sub` verificado; si se envolviera al revés, no habría
+	// identidad y el limitador nunca se aplicaría.
+	conCuota := LimitarPorUsuarioContrato(limitador, "analytics", h.serve)
+	h.protected = middleware.AuthenticateBearerWithSession(tokens, sessions)(conCuota)
 	return h
 }
 

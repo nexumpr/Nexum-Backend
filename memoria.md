@@ -2293,3 +2293,15 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Estados:** `CODE_IMPLEMENTED=YES`, `CI_LOCAL=PASS`, `CI_LINUX=PENDIENTE`, `AWS_DEPLOYED=NO`, `HTTPS_VERIFIED=NO`, `FUNCTIONAL_VERIFIED=NO`.
 - **Siguiente aprobacion:** confirmacion para continuar con E053 en la misma rama y acceso Firebase/applicationId/dispositivo cuando se llegue a E059; Gate ML-155 antes de declarar E055.
 
+
+### Checkpoint 2026-11-22 â€” E053 implementado en `liz-oleada4`
+
+- **Autorizacion:** instruccion humana expresa de aplicar el mismo estandar a todos los endpoints de la Oleada 4, con ejecucion spec por spec desde `liz-oleada4`. No autoriza merge, AWS ni despliegue.
+- **Cambios E053:** `cmd/server/e053.go`, `internal/application/analytics/categories.go`, `internal/transport/http/analytics_categories_handler.go`, `internal/transport/http/limitador_contrato.go`, tests `categories_test.go` y `analytics_categories_test.go`. Se refactorizo `service.go` para compartir `periodoValidado` y `loadMovements` entre E052 y E053. Sin cambios en `spec.md`, `plan.md` ni OpenAPI.
+- **Funcionalidad real:** distribucion por categoria sobre gastos persistidos del titular; importes int64 centavos, `amount` decimal canonico, porcentajes 0-100 por mayor resto con suma exacta 100 y desempate deterministico, `currency=MXN`, periodo UTC, `Cache-Control: private, no-store`, `Query` acotada por usuario/mes sin Scan, agregacion multi-pagina, 503 fail-closed.
+- **Falla detectada y corregida:** el wrapper de cuota de E052 estaba FUERA de la autenticacion, por lo que no veia el `sub` y nunca limitaba. Se corrigio en E052 y E053 con `LimitarPorUsuarioContrato`, que ademas emite `RATE_LIMITED` segun H06/OpenAPI sin tocar el helper heredado ni tests de otros endpoints. Evidencia: `TestE053HTTPNegativas/cuota` PASS (429 + Retry-After).
+- **Pruebas reales ejecutadas:** `gofmt` aplicado; `go test ./internal/application/analytics ./tests/unit/transport ./cmd/server -run 'E053|E052' -count=1` PASS; `go vet ./...`, `go build ./...` y `go test ./... -count=1` PASS; validadores H06 y SDD PASS; baseline recalculado. `go test -race` NO EJECUTADO: requiere cgo/gcc ausente en Windows; CI Linux es la autoridad.
+- **Firebase/FCM recibido del responsable:** proyecto Spark creado, acceso delegado `perezlizeth489@gmail.com` con rol Editor, `applicationId=com.nexum.nexum`, emulador/dispositivo con Google Play Services listo. Se usara en E059/E063; credencial privada nunca en chat ni repo, se inyecta por secret store. Hermano `liz-oleada5` creado desde `liz-oleada4` para heredar FCM/codigo compartido.
+- **Estados:** `CODE_IMPLEMENTED=YES`, `CI_LOCAL=PASS`, `CI_LINUX=PENDIENTE`, `AWS_DEPLOYED=NO`, `HTTPS_VERIFIED=NO`, `FUNCTIONAL_VERIFIED=NO`.
+- **Siguiente:** E054 (patrones de gasto) en la misma rama; E055 queda supeditado al Gate ML-155.
+

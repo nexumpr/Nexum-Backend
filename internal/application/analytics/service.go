@@ -53,52 +53,13 @@ func (s *Service) Insights(ctx context.Context, userID, periodo string) (*Page, 
 	if titular == "" {
 		return nil, ErrUnauthorized
 	}
-	ahora := time.Now().UTC()
-	if s.now != nil {
-		ahora = s.now().UTC()
-	}
-	periodo, err := NormalizePeriod(periodo, ahora)
+	desde, hasta, err := s.periodoValidado(titular, periodo)
 	if err != nil {
 		return nil, err
 	}
-	desde, hasta, err := PeriodBounds(periodo)
+	movimientos, err := s.loadMovements(ctx, titular, desde, hasta)
 	if err != nil {
 		return nil, err
-	}
-
-	consulta := appMovements.ListQuery{
-		UserID:  titular,
-		Limit:   pageSize,
-		From:    desde,
-		HasFrom: true,
-		// ListMovements usa SK < To+1ms. Restar 1ms deja el límite exclusivo en el
-		// primer instante del mes siguiente, sin depender de caracteres centinela.
-		To:    hasta.Add(-time.Millisecond),
-		HasTo: true,
-	}
-
-	movimientos := make([]appMovements.Movement, 0, MinimumSamples)
-	startSK := ""
-	limite := s.maxPag
-	if limite <= 0 {
-		limite = maxPages
-	}
-	for pagina := 0; pagina < limite; pagina++ {
-		filas, siguiente, errLista := s.source.ListMovements(ctx, consulta, startSK, pageSize)
-		if errLista != nil {
-			return nil, traducirError(errLista)
-		}
-		movimientos = append(movimientos, filas...)
-		if strings.TrimSpace(siguiente) == "" {
-			break
-		}
-		if siguiente == startSK {
-			return nil, fmt.Errorf("%w: cursor sin progreso", ErrUnavailable)
-		}
-		startSK = siguiente
-		if pagina == limite-1 {
-			return nil, fmt.Errorf("%w: conjunto demasiado grande", ErrUnavailable)
-		}
 	}
 
 	pagina := &Page{
@@ -177,6 +138,66 @@ func insightID(userID, periodo, categoria string) string {
 	b[6] = (b[6] & 0x0f) | 0x50 // versión 5
 	b[8] = (b[8] & 0x3f) | 0x80 // variante RFC 4122
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+// periodoValidado normaliza `period` con el reloj inyectado y devuelve los límites UTC
+// del mes. Lo comparten E052 y E053 para que un mismo parámetro produzca exactamente el
+// mismo conjunto de movimientos en ambos endpoints.
+func (s *Service) periodoValidado(userID, periodo string) (time.Time, time.Time, error) {
+	ahora := time.Now().UTC()
+	if s != nil && s.now != nil {
+		ahora = s.now().UTC()
+	}
+	periodo, err := NormalizePeriod(periodo, ahora)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	return PeriodBounds(periodo)
+}
+
+// loadMovements recorre la partición del titular en páginas acotadas. Es la única
+// entrada de datos de E052 y E053: una Query por `USER#<sub>` con rango de mes, nunca
+// un Scan. Un corte antes del final devuelve ErrUnavailable para no calcular con datos
+// incompletos.
+func (s *Service) loadMovements(ctx context.Context, userID string, desde, hasta time.Time) ([]appMovements.Movement, error) {
+	if s == nil || s.source == nil {
+		return nil, ErrUnavailable
+	}
+	consulta := appMovements.ListQuery{
+		UserID:  userID,
+		Limit:   pageSize,
+		From:    desde,
+		HasFrom: true,
+		// ListMovements usa SK < To+1ms. Restar 1ms deja el límite exclusivo en el
+		// primer instante del mes siguiente, sin depender de caracteres centinela.
+		To:    hasta.Add(-time.Millisecond),
+		HasTo: true,
+	}
+
+	movimientos := make([]appMovements.Movement, 0, MinimumSamples)
+	startSK := ""
+	limite := s.maxPag
+	if limite <= 0 {
+		limite = maxPages
+	}
+	for pagina := 0; pagina < limite; pagina++ {
+		filas, siguiente, errLista := s.source.ListMovements(ctx, consulta, startSK, pageSize)
+		if errLista != nil {
+			return nil, traducirError(errLista)
+		}
+		movimientos = append(movimientos, filas...)
+		if strings.TrimSpace(siguiente) == "" {
+			return movimientos, nil
+		}
+		if siguiente == startSK {
+			return nil, fmt.Errorf("%w: cursor sin progreso", ErrUnavailable)
+		}
+		startSK = siguiente
+		if pagina == limite-1 {
+			return nil, fmt.Errorf("%w: conjunto demasiado grande", ErrUnavailable)
+		}
+	}
+	return movimientos, nil
 }
 
 func traducirError(err error) error {
