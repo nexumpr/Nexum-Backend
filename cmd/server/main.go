@@ -219,6 +219,19 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	}
 	montarOleada3(depsOleada3)
 
+	// Oleada 4: registro cerrado E052–E063. Hereda las mismas dependencias reales y
+	// sólo monta los E-ID con implementación presente en esta rama.
+	depsOleada4 := &dependenciasOleada4{
+		Router:     router,
+		Dynamo:     dynamoAPI,
+		Redis:      clienteRedis,
+		Tabla:      cfgDeps.TablaDynamoDB,
+		Logger:     logger,
+		Tokens:     verificadorTokens,
+		Authorizer: logoutStore,
+	}
+	montarOleada4(depsOleada4)
+
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
 	// Start bloquea hasta que el listener falla o se cierra; el canal transporta

@@ -1,29 +1,30 @@
 # Checklist de calidad — E052
 
-**Diseño H06:** review. **Implementación y evidencia:** NOT_RUN. **Respuesta prevista:** 200.
+**Estado:** `CODE_IMPLEMENTADO_LOCAL=SI` · `CI_LOCAL=PASS` · `CI_LINUX=PENDIENTE` · `AWS_DEPLOYED=NO` · `HTTPS_VERIFIED=NO` · `FUNCTIONAL_VERIFIED=NO`.
 
-- [ ] Firma del Gate H06 por el responsable; no confundir instalación con aprobación.
-- [ ] Método/path conservan el ID del inventario H04.
-- [ ] Payload válido/negativo, ejemplo y JSON Schema `N/A` revisados.
-- [ ] Respuesta `PageOfInsight` y errores de OpenAPI revisados.
-- [ ] Semántica de propiedad y JWT o excepción pública justificada.
-- [ ] Idempotencia no exigida específicamente y concurrencia resueltas.
-- [ ] DynamoDB tiene Get/Query/Transact, localizadores e índices, **nunca Scan**.
-- [ ] Redis invalidación/TTL/servicio real previsto; fallo seguro.
-- [ ] Montos decimales/cents y timestamps UTC/zonas IANA correctos donde aplican.
-- [ ] Pruebas de error 400/401/403/404/409/412/422/429/500/503 pertinentes al caso.
-- [ ] PII y secretos ausentes en logs, capturas y fixture.
-- [ ] Tests unitarios reales, contrato OpenAPI, integración Dynamo y HTTP: NOT_RUN ahora.
-- [ ] API en dos instancias, TLS público, CI/CD e IaC: NOT_RUN ahora.
-- [ ] Gate individual de release H08 y rollback aprobados antes de `terraform apply`.
-- [ ] Dependencias del cliente Mobile nunca constituyen Gate del Backend.
+- [x] Método/path conservan el ID del inventario H04 (`GET /api/v1/analytics/insights`, `nexum_e052`).
+- [x] Payload válido/negativo revisado: sin cuerpo; `period` validado con `^\d{4}-(0[1-9]|1[0-2])$`.
+- [x] Respuesta `PageOfInsight` y errores de OpenAPI revisados e implementados (`ErrorEnvelope`).
+- [x] Semántica de propiedad: `sub` verificado + sesión autoritativa + consulta `USER#<sub>`; dos sujetos probados.
+- [x] Idempotencia no exigida y concurrencia resuelta con Redis compartido y fail-closed de persistencia.
+- [x] DynamoDB usa `Get/Query`, nunca `Scan`; sin recursos ni índices nuevos.
+- [x] Redis: limitador real por usuario con TTL de ventana; sin caché de datos financieros.
+- [x] Montos en `int64` centavos y fechas UTC con límites de mes IANA-neutrales en el servidor.
+- [x] Pruebas de error 400/401/405/503/500 ejecutadas en local; 404/409/412/422 no aplican a esta operación de lectura sin recurso por ID.
+- [x] PII y secretos ausentes en logs, capturas y fixtures; `id` derivado por hash, nunca el `sub`.
+- [x] Tests unitarios, de transporte y validadores H06/SDD ejecutados en local con resultado PASS.
+- [x] `go vet ./...`, `go build ./...` y `go test ./... -count=1` PASS.
+- [ ] `go test -race`: **NOT_RUN_LOCAL** — requiere cgo/toolchain C ausente en Windows; CI Linux debe ejecutarlo.
+- [ ] API en dos instancias, TLS público, CI/CD y IaC: **NOT_RUN** sin Gate ni AWS.
+- [ ] Gate individual de release y rollback aprobados antes de `terraform apply`: **BLOQUEADO**.
+- [x] Dependencias del cliente Mobile no constituyeron Gate del Backend.
+- [x] Anexo PDF↔guía Oleada 4 aplicado en la guía externa; sin cambios a `spec.md`/`plan.md` ni OpenAPI.
 
-**Criterio de cierre:** ninguna casilla operativa se marca por generar este documento; la documentación contractual se valida con el auditor del ZIP y queda REVIEW hasta aprobación.
+## Criterios de aceptación A5
 
-## Criterios de aceptacion de la enmienda (A5)
+- [x] `enoughData` y `minimumSamples` aparecen en OpenAPI YAML/JSON y en la respuesta.
+- [x] Se devuelven en el listado con el mismo tipo y formato (no hay creación/edición en E052).
+- [x] Validación negativa de `period` devuelve 400 sin filtrar datos internos.
+- [ ] HTTP real post-despliegue: **BLOQUEADO** hasta autorización de release.
 
-- [ ] El campo aparece en el contrato OpenAPI (YAML y JSON en paridad).
-- [ ] Se persiste y se devuelve en la respuesta de creacion.
-- [ ] Se consulta en el detalle y en el listado con el mismo tipo y formato.
-- [ ] Se puede editar (si aplica) y la edicion se refleja al releer.
-- [ ] Validacion negativa devuelve 422 sin filtrar datos internos.
+**Cierre:** no se declara `PASS` de despliegue ni certificación funcional; la evidencia disponible es local y CI Linux queda como autoridad.
