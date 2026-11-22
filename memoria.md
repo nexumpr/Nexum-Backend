@@ -2305,3 +2305,12 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Estados:** `CODE_IMPLEMENTED=YES`, `CI_LOCAL=PASS`, `CI_LINUX=PENDIENTE`, `AWS_DEPLOYED=NO`, `HTTPS_VERIFIED=NO`, `FUNCTIONAL_VERIFIED=NO`.
 - **Siguiente:** E054 (patrones de gasto) en la misma rama; E055 queda supeditado al Gate ML-155.
 
+
+### Checkpoint 2026-11-22 â€” E054 implementado en `liz-oleada4`
+
+- **Cambios:** `cmd/server/e054.go`, `internal/application/analytics/patterns.go`, `internal/transport/http/analytics_patterns_handler.go`, tests `patterns_test.go` y `analytics_patterns_test.go`; `tasks.md`/`checklist.md` con evidencia. Sin cambios en spec/plan/OpenAPI.
+- **Funcionalidad real:** patrones de gasto verificables por categoria con muestra real minima de 3 movimientos y al menos 2 dias UTC distintos; `sampleSize` es el conteo exacto y `description` lo cita; se ignoran ingresos, importes no positivos (reversas) y periodos ajenos; sin probabilidades no calculadas. Query acotada por usuario/mes compartida, sin Scan; Redis como limitador con `RATE_LIMITED`.
+- **Pruebas reales:** targeted `go test -run E054` PASS (6 unitarias + 3 HTTP); `go vet ./...`, `go build ./...`, `go test ./... -count=1`, validadores H06 y SDD PASS; baseline recalculado. `go test -race` NOT_RUN_LOCAL por cgo/gcc ausente en Windows.
+- **Estados:** `CODE_IMPLEMENTED=YES`, `CI_LOCAL=PASS`, `CI_LINUX=PENDIENTE`, `AWS_DEPLOYED=NO`, `HTTPS_VERIFIED=NO`, `FUNCTIONAL_VERIFIED=NO`.
+- **Siguiente:** E055 (recomendaciones). Requiere Gate ML-155 antes de declarar ML aprobado; la implementacion sera K-Means real y no reglas fijas.
+
