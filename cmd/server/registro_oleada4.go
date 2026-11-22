@@ -11,6 +11,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	dynamoAdapter "github.com/nexumpr/Nexum-Backend/internal/adapters/dynamo"
+	appPrefs "github.com/nexumpr/Nexum-Backend/internal/application/notificationprefs"
+	appPushDevices "github.com/nexumpr/Nexum-Backend/internal/application/pushdevices"
 	"github.com/nexumpr/Nexum-Backend/internal/ports"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 )
@@ -25,6 +27,20 @@ type dependenciasOleada4 struct {
 	Logger     *slog.Logger
 	Tokens     ports.TokenProvider
 	Authorizer ports.SessionAuthorizer
+
+	// PushSealer cifra los tokens FCM con AES-GCM antes de persistirlos. Se
+	// construye desde una clave de entorno/secret store; sin él E059/E060
+	// responden 503 (fail-closed) y nunca escriben un token en claro.
+	PushSealer appPushDevices.TokenSealer
+
+	// CursorKey firma los cursores opacos de E061. Viene de una clave de entorno
+	// estable (32 bytes); sin ella los handlers responden 503 en vez de generar
+	// una clave efímera que invalidaría los cursores entre reinicios.
+	CursorKey []byte
+
+	// Preferencias es el mismo caso de uso expuesto por E057/E058. El worker FCM
+	// lo consulta antes de enviar; sin él no envía nada (opt-out por defecto).
+	Preferencias *appPrefs.Service
 }
 
 // montajeOleada4 declara un endpoint autorizado. La ruta es relativa a /api/v1.

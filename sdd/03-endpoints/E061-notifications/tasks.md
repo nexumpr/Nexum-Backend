@@ -1,33 +1,45 @@
-# Tareas planificadas — E061
+# Tareas — E061 (`GET /api/v1/notifications`)
 
-> Todas las tareas de implementación están **TODO** hasta H08. Este archivo es especificación, no evidencia de código.
+> Estado: implementación local y evidencia unitaria **COMPLETADAS**. Integración real/AWS/dos nodos **BLOQUEADA** sin Gate H08 ni autorización de despliegue.
+>
+> Evidencia de ejecución real (2026-11-22):
+> `go test ./internal/application/notifications ./internal/adapters/dynamo ./tests/unit/transport ./cmd/server -run 'E061|E062|E063' -count=1 -timeout 300s` → `ok` en los cuatro paquetes.
+> `go vet ./internal/application/notifications ./internal/adapters/dynamo ./internal/transport/http ./cmd/server` → sin salida.
 
-- [ ] `E061-T01` Revisar OpenAPI `operationId=nexum_e061` vs `GET /api/v1/notifications` y contrato de dominio.
-- [ ] `E061-T02` Implementar request/response DTO estrictos `ninguno` / `PageOfNotification`; rechazo de campos desconocidos.
-- [ ] `E061-T03` Implementar autorización por sujeto JWT y propiedad; públicas solo según allowlist aprobada.
-- [ ] `E061-T04` Implementar caso de uso y invariantes: Solo destinatario; cursor y filtros isRead; sin PII sensible en textos push.
-- [ ] `E061-T05` Implementar adaptador DynamoDB y patrón: USER#<sub> / DEVICE#<id>, NOTIFICATION#<UTC>#<id>, REMINDER#<id>, PREFERENCES; GSI2 solo worker due.
-- [ ] `E061-T06` Integrar Redis y consistencia multiinstancia sin confiar en caché para privilegios.
-- [ ] `E061-T07` Implementar códigos y errores definidos, ETag e idempotencia según operación.
-- [ ] `E061-T08` Crear unit tests de reglas y validaciones; fixture sin PII/credenciales reales.
-- [ ] `E061-T09` Crear integración Dynamo y prueba HTTP desde cliente externo conforme OpenAPI.
-- [ ] `E061-T10` Ejecutar negativas de auth/ownership/concurrencia y carga paginada cuando aplique.
-- [ ] `E061-T11` CI + seguridad + revisión de contratos + rollback y trazas saneadas.
-- [ ] `E061-T12` Solicitar autorización humana de release; desplegar desde IaC/CI, probar en dos nodos y registrar evidencia real.
+## Completado con evidencia local
+
+- [x] `E061-T01` Contrato revisado en `sdd/03-endpoints/openapi/nexum-api-v1.yaml`: `operationId=nexum_e061`, `GET /api/v1/notifications`, parámetros `limit/cursor/isRead/type`, `200 PageOfNotification`, `Cache-Control: private, no-store`.
+- [x] `E061-T02` DTO estrictos en `internal/application/notifications/service.go` (`ListParams`, `WirePage`, `WireNotification`): whitelist exacta, `items` nunca `null`, `nextCursor` omitido cuando no hay más páginas.
+- [x] `E061-T03` Sujeto obtenido de `middleware.UserIDFromContext` tras `middleware.AuthenticateBearerWithSession`; la partición `USER#<sub>` nunca la elige el cliente.
+- [x] `E061-T04` Invariantes: cursor HMAC-SHA256 ligado a `userID+limit+isRead+type+LastEvaluatedKey`; `unreadCount` calculado con `Query/Select COUNT` sobre toda la bandeja; sin notificaciones sintéticas.
+- [x] `E061-T05` Adaptador `internal/adapters/dynamo/notifications_store.go`: `USER#<sub> / NOTIFICATION#<RFC3339Nano>#<id>`, `Query begins_with`, `ExclusiveStartKey`, `Select COUNT`, sin `Scan`. Los prefijos `DEVICE#/REMINDER#/PREFERENCES` y GSI2 pertenecen a otras especificaciones y no se tocaron.
+- [x] `E061-T06` Cuota Redis real por sujeto: `LimitarPorUsuarioContrato(limitador, "analytics", handler)` con `cacheinfra.NewAuthRateLimiter(d.Redis, cuotaAnalyticsPorMinuto, time.Minute)`; Redis no se usa como fuente de privilegios ni de paginación.
+- [x] `E061-T07` Errores mapeados a `ErrorEnvelope`: 400 `INVALID_REQUEST`, 401 `UNAUTHORIZED`, 404 `NOT_FOUND`, 429 `RATE_LIMITED`, 503 `DEPENDENCY_UNAVAILABLE`, 500 `INTERNAL_ERROR`. No se declara ETag porque E061 no lo define en OpenAPI.
+- [x] `E061-T08` Unit tests reales con fixture sintético: `service_test.go` (vacío, 30 paginadas, filtros, cursor válido/tamper/cross-user) y `notifications_store_test.go` (fake DynamoDB con `ExclusiveStartKey`, `Select COUNT`, fallos cerrados).
+- [x] `E061-T09` HTTP local conforme OpenAPI en `tests/unit/transport/notifications_test.go`: esquema exacto y whitelist de campos, 400 (`limit=0/101`, cursor corto/tamper, `isRead`, `type`), 401, 429, 503, 404 homogéneo, `Cache-Control` y `ErrorEnvelope`.
+- [x] `E061-T10` Negativas locales de auth/ownership/cuota/fallo de store y paginación sin duplicados (25+5 de 30).
+- [x] `E061-T11` `gofmt -w` y `go vet` sobre los archivos propios, sin salida de error.
+
+## Bloqueado (requiere autorización humana / H08)
+
+- [ ] `E061-T09b` Integración contra DynamoDB real y prueba HTTP desde cliente externo: **BLOCKED_AWS**, sin credenciales ni Tabla real; se usó fake client y `httptest`.
+- [ ] `E061-T10b` Misma operación en dos nodos Go reales con consistencia de sesión/caché: **BLOCKED_TWO_NODE**, no autorizado.
+- [ ] `E061-T11b` CI/seguridad/revisión de contratos/rollback con trazas del despliegue: **BLOCKED_GATE_H08**.
+- [ ] `E061-T12` Release: **BLOCKED_RELEASE**; sin commit, push, merge, Terraform ni AWS en esta entrega.
 
 ## Casos concretos
 
-- [ ] `E061-CT01` Solicitud válida produce el código y esquema exactos indicados en OpenAPI; ejemplos sintéticos deben validarse con JSON Schema.
-- [ ] `E061-CT02` JSON malformado, campos desconocidos, tipo incorrecto y longitud excedida -> 400/422 sin secretos en logs.
-- [ ] `E061-CT03` Petición sobre recurso de otro usuario no filtra existencia (404), si aplica; verificar propiedad con dos sujetos.
-- [ ] `E061-CT04` Pérdida temporal de DynamoDB/Redis -> respuesta de fallo controlado 503; jamás confirmar escritura parcial.
-- [ ] `E061-CT05` Misma operación en dos nodos Go reales; consistencia de sesión/caché y ausencia de duplicaciones.
-- [ ] `E061-CT06` Paginación 25/100, filtro modificado con cursor antiguo -> 400, lectura sin Scan, sin duplicados en páginas.
-- [ ] `E061-CT07` Opt-in/opt-out efectivo; no enviar push con token revocado; no requerir aceptación del equipo Android.
+- [x] `E061-CT01` 200 con esquema exacto verificado por HTTP local (whitelist `items/nextCursor/unreadCount` e `id/title/message/isRead/createdAt`).
+- [x] `E061-CT02` Parámetros inválidos y cursor alterado → 400 `INVALID_REQUEST` sin secretos en la respuesta.
+- [x] `E061-CT03` Cursor de otro usuario y filtro modificado → 400; ningún item de otra partición aparece.
+- [x] `E061-CT04` Store caído o clave HMAC ausente → 503 `DEPENDENCY_UNAVAILABLE`, fail-closed.
+- [x] `E061-CT06` Paginación 25/100, filtro `type/isRead` aplicado antes de paginar, sin duplicados; `unreadCount` global.
+- [ ] `E061-CT05` Dos nodos reales: **BLOCKED_TWO_NODE**.
+- [ ] `E061-CT07` Opt-in/opt-out push: **NO APLICA** a E061 (pertenece a E059/E060); este endpoint no envía push.
 
-## Tareas de la enmienda (A8) — PENDIENTES DE EJECUCION
+## Enmienda (A8)
 
-- [ ] Implementar filtro `type` aplicado antes de paginar y `unreadCount` global en la pagina.
-- [ ] Anadir la validacion de entrada correspondiente y su mensaje 422.
-- [ ] Cubrir con prueba positiva y negativa.
-- [ ] Verificar por HTTP real tras el despliegue autorizado.
+- [x] Filtro `type` aplicado en `FilterExpression` y verificado de nuevo al proyectar; `unreadCount` global en la página.
+- [x] Validación negativa de `type`, `isRead`, `limit` y cursor con 400 `INVALID_REQUEST`; E061 no define 422 en OpenAPI, por lo que no se emite un 422 artificial.
+- [x] Pruebas positivas y negativas en capa aplicación, adaptador y HTTP.
+- [ ] Verificación por HTTP real tras despliegue autorizado: **BLOCKED_AWS**.

@@ -229,8 +229,27 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 		Logger:     logger,
 		Tokens:     verificadorTokens,
 		Authorizer: logoutStore,
+		PushSealer: pushSealerOleada4(),
+		CursorKey:  claveCursorDesdeEntorno(),
 	}
+	depsOleada4.Preferencias = preferenciasWorkerOleada4(depsOleada4)
 	montarOleada4(depsOleada4)
+
+	// Emisor FCM real: se arranca sólo si existe credencial de servidor válida en
+	// el secret store/entorno. Sin ella el worker queda inerte y no se afirma E2E.
+	cfgFCM, errFCM := configuracionFCMOleada4DesdeEntorno()
+	if errFCM != nil {
+		logger.WarnContext(ctx, "FCM Oleada 4: credencial no inyectada; worker no iniciado",
+			slog.String("clase", "FCM_CREDENCIAL_AUSENTE"))
+	} else {
+		cerrarFCM, errWorker := iniciarFCMWorkerOleada4(ctx, depsOleada4, cfgFCM)
+		if errWorker != nil {
+			logger.WarnContext(ctx, "FCM Oleada 4: worker no iniciado",
+				slog.String("clase", "FCM_WORKER_NO_INICIADO"))
+		} else {
+			defer cerrarFCM()
+		}
+	}
 
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
