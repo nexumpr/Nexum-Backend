@@ -2339,3 +2339,16 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Estados:** `CODE_IMPLEMENTED=YES`, `CI_LOCAL=PASS`, `CI_LINUX=PENDIENTE`, `AWS_DEPLOYED=NO`, `HTTPS_VERIFIED=NO`, `FUNCTIONAL_VERIFIED=NO`.
 - **Siguiente:** E057 (obtener preferencias de notificacion) en la misma rama. Regla de racha queda pendiente de confirmacion humana de Gate.
 
+
+### Checkpoint 2026-11-22 â€” E057 implementado en `liz-oleada4`
+
+- **Autorizacion:** instruccion humana expresa de ejecutar la Oleada 4 con el mismo estandar de E052. No autoriza merge, AWS ni despliegue.
+- **Cambios:** `internal/application/notificationprefs/preferences.go` y su test (3 pruebas); `internal/adapters/dynamo/notification_preferences_store.go` y su test (5 pruebas); `internal/transport/http/notification_preferences_handler.go`; `tests/unit/transport/notification_preferences_test.go` (4 pruebas); `cmd/server/e057.go`; `tasks.md`/`checklist.md` con evidencia. Sin cambios en `spec.md`, `plan.md` ni OpenAPI.
+- **Contrato:** `GET /api/v1/notification-preferences` responde 200 con `NotificationPreferences` exacto (4 campos requeridos + 6 opcionales de la enmienda A3), `Cache-Control: private, no-store`, whitelist de campos verificada por test. Errores 400/401/405/429/500/503 con `ErrorEnvelope`. 403/404 no aplican; 409 se reserva a E058; 422 no existe en GET.
+- **Defaults sin registro:** `pushEnabled=false`, `emailEnabled=false`, `reminderEnabled=true`, `version=1`, `budgetAlerts/goalUpdates/recurringReminders=true`, `streakReminders=false`, `quietHours` omitido y `timeZone` omitido (sin default contractual). Materializacion idempotente con `PutItem` condicional `attribute_not_exists(PK)`; la segunda lectura no incrementa version.
+- **Modelo fisico:** item `USER#<sub>/NOTIFICATION_PREFERENCES` en la tabla unica existente, con SK dedicada para no colisionar con el `PREFERENCES` de perfil (E068/E069). `GetItem` con ConsistentRead y `PutItem` condicional; sin `Scan`, sin recursos/indices nuevos. `quietHours` se persiste aplanado (`quietHoursEnabled/Start/End`) y conserva `enabled=false` cuando el objeto existe.
+- **Fallas/deviaciones corregidas en local:** (1) se definio `boolAttribute` duplicado en el adaptador y se encontro la funcion existente en `profile_store.go`; se conservo la existente y se renombro la nueva a `notificationBoolOptional`. (2) el test de usuario B comprobaba la clave literal del token en vez del `sub` real (`e004HTTPOtroUser`); se corrigio. (3) se corrigio un alias de import mal escrito en `e057.go`. Todas detectadas por compilacion/test antes del commit.
+- **Pruebas reales:** `go test ./internal/application/notificationprefs ./internal/adapters/dynamo ./tests/unit/transport ./cmd/server -run 'E057' -count=1` PASS. `go vet ./...`, `go build ./...`, `go test ./... -count=1`, validadores H06/SDD, DevSecOps y baseline: ver ejecucion de cierre. `go test -race` NOT_RUN_LOCAL por cgo/gcc ausente en Windows; CI Linux autoridad.
+- **Estados:** `CODE_IMPLEMENTED=YES`, `CI_LOCAL=PASS`, `CI_LINUX=PENDIENTE`, `AWS_DEPLOYED=NO`, `HTTPS_VERIFIED=NO`, `FUNCTIONAL_VERIFIED=NO`.
+- **Siguiente:** E058 (actualizar preferencias de notificacion) en la misma rama, reutilizando el store/service creados aqui.
+
