@@ -2,7 +2,7 @@
 
 **Diseño H06:** review (contrato existente, no modificado). **Implementación local:** PASS. **Respuesta prevista:** 204. **AWS/despliegue:** NOT_RUN / BLOQUEADO.
 
-- [ ] Firma del Gate H06 por el responsable; no confundir instalación con aprobación. Fuera del alcance de este subagente.
+- [ ] Firma del Gate H06 por el responsable; no confundir instalación con aprobación. Pendiente; el código quedó en `9b5d950` y no se declara Gate firmado.
 - [x] Método/path conservan el ID del inventario H04: `DELETE /api/v1/devices/push-tokens/{deviceRegistrationId}`, `operationId=nexum_e060` (OpenAPI sin cambios).
 - [x] Payload nulo revisado: sin cuerpo, sin lectura de JSON; `deviceRegistrationId` validado como UUID canónico y extraído de `PathValue`/último segmento, nunca de query o cabecera.
 - [x] Respuesta `204` sin cuerpo ni `Location` y errores de OpenAPI revisados: `TestE060HTTPBajaExitosaEIdempotente`, `TestE060HTTPNegativas`, `TestE060HTTPFailClosed`.

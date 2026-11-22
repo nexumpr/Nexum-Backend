@@ -2377,3 +2377,9 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Estados separados:** `CODE_IMPLEMENTED=YES` · `CI_LOCAL=PASS` · `CI_LINUX=PENDIENTE` · `AWS_DEPLOYED=NO` · `HTTPS_VERIFIED=NO` · `FUNCTIONAL_VERIFIED=NO` · `FIREBASE_CONSOLE_ACCESS=SI` · `FCM_SERVICE_CREDENTIAL_INJECTED=NO` · `ANDROID_DEVICE_READY=SI` · `FCM_E2E_PASS=NO` · `ML_GATE_APPROVED=NO` · `GATE_TRANSVERSAL_O4=PENDIENTE`.
 - **Siguiente:** integración humana a `main` y rebase de `liz-oleada5`; Gate `ML-155` antes de declarar E055 aprobado; Gate de inyección de credencial y prueba FCM en dispositivo antes de declarar `FCM_E2E_PASS`; autorización humana antes de AWS/Terraform/despliegue.
 
+
+### Revisión final posterior al commit `9b5d950` (2026-11-22)
+
+- Se revisaron todas las tareas/checklist de E052–E063. Los ítems sin marcar son exclusivamente **Gates humanos, AWS/Terraform/despliegue, dos nodos, HTTPS real, `go test -race` local y E2E FCM**; no son código pendiente. `E061-CT07` se marcó como **NO APLICA verificado** para uniformarlo con E062/E063.
+- Se corrigió redacción obsoleta en `E061/E062/E063-T12`: el código sí fue commitado y pusheado en `9b5d950`; lo que sigue bloqueado es el release. Igualmente se precisó en E059/E060 que la firma del Gate H06 está pendiente, no fuera de alcance.
+- Conclusión honesta: **Oleada 4 completa en código y validación local**, no completa al 100% operativo/producción. `ML_GATE_APPROVED=NO`, `FCM_SERVICE_CREDENTIAL_INJECTED=NO`, `FCM_E2E_PASS=NO`, `AWS_DEPLOYED=NO`, `HTTPS_VERIFIED=NO`, `GATE_TRANSVERSAL_O4=PENDIENTE`.

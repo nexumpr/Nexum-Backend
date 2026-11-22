@@ -2,7 +2,7 @@
 
 **Diseño H06:** review (contrato existente, no modificado). **Implementación local:** PASS. **Respuesta prevista:** 201. **AWS/despliegue:** NOT_RUN / BLOQUEADO.
 
-- [ ] Firma del Gate H06 por el responsable; no confundir instalación con aprobación. Fuera del alcance de este subagente.
+- [ ] Firma del Gate H06 por el responsable; no confundir instalación con aprobación. Pendiente; el código quedó en `9b5d950` y no se declara Gate firmado.
 - [x] Método/path conservan el ID del inventario H04: `POST /api/v1/devices/push-tokens`, `operationId=nexum_e059` (OpenAPI sin cambios).
 - [x] Payload válido/negativo, ejemplo y JSON Schema `PushTokenRegister` revisados: `provider=fcm`, `token>=8`, `deviceLabel<=80`, `additionalProperties:false`; caso `campo_extra` → 400.
 - [x] Respuesta `PushDevice` y errores de OpenAPI revisados: exactamente `id`, `provider`, `deviceLabel`, `registeredAt`; `Location` y ErrorEnvelope en `TestE059HTTPContratoValido` / `TestE059HTTPNegativas`.

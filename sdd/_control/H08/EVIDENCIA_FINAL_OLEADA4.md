@@ -47,3 +47,4 @@
 - E014/E020: ver `IMPACTO_TRANSVERSAL_OLEADA4.md`; `GATE_TRANSVERSAL_O4=PENDIENTE` y E014/E020 quedan intactos.
 - Sin merge a `main`, PR, AWS, Terraform, IaC apply ni despliegue. Release productiva sigue `v0.19.2+3098f379d7ab`.
 - `liz-oleada5` debe rebasearse tras la integración humana. E072/E073 permanecen `CONTRACT_BLOCKED` (Oleada 5).
+- Revisión final posterior a `9b5d950`: los ítems sin marcar en E052–E063 son Gates/despliegue/dos nodos/HTTPS/`race`/E2E, no código pendiente. Se corrigió la redacción de `E061/E062/E063-T12` para reflejar que el código sí quedó commitado y pusheado, y se marcó `E061-CT07` como no aplicable verificado.

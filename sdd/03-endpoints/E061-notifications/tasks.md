@@ -25,7 +25,7 @@
 - [ ] `E061-T09b` Integración contra DynamoDB real y prueba HTTP desde cliente externo: **BLOCKED_AWS**, sin credenciales ni Tabla real; se usó fake client y `httptest`.
 - [ ] `E061-T10b` Misma operación en dos nodos Go reales con consistencia de sesión/caché: **BLOCKED_TWO_NODE**, no autorizado.
 - [ ] `E061-T11b` CI/seguridad/revisión de contratos/rollback con trazas del despliegue: **BLOCKED_GATE_H08**.
-- [ ] `E061-T12` Release: **BLOCKED_RELEASE**; sin commit, push, merge, Terraform ni AWS en esta entrega.
+- [ ] `E061-T12` Release: **BLOCKED_RELEASE**; código commitado y pusheado en `9b5d950`, pero sin merge, Terraform, AWS ni despliegue; requiere Gate humano.
 
 ## Casos concretos
 
@@ -35,7 +35,7 @@
 - [x] `E061-CT04` Store caído o clave HMAC ausente → 503 `DEPENDENCY_UNAVAILABLE`, fail-closed.
 - [x] `E061-CT06` Paginación 25/100, filtro `type/isRead` aplicado antes de paginar, sin duplicados; `unreadCount` global.
 - [ ] `E061-CT05` Dos nodos reales: **BLOCKED_TWO_NODE**.
-- [ ] `E061-CT07` Opt-in/opt-out push: **NO APLICA** a E061 (pertenece a E059/E060); este endpoint no envía push.
+- [x] `E061-CT07` Opt-in/opt-out push: **NO APLICA verificado** a E061 (pertenece a E059/E060); este endpoint no envía push.
 
 ## Enmienda (A8)
 

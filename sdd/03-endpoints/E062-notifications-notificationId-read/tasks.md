@@ -25,7 +25,7 @@
 - [ ] `E062-T09b` Integración DynamoDB real y prueba HTTP desde cliente externo: **BLOCKED_AWS**.
 - [ ] `E062-T10b` Misma operación en dos nodos Go reales (carrera de marcas de lectura): **BLOCKED_TWO_NODE**.
 - [ ] `E062-T11b` CI/seguridad/revisión/rollback con trazas del despliegue: **BLOCKED_GATE_H08**.
-- [ ] `E062-T12` Release: **BLOCKED_RELEASE**; sin commit, push, merge, Terraform ni AWS en esta entrega.
+- [ ] `E062-T12` Release: **BLOCKED_RELEASE**; código commitado y pusheado en `9b5d950`, pero sin merge, Terraform, AWS ni despliegue; requiere Gate humano.
 
 ## Casos concretos
 
