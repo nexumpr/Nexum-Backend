@@ -2383,3 +2383,11 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Se revisaron todas las tareas/checklist de E052–E063. Los ítems sin marcar son exclusivamente **Gates humanos, AWS/Terraform/despliegue, dos nodos, HTTPS real, `go test -race` local y E2E FCM**; no son código pendiente. `E061-CT07` se marcó como **NO APLICA verificado** para uniformarlo con E062/E063.
 - Se corrigió redacción obsoleta en `E061/E062/E063-T12`: el código sí fue commitado y pusheado en `9b5d950`; lo que sigue bloqueado es el release. Igualmente se precisó en E059/E060 que la firma del Gate H06 está pendiente, no fuera de alcance.
 - Conclusión honesta: **Oleada 4 completa en código y validación local**, no completa al 100% operativo/producción. `ML_GATE_APPROVED=NO`, `FCM_SERVICE_CREDENTIAL_INJECTED=NO`, `FCM_E2E_PASS=NO`, `AWS_DEPLOYED=NO`, `HTTPS_VERIFIED=NO`, `GATE_TRANSVERSAL_O4=PENDIENTE`.
+
+### Operación FCM/AWS — documentación corregida (2026-11-22)
+
+- El responsable creó la cuenta de servicio con rol `Firebase Messaging Admin` y descargó el JSON a `C:\secretos-nexum\fcm-key.json` (fuera del repo). Project ID informado: `proyectonexum-ee910`.
+- Se revisó el script propuesto para armar `secrets/v2`: es correcto en la lógica (conserva variables v1, credencial en una sola línea con `\n` escapados, claves B64 de 32 bytes) pero **en Windows PowerShell 5.1 `Set-Content -Encoding UTF8` escribe BOM**, y el bootstrap lee con `encoding="utf-8"`, por lo que fallaría con `JSONDecodeError` y el ASG reemplazaría la instancia. Corrección: `[System.IO.File]::WriteAllText(..., New-Object System.Text.UTF8Encoding($false))`.
+- Verificado con datos sintéticos: con la corrección no hay BOM, `json.loads` funciona, `NEXUM_FCM_CREDENTIALS_JSON` no contiene LF literal y `private_key` recupera sus saltos al deserializar en Go.
+- Nuevo documento: `sdd/_control/H08/OPERACION_FCM_AWS_OLEADA4.md` con verificación en Firebase/GCP, script corregido, preflight sin secretos, subida S3 con SSE-S3, `terraform plan/apply -var='secretos_version=v2'`, rollback y estados separados.
+- Sin AWS, Terraform apply, merge ni secretos en el repo. La prueba E2E en dispositivo sigue sin ejecutarse por decisión del responsable; `FCM_E2E_PASS=NO`.
