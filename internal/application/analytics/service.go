@@ -21,6 +21,9 @@ type Service struct {
 	// modelo se usa sólo en E055. Por defecto se carga el artefacto incrustado;
 	// las pruebas pueden inyectar una copia para verificar el criterio de silueta.
 	modelo *ml.Artifact
+	// savings y zonas se usan sólo en E056: aportaciones activas y preferencia IANA.
+	savings SavingsSource
+	zonas   TimezoneSource
 }
 
 // NewService construye el caso de uso con la dependencia real inyectada.

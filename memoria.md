@@ -2326,3 +2326,16 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Estados:** `CODE_IMPLEMENTED=YES`, `CI_LOCAL=PASS`, `CI_LINUX=PENDIENTE`, `ML_GATE_APPROVED=NO`, `AWS_DEPLOYED=NO`, `HTTPS_VERIFIED=NO`, `FUNCTIONAL_VERIFIED=NO`.
 - **Siguiente:** E056 (racha de ahorro) en la misma rama. E055 queda implementado pero no aprobado hasta la frase humana de Gate.
 
+
+### Checkpoint 2026-11-22 â€” E056 implementado en `liz-oleada4`
+
+- **Autorizacion:** instruccion humana expresa de ejecutar la Oleada 4 con el mismo estandar de E052. No autoriza merge, AWS ni despliegue.
+- **Cambios:** `internal/application/analytics/savings.go` y su test (8 pruebas); `internal/transport/http/analytics_savings_handler.go`; `tests/unit/transport/analytics_savings_test.go` (3 pruebas); `cmd/server/e056.go`; campo `savings`/`zonas` y `WithSavings` en `internal/application/analytics/service.go`; `tasks.md`/`checklist.md` con evidencia. Sin cambios en `spec.md`, `plan.md` ni OpenAPI.
+- **Contrato:** `GET /api/v1/analytics/savings-streak` responde 200 con `SavingsStreak` exacto (`days`, `timezone`, `asOfDate`), `Cache-Control: private, no-store`, `nextCursor` no aplica. Errores 400/401/405/429/500/503 con `ErrorEnvelope`. 403/404 no se sintetizan en lectura agregada sin ID de recurso; 409/412/422 no existen en esta operacion.
+- **Regla de racha (decision local, pendiente de Gate):** dias civiles IANA consecutivos hacia atras desde `asOfDate`; un dia sin aportacion activa ROMPE la racha. Solo cuentan aportaciones `active`, positivas, no revertidas y deduplicadas por id; el movimiento vinculado no se suma dos veces. Ventana maxima 365 dias. La preferencia IANA se resuelve con fallback aprobado `America/Mexico_City` y `_ "time/tzdata"` embebido. Probados cruce medianoche y cambio DST `America/New_York`.
+- **Datos reales:** reutiliza `dynamo.ContributionsStore` con `Query` acotada a `USER#<sub>` y rango de fechas, `Status=active`, sin `Scan`, sin recursos/indices nuevos. Redis como limitador por usuario (`analytics`, 60/min), aplicado tras autenticar.
+- **Fallas/deviaciones corregidas en local:** (1) la respuesta publicaba la preferencia IANA invalida recibida en vez de la zona resuelta; se corrigio para devolver `zona.String()`. (2) una prueba usaba `NewService(nil).WithSavings(...)` esperando ErrUnavailable pero las dependencias estaban inyectadas; se corrigio a `NewService(nil).SavingsStreak(...)`. Ambas detectadas por test y resueltas antes del commit.
+- **Pruebas reales:** `go test ./internal/application/analytics ./tests/unit/transport ./cmd/server -run 'E056' -count=1` PASS. `go vet ./...`, `go build ./...`, `go test ./... -count=1`, validadores H06/SDD, DevSecOps y baseline: ver ejecucion de cierre. `go test -race` NOT_RUN_LOCAL por cgo/gcc ausente en Windows; CI Linux autoridad.
+- **Estados:** `CODE_IMPLEMENTED=YES`, `CI_LOCAL=PASS`, `CI_LINUX=PENDIENTE`, `AWS_DEPLOYED=NO`, `HTTPS_VERIFIED=NO`, `FUNCTIONAL_VERIFIED=NO`.
+- **Siguiente:** E057 (obtener preferencias de notificacion) en la misma rama. Regla de racha queda pendiente de confirmacion humana de Gate.
+
