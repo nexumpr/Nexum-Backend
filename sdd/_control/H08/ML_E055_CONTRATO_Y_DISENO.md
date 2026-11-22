@@ -155,7 +155,23 @@ con otros usuarios, cualquier cifra no calculada en el paso 5.
 | Estado | Valor |
 |---|---|
 | `ML_DESIGNED` | **PENDIENTE_APROBACION** (este documento es propuesta) |
-| `ML_IMPLEMENTED` | `NOT_RUN` |
+| `ML_IMPLEMENTED` | `CODE_COMPLETE_LOCAL` (2026-11-22); no desplegado ni aprobado |
 | `ML_DEPLOYED` | `NOT_RUN` |
 | Enmienda de contrato requerida | `hasEnoughData` (ESENCIAL) + 3 opcionales pospuestos |
 | Gate | `APRUEBO_RFC_016_CONTRATOS_E005_E075` |
+
+## 13. Evidencia local de implementación — NO constituye Gate
+
+| Campo | Valor observado |
+|---|---|
+| Fecha | 2026-11-22 |
+| Rama | `liz-oleada4` |
+| Artefacto | `ml/modelo_kmeans_v1.json`, SHA256 `1997370f1c148df63e126e477d1f931c565d2b1f9b54dd57dc1e48b1a16d48cf` |
+| Datos sintéticos | 500 registros, SHA256 `8d2bf29691a08eee6a1cd1230ad81b8454712424721e5e3e21bb9e9bd99918fd` |
+| Selección | `k=2`, silueta de entrenamiento `0.780658`, semilla `20261116`, `n_init=10` |
+| Entorno real de entrenamiento | Python `3.14.5` + scikit-learn `1.9.0`; Python `3.13` no está instalado en el equipo. El script usa sintaxis compatible con 3.13 y debe regenerarse en 3.13 cuando el responsable lo exija como Gate. |
+| Inferencia | Go puro, sin Python/AWS/proveedor en la ruta de petición; 12 asignaciones de referencia Python reproducidas por `ml/inference_test.go`. |
+| Latencia local | p95 `1.724 ms` con 500 movimientos (30 iteraciones); objetivo `<= 300 ms`. |
+| Gates | `ML_GATE_APPROVED=NO`; `ML_DESIGNED=PENDIENTE_APROBACION`; `AWS_DEPLOYED=NO`. |
+
+Esta sección documenta ejecución local verificable. No firma, no aprueba el RFC y no autoriza despliegue.

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	appMovements "github.com/nexumpr/Nexum-Backend/internal/application/movements"
+	"github.com/nexumpr/Nexum-Backend/ml"
 )
 
 // Service resuelve E052 leyendo únicamente la partición del titular autenticado.
@@ -17,6 +18,9 @@ type Service struct {
 	source MovementSource
 	now    func() time.Time
 	maxPag int
+	// modelo se usa sólo en E055. Por defecto se carga el artefacto incrustado;
+	// las pruebas pueden inyectar una copia para verificar el criterio de silueta.
+	modelo *ml.Artifact
 }
 
 // NewService construye el caso de uso con la dependencia real inyectada.
@@ -33,6 +37,17 @@ func (s *Service) WithClock(fn func() time.Time) *Service {
 	if fn != nil {
 		copia.now = fn
 	}
+	return &copia
+}
+
+// WithModelo inyecta el artefacto K-Means a usar en E055. No altera el comportamiento
+// de E052, E053 ni E054; se conserva en las copias devueltas por WithClock.
+func (s *Service) WithModelo(modelo *ml.Artifact) *Service {
+	if s == nil {
+		return nil
+	}
+	copia := *s
+	copia.modelo = modelo
 	return &copia
 }
 
