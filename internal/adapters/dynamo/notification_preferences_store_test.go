@@ -3,6 +3,7 @@ package dynamo
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,12 +14,16 @@ import (
 )
 
 type e057FakeClient struct {
-	item     map[string]types.AttributeValue
-	getErr   error
-	putErr   error
-	lastPut  *dynamodb.PutItemInput
-	lastGet  *dynamodb.GetItemInput
-	getCalls int
+	item        map[string]types.AttributeValue
+	getErr      error
+	putErr      error
+	updateErr   error
+	updateValue appPrefs.Preferences
+	lastPut     *dynamodb.PutItemInput
+	lastGet     *dynamodb.GetItemInput
+	lastUpdate  *dynamodb.UpdateItemInput
+	getCalls    int
+	updateCalls int
 }
 
 func (f *e057FakeClient) GetItem(_ context.Context, params *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
@@ -36,6 +41,16 @@ func (f *e057FakeClient) PutItem(_ context.Context, params *dynamodb.PutItemInpu
 		return nil, f.putErr
 	}
 	return &dynamodb.PutItemOutput{}, nil
+}
+
+func (f *e057FakeClient) UpdateItem(_ context.Context, params *dynamodb.UpdateItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
+	f.lastUpdate = params
+	f.updateCalls++
+	if f.updateErr != nil {
+		return nil, f.updateErr
+	}
+	actualizado := notificationPreferencesItem("user-a", "USER#user-a", notificationPreferencesSortKey, f.updateValue, time.Now())
+	return &dynamodb.UpdateItemOutput{Attributes: actualizado}, nil
 }
 
 func e057Item() map[string]types.AttributeValue {
@@ -139,4 +154,77 @@ func TestE057AdaptadorFallaCerrada(t *testing.T) {
 	if _, err := NewNotificationPreferencesStore(caido, "nexum-table").Load(context.Background(), "user-a"); !errors.Is(err, appPrefs.ErrUnavailable) {
 		t.Fatalf("store caído: %v", err)
 	}
+	if _, err := NewNotificationPreferencesStore(nil, "nexum-table").Update(context.Background(), "user-a", appPrefs.Update{}); !errors.Is(err, appPrefs.ErrUnavailable) {
+		t.Fatalf("sin cliente update: %v", err)
+	}
+}
+
+func TestE058AdaptadorUpdateExpresionYCAM(t *testing.T) {
+	nuevo := appPrefs.Defaults()
+	nuevo.PushEnabled = true
+	nuevo.EmailEnabled = false
+	nuevo.ReminderEnabled = true
+	nuevo.Version = 6
+	nuevo.QuietHours = &appPrefs.QuietHours{Enabled: true, Start: "22:00", End: "06:00"}
+	nuevo.TimeZone = "America/New_York"
+	cliente := &e057FakeClient{updateValue: nuevo}
+	store := NewNotificationPreferencesStore(cliente, "nexum-table")
+	resultado, err := store.Update(context.Background(), "user-a", appPrefs.Update{
+		Value: nuevo, ExpectedVersion: 5, Now: time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC),
+	})
+	if err != nil || resultado == nil {
+		t.Fatalf("update: %+v %v", resultado, err)
+	}
+	u := cliente.lastUpdate
+	if u == nil || u.ConditionExpression == nil || *u.ConditionExpression != "#version = :expected" {
+		t.Fatal("la escritura no es condicional por versión")
+	}
+	if got := attributeIntMust(u.ExpressionAttributeValues[":version"]); got != 6 {
+		t.Fatalf("la nueva versión debió ser 6, obtenido %d", got)
+	}
+	if got := attributeIntMust(u.ExpressionAttributeValues[":expected"]); got != 5 {
+		t.Fatalf(":expected debía ser 5, obtenido %d", got)
+	}
+	if exp := *u.UpdateExpression; !strings.Contains(exp, "SET ") || !strings.Contains(exp, "#pushEnabled = :pushEnabled") ||
+		!strings.Contains(exp, "#version = :version") || strings.Contains(exp, "REMOVE") {
+		t.Fatalf("expresión inesperada con quietHours presente: %s", exp)
+	}
+}
+
+func TestE058AdaptadorUpdateRetiraOpcionalesAusentes(t *testing.T) {
+	nuevo := appPrefs.Defaults()
+	nuevo.Version = 2
+	cliente := &e057FakeClient{updateValue: nuevo}
+	store := NewNotificationPreferencesStore(cliente, "nexum-table")
+	if _, err := store.Update(context.Background(), "user-a", appPrefs.Update{Value: nuevo, ExpectedVersion: 1, Now: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	exp := *cliente.lastUpdate.UpdateExpression
+	if !strings.Contains(exp, "REMOVE #quietHoursEnabled") || !strings.Contains(exp, "#timeZone") {
+		t.Fatalf("los opcionales ausentes no se retiran: %s", exp)
+	}
+}
+
+func TestE058AdaptadorUpdateConflictoDeVersion(t *testing.T) {
+	nuevo := appPrefs.Defaults()
+	nuevo.Version = 2
+	// La condición falla y la relectura muestra otra versión => 409, sin reintentos.
+	cliente := &e057FakeClient{
+		item:        map[string]types.AttributeValue{"version": numberAttr(9)},
+		updateErr:   &types.ConditionalCheckFailedException{},
+		updateValue: nuevo,
+	}
+	store := NewNotificationPreferencesStore(cliente, "nexum-table")
+	_, err := store.Update(context.Background(), "user-a", appPrefs.Update{Value: nuevo, ExpectedVersion: 1, Now: time.Now()})
+	if !errors.Is(err, appPrefs.ErrVersionConflict) {
+		t.Fatalf("esperado ErrVersionConflict, obtenido %v", err)
+	}
+}
+
+func attributeIntMust(v types.AttributeValue) int64 {
+	n, ok := attributeInt(v)
+	if !ok {
+		return -1
+	}
+	return n
 }

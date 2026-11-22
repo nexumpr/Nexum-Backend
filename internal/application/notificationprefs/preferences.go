@@ -35,6 +35,21 @@ var (
 	ErrUnavailable     = errors.New("servicio de preferencias de notificacion no disponible")
 )
 
+// FieldViolation describe una regla de negocio incumplida. El transporte la
+// traduce a 422 BUSINESS_RULE_VIOLATION con `field` y `reason`, sin incluir el
+// valor rechazado (podría ser un dato del titular).
+type FieldViolation struct {
+	Field  string
+	Reason string
+}
+
+func (v *FieldViolation) Error() string {
+	if v == nil {
+		return "violacion de regla de negocio"
+	}
+	return v.Field + ": " + v.Reason
+}
+
 // QuietHours es el bloque opcional `quietHours` del contrato. `Enabled` es el
 // único campo requerido cuando el objeto está presente.
 type QuietHours struct {
@@ -125,6 +140,31 @@ type Store interface {
 	Create(ctx context.Context, userID string, defaults Preferences, now time.Time) (*Preferences, error)
 }
 
+// UpdateStore extiende Store con la escritura condicional por versión que E058
+// necesita para no pisar actualizaciones concurrentes.
+type UpdateStore interface {
+	Store
+	Update(ctx context.Context, userID string, update Update) (*Preferences, error)
+}
+
+// Update es la escritura atómica solicitada al adaptador. `ExpectedVersion` es
+// la versión observada en la lectura previa; el adaptador la incrementa en uno
+// bajo condición y devuelve el estado resultante.
+type Update struct {
+	Value           Preferences
+	ExpectedVersion int64
+	Now             time.Time
+}
+
+// UpdateCommand es la entrada de aplicación de E058. `Value` es el estado
+// completo deseado: el transporte ya aplicó los defaults de los campos
+// opcionales ausentes (PUT reemplaza el conjunto declarado) y validó forma.
+// `Version` de `Value` se ignora; el servicio lo toma de la lectura vigente.
+type UpdateCommand struct {
+	UserID string
+	Value  Preferences
+}
+
 // Service orquesta la lectura y materialización de preferencias.
 type Service struct {
 	store Store
@@ -176,6 +216,55 @@ func (s *Service) Get(ctx context.Context, userID string) (*Preferences, error) 
 		return nil, ErrUnavailable
 	}
 	return normalize(creado), nil
+}
+
+// Update reemplaza el conjunto de preferencias declaradas con una escritura
+// condicional por versión. Materializa los defaults si el titular no tenía
+// item (igual que Get) y nunca escribe sobre una versión no observada.
+func (s *Service) Update(ctx context.Context, cmd UpdateCommand) (*Preferences, error) {
+	if !s.Disponible() {
+		return nil, ErrUnavailable
+	}
+	userID := strings.TrimSpace(cmd.UserID)
+	if userID == "" {
+		return nil, ErrUnauthorized
+	}
+
+	actual, err := s.store.Load(ctx, userID)
+	if err != nil {
+		return nil, normalizeError(err)
+	}
+	if actual == nil {
+		creado, errCreacion := s.store.Create(ctx, userID, Defaults(), s.now().UTC())
+		if errCreacion != nil {
+			return nil, normalizeError(errCreacion)
+		}
+		if creado == nil {
+			return nil, ErrUnavailable
+		}
+		actual = creado
+	}
+	actual = normalize(actual)
+
+	escritor, ok := s.store.(UpdateStore)
+	if !ok {
+		// Sin escritura condicional no se puede prometer el CAS.
+		return nil, ErrUnavailable
+	}
+	nuevo := cmd.Value
+	nuevo.Version = actual.Version
+	actualizado, errUpdate := escritor.Update(ctx, userID, Update{
+		Value:           nuevo,
+		ExpectedVersion: actual.Version,
+		Now:             s.now().UTC(),
+	})
+	if errUpdate != nil {
+		return nil, normalizeError(errUpdate)
+	}
+	if actualizado == nil {
+		return nil, ErrUnavailable
+	}
+	return normalize(actualizado), nil
 }
 
 func normalize(p *Preferences) *Preferences {

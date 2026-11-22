@@ -2352,3 +2352,15 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Estados:** `CODE_IMPLEMENTED=YES`, `CI_LOCAL=PASS`, `CI_LINUX=PENDIENTE`, `AWS_DEPLOYED=NO`, `HTTPS_VERIFIED=NO`, `FUNCTIONAL_VERIFIED=NO`.
 - **Siguiente:** E058 (actualizar preferencias de notificacion) en la misma rama, reutilizando el store/service creados aqui.
 
+
+### Checkpoint 2026-11-22 â€” E058 implementado en `liz-oleada4`
+
+- **Autorizacion:** instruccion humana expresa de ejecutar la Oleada 4 completa con el estandar de E052. No autoriza merge, AWS ni despliegue.
+- **Cambios:** `internal/application/notificationprefs/preferences.go` (FieldViolation, UpdateStore, UpdateCommand, Service.Update); `update_test.go` (3 pruebas); `internal/adapters/dynamo/notification_preferences_store.go` extendido con `UpdateItem` CAS y test (3 pruebas nuevas); `internal/transport/http/notification_preferences_handler.go` extendido con PUT estricto; `tests/unit/transport/notification_preferences_test.go` (5 pruebas nuevas); `cmd/server/e058.go`; `tasks.md`/`checklist.md`. Sin cambios en `spec.md`, `plan.md` ni OpenAPI.
+- **Contrato:** `PUT /api/v1/notification-preferences` devuelve 200 con `NotificationPreferences` exacto y `Cache-Control: private, no-store`. Request con tres booleanos requeridos; opcionales `budgetAlerts/goalUpdates/recurringReminders=true`, `streakReminders=false`, `quietHours` objeto/nulo y `timeZone` IANA. Campos desconocidos, JSON roto y tipos incorrectos â†’ 400 `INVALID_REQUEST`; quietHours/timeZone invÃ¡lidos â†’ 422 `BUSINESS_RULE_VIOLATION` con `field`; 401/405/409/429/500/503 segÃºn contrato. 403/404 no aplican a preferencias del propio `sub`.
+- **Concurrencia:** CAS interno por versiÃ³n. El cliente NO envÃ­a `version` porque `NotificationPreferencesUpdate` del OpenAPI no lo declara; discrepancia RFC-016/A3 documentada sin introducir campo no aprobado. El adaptador usa `#version = :expected`, escribe `expected+1`, retira opcionales ausentes con `REMOVE`, relee en conflicto y agota en 409. Response `version` se incrementa.
+- **Fallas detectadas y corregidas antes del commit:** (1) test asumÃ­a `:expected` como string siendo nÃºmero; (2) aserciÃ³n de `REMOVE #timeZone` demasiado literal porque el nombre aparece en el mapa; (3) caso de 405 usaba PUT, ahora mÃ©todo vÃ¡lido de E058, se cambiÃ³ a POST; (4) expectativa de `recurringReminders` era falsa pese al default `true`. Todas detectadas por `go test` y corregidas.
+- **Pruebas reales:** `go test ./internal/application/notificationprefs ./internal/adapters/dynamo ./tests/unit/transport ./cmd/server -run 'E05[78]' -count=1` PASS. Cierre con `go vet ./...`, `go build ./...`, `go test ./... -count=1`, validadores H06/SDD y DevSecOps: ver ejecucion de cierre. `go test -race` NOT_RUN_LOCAL por cgo/gcc ausente en Windows; CI Linux autoridad.
+- **Estados:** `CODE_IMPLEMENTED=YES`, `CI_LOCAL=PASS`, `CI_LINUX=PENDIENTE`, `AWS_DEPLOYED=NO`, `HTTPS_VERIFIED=NO`, `FUNCTIONAL_VERIFIED=NO`.
+- **Siguiente:** E059 registro de token FCM; sin secretos en repo/chat, sin AWS ni despliegue.
+

@@ -28,6 +28,7 @@ const (
 type NotificationPreferencesAPI interface {
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
+	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
 }
 
 // NotificationPreferencesStore implementa `notificationprefs.Store` sobre la
@@ -107,6 +108,137 @@ func (s *NotificationPreferencesStore) Create(ctx context.Context, userID string
 		return nil, appPrefs.ErrConflict
 	}
 	return existente, nil
+}
+
+// notificationPreferencesUpdateAttempts acota los reintentos del CAS interno de
+// E058. El cliente no envía versión: los conflictos se resuelven releyendo.
+const notificationPreferencesUpdateAttempts = 3
+
+// Update aplica un reemplazo atómico del conjunto declarado con CAS por versión.
+// Una sola `UpdateItem` condicional por intento; los campos opcionales ausentes
+// se RETIRAN del item para que la lectura posterior no herede valores viejos.
+func (s *NotificationPreferencesStore) Update(ctx context.Context, userID string, update appPrefs.Update) (*appPrefs.Preferences, error) {
+	if s == nil || s.client == nil || s.table == "" {
+		return nil, appPrefs.ErrUnavailable
+	}
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, appPrefs.ErrUnavailable
+	}
+	expected := update.ExpectedVersion
+	if expected < 1 {
+		expected = appPrefs.DefaultVersion
+	}
+	pk, sk := notificationPreferencesKeys(userID)
+
+	sets := []string{
+		"#pushEnabled = :pushEnabled",
+		"#emailEnabled = :emailEnabled",
+		"#reminderEnabled = :reminderEnabled",
+		"#budgetAlerts = :budgetAlerts",
+		"#goalUpdates = :goalUpdates",
+		"#recurringReminders = :recurringReminders",
+		"#streakReminders = :streakReminders",
+		"#version = :version",
+		"#updatedAt = :updatedAt",
+	}
+	names := map[string]string{
+		"#pushEnabled": "pushEnabled", "#emailEnabled": "emailEnabled",
+		"#reminderEnabled": "reminderEnabled", "#budgetAlerts": "budgetAlerts",
+		"#goalUpdates": "goalUpdates", "#recurringReminders": "recurringReminders",
+		"#streakReminders": "streakReminders", "#version": "version", "#updatedAt": "updatedAt",
+	}
+	values := map[string]types.AttributeValue{
+		":pushEnabled":        boolAttr(update.Value.PushEnabled),
+		":emailEnabled":       boolAttr(update.Value.EmailEnabled),
+		":reminderEnabled":    boolAttr(update.Value.ReminderEnabled),
+		":budgetAlerts":       boolAttr(update.Value.BudgetAlerts),
+		":goalUpdates":        boolAttr(update.Value.GoalUpdates),
+		":recurringReminders": boolAttr(update.Value.RecurringReminders),
+		":streakReminders":    boolAttr(update.Value.StreakReminders),
+		":version":            numberAttr(expected + 1),
+		":updatedAt":          stringAttr(update.Now.UTC().Format(time.RFC3339)),
+	}
+
+	var removes []string
+	if update.Value.QuietHours != nil {
+		sets = append(sets, "#quietHoursEnabled = :quietHoursEnabled")
+		names["#quietHoursEnabled"] = "quietHoursEnabled"
+		values[":quietHoursEnabled"] = boolAttr(update.Value.QuietHours.Enabled)
+		if update.Value.QuietHours.Start != "" {
+			sets = append(sets, "#quietHoursStart = :quietHoursStart")
+			names["#quietHoursStart"] = "quietHoursStart"
+			values[":quietHoursStart"] = stringAttr(update.Value.QuietHours.Start)
+		} else {
+			removes = append(removes, "#quietHoursStart")
+			names["#quietHoursStart"] = "quietHoursStart"
+		}
+		if update.Value.QuietHours.End != "" {
+			sets = append(sets, "#quietHoursEnd = :quietHoursEnd")
+			names["#quietHoursEnd"] = "quietHoursEnd"
+			values[":quietHoursEnd"] = stringAttr(update.Value.QuietHours.End)
+		} else {
+			removes = append(removes, "#quietHoursEnd")
+			names["#quietHoursEnd"] = "quietHoursEnd"
+		}
+	} else {
+		removes = append(removes, "#quietHoursEnabled", "#quietHoursStart", "#quietHoursEnd")
+		names["#quietHoursEnabled"] = "quietHoursEnabled"
+		names["#quietHoursStart"] = "quietHoursStart"
+		names["#quietHoursEnd"] = "quietHoursEnd"
+	}
+	if zona := strings.TrimSpace(update.Value.TimeZone); zona != "" {
+		sets = append(sets, "#timeZone = :timeZone")
+		names["#timeZone"] = "timeZone"
+		values[":timeZone"] = stringAttr(zona)
+	} else {
+		removes = append(removes, "#timeZone")
+		names["#timeZone"] = "timeZone"
+	}
+
+	expresion := "SET " + strings.Join(sets, ", ")
+	if len(removes) > 0 {
+		expresion += " REMOVE " + strings.Join(removes, ", ")
+	}
+
+	for intento := 0; intento < notificationPreferencesUpdateAttempts; intento++ {
+		valores := make(map[string]types.AttributeValue, len(values)+1)
+		for k, v := range values {
+			valores[k] = v
+		}
+		valores[":expected"] = numberAttr(expected)
+		salida, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+			TableName:                 aws.String(s.table),
+			Key:                       map[string]types.AttributeValue{"PK": stringAttr(pk), "SK": stringAttr(sk)},
+			UpdateExpression:          aws.String(expresion),
+			ConditionExpression:       aws.String("#version = :expected"),
+			ExpressionAttributeNames:  names,
+			ExpressionAttributeValues: valores,
+			ReturnValues:              types.ReturnValueAllNew,
+		})
+		if err == nil {
+			if salida == nil {
+				return nil, appPrefs.ErrUnavailable
+			}
+			actualizado := notificationPreferencesFromItem(salida.Attributes)
+			if actualizado == nil {
+				return nil, appPrefs.ErrUnavailable
+			}
+			return actualizado, nil
+		}
+		var condicional *types.ConditionalCheckFailedException
+		if !errors.As(err, &condicional) {
+			return nil, appPrefs.ErrUnavailable
+		}
+		actual, errLectura := s.Load(ctx, userID)
+		if errLectura != nil || actual == nil {
+			return nil, appPrefs.ErrUnavailable
+		}
+		if observada := actual.Version; observada != expected {
+			return nil, appPrefs.ErrVersionConflict
+		}
+	}
+	return nil, appPrefs.ErrConflict
 }
 
 func notificationPreferencesItem(userID, pk, sk string, p appPrefs.Preferences, now time.Time) map[string]types.AttributeValue {
