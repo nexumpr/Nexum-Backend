@@ -235,6 +235,22 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	depsOleada4.Preferencias = preferenciasWorkerOleada4(depsOleada4)
 	montarOleada4(depsOleada4)
 
+	// Oleada 5: registro cerrado E021/E064-E067/E074/E075. E072/E073 ya están
+	// montados por RegisterHealth y no se duplican aquí. Sólo se registran los
+	// E-ID con implementación presente; sin dependencias reales responden 503.
+	depsOleada5 := &dependenciasOleada5{
+		Router:      router,
+		Dynamo:      dynamoAPI,
+		Redis:       clienteRedis,
+		Tabla:       cfgDeps.TablaDynamoDB,
+		Logger:      logger,
+		Tokens:      verificadorTokens,
+		Authorizer:  logoutStore,
+		CursorKey:   claveCursorDesdeEntorno(),
+		DemoEnabled: demoHabilitadoOleada5(),
+	}
+	montarOleada5(depsOleada5)
+
 	// Emisor FCM real: se arranca sólo si existe credencial de servidor válida en
 	// el secret store/entorno. Sin ella el worker queda inerte y no se afirma E2E.
 	cfgFCM, errFCM := configuracionFCMOleada4DesdeEntorno()
