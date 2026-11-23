@@ -21,7 +21,7 @@
 | E062 | PATCH `/api/v1/notifications/{notificationId}/read` | `nexum_e062` | atómico E059–E063 | lectura atómica e idempotente | comparte suite E061 | NO | NO | — |
 | E063 | POST `/api/v1/notifications/read-all` | `nexum_e063` | atómico E059–E063 | 202 durable con reanudación | comparte suite E061 | NO | NO | — |
 
-> `NO` en `AWS funcional`/`HTTPS funcional` significa que no se ejecutó la prueba funcional individual con JWT. El despliegue real del release Oleada 4 y la disponibilidad HTTPS de las rutas se registran en §5; una respuesta 401 sin JWT confirma que la ruta existe.
+> `NO` en `AWS funcional`/`HTTPS funcional` significa que **no se ejecutó la prueba individual con JWT**. Tras el despliegue se comprobaron las **12 rutas** por HTTPS sin JWT (todas `401`) frente a una ruta inexistente de control (`404`): eso acredita presencia de ruta, no comportamiento funcional. El detalle por E-ID quedó registrado en los `checklist.md` actualizados (§6).
 
 ## 2. Evidencia de ejecución local
 
@@ -51,7 +51,7 @@
 - E014/E020: ver `IMPACTO_TRANSVERSAL_OLEADA4.md`; `GATE_TRANSVERSAL_O4=PENDIENTE` y E014/E020 quedan intactos.
 - Sin merge a `main` ni PR. El 2026-11-23 se aplicó con Gate el plan `tfplan-v2c` (SHA-256 `3e5a469091dfd1cf79e897632cb4402d9d8248651d3f0a93f0255bab91c2c492`): **0 altas / 5 cambios / 0 bajas**, único cambio funcional `SECRETOS_URI v1 → v2`; IAM sin pérdida de ARN; LT v18; refresh `4f95effd-6acf-4f04-a883-211283c34640` Successful 100 %. Después, con Gate de release propio, se desplegó `v0.20.0+4bf6758d372`: plan `tfplan-o4b` SHA-256 `e45b79c461d5a8cc4968ebd6606fe93ca0151eddc1b14c54fbaea3b1c5e95621` (**0 altas / 4 cambios / 0 bajas**), apply **0 added / 4 changed / 0 destroyed**, LT **v19**, refresh `914d3fc7-f808-4865-a744-689cfe749b61` Successful 100 % y ASG 2/2/2 con protección restaurada. `HTTPS_VERIFIED=SI` (`live` y `ready` 200 por CloudFront, DynamoDB/Redis UP). `FUNCTIONAL_VERIFIED=PARCIAL`: rutas nuevas responden 401 sin JWT; `recommendations`/`kmeans-v1` no consultado. Ver `OPERACION_FCM_AWS_OLEADA4.md` §4.1–§4.2.
 - `liz-oleada5` debe rebasearse tras la integración humana. E072/E073 permanecen `CONTRACT_BLOCKED` (Oleada 5).
-- Revisión final posterior a `9b5d950`: los ítems sin marcar en E052–E063 son Gates/despliegue/dos nodos/HTTPS/`race`/E2E, no código pendiente. Se corrigió la redacción de `E061/E062/E063-T12` para reflejar que el código sí quedó commitado y pusheado, y se marcó `E061-CT07` como no aplicable verificado.
+- Revisión final posterior a `9b5d950`: los ítems sin marcar en E052–E063 son Gates/`race`/CI Linux/E2E/prueba con JWT, no código pendiente. Se corrigió la redacción de `E061/E062/E063-T12` para reflejar que el código sí quedó commitado y pusheado, y se marcó `E061-CT07` como no aplicable verificado.
 
 ## 5. Despliegue real del binario Oleada 4 (2026-11-23)
 
@@ -65,7 +65,23 @@
 | Infraestructura | LT `lt-05445f32a7ee8a2f7` v19; refresh `914d3fc7-f808-4865-a744-689cfe749b61` `Successful 100 %`; ASG `nexum-h08i-asg-backend` 2/2/2 con `i-095a65bdfd7a95448` e `i-0a00134ccecc76ffa` `InService`/`Healthy`/`ProtectedFromScaleIn=True`. La protección se restauró manualmente tras el reemplazo de instancias. |
 | Consola EC2 | Ambas instancias: `BIN_SHA_OK=True`, `UNIT_SHA_OK=True`, `BUNDLE_V2_17=True`, `SERVICE_ACTIVE=True`, `BOOTSTRAP_ERROR=False`. |
 | HTTPS | CloudFront `https://d2lpmqy5w6x9es.cloudfront.net`: `/api/v1/health/live` y `/api/v1/health/ready` → 200, `dynamodb=UP`, `redis=UP`. |
-| Rutas nuevas | Sin JWT: `POST /api/v1/devices/push-tokens`, `GET /api/v1/notification-preferences` y `GET /api/v1/notifications` → 401; rutas inexistentes usadas como control → 404. |
+| Rutas nuevas | Sin JWT, las 12 operaciones E052–E063 responden `401`: `GET /analytics/insights`, `/analytics/categories`, `/analytics/spending-patterns`, `/analytics/recommendations`, `/analytics/savings-streak`, `/notification-preferences`, `/notifications`; `PUT /notification-preferences`; `POST /devices/push-tokens`, `/notifications/read-all`; `DELETE /devices/push-tokens/{id}`; `PATCH /notifications/{id}/read`. Ruta inexistente de control → 404. |
 | Límites | Sin streams en CloudWatch Logs ni agente SSM: no se confirmó por journal `FCM Oleada 4: worker iniciado`. Sin JWT no se consultó `recommendations`, por lo que `modelVersion:"kmeans-v1"` sigue sin verificación en producción. `FCM_E2E_PASS=NO`, `ML_GATE_APPROVED=NO`, `GATE_TRANSVERSAL_O4=PENDIENTE`, `CI_LINUX=PENDIENTE`, `go test -race=NOT_RUN_LOCAL`. |
 
 **Estados finales:** `AWS_DEPLOYED=SI` · `HTTPS_VERIFIED=SI` · `FCM_SERVICE_CREDENTIAL_INJECTED=SI` · `FCM_WORKER_ACTIVO=DESPLEGADO_NO_VERIFICADO_POR_LOG` · `FCM_CONFIGURED=SI_SIN_E2E` · `FCM_E2E_PASS=NO` · `FUNCTIONAL_VERIFIED=PARCIAL` · sin merge ni PR.
+
+## 6. Auditoría de cierre y checklists (actualización posterior al despliegue)
+
+Los doce `sdd/03-endpoints/E0xx-*/checklist.md` se actualizaron con la evidencia realmente ejecutada, sin marcar nada que no esté verificado:
+
+| Marca | Estado en los 12 checklists | Base de la marca |
+|---|---|---|
+| `[x]` despliegue en dos instancias, TLS e IaC | SÍ | release `v0.20.0+4bf6758d372`, LT v19, ASG 2/2/2, refresh `914d3fc7…` 100 %, `/health/live` y `/ready` 200 con DynamoDB/Redis UP. |
+| `[x]` Gate agregado de release y rollback preservado | SÍ | `tfplan-o4b` aplicado `0/4/0`; `v1` y `v0.19.2+3098f379d7ab` conservados. |
+| `[x]` presencia de ruta HTTPS | SÍ, 12/12 | `401` sin JWT en cada una de las 12 operaciones; `404` en ruta de control. |
+| `[ ]` prueba funcional con JWT en AWS | NO | Sin JWT válido; `FUNCTIONAL_VERIFIED_AWS=NO`. |
+| `[ ]` `go test -race` y CI Linux | NO | `NOT_RUN_LOCAL` · `CI_LINUX=PENDIENTE`. |
+| `[ ]` Gate individual por E-ID y firma H06 | NO | Se ejerció un Gate agregado de Oleada 4; `GATE_H06_PENDIENTE.md` sigue vigente. |
+| `[ ]` ML-155, transversal E014/E020 y FCM E2E | NO | `ML_GATE_APPROVED=NO` · `GATE_TRANSVERSAL_O4=PENDIENTE` · `FCM_E2E_PASS=NO`. |
+
+Las fichas `spec.md`, `plan.md`, `tasks.md` y el OpenAPI **no** se modificaron; solo se ajustaron checklists y documentos de control para que el registro sea verdadero.

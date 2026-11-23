@@ -175,13 +175,13 @@ terraform apply -var='secretos_version=v2'
 
 1. `curl -fsS https://<ALB>/api/v1/health/live` y `/ready` en los dos nodos.
 2. Revisar logs del servicio **sin imprimir secretos**: debe aparecer `FCM Oleada 4: worker iniciado` y **no** `FCM_CREDENCIAL_AUSENTE` ni `FCM_WORKER_NO_INICIADO`.
-3. `GET /api/v1/analytics/recommendations` con JWT válido: la respuesta debe traer `"modelVersion":"kmeans-v1"`. Eso confirma que el modelo embedido carga en producción.
+3. `GET /api/v1/analytics/recommendations` con JWT válido: la respuesta debe traer `"modelVersion":"kmeans-v1"`. Eso confirma que el modelo embebido carga en producción.
 4. Registrar en la evidencia: `FCM_SERVICE_CREDENTIAL_INJECTED=SI`, `NEXUM_FCM_PROJECT_ID=<id>`, versión del bundle `v2`, fecha y hash del objeto. **Nunca** el contenido del JSON ni las claves.
 5. La verificación final de entrega (`FCM_E2E_PASS=SI`) sigue exigiendo una notificación real recibida en `com.nexum.nexum`. Sin ese hecho, el estado honesto es "servidor configurado, entrega no verificada".
 
 ### 5.1 Resultado real de la verificación posterior (2026-11-23)
 
-- **Ítems 1 y rutas:** ejecutados. `/api/v1/health/live` y `/ready` → 200 con `dynamodb=UP` y `redis=UP`; `POST /api/v1/devices/push-tokens`, `GET /api/v1/notification-preferences` y `GET /api/v1/notifications` → 401 sin JWT, frente a 404 de rutas no desplegadas.
+- **Ítems 1 y rutas:** ejecutados. `/api/v1/health/live` y `/ready` → 200 con `dynamodb=UP` y `redis=UP`; las **12 operaciones E052–E063** responden 401 sin JWT (`GET` de las cinco analíticas, preferencias y bandeja; `PUT` de preferencias; `POST` de tokens y `read-all`; `DELETE` de dispositivo; `PATCH` de lectura), frente a 404 de una ruta inexistente de control. Eso acredita presencia de ruta, no funcionalidad con JWT.
 - **Ítem 2:** no verificable por log. `/nexum/h08i/backend` no tiene streams y no hay agente SSM; no se afirmó `FCM Oleada 4: worker iniciado`. Tampoco aparecieron errores de bootstrap en la consola de las dos instancias.
 - **Ítem 3:** no ejecutado. Sin JWT válido no se consultó `/api/v1/analytics/recommendations`; `modelVersion:"kmeans-v1"` sigue sin verificación en producción, aunque el modelo está embebido en el binario desplegado.
 - **Registro permitido:** release `v0.20.0+4bf6758d372`, binario SHA-256 `8f681d4ecf547bb40a45008a78bc683fe44aec5b19cdcea9858c8e51459ce94c`, unidad SHA-256 `6fa4d5fb051914102b1bc3b6cd2814e881bf02bb26df1d938f4f0d46e15705cc`, bundle `v2`, `NEXUM_FCM_PROJECT_ID=proyectonexum-ee910`. Nunca el JSON, las claves ni URLs presignadas.

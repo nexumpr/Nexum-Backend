@@ -1,6 +1,6 @@
 # Checklist de calidad — E055
 
-**Estado:** `CODE_IMPLEMENTADO_LOCAL=SI` · `CI_LOCAL=PASS` · `CI_LINUX=PENDIENTE` · `ML_GATE_APPROVED=NO` · `AWS_DEPLOYED=NO` · `HTTPS_VERIFIED=NO` · `FUNCTIONAL_VERIFIED=NO`.
+**Estado:** `CODE_IMPLEMENTADO_LOCAL=SI` · `CI_LOCAL=PASS` · `CI_LINUX=PENDIENTE` · `AWS_DEPLOYED=SI` · `HTTPS_RUTA_PRESENTE=SI` · `HTTPS_FUNCIONAL_CON_JWT=NO` · `FUNCTIONAL_VERIFIED_AWS=NO` · `RELEASE=v0.20.0+4bf6758d372` · `ML_GATE_APPROVED=NO`.
 
 - [x] Método/path conservan el ID del inventario H04 (`GET /api/v1/analytics/recommendations`, `nexum_e055`).
 - [x] Payload válido/negativo revisado: sin cuerpo; `period` validado con `^\d{4}-(0[1-9]|1[0-2])$`.
@@ -18,10 +18,14 @@
 - [x] Latencia local p95 `1.724 ms` con 500 movimientos (objetivo <= 300 ms) y benchmark `718127 ns/op`.
 - [x] `go vet ./...`, `go build ./...` y `go test ./... -count=1` PASS.
 - [ ] `go test -race`: **NOT_RUN_LOCAL** — requiere cgo/toolchain C ausente en Windows; CI Linux debe ejecutarlo.
-- [ ] CI/CD, dos instancias y TLS público: **NOT_RUN** sin Gate ni AWS.
-- [ ] Gate ML-155 y Gate individual de release: **PENDIENTE_APROBACION**; no se declara aprobado con código local.
+- [x] Despliegue real en dos instancias con TLS público e IaC aplicada bajo Gate: release `v0.20.0+4bf6758d372`, LT v19, ASG 2/2/2, refresh `914d3fc7-f808-4865-a744-689cfe749b61` Successful 100 %.
+- [ ] CI/CD ejecutado en Linux sobre el SHA exacto: **CI_LINUX=PENDIENTE**.
+- [x] Gate humano de release ejercido para el conjunto E052–E063: plan `tfplan-o4b` aplicado con `0 added, 4 changed, 0 destroyed`; rollback preservado (`v1`, `v0.19.2+3098f379d7ab`).
+- [ ] Gate ML-155 y Gate individual por E-ID: **PENDIENTE_APROBACION**; `ML_GATE_APPROVED=NO`.
 - [ ] Python 3.13 exacto: **DEVIACION_REGISTRADA** — el equipo tiene 3.14.5; el script es compatible con 3.13 y debe regenerarse en ese runtime si el Gate lo exige.
 - [x] Dependencias del cliente Mobile no constituyeron Gate del Backend.
 - [x] Sin cambios a `spec.md`, `plan.md` ni OpenAPI.
 
-**Cierre:** no se declara `PASS` de despliegue ni certificación funcional; evidencia local y CI Linux queda como autoridad. El Gate de ML requiere decisión humana explícita.
+- [x] Ruta HTTPS desplegada: sin JWT responde 401 en `https://d2lpmqy5w6x9es.cloudfront.net`; ruta inexistente de control responde 404. Verificado tras el despliegue.
+- [ ] Prueba funcional con JWT contra AWS: **NO_EJECUTADA**; `FUNCTIONAL_VERIFIED_AWS=NO`.
+**Cierre: despliegue y presencia de ruta verificados por HTTP sin JWT; no se declara `FUNCTIONAL_VERIFIED_AWS=SI`. Pendientes: prueba con JWT, `go test -race` y CI Linux. Gate ML-155 sin aprobación.**

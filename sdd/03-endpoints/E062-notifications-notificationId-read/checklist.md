@@ -1,6 +1,6 @@
 # Checklist de calidad — E062
 
-**Diseño H06:** review. **Implementación y evidencia local:** COMPLETADA. **Respuesta prevista:** 200 con `isRead=true`. **Despliegue/HTTP real:** BLOCKED_AWS / BLOCKED_TWO_NODE.
+**Diseño H06:** review. **Implementación y evidencia local:** COMPLETADA. **Respuesta prevista:** 200 con `isRead=true`. **Despliegue/HTTP real:** SI / 401_SIN_JWT.
 
 > Nota de contrato: el ejemplo `200` del OpenAPI muestra `isRead: false`, coherente con el estado previo, pero la semántica de E062 y la instrucción humana vigente exigen devolver el item real ya leído (`isRead=true`). Se implementa y se prueba ese valor; no se modifica el OpenAPI.
 
@@ -25,9 +25,11 @@ ok  	github.com/nexumpr/Nexum-Backend/cmd/server	0.170s [no tests to run]
 - [x] Errores cubiertos localmente: 400/401/404/409/429/503; 500 mapeado; 422 no se fabrica para una operación idempotente.
 - [x] PII/secretos ausentes en logs y fixtures; clave HMAC de cursores inyectada, nunca efímera.
 - [x] Tests unitarios reales, adaptador con fake DynamoDB y HTTP local: PASS.
-- [ ] Integración DynamoDB real y HTTP desde cliente externo: **BLOCKED_AWS**.
-- [ ] API en dos instancias, TLS público, CI/CD e IaC: **BLOCKED_TWO_NODE / BLOCKED_GATE_H08**.
-- [ ] Gate individual de release H08 y rollback aprobados antes de `terraform apply`: **BLOCKED_RELEASE**.
+- [ ] Integración funcional con DynamoDB real y cliente autenticado: **NO_EJECUTADA**; `/api/v1/health/ready` reporta `dynamodb=UP` y la ruta responde 401 sin JWT.
+- [x] Despliegue real en dos instancias con TLS público e IaC aplicada bajo Gate: release `v0.20.0+4bf6758d372`, LT v19, ASG 2/2/2, refresh `914d3fc7-f808-4865-a744-689cfe749b61` Successful 100 %.
+- [ ] CI/CD ejecutado en Linux sobre el SHA exacto: **CI_LINUX=PENDIENTE**.
+- [x] Gate humano de release ejercido para el conjunto E052–E063: plan `tfplan-o4b` aplicado con `0 added, 4 changed, 0 destroyed`; rollback preservado (`v1`, `v0.19.2+3098f379d7ab`).
+- [ ] Gate individual por E-ID: **NO_EJERCIDO**; se aplicó un Gate agregado de Oleada 4.
 - [x] Dependencias del cliente Mobile no constituyen Gate del Backend; no se modificaron.
 
 ## Criterios de aceptación de la enmienda (A8)
@@ -35,6 +37,7 @@ ok  	github.com/nexumpr/Nexum-Backend/cmd/server	0.170s [no tests to run]
 - [x] `unreadCount` aparece en la respuesta con el mismo tipo que en `PageOfNotification`.
 - [x] Se persiste el cambio real de `isRead` y se devuelve `true` tras la transición.
 - [x] Se consulta el detalle con la misma entidad `Notification` que el listado, sin campos extra.
-- [ ] Verificación por HTTP real tras despliegue autorizado: **BLOCKED_AWS**.
+- [x] Ruta HTTPS desplegada: sin JWT responde 401 en `https://d2lpmqy5w6x9es.cloudfront.net`; ruta inexistente de control responde 404. Verificado tras el despliegue.
+- [ ] Prueba funcional con JWT contra AWS: **NO_EJECUTADA**; `FUNCTIONAL_VERIFIED_AWS=NO`.
 
-**Criterio de cierre:** evidencia local ejecutada y registrada; queda REVIEW hasta aprobación del Gate H08. No se declara AWS_DEPLOYED sin despliegue real autorizado.
+**Cierre: despliegue y presencia de ruta verificados por HTTP sin JWT; no se declara `FUNCTIONAL_VERIFIED_AWS=SI`. Pendientes: prueba con JWT, `go test -race` y CI Linux. Gate transversal E014/E020 pendiente.**

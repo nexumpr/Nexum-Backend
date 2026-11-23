@@ -5,12 +5,12 @@
 | Rama | `liz-oleada4` |
 | Fecha | 2026-11-22 |
 | Alcance | E057–E063 + emisor FCM; reutilizable por E064–E067 en Oleada 5 |
-| Estado actual | `FIREBASE_CONSOLE_ACCESS=SI` · `FCM_SERVICE_CREDENTIAL_INJECTED=NO` · `ANDROID_DEVICE_READY=SI` · `FCM_E2E_PASS=NO` · `FCM_CONFIGURED=NO` hasta inyectar la credencial de servidor y ejecutar la prueba real |
+| Estado actual (post-despliegue) | `FIREBASE_CONSOLE_ACCESS=SI` · `FCM_SERVICE_CREDENTIAL_INJECTED=SI` · `ANDROID_DEVICE_READY=SI` · `FCM_CONFIGURED=SI_SIN_E2E` · `AWS_DEPLOYED=SI` · `FCM_E2E_PASS=NO` por decisión humana |
 | Costo | Firebase **plan Spark**, sin tarjeta, sin servicios facturables |
 
 > Documento de ejecución. **No hay credenciales, tokens ni JSON privado aquí.** No se han tocado proyectos externos ni AWS.
 >
-> Datos no secretos confirmados por el responsable: proyecto Firebase Spark ya creado; acceso delegado a `perezlizeth489@gmail.com` con rol **Editor**; `applicationId` real **`com.nexum.nexum`**; emulador/dispositivo con Google Play Services listo. El bloqueo previo por acceso a consola y por dispositivo quedó resuelto; **sigue pendiente la credencial de servidor**, por lo que `FCM_E2E_PASS` permanece `NO`.
+> Datos no secretos confirmados por el responsable: proyecto Firebase Spark ya creado; acceso delegado a `perezlizeth489@gmail.com` con rol **Editor**; `applicationId` real **`com.nexum.nexum`**; emulador/dispositivo con Google Play Services listo. El bloqueo previo por acceso a consola y por dispositivo quedó resuelto. La credencial de servidor se inyectó en el bundle `v2` desplegado (17 variables, contenido nunca impreso ni leído), pero **no se ejecutó la prueba con dispositivo**: `FCM_E2E_PASS=NO` por decisión humana, no por falta de credencial.
 
 ## 1. Configuración en Firebase Console (acceso confirmado)
 
@@ -58,7 +58,7 @@ Con el dispositivo/emulador ya listo:
 6. Verificar **dos hechos distintos**: FCM aceptó el envío **y** la app mostró la notificación.
 7. Repetir con usuario A/B: rotación, logout, E060, opt-out, `quietHours`, token inválido. Sin secretos en evidencia.
 
-Hasta completar el paso 6: `FCM_SERVICE_CREDENTIAL_INJECTED=NO` y `FCM_E2E_PASS=NO`. No basta con tener consola y dispositivo.
+Estado real: el paso 1 se completó con el bundle `v2`; los pasos 2–6 no se ejecutaron por decisión del responsable. Por tanto `FCM_SERVICE_CREDENTIAL_INJECTED=SI`, pero `FCM_ANDROID_E2E_PASS=NO` y `FCM_E2E_PASS=NO`. Tener consola, credencial y dispositivo no equivale a notificación recibida.
 
 ## 5. Handoff y AWS (responsable)
 
@@ -68,7 +68,7 @@ Al propietario: enlaces de consola, IDs no secretos, paquete `com.nexum.nexum`, 
 
 `FIREBASE_CONSOLE_ACCESS` · `FCM_SERVICE_CREDENTIAL_INJECTED` · `ANDROID_DEVICE_READY` · `FCM_CONFIGURED` · `FCM_ANDROID_E2E_PASS` · `FCM_E2E_PASS` · `AWS_DEPLOYED` · `HTTPS_VERIFIED` · `FUNCTIONAL_VERIFIED` · `ANDROID_ACCEPTED` se informan por separado; uno no implica el otro.
 
-Estado actual: `FIREBASE_CONSOLE_ACCESS=SI` · `FCM_SERVICE_CREDENTIAL_INJECTED=NO` · `ANDROID_DEVICE_READY=SI` · `FCM_CONFIGURED=NO` · `FCM_E2E_PASS=NO` · `AWS_DEPLOYED=NO`.
+Estado actual: `FIREBASE_CONSOLE_ACCESS=SI` · `FCM_SERVICE_CREDENTIAL_INJECTED=SI` · `ANDROID_DEVICE_READY=SI` · `FCM_CONFIGURED=SI_SIN_E2E` · `FCM_WORKER_ACTIVO=DESPLEGADO_NO_VERIFICADO_POR_LOG` · `FCM_ANDROID_E2E_PASS=NO` · `FCM_E2E_PASS=NO` · `AWS_DEPLOYED=SI` · `HTTPS_VERIFIED=SI` · `FUNCTIONAL_VERIFIED=PARCIAL` · `ANDROID_ACCEPTED=NO`.
 
 ## 7. Integración de código (constructores)
 

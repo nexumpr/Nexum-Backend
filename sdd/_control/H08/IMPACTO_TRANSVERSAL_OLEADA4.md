@@ -1,6 +1,6 @@
 # Impacto transversal de la Oleada 4 (E052–E063) sobre E014/E020
 
-**Estado:** propuesta documental, `PENDIENTE_GATE_TRANSVERSAL_O4`. No se ha modificado E014 ni E020. No se ha tocado AWS, Terraform, OpenAPI, `spec.md` ni `plan.md`.
+**Estado:** propuesta documental, `PENDIENTE_GATE_TRANSVERSAL_O4`. E014 y E020 siguen intactos; OpenAPI, `spec.md` y `plan.md` no se modificaron. El documento se redactó antes del despliegue de la Oleada 4; después se aplicó con Gate el bundle `v2` y la release `v0.20.0+4bf6758d372` (Terraform/IAM/LT v19 y AWS), sin tocar por ello E014 ni E020.
 
 ## 1. Familias de datos introducidas por E052–E063
 
@@ -50,4 +50,4 @@ Archivos previstos: `internal/application/export/export.go` y el adaptador de ex
 
 ## 5. Estado de despliegue
 
-`CODE_IMPLEMENTADO_EN_LOCAL=PARCIAL` · `AWS_DEPLOYED=NO` · `HTTPS_VERIFIED_AWS=NO` · `FCM_E2E_PASS=NO` (sin credencial de servidor ni dispositivo real inyectados) · `ML_GATE_APPROVED=NO` · `GATE_TRANSVERSAL_O4=PENDIENTE`.
+`CODE_IMPLEMENTADO_EN_LOCAL=SI` · `AWS_DEPLOYED=SI` (release `v0.20.0+4bf6758d372`, bundle `v2`) · `HTTPS_VERIFIED_AWS=SI` (health 200 y 12 rutas con 401 sin JWT) · `FUNCTIONAL_VERIFIED_AWS=NO` (sin JWT) · `FCM_SERVICE_CREDENTIAL_INJECTED=SI` · `FCM_E2E_PASS=NO` (prueba con dispositivo no ejecutada por decisión humana) · `ML_GATE_APPROVED=NO` · `GATE_TRANSVERSAL_O4=PENDIENTE` · `BLOCKED_INTEGRACION_TRANSVERSAL`.
