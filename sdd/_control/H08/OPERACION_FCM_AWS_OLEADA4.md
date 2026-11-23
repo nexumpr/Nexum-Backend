@@ -1,7 +1,7 @@
 # Operación FCM en AWS — Oleada 4 (E057–E063)
 
 **Rama:** `liz-oleada4` · **Autoridad:** guía V2 §6.1–§6.12/F + OpenAPI + `FIREBASE_FCM_OLEADA4_RUNBOOK.md`
-**Fecha:** 2026-11-22 · **Estado:** `FCM_SERVICE_CREDENTIAL_INJECTED=NO` · `AWS_DEPLOYED=NO` · `FCM_E2E_PASS=NO`
+**Fecha:** 2026-11-22 · **Estado:** `RELEASE_DESPLEGADA=v0.20.0+4bf6758d372` · `FCM_SERVICE_CREDENTIAL_INJECTED=SI` · `AWS_DEPLOYED=SI` · `FCM_E2E_PASS=NO`
 
 > Documento operativo para el responsable de AWS. **No contiene secretos.** El JSON de cuenta de servicio y las claves B64 se generan y permanecen fuera del repositorio. Ningún valor se pega en chat, `memoria.md`, evidencia ni Terraform state.
 
@@ -18,7 +18,7 @@
 | Modelo K-Means `kmeans-v1` | `ml/artifact.go` (`go:embed` dentro del binario) | **No**: no hay Python ni archivos ML en el runtime |
 | Inyección de secretos al proceso | `infra/terraform/modules/computo/user-data.sh.tftpl` → `/etc/nexum/backend.env` → `infra/systemd/nexum-backend.service` | Sí: publicar nueva versión del bundle |
 
-**Conclusión:** el código está listo. Lo único que falta para que FCM funcione desplegado es **inyectar la credencial de servidor** en el bundle de secretos.
+**Conclusión:** el bundle `v2` con la credencial de servidor y el binario Oleada 4 con el emisor/worker FCM están desplegados (§4.2). Falta únicamente la prueba E2E con dispositivo, no ejecutada por decisión humana.
 
 ---
 
@@ -151,11 +151,21 @@ terraform apply -var='secretos_version=v2'
 - Gate 2 (humano): autorización para desproteger temporalmente las dos instancias, relanzar el refresh y volver a protegerlas. Refresh `4f95effd-6acf-4f04-a883-211283c34640`: **Successful 100 %**, estratégia Rolling (`min_healthy=100`, `max_healthy=200`, `warmup=120`), ASG final 2/2/2. Protección `ProtectedFromScaleIn=True` restaurada en ambas instancias (`i-06838d26d116db732`, `i-0db7e5679704d21b9`), ambas `InService`/`Healthy`.
 - Evidencia de inyección sin secretos: `aws ec2 get-console-output` de ambas instancias muestra `[bootstrap] configuracion instalada (version v2, 17 variables)`, además del SHA del binario `acd45cf9…ac553213` y de la unidad `6fa4d5fb…e15705cc`, idénticos a los declarados. No se leyó ni imprimió `/etc/nexum/backend.env`; no hay agente SSM en las instancias.
 - HTTPS por CloudFront (`https://d2lpmqy5w6x9es.cloudfront.net`): `/api/v1/health/live` → **200** `{"status":"UP"}`; `/api/v1/health/ready` → **200** `{"status":"UP","dependencies":{"dynamodb":"UP","redis":"UP"}}`.
-- `CloudWatch Logs /nexum/h08i/backend` no tiene streams, así que no hay evidencia de arranque del worker FCM por logs. Además, el binario desplegado `v0.19.2+3098f379d7ab` es **anterior** al commit `9b5d950` que implementa el emisor FCM; por tanto **el worker FCM no está ejecutándose en producción**. El bundle `v2` deja la configuración lista, pero hace falta publicar y desplegar un binario Oleada 4 con Gate propio para activarlo.
+- `CloudWatch Logs /nexum/h08i/backend` no tiene streams, así que no hay evidencia de arranque del worker FCM por logs. En ese momento el binario desplegado `v0.19.2+3098f379d7ab` era **anterior** al commit `9b5d950` que implementa el emisor FCM; por tanto el worker FCM no estaba ejecutándose en producción. El bundle `v2` dejó la configuración lista y el binario Oleada 4 se desplegó después, con Gate propio, en §4.2.
+
+### 4.2 Despliegue del binario Oleada 4 (2026-11-23, Gate de release)
+
+- **Gate humano:** autorización expresa del responsable para publicar y desplegar el artefacto Oleada 4 («haz lo que hace falta para que FCM funcione»). Sin merge a `main`, PR ni cambio de contrato.
+- **Artefacto:** `nexum-backend-linux-arm64`, 22 755 777 B, SHA-256 `8f681d4ecf547bb40a45008a78bc683fe44aec5b19cdcea9858c8e51459ce94c`, compilado desde `4bf6758d372` con `GOOS=linux GOARCH=arm64 CGO_ENABLED=0`, `-trimpath` y `-buildvcs=true`. Unidad `nexum-backend.service` SHA-256 `6fa4d5fb051914102b1bc3b6cd2814e881bf02bb26df1d938f4f0d46e15705cc`. Marcadores verificados en local antes de publicar: `FCM Oleada 4`, `worker iniciado`, `kmeans-v1` y `NEXUM_FCM_CREDENTIALS_JSON`.
+- **Publicación:** `s3://nexum-h08i-artefactos-713797602090/releases/v0.20.0+4bf6758d372/` con los dos objetos anteriores, mediante PUT presignado con SSE-S3 (`AES256`); ambas respuestas HTTP **200**. La política del bucket niega `GetObject` al rol publicador, por lo que no se releyó el objeto con esa identidad; la integridad efectiva se comprobó después en la consola de las instancias.
+- **Terraform:** el `tfvars` se corrigió para conservar exactamente **34 ARN** de artefactos y 4 referencias al release nuevo, sin duplicados. Plan `tfplan-o4b` SHA-256 `e45b79c461d5a8cc4968ebd6606fe93ca0151eddc1b14c54fbaea3b1c5e95621`: `TFPLAN_O4B_RC=0`, `Plan: 0 to add, 4 to change, 0 to destroy`. Apply: `TFAPPLY_O4_RC=0`, `Apply complete! 0 added, 4 changed, 0 destroyed`; log `tfapply-o4.log` SHA-256 `79bef7c0f838d6a034339a96063e4715da58d24e34b31fbad6582f3a8b1957a5`. Cambios: `module.computo[0].aws_launch_template.backend`, `module.computo[0].terraform_data.invariantes_computo`, `module.iam.aws_iam_role_policy.runtime` y `module.iam.terraform_data.iam_preconditions`. Launch template `lt-05445f32a7ee8a2f7` pasó a la versión **19**. La contraseña RBAC se tomó en CloudShell desde el bundle privado y se pasó como variable de entorno a Terraform; nunca se imprimió ni versionó.
+- **Instance refresh:** `914d3fc7-f808-4865-a744-689cfe749b61`, Rolling, **Successful 100 %**. La restauración automática de protección del script falló porque las instancias originales ya habían sido reemplazadas; se corrigió aplicando protección a las instancias nuevas. Estado final: ASG `nexum-h08i-asg-backend` **2/2/2**, `i-095a65bdfd7a95448` e `i-0a00134ccecc76ffa` `InService`/`Healthy` y `ProtectedFromScaleIn=True`.
+- **Verificación:** consola de EC2 en ambas instancias con `BIN_SHA_OK=True`, `UNIT_SHA_OK=True`, `BUNDLE_V2_17=True`, `SERVICE_ACTIVE=True`, `BOOTSTRAP_ERROR=False`. HTTPS por CloudFront: `/api/v1/health/live` y `/api/v1/health/ready` → **200**, `dynamodb=UP`, `redis=UP`. Las rutas nuevas `POST /api/v1/devices/push-tokens`, `GET /api/v1/notification-preferences` y `GET /api/v1/notifications` devuelven **401 sin JWT** (frente al 404 de rutas inexistentes): el binario Oleada 4 está sirviendo.
+- **Límite honesto:** CloudWatch sigue sin streams y las instancias no tienen agente SSM, así que no fue posible leer el journal para confirmar literalmente `FCM Oleada 4: worker iniciado`. Tampoco se ejecutó la prueba E2E con dispositivo ni `GET /api/v1/analytics/recommendations` con JWT para ver `modelVersion:"kmeans-v1"`. El worker y el modelo están **desplegados** en el binario verificado; su arranque/respuesta no se declara verificado por log, JWT o dispositivo.
 
 ### Rollback
 
-1. `terraform apply -var='secretos_version=v1'` con plan y Gate propios. Implica otro refresh y una breve interrupción; **no** es una operación de impacto cero.
+1. Para volver al estado previo a Oleada 4 hay que restaurar también las URI/SHA del release `v0.19.2+3098f379d7ab` en el `tfvars`, además de `secretos_version=v1`, con plan y Gate propios. Implica otro refresh y una breve interrupción; **no** es una operación de impacto cero. `v1` y el release anterior se conservan únicamente a efectos de rollback.
 2. Si el refresh no se dispara solo, ejecútalo manualmente. Si las instancias están protegidas, repite el procedimiento de desprotección temporal con Gate, y restaura la protección al terminar.
 3. No elimines el objeto `v2` hasta confirmar que el rollback funcionó.
 
@@ -168,6 +178,13 @@ terraform apply -var='secretos_version=v2'
 3. `GET /api/v1/analytics/recommendations` con JWT válido: la respuesta debe traer `"modelVersion":"kmeans-v1"`. Eso confirma que el modelo embedido carga en producción.
 4. Registrar en la evidencia: `FCM_SERVICE_CREDENTIAL_INJECTED=SI`, `NEXUM_FCM_PROJECT_ID=<id>`, versión del bundle `v2`, fecha y hash del objeto. **Nunca** el contenido del JSON ni las claves.
 5. La verificación final de entrega (`FCM_E2E_PASS=SI`) sigue exigiendo una notificación real recibida en `com.nexum.nexum`. Sin ese hecho, el estado honesto es "servidor configurado, entrega no verificada".
+
+### 5.1 Resultado real de la verificación posterior (2026-11-23)
+
+- **Ítems 1 y rutas:** ejecutados. `/api/v1/health/live` y `/ready` → 200 con `dynamodb=UP` y `redis=UP`; `POST /api/v1/devices/push-tokens`, `GET /api/v1/notification-preferences` y `GET /api/v1/notifications` → 401 sin JWT, frente a 404 de rutas no desplegadas.
+- **Ítem 2:** no verificable por log. `/nexum/h08i/backend` no tiene streams y no hay agente SSM; no se afirmó `FCM Oleada 4: worker iniciado`. Tampoco aparecieron errores de bootstrap en la consola de las dos instancias.
+- **Ítem 3:** no ejecutado. Sin JWT válido no se consultó `/api/v1/analytics/recommendations`; `modelVersion:"kmeans-v1"` sigue sin verificación en producción, aunque el modelo está embebido en el binario desplegado.
+- **Registro permitido:** release `v0.20.0+4bf6758d372`, binario SHA-256 `8f681d4ecf547bb40a45008a78bc683fe44aec5b19cdcea9858c8e51459ce94c`, unidad SHA-256 `6fa4d5fb051914102b1bc3b6cd2814e881bf02bb26df1d938f4f0d46e15705cc`, bundle `v2`, `NEXUM_FCM_PROJECT_ID=proyectonexum-ee910`. Nunca el JSON, las claves ni URLs presignadas.
 
 ---
 
@@ -183,6 +200,6 @@ terraform apply -var='secretos_version=v2'
 
 ## 7. Estados a reportar
 
-`FIREBASE_CONSOLE_ACCESS=SI` · `ANDROID_DEVICE_READY=SI` · `FIREBASE_MESSAGING_ADMIN_CREADO=SI` · `BUNDLE_V2_PREFLIGHT=OK` · `V2_PUBLICADO=SI` · `V1_PRESERVADO=SI` · `FCM_SERVICE_CREDENTIAL_INJECTED=SI` (bootstrap v2, 17 variables, verificado en consola; contenido no leído) · `FCM_WORKER_ACTIVO=NO` (binario `v0.19.2+3098f379d7ab` anterior al código FCM) · `FCM_CONFIGURED=PARCIAL` · `FCM_E2E_PASS=NO` · `ML_GATE_APPROVED=NO` · `AWS_DEPLOYED=SI` (configuración v2 aplicada; release sin cambiar) · `HTTPS_VERIFIED=SI` · `FUNCTIONAL_VERIFIED=NO` (recommendations con JWT no ejecutado: el binario no contiene `kmeans-v1`).
+`FIREBASE_CONSOLE_ACCESS=SI` · `ANDROID_DEVICE_READY=SI` · `FIREBASE_MESSAGING_ADMIN_CREADO=SI` · `BUNDLE_V2_PREFLIGHT=OK` · `V2_PUBLICADO=SI` · `V1_PRESERVADO=SI` · `FCM_SERVICE_CREDENTIAL_INJECTED=SI` (bootstrap v2, 17 variables, verificado en consola; contenido no leído) · `RELEASE_DESPLEGADA=v0.20.0+4bf6758d372` · `FCM_WORKER_ACTIVO=DESPLEGADO_NO_VERIFICADO_POR_LOG` (binario con emisor/worker verificado en consola; sin streams de CloudWatch ni SSM) · `FCM_CONFIGURED=SI_SIN_E2E` · `FCM_E2E_PASS=NO` · `ML_GATE_APPROVED=NO` · `AWS_DEPLOYED=SI` (configuración v2 + binario Oleada 4) · `HTTPS_VERIFIED=SI` · `FUNCTIONAL_VERIFIED=PARCIAL` (rutas nuevas responden 401 sin JWT; `recommendations`/`kmeans-v1` no consultado) · `GATE_TRANSVERSAL_O4=PENDIENTE` · `CI_LINUX=PENDIENTE` · `go test -race=NOT_RUN_LOCAL`.
 
-Para activar el worker FCM hace falta un **Gate nuevo** de publicación de artefacto Oleada 4, plan con las URI/SHA del binario y la unidad, apply y refresh; después sí aplican las comprobaciones de la sección 5.
+El worker FCM quedó **desplegado** con el release `v0.20.0+4bf6758d372`; para elevar `FCM_E2E_PASS=SI` hace falta una notificación real recibida en `com.nexum.nexum`, no ejecutada por decisión humana. Para verificar `kmeans-v1` en producción se requiere además una consulta autenticada de `recommendations`.
