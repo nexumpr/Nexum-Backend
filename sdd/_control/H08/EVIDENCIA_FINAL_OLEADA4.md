@@ -27,7 +27,7 @@
 - `go vet ./...` PASS; `go build ./...` PASS.
 - `go test ./... -count=1 -timeout 600s` PASS (todos los paquetes, incluidos `cmd/server`, `internal/...`, `ml` y `tests/...`).
 - Pruebas nuevas: 8 app + 7 Dynamo + 8 HTTP (E059/E060); 7 app + 5 Dynamo + 5 HTTP (E061–E063); 11 app + 6 Dynamo + 6 HTTP v1 + 1 integración de fuente E059 + 3 de configuración de claves (FCM/outbox).
-- `py -3 herramientas/validar_sdd_integral.py --check-git` → `H06_CONTRACT_PASS` (75 operaciones; 300 specs; 33M+23S+12E+7O; OpenAPI 3.1 válido) y `SDD_DOCUMENTAL_PASS` (893 archivos rastreados; SHA256 exacto; AWS/HTTP NOT_RUN).
+- `py -3 herramientas/validar_sdd_integral.py --check-git` → `H06_CONTRACT_PASS` (75 operaciones; 300 specs; 33M+23S+12E+7O; OpenAPI 3.1 válido) y `SDD_DOCUMENTAL_PASS` (894 archivos rastreados; SHA256 exacto; AWS/HTTP NOT_RUN).
 - `py -3 herramientas/verificar_iac_devsecops.py` → `IAC_DEVSECOPS_PASS: 51 archivos sin hallazgos`.
 - `go test -race`: `NOT_RUN_LOCAL` — requiere cgo/gcc ausente en Windows; CI Linux es autoridad.
 
@@ -39,12 +39,14 @@
 - El worker lee `tokenCipher` base64 de E059 con AAD `<userID>|<deviceID>`, omite dispositivos `active=false` y replica la baja E060 ante `UNREGISTERED`.
 - Claves de runtime: `NEXUM_PUSH_TOKEN_KEY_B64` (AES-GCM, alias `NEXUM_PUSH_TOKEN_KEY`) y `NEXUM_NOTIFICATION_CURSOR_KEY_B64` (HMAC). Nunca se generan efímeras: sin clave válida, 503. Nunca aparecen en repo, logs, `memoria.md` ni evidencia.
 - Firebase: proyecto Spark creado, acceso Editor delegado, `applicationId=com.nexum.nexum`, dispositivo/emulador con Google Play Services listo. **Credencial privada de servidor nunca se pegó en chat/repo.**
-- `FCM_SERVICE_CREDENTIAL_INJECTED=NO`, `FCM_E2E_PASS=NO`; el worker no se inicia en runtime sin credencial válida.
+- `FCM_SERVICE_CREDENTIAL_INJECTED=SI` desde el 2026-11-23: el bundle `v2` (17 variables, 13 de `v1` + 4 FCM) fue publicado en S3 y el bootstrap de las dos instancias nuevas registró `[bootstrap] configuracion instalada (version v2, 17 variables)`. El contenido del JSON y las claves **nunca** se imprimieron ni se leyeron desde la instancia.
+- `FCM_WORKER_ACTIVO=NO`, `FCM_CONFIGURED=PARCIAL`: el release productivo sigue siendo `v0.19.2+3098f379d7ab`, anterior al commit `9b5d950` que implementa el emisor. La credencial está inyectada, pero el binario desplegado no tiene código para usarla. Hace falta publicar/desplegar un artefacto Oleada 4 con Gate propio.
+- `FCM_E2E_PASS=NO` por decisión del responsable: no se realizó prueba con dispositivo.
 
 ## 4. ML / transversal / límites honestos
 
 - ML: artefacto `kmeans-v1` SHA256 `1997370f1c148df63e126e477d1f931c565d2b1f9b54dd57dc1e48b1a16d48cf`; datos SHA256 `8d2bf29691a08eee6a1cd1230ad81b8454712424721e5e3e21bb9e9bd99918fd`; `ML_GATE_APPROVED=NO`.
 - E014/E020: ver `IMPACTO_TRANSVERSAL_OLEADA4.md`; `GATE_TRANSVERSAL_O4=PENDIENTE` y E014/E020 quedan intactos.
-- Sin merge a `main`, PR, AWS, Terraform, IaC apply ni despliegue. Release productiva sigue `v0.19.2+3098f379d7ab`.
+- Sin merge a `main`, PR ni cambio de release. El 2026-11-23 se aplicó con Gate el plan `tfplan-v2c` (SHA-256 `3e5a469091dfd1cf79e897632cb4402d9d8248651d3f0a93f0255bab91c2c492`): **0 altas / 5 cambios / 0 bajas**, único cambio funcional `SECRETOS_URI v1 → v2`; IAM sin pérdida de ARN. Release productiva sigue `v0.19.2+3098f379d7ab`; LT v18; refresh `4f95effd-6acf-4f04-a883-211283c34640` Successful 100 %; ASG 2/2/2 con protección restaurada. `HTTPS_VERIFIED=SI` (`live` y `ready` 200 por CloudFront, DynamoDB/Redis UP). `FUNCTIONAL_VERIFIED=NO`: `recommendations`/`kmeans-v1` no se pudo verificar en producción porque el binario no incluye E055. Ver `OPERACION_FCM_AWS_OLEADA4.md` §4.1.
 - `liz-oleada5` debe rebasearse tras la integración humana. E072/E073 permanecen `CONTRACT_BLOCKED` (Oleada 5).
 - Revisión final posterior a `9b5d950`: los ítems sin marcar en E052–E063 son Gates/despliegue/dos nodos/HTTPS/`race`/E2E, no código pendiente. Se corrigió la redacción de `E061/E062/E063-T12` para reflejar que el código sí quedó commitado y pusheado, y se marcó `E061-CT07` como no aplicable verificado.

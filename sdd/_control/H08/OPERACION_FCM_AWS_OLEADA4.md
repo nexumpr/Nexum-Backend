@@ -143,10 +143,20 @@ terraform apply -var='secretos_version=v2'
 
 > Usar `-var` evita editar `variables.tf` y hace el rollback trivial. La instancia nueva descarga `v2`, genera `/etc/nexum/backend.env` con permisos `0640 root:nexum` y reinicia el servicio. Las instancias antiguas **no leen el bundle nuevo** hasta ser reemplazadas; verifica que el refresh termine con dos nodos sanos.
 
+### 4.1 Ejecución real del rollout (2026-11-23, con Gates explícitos)
+
+- Gate 1 (humanos): autorización para aplicar el plan `tfplan-v2c`, SHA-256 `3e5a469091dfd1cf79e897632cb4402d9d8248651d3f0a93f0255bab91c2c492`. Plan **0 altas / 5 cambios / 0 bajas**; el único cambio funcional fue `SECRETOS_URI` de `v1` a `v2` en el `user_data` (158 líneas antes/después, diff de 5 líneas). La política IAM conservó sus 34 ARN de rollback. Se descartó el plan inicial con defaults porque proponía destruir la aplicación.
+- `terraform apply -auto-approve` sobre ese plan: **Apply complete! 0 added, 5 changed, 0 destroyed**. Launch template `lt-05445f32a7ee8a2f7` pasó a la versión **18**, con `SECRETOS_URI="s3://nexum-h08i-secretos-713797602090/nexum/secrets/v2/secrets.json"`.
+- Terraform **no disparó instance refresh**. El primer refresh manual (`61ab3404-4895-41cb-a96e-aa0d2f3c3c9e`) quedó bloqueado al 0 % porque `protect_from_scale_in = true`: AWS indicó `is protected. Remove instance scale-in protection to continue`. Se canceló (`Cancelled`) sin impacto de servicio; las instancias seguían sanas con `v1`.
+- Gate 2 (humano): autorización para desproteger temporalmente las dos instancias, relanzar el refresh y volver a protegerlas. Refresh `4f95effd-6acf-4f04-a883-211283c34640`: **Successful 100 %**, estratégia Rolling (`min_healthy=100`, `max_healthy=200`, `warmup=120`), ASG final 2/2/2. Protección `ProtectedFromScaleIn=True` restaurada en ambas instancias (`i-06838d26d116db732`, `i-0db7e5679704d21b9`), ambas `InService`/`Healthy`.
+- Evidencia de inyección sin secretos: `aws ec2 get-console-output` de ambas instancias muestra `[bootstrap] configuracion instalada (version v2, 17 variables)`, además del SHA del binario `acd45cf9…ac553213` y de la unidad `6fa4d5fb…e15705cc`, idénticos a los declarados. No se leyó ni imprimió `/etc/nexum/backend.env`; no hay agente SSM en las instancias.
+- HTTPS por CloudFront (`https://d2lpmqy5w6x9es.cloudfront.net`): `/api/v1/health/live` → **200** `{"status":"UP"}`; `/api/v1/health/ready` → **200** `{"status":"UP","dependencies":{"dynamodb":"UP","redis":"UP"}}`.
+- `CloudWatch Logs /nexum/h08i/backend` no tiene streams, así que no hay evidencia de arranque del worker FCM por logs. Además, el binario desplegado `v0.19.2+3098f379d7ab` es **anterior** al commit `9b5d950` que implementa el emisor FCM; por tanto **el worker FCM no está ejecutándose en producción**. El bundle `v2` deja la configuración lista, pero hace falta publicar y desplegar un binario Oleada 4 con Gate propio para activarlo.
+
 ### Rollback
 
-1. `terraform apply -var='secretos_version=v1'`.
-2. Si el refresh no se dispara solo, ejecuta el instance refresh autorizado desde la consola.
+1. `terraform apply -var='secretos_version=v1'` con plan y Gate propios. Implica otro refresh y una breve interrupción; **no** es una operación de impacto cero.
+2. Si el refresh no se dispara solo, ejecútalo manualmente. Si las instancias están protegidas, repite el procedimiento de desprotección temporal con Gate, y restaura la protección al terminar.
 3. No elimines el objeto `v2` hasta confirmar que el rollback funcionó.
 
 ---
@@ -173,4 +183,6 @@ terraform apply -var='secretos_version=v2'
 
 ## 7. Estados a reportar
 
-`FIREBASE_CONSOLE_ACCESS=SI` · `ANDROID_DEVICE_READY=SI` · `FIREBASE_MESSAGING_ADMIN_CREADO=SI` · `BUNDLE_V2_PREFLIGHT=PENDIENTE` · `FCM_SERVICE_CREDENTIAL_INJECTED=NO` · `FCM_CONFIGURED=NO` · `FCM_E2E_PASS=NO` · `ML_GATE_APPROVED=NO` · `AWS_DEPLOYED=NO` · `HTTPS_VERIFIED=NO`
+`FIREBASE_CONSOLE_ACCESS=SI` · `ANDROID_DEVICE_READY=SI` · `FIREBASE_MESSAGING_ADMIN_CREADO=SI` · `BUNDLE_V2_PREFLIGHT=OK` · `V2_PUBLICADO=SI` · `V1_PRESERVADO=SI` · `FCM_SERVICE_CREDENTIAL_INJECTED=SI` (bootstrap v2, 17 variables, verificado en consola; contenido no leído) · `FCM_WORKER_ACTIVO=NO` (binario `v0.19.2+3098f379d7ab` anterior al código FCM) · `FCM_CONFIGURED=PARCIAL` · `FCM_E2E_PASS=NO` · `ML_GATE_APPROVED=NO` · `AWS_DEPLOYED=SI` (configuración v2 aplicada; release sin cambiar) · `HTTPS_VERIFIED=SI` · `FUNCTIONAL_VERIFIED=NO` (recommendations con JWT no ejecutado: el binario no contiene `kmeans-v1`).
+
+Para activar el worker FCM hace falta un **Gate nuevo** de publicación de artefacto Oleada 4, plan con las URI/SHA del binario y la unidad, apply y refresh; después sí aplican las comprobaciones de la sección 5.
