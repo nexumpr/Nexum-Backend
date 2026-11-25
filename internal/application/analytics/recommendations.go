@@ -134,7 +134,6 @@ func (s *Service) Recommendations(ctx context.Context, userID, periodo string) (
 
 	muestreados, limitado := muestraDeterminista(utiles, RecommendationMaxMovements)
 	registros := make([]ml.Registro, 0, len(muestreados))
-	importes := make([]int64, 0, len(muestreados))
 	for _, movimiento := range muestreados {
 		registros = append(registros, ml.Registro{
 			Category:    strings.TrimSpace(movimiento.CategoryID),
@@ -144,10 +143,11 @@ func (s *Service) Recommendations(ctx context.Context, userID, periodo string) (
 			DayOfWeek: (int(movimiento.OccurredAt.UTC().Weekday()) + 6) % 7,
 			Recurring: strings.TrimSpace(movimiento.RecurringPaymentID) != "",
 		})
-		importes = append(importes, movimiento.AmountCents)
 	}
-	mediana := medianaEntera(importes)
-	asignaciones, err := modelo.Assign(registros, float64(mediana))
+	// El modelo calcula internamente el recorte global y la mediana de importes
+	// recortados del titular. No se le pasa una mediana externa para que la
+	// definición de train y serve sea exactamente la misma.
+	asignaciones, err := modelo.Assign(registros)
 	if err != nil {
 		return nil, ErrUnavailable
 	}
@@ -223,6 +223,10 @@ type infoCluster struct {
 
 // ventanaRecomendaciones aplica el periodo explícito del contrato o, si falta,
 // la ventana móvil de 90 días del diseño ML-155. Todas las fechas son UTC.
+//
+// La línea "excluir el trimestre en curso" del diseño no se aplica: contradice la
+// ventana explícita de 90 días y no forma parte del contrato E055 aprobado. Queda
+// registrada para enmienda del diseño; los datos del trimestre en curso sí cuentan.
 func (s *Service) ventanaRecomendaciones(userID, periodo string) (time.Time, time.Time, string, error) {
 	ahora := time.Now().UTC()
 	if s != nil && s.now != nil {

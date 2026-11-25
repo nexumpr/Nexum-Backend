@@ -14,6 +14,7 @@ import (
 	appAnalytics "github.com/nexumpr/Nexum-Backend/internal/application/analytics"
 	appMovements "github.com/nexumpr/Nexum-Backend/internal/application/movements"
 	internalhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
+	"github.com/nexumpr/Nexum-Backend/ml"
 )
 
 type e055HTTPSource struct {
@@ -90,7 +91,7 @@ func TestE055HTTPContratoValido(t *testing.T) {
 	uuid := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 	for _, item := range cuerpo.Items {
 		if !uuid.MatchString(item.ID) || item.Title == "" || item.Reason == "" ||
-			item.Disclaimer != appAnalytics.RecommendationDisclaimer || item.ModelVersion != "kmeans-v1" {
+			item.Disclaimer != appAnalytics.RecommendationDisclaimer || item.ModelVersion != ml.ActiveModelVersion {
 			t.Fatalf("item fuera de contrato: %+v", item)
 		}
 	}

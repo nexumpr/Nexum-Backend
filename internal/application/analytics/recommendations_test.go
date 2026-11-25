@@ -103,8 +103,8 @@ func TestE055RecomendacionesKMeansReales(t *testing.T) {
 			t.Fatalf("id duplicado: %s", item.ID)
 		}
 		visto[item.ID] = true
-		if item.ModelVersion != "kmeans-v1" {
-			t.Fatalf("modelVersion no corresponde al artefacto: %q", item.ModelVersion)
+		if item.ModelVersion != ml.ActiveModelVersion {
+			t.Fatalf("modelVersion no corresponde al artefacto v2: %q", item.ModelVersion)
 		}
 		if item.Disclaimer != RecommendationDisclaimer {
 			t.Fatalf("disclaimer ausente o alterado: %q", item.Disclaimer)
@@ -190,6 +190,9 @@ func TestE055Ventana90DiasPorDefecto(t *testing.T) {
 	}
 	servicio := e055Servicio(e055Fuente("user-a", octubre, servicios))
 
+	// El diseño fija 90 días móviles. Esta prueba codifica que octubre (trimestre
+	// en curso respecto al reloj de prueba) sí cuenta: la línea de "excluir el
+	// trimestre en curso" no se aplica porque contradice la ventana de 90 días.
 	porDefecto, err := servicio.Recommendations(ctx, "user-a", "")
 	if err != nil {
 		t.Fatal(err)
@@ -290,5 +293,92 @@ func TestE055Negativas(t *testing.T) {
 	caido := e055Servicio(&e053PaginatedSource{err: appMovements.ErrUnavailable})
 	if _, err := caido.Recommendations(ctx, "user-a", "2026-11"); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("Dynamo caido: esperado ErrUnavailable, obtenido %v", err)
+	}
+}
+
+func TestE055ImportesNoPositivosNoCuentan(t *testing.T) {
+	ctx := context.Background()
+	noPositivos := []appMovements.Movement{
+		{ID: "cero", Type: appMovements.TypeExpense, AmountCents: 0, CategoryID: "comida", OccurredAt: time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)},
+		{ID: "negativo", Type: appMovements.TypeExpense, AmountCents: -500, CategoryID: "comida", OccurredAt: time.Date(2026, 11, 3, 9, 0, 0, 0, time.UTC)},
+	}
+	once := append(e055Movimientos("user-a", "comida", 6, 18000), e055Movimientos("user-a", "vivienda", 5, 280000)...)
+	once = append(once, noPositivos...)
+	pagina, err := e055Servicio(e055Fuente("user-a", once)).Recommendations(ctx, "user-a", "2026-11")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pagina.HasEnoughData || len(pagina.Items) != 0 {
+		t.Fatalf("11 positivos + no positivos no debe alcanzar el minimo: %+v", pagina)
+	}
+
+	doce := append(e055Movimientos("user-a", "comida", 6, 18000), e055Movimientos("user-a", "vivienda", 6, 280000)...)
+	doce = append(doce, noPositivos...)
+	pagina, err = e055Servicio(e055Fuente("user-a", doce)).Recommendations(ctx, "user-a", "2026-11")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pagina.HasEnoughData || len(pagina.Items) == 0 {
+		t.Fatalf("12 positivos con no positivos intercalados debe calcular: %+v", pagina)
+	}
+}
+
+func TestE055RecomendacionesDependenDelClustering(t *testing.T) {
+	ctx := context.Background()
+	modelo, err := ml.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bajo := e055Fuente("user-a",
+		e055Movimientos("user-a", "comida", 6, 18000),
+		e055Movimientos("user-a", "vivienda", 6, 280000),
+	)
+	unCluster := e055Fuente("user-b",
+		e055Movimientos("user-b", "comida", 6, 18000),
+		e055Movimientos("user-b", "transporte", 6, 8000),
+	)
+	servicio := e055Servicio(bajo)
+	conDosGrupos, err := servicio.Recommendations(ctx, "user-a", "2026-11")
+	if err != nil {
+		t.Fatal(err)
+	}
+	conUnGrupo, err := e055Servicio(unCluster).Recommendations(ctx, "user-b", "2026-11")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !conDosGrupos.HasEnoughData || !conUnGrupo.HasEnoughData {
+		t.Fatalf("historial suficiente esperado en ambos: A=%+v B=%+v", conDosGrupos, conUnGrupo)
+	}
+	t.Logf("E055_CLUSTERING grupos_con_dos_escalas=%d grupos_con_una_escala=%d",
+		len(conDosGrupos.Items), len(conUnGrupo.Items))
+	if fmt.Sprint(conDosGrupos) == fmt.Sprint(conUnGrupo) {
+		t.Fatal("dos composiciones distintas produjeron la misma respuesta")
+	}
+	if len(conDosGrupos.Items) <= len(conUnGrupo.Items) {
+		t.Fatalf("el historial con dos escalas debio producir mas grupos: A=%d B=%d",
+			len(conDosGrupos.Items), len(conUnGrupo.Items))
+	}
+	if !strings.Contains(fmt.Sprint(conDosGrupos.Items), "vivienda") {
+		t.Fatalf("la recomendacion del grupo alto no cita vivienda: %+v", conDosGrupos.Items)
+	}
+	if strings.Contains(fmt.Sprint(conUnGrupo.Items), "vivienda") {
+		t.Fatalf("el historial de un solo grupo no debe citar vivienda: %+v", conUnGrupo.Items)
+	}
+
+	// Cambiar solo los centroides (sin tocar movimientos) debe cambiar la salida:
+	// las recomendaciones dependen de la asignación, no de textos fijos.
+	copia := *modelo
+	copia.Centroids = make([][]float64, len(modelo.Centroids))
+	for i := range modelo.Centroids {
+		copia.Centroids[i] = append([]float64(nil), modelo.Centroids[i]...)
+	}
+	copia.Centroids[0], copia.Centroids[1] = copia.Centroids[1], copia.Centroids[0]
+	invertida, err := e055Servicio(bajo).WithModelo(&copia).Recommendations(ctx, "user-a", "2026-11")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(invertida) == fmt.Sprint(conDosGrupos) {
+		t.Fatal("invertir los centroides no cambio las recomendaciones")
 	}
 }
