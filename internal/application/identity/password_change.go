@@ -206,6 +206,11 @@ func (s *PasswordChangeService) Change(ctx context.Context, in PasswordChangeCom
 
 	verificada, err := s.hasher.VerifyPassword(cmd.CurrentPassword, profile.PasswordHash)
 	if err != nil {
+		// El hasher Argon2id devuelve `ports.ErrInvalidPassword` cuando la contraseña no
+		// coincide. Es una violación de regla (422), no una caída de dependencia.
+		if errors.Is(err, ports.ErrInvalidPassword) {
+			return ErrPasswordChangeActualIncorrecta
+		}
 		return ErrPasswordChangeUnavailable
 	}
 	if !verificada {
