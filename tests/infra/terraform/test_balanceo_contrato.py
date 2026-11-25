@@ -358,6 +358,13 @@ class ComposicionDelEntorno(unittest.TestCase):
     def test_sin_recursos_prohibidos_en_el_repo_terraform(self) -> None:
         tipos = set()
         for archivo in DEFINICIONES.rglob("*.tf"):
+            # `modules/egreso_fcm` es la propuesta de egreso FCM: declara NAT/EIP
+            # con `habilitar=false` (todos los `count` en cero) y no se crea
+            # ningún recurso por defecto. Su contrato propio comprueba que no
+            # crea NAT/EIP sin la variable (test_egreso_fcm_contrato.py). El
+            # resto del repo sigue sin NAT ni EIP.
+            if archivo.parent.name == "egreso_fcm":
+                continue
             tipos |= {tipo for tipo, _ in recursos(_leer(archivo))}
         for prohibido in (
             "aws_acm_certificate",

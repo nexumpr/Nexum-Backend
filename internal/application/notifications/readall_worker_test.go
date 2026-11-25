@@ -1,11 +1,13 @@
 package notifications
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
 	"log/slog"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -426,5 +428,218 @@ func TestE063ReintentoAcotado(t *testing.T) {
 		if got := reintentoReadAll(caso.intentos); got != caso.esperado {
 			t.Fatalf("reintentoReadAll(%d)=%s, esperado %s", caso.intentos, got, caso.esperado)
 		}
+	}
+}
+
+// presenciaFake registra los latidos y retiros del heartbeat sin Redis. La
+// semántica de vencimiento y capacidad compartida se prueba en el adaptador.
+type presenciaFake struct {
+	mu       sync.Mutex
+	latidos  int
+	retiros  int
+	errores  int
+	err      error
+	ultimoID string
+}
+
+func (p *presenciaFake) Latir(_ context.Context, owner string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.err != nil {
+		p.errores++
+		return p.err
+	}
+	p.latidos++
+	p.ultimoID = owner
+	return nil
+}
+
+func (p *presenciaFake) Retirar(_ context.Context, owner string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.retiros++
+	p.ultimoID = owner
+	return nil
+}
+
+func (p *presenciaFake) estado() (latidos, retiros, errores int, owner string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.latidos, p.retiros, p.errores, p.ultimoID
+}
+
+func esperarHasta(t *testing.T, limite time.Duration, condicion func() bool) {
+	t.Helper()
+	fin := time.Now().Add(limite)
+	for time.Now().Before(fin) {
+		if condicion() {
+			return
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	t.Fatalf("condición no alcanzada en %s", limite)
+}
+
+func TestE063HeartbeatAlArrancarEnCadaCicloYRetiro(t *testing.T) {
+	store := nuevoFakeStore()
+	reloj := nuevoReloj()
+	worker := workerDePrueba(store, reloj)
+	worker.Intervalo = 10 * time.Millisecond
+	presencia := &presenciaFake{}
+	worker.ConPresencia(presencia)
+
+	ctx, cancelar := context.WithCancel(context.Background())
+	terminado := make(chan struct{})
+	go func() {
+		defer close(terminado)
+		worker.Run(ctx)
+	}()
+
+	esperarHasta(t, 2*time.Second, func() bool {
+		latidos, _, _, _ := presencia.estado()
+		return latidos >= 2
+	})
+	cancelar()
+	select {
+	case <-terminado:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run no termino tras cancelar")
+	}
+
+	latidos, retiros, errores, owner := presencia.estado()
+	if latidos < 2 {
+		t.Fatalf("el heartbeat debe renovarse en cada ciclo: %d latidos", latidos)
+	}
+	if retiros != 1 {
+		t.Fatalf("el cierre debe retirar el heartbeat una vez: %d", retiros)
+	}
+	if errores != 0 {
+		t.Fatalf("no debía fallar el heartbeat: %d", errores)
+	}
+	if owner != worker.Owner() {
+		t.Fatalf("el heartbeat debe publicar el owner del worker: %q != %q", owner, worker.Owner())
+	}
+}
+
+func TestE063ReinicioRepublicaHeartbeat(t *testing.T) {
+	store := nuevoFakeStore()
+	reloj := nuevoReloj()
+	presencia := &presenciaFake{}
+
+	workerA := workerDePrueba(store, reloj)
+	workerA.Intervalo = 10 * time.Millisecond
+	workerA.ConPresencia(presencia)
+	ctxA, cancelarA := context.WithCancel(context.Background())
+	terminadoA := make(chan struct{})
+	go func() {
+		defer close(terminadoA)
+		workerA.Run(ctxA)
+	}()
+	esperarHasta(t, 2*time.Second, func() bool {
+		latidos, _, _, _ := presencia.estado()
+		return latidos >= 1
+	})
+	cancelarA()
+	<-terminadoA
+
+	workerB := workerDePrueba(store, reloj)
+	workerB.Intervalo = 10 * time.Millisecond
+	workerB.ConPresencia(presencia)
+	ctxB, cancelarB := context.WithCancel(context.Background())
+	terminadoB := make(chan struct{})
+	go func() {
+		defer close(terminadoB)
+		workerB.Run(ctxB)
+	}()
+	esperarHasta(t, 2*time.Second, func() bool {
+		latidos, _, _, _ := presencia.estado()
+		return latidos >= 2
+	})
+	cancelarB()
+	<-terminadoB
+
+	latidos, retiros, errores, owner := presencia.estado()
+	if latidos < 2 || retiros != 2 || errores != 0 {
+		t.Fatalf("reinicio incorrecto: latidos=%d retiros=%d errores=%d", latidos, retiros, errores)
+	}
+	if owner != workerB.Owner() {
+		t.Fatalf("el último heartbeat debe pertenecer al worker reiniciado: %q != %q", owner, workerB.Owner())
+	}
+}
+
+func TestE063HeartbeatFallidoNoDetieneProcesamiento(t *testing.T) {
+	store := nuevoFakeStore()
+	reloj := nuevoReloj()
+	store.sembrar("user-a", 8, 8, TypeSystem)
+	const requestID = "018f90ef-08e5-7a68-b09f-000000009108"
+	admitir(t, store, "user-a", requestID, reloj.Ahora())
+
+	var registro bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&registro, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	worker := NewReadAllWorker(store, logger)
+	worker.WithClock(reloj.Ahora)
+	worker.Intervalo = 10 * time.Millisecond
+	presencia := &presenciaFake{err: errors.New("redis caido")}
+	worker.ConPresencia(presencia)
+
+	ctx, cancelar := context.WithCancel(context.Background())
+	terminado := make(chan struct{})
+	go func() {
+		defer close(terminado)
+		worker.Run(ctx)
+	}()
+	esperarHasta(t, 2*time.Second, func() bool {
+		_, _, errores, _ := presencia.estado()
+		return errores >= 2
+	})
+	cancelar()
+	<-terminado
+
+	if store.noLeidas("user-a") != 0 {
+		t.Fatal("un heartbeat fallido no debe impedir procesar la cola existente")
+	}
+	if !strings.Contains(registro.String(), claseHeartbeatAusente) {
+		t.Fatalf("falta la clase %s en el log: %s", claseHeartbeatAusente, registro.String())
+	}
+	if strings.Contains(registro.String(), "user-a") || strings.Contains(registro.String(), requestID) {
+		t.Fatal("el log del heartbeat no debe incluir identificadores de usuario ni de solicitud")
+	}
+}
+
+func TestE063SinResurreccionTrasTombstone(t *testing.T) {
+	store := nuevoFakeStore()
+	reloj := nuevoReloj()
+	store.sembrar("user-a", 30, 30, TypeSystem)
+	const requestID = "018f90ef-08e5-7a68-b09f-000000009109"
+	admitir(t, store, "user-a", requestID, reloj.Ahora())
+
+	// E014 purga la partición del titular (registro READALL y puntero) y deja el
+	// ítem de la cola global. El worker debe descartarlo, no recrear nada.
+	store.mu.Lock()
+	delete(store.readall, claveReadAll("user-a", requestID))
+	if store.punteros["user-a"] != nil {
+		delete(store.punteros["user-a"], requestID)
+	}
+	store.mu.Unlock()
+	beginAntes := store.beginCalls
+
+	worker := workerDePrueba(store, reloj)
+	if completados := worker.Ciclo(context.Background()); completados != 1 {
+		t.Fatalf("el trabajo obsoleto debía cerrarse: %d completados", completados)
+	}
+	if store.trabajoCount() != 0 {
+		t.Fatalf("el ítem de cola obsoleto no se descartó: %d", store.trabajoCount())
+	}
+	if store.estado("user-a", requestID) != nil {
+		t.Fatal("el worker resucitó el registro READALL tras el tombstone")
+	}
+	if store.tienePuntero("user-a", requestID) {
+		t.Fatal("el worker recreó el puntero del titular")
+	}
+	if store.beginCalls != beginAntes {
+		t.Fatal("el worker no debe abrir una admisión nueva")
+	}
+	if len(store.markCalls) != 0 {
+		t.Fatalf("no debe marcar notificaciones de una cuenta purgada: %d", len(store.markCalls))
 	}
 }

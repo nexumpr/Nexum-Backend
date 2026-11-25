@@ -9,8 +9,10 @@ package main
 // se arranca: el endpoint seguiría aceptando trabajo que nadie ejecutaría, así
 // que el montaje falla cerrado y se registra el motivo.
 //
-// No requiere Redis: la exclusión mutua y la recuperación tras caída viven en el
-// ítem de cola (lease vencido ⇒ otro nodo lo reclama).
+// No requiere Redis para procesar: la exclusión mutua y la recuperación tras
+// caída viven en el ítem de cola (lease vencido ⇒ otro nodo lo reclama). Redis
+// sí es necesario para anunciar la capacidad de proceso: sin heartbeat vigente
+// E063 responde 503 y no acepta trabajo que nadie ejecutaría.
 
 import (
 	"context"
@@ -20,6 +22,7 @@ import (
 
 	dynamoAdapter "github.com/nexumpr/Nexum-Backend/internal/adapters/dynamo"
 	appNotifications "github.com/nexumpr/Nexum-Backend/internal/application/notifications"
+	cacheinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/cache"
 )
 
 // iniciarReadAllWorkerOleada4 arranca el worker y devuelve su cierre ordenado.
@@ -42,6 +45,16 @@ func iniciarReadAllWorkerOleada4(ctx context.Context, d *dependenciasOleada4) (f
 	worker := appNotifications.NewReadAllWorker(dynamoAdapter.NewNotificationsStore(cliente, d.Tabla), logger)
 	if !worker.Disponible() {
 		return nil, errors.New("E063: worker no disponible con la configuración actual")
+	}
+	// Presencia compartida: cada nodo publica su heartbeat; basta uno vigente
+	// para que la admisión de E063 acepte trabajo. Sin Redis el worker sigue
+	// procesando la cola, pero no anuncia capacidad y el endpoint responde 503.
+	if d.Redis != nil {
+		worker.ConPresencia(cacheinfra.NewReadAllPresence(d.Redis))
+	} else {
+		logger.WarnContext(ctx, "E063: Redis no configurado; el worker no publicara heartbeat",
+			slog.String("clase", "READALL_HEARTBEAT_AUSENTE"),
+			slog.String("motivo", "redis_no_configurado"))
 	}
 
 	hijo, cancelar := context.WithCancel(ctx)
