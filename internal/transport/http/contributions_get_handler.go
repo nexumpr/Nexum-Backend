@@ -32,9 +32,9 @@ func NewContributionGetHandler(service *appContrib.Service, tokens ports.TokenPr
 		logger = slog.Default()
 	}
 	h := &ContributionGetHandler{service: service, logger: logger}
-	protegido := CadenaAportaciones(service, tokens, sessions, h.serve)
+	protegido := CadenaAportaciones(service, tokens, sessions, LimitarPorUsuario(limitador, "contributions", h.serve))
 	if protegido != nil {
-		h.protected = LimitarPorUsuario(limitador, "contributions", protegido.ServeHTTP)
+		h.protected = protegido
 	}
 	return h
 }

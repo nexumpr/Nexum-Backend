@@ -33,8 +33,8 @@ func NewFinancialSummaryHandler(
 	}
 	h := &FinancialSummaryHandler{service: service, logger: logger}
 	if service != nil && tokens != nil && sessions != nil {
-		protegido := middleware.AuthenticateBearerWithSession(tokens, sessions)(http.HandlerFunc(h.serve))
-		h.protected = LimitarPorUsuario(limitador, "financial-summary", protegido.ServeHTTP)
+		interior := LimitarPorUsuario(limitador, "financial-summary", h.serve)
+		h.protected = middleware.AuthenticateBearerWithSession(tokens, sessions)(http.HandlerFunc(interior))
 	}
 	return h
 }

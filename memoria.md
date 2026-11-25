@@ -2304,3 +2304,13 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Pruebas:** `go test ./... -count=1` PASS en O4 y O5; Staticcheck v0.8.2, Gosec v2.30.0 y Gitleaks 8.30.1 en cero; SDD integral, H06 y paridad PASS; `tests/infra/publicacion` 110 PASS; Terraform 521 y FinOps 258 PASS en #144.
 - **Scheduler durable y productor FCM:** en implementacion al cierre de esta entrada; no se declaran terminados hasta tener pruebas y CI.
 - **Estados:** `OLEADA_4_PR_READY=YES`; `OLEADA_5_PR_READY=EN_CURSO`; `HISTORICOS_PR_READY=YES`; `IAC_PR_READY=YES`; `MERGE=NOT_AUTHORIZED`; `RELEASE=NOT_AUTHORIZED`; `DEPLOY=NOT_RUN`; `AWS_MUTATION=NOT_AUTHORIZED`.
+
+### Deuda histórica D-429 y reconciliación E002/E051 — 2026-11-25
+
+- **D-429-03 (defecto real, corregido):** `identity_support.go` emitía el 429 con `TOO_MANY_REQUESTS` mientras el contrato declara `RATE_LIMITED` en 73 operaciones. Corregido el código y actualizadas las pruebas que fijaban el anterior.
+- **D-429-01/02 (defecto real, corregido):** E008 y E009 no aplicaban la cuota de 120 req/min por usuario exigida por D-429 aunque Redis está configurado. Añadido `LimitadorRuta` a ambos constructores, clases `sessions` y `sessions_revoke`, cableado en `cmd/server/e008.go`, `e009.go` y `main.go`, y pruebas de 429 con `Retry-After`, código `RATE_LIMITED` y sujeto verificado.
+- **Defecto sistémico adicional (corregido):** once handlers (`sessions`, `sessions_revoke`, `dashboard`, `financial-summary`, `budgets` ×3, `contributions` ×3, `goals`) envolvían `LimitarPorUsuario` **por fuera** de la autenticación; como el helper necesita el `sub` del contexto, la cuota nunca se aplicaba. Corregido el orden (limitador dentro de la cadena autenticada) sin cambiar límites ni lógica.
+- **D-429-04 (enmienda aditiva aplicada):** cabecera `Retry-After` declarada inline en el 429 de E002/E008/E009/E051 (no se pudo usar `components.headers` porque H06 no resuelve esa sección; no se modificó el validador). H06 PASS, paridad OK y comparador `COMPATIBLE`.
+- **D-E002-01:** `409`/`422` de E002 anotados como reservados en `description` (sin retirar códigos).
+- **Pruebas de la rama:** `go build`, `go vet`, `go test ./... -count=1`, staticcheck v0.8.2 y gosec v2.30.0 PASS; `tests/infra/publicacion` 110 PASS con el checksum recalculado.
+- **Estados:** `D429_CODE_FIXED=YES`; `D429_E008_E009=IMPLEMENTED_LOCAL`; `E051_RFC026=PENDIENTE_DOCUMENTO`; `E031=PENDIENTE_DECISION`; `E015_V3=PROPUESTA`; sin merge, release, apply ni despliegue.

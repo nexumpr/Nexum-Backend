@@ -21,8 +21,8 @@ import (
 // titular; en caso contrario la respuesta es el mismo 404 que una sesión inexistente.
 //
 // Contrato: 204 sin cuerpo. Códigos contemplados: 204, 400, 401, 403, 404, 409, 422, 429, 500
-// y 503. Este recorte no incorpora limitador distribuido (429 no se emite): la cuota por cuenta
-// requiere Redis y pertenece a una unidad con Gate propio; no se simula.
+// y 503. La cuota D-429 se aplica por usuario con Redis; sin Redis se sirve la operacion
+// (fail-open de cuota) y nunca se simula el 429.
 type SessionRevokeHandler struct {
 	service   *appIdentity.SessionRevokeService
 	logger    *slog.Logger
@@ -31,11 +31,14 @@ type SessionRevokeHandler struct {
 
 // NewSessionRevokeHandler construye el handler. Si falta el servicio, el proveedor de tokens o
 // el autorizador de sesiones, el endpoint responde 503 (fail-closed): nunca se revoca sin
-// identidad verificada ni sin persistencia.
+// identidad verificada ni sin persistencia. La cuota D-429 (120 req/min por usuario) se aplica
+// con la clase `sessions_revoke`; sin Redis el limitador es nil y la revocación se sirve
+// (fail-open de cuota, no de seguridad).
 func NewSessionRevokeHandler(
 	service *appIdentity.SessionRevokeService,
 	tokens ports.TokenProvider,
 	sessions ports.SessionAuthorizer,
+	limitador LimitadorRuta,
 	logger *slog.Logger,
 ) *SessionRevokeHandler {
 	if logger == nil {
@@ -43,7 +46,8 @@ func NewSessionRevokeHandler(
 	}
 	h := &SessionRevokeHandler{service: service, logger: logger}
 	if service != nil && tokens != nil && sessions != nil {
-		h.protected = middleware.AuthenticateBearerWithSession(tokens, sessions)(http.HandlerFunc(h.serve))
+		interior := LimitarPorUsuario(limitador, "sessions_revoke", h.serve)
+		h.protected = middleware.AuthenticateBearerWithSession(tokens, sessions)(http.HandlerFunc(interior))
 	}
 	return h
 }

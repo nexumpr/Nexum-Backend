@@ -3,8 +3,10 @@ package main
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/redis/go-redis/v9"
 
 	dynamoAdapter "github.com/nexumpr/Nexum-Backend/internal/adapters/dynamo"
 	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
@@ -14,6 +16,10 @@ import (
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 	"github.com/nexumpr/Nexum-Backend/pkg/httputil"
 )
+
+// cuotaSesionesPorMinuto es la cuota D-429 para las rutas de sesiones (120 req/min por usuario),
+// aplicada con clases separadas para listar (`sessions`) y revocar (`sessions_revoke`).
+const cuotaSesionesPorMinuto int64 = 120
 
 // montarE008 conecta el listado paginado de sesiones propias (E008).
 //
@@ -28,6 +34,7 @@ import (
 func montarE008(
 	router registradorHTTP,
 	clienteDynamo *dynamodb.Client,
+	clienteRedis *redis.Client,
 	tabla string,
 	logger *slog.Logger,
 ) {
@@ -72,6 +79,10 @@ func montarE008(
 			slog.String("motivo", "sin_persistencia_credenciales_autorizador_o_clave_cursor"))
 	}
 
-	handler := nexumhttp.NewSessionsHandler(servicio, tokens, autorizador, logger)
+	var limitador nexumhttp.LimitadorRuta
+	if clienteRedis != nil {
+		limitador = cacheinfra.NewAuthRateLimiter(clienteRedis, cuotaSesionesPorMinuto, time.Minute)
+	}
+	handler := nexumhttp.NewSessionsHandler(servicio, tokens, autorizador, limitador, logger)
 	router.HandleFunc(http.MethodGet, "/auth/sessions", handler.ServeHTTP)
 }

@@ -103,7 +103,7 @@ func TestE070FAQLimitaPorIP(t *testing.T) {
 	if rec.Header().Get("Retry-After") != "42" {
 		t.Fatalf("Retry-After inesperado: %q", rec.Header().Get("Retry-After"))
 	}
-	if !strings.Contains(rec.Body.String(), "TOO_MANY_REQUESTS") {
+	if !strings.Contains(rec.Body.String(), "RATE_LIMITED") {
 		t.Fatalf("cuerpo inesperado: %s", rec.Body.String())
 	}
 }

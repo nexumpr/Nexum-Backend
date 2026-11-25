@@ -737,7 +737,7 @@ func TestE024E025HTTPCuotaPorUsuario(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, e004Peticion(http.MethodGet, "/api/v1/income", "jwt-valido", ""))
 
-	exigirErrorHTTP(t, rec, http.StatusTooManyRequests, "TOO_MANY_REQUESTS")
+	exigirErrorHTTP(t, rec, http.StatusTooManyRequests, "RATE_LIMITED")
 	if got := rec.Header().Get("Retry-After"); got != "30" {
 		t.Fatalf("Retry-After esperado 30, obtenido %q", got)
 	}
@@ -755,7 +755,7 @@ func TestE024E025HTTPCuotaPorUsuario(t *testing.T) {
 	handlerPut := internalhttp.NewIncomePutHandler(e024ServicioHTTP(newIngresoStoreHTTP()), e004TokensValidos(), newE004Sesiones(), negadoPut, silencioso())
 	recPut := httptest.NewRecorder()
 	handlerPut.ServeHTTP(recPut, e025Peticion("jwt-valido", `"v1"`, e024CuerpoIngreso("1000.00", "MXN", "monthly")))
-	exigirErrorHTTP(t, recPut, http.StatusTooManyRequests, "TOO_MANY_REQUESTS")
+	exigirErrorHTTP(t, recPut, http.StatusTooManyRequests, "RATE_LIMITED")
 	if negadoPut.clase != "e025" {
 		t.Fatalf("clase de cuota inesperada en E025: %q", negadoPut.clase)
 	}
