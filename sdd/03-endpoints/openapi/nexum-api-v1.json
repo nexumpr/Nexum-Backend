@@ -394,7 +394,7 @@
       }
      },
      "409": {
-      "description": "CONFLICT",
+      "description": "CONFLICT - reservado; el runtime actual de E002 no lo emite (ver RECONCILIACION_CONTRACTUAL_E002_E008_E009_E051.md D-E002-01).",
       "content": {
        "application/json": {
         "schema": {
@@ -412,7 +412,7 @@
       }
      },
      "422": {
-      "description": "BUSINESS_RULE_VIOLATION",
+      "description": "BUSINESS_RULE_VIOLATION - reservado; el runtime actual de E002 no lo emite (ver RECONCILIACION_CONTRACTUAL_E002_E008_E009_E051.md D-E002-01).",
       "content": {
        "application/json": {
         "schema": {
@@ -431,6 +431,17 @@
      },
      "429": {
       "description": "RATE_LIMITED",
+      "headers": {
+       "Retry-After": {
+        "description": "Segundos que el cliente debe esperar antes de reintentar.",
+        "schema": {
+         "type": "integer",
+         "format": "int64",
+         "minimum": 1,
+         "example": 60
+        }
+       }
+      },
       "content": {
        "application/json": {
         "schema": {
@@ -1537,6 +1548,17 @@
      },
      "429": {
       "description": "RATE_LIMITED",
+      "headers": {
+       "Retry-After": {
+        "description": "Segundos que el cliente debe esperar antes de reintentar.",
+        "schema": {
+         "type": "integer",
+         "format": "int64",
+         "minimum": 1,
+         "example": 60
+        }
+       }
+      },
       "content": {
        "application/json": {
         "schema": {
@@ -1736,6 +1758,17 @@
      },
      "429": {
       "description": "RATE_LIMITED",
+      "headers": {
+       "Retry-After": {
+        "description": "Segundos que el cliente debe esperar antes de reintentar.",
+        "schema": {
+         "type": "integer",
+         "format": "int64",
+         "minimum": 1,
+         "example": 60
+        }
+       }
+      },
       "content": {
        "application/json": {
         "schema": {
@@ -10529,6 +10562,17 @@
      },
      "429": {
       "description": "RATE_LIMITED",
+      "headers": {
+       "Retry-After": {
+        "description": "Segundos que el cliente debe esperar antes de reintentar.",
+        "schema": {
+         "type": "integer",
+         "format": "int64",
+         "minimum": 1,
+         "example": 60
+        }
+       }
+      },
       "content": {
        "application/json": {
         "schema": {

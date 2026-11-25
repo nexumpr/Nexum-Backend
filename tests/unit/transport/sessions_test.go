@@ -72,7 +72,7 @@ func e008HTTPHandler(store appIdentity.SessionsStore) *internalhttp.SessionsHand
 		servicio = appIdentity.NewSessionsService(store, []byte(e008ClaveCursores)).
 			WithClock(func() time.Time { return e008HTTPAhora })
 	}
-	return internalhttp.NewSessionsHandler(servicio, e004TokensValidos(), newE004Sesiones(), silencioso())
+	return internalhttp.NewSessionsHandler(servicio, e004TokensValidos(), newE004Sesiones(), nil, silencioso())
 }
 
 // e008HTTPPeticion construye la petición GET con la sesión y el usuario del token indicado.

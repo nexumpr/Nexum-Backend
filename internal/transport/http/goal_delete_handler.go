@@ -24,9 +24,9 @@ func NewGoalDeleteHandler(service *appGoals.Service, tokens ports.TokenProvider,
 		logger = slog.Default()
 	}
 	h := &GoalDeleteHandler{service: service, logger: logger}
-	protegido := cadenaMetas(service, tokens, sessions, h.serve)
+	protegido := cadenaMetas(service, tokens, sessions, LimitarPorUsuario(limitador, "goals", h.serve))
 	if protegido != nil {
-		h.protected = LimitarPorUsuario(limitador, "goals", protegido.ServeHTTP)
+		h.protected = protegido
 	}
 	return h
 }

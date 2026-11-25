@@ -1,4 +1,12 @@
-# Tareas planificadas — E031
+# Tareas planificadas - E031
+
+> **Nota de vigencia (2026-11-24).** El borrado se implementó en local como **tombstone lógico con
+> `204` idempotente y puntero `MOVEMENTPTR#` conservado**, conforme a
+> `sdd/_control/H08/DECISION_E031_BORRADO.md` v1.1.0 y a las autorizaciones
+> `APRUEBO_E031_IDEMPOTENTE_204_CON_PUNTERO` / `APRUEBO_CIERRE_IMPLEMENTACION_E031_TOMBSTONE`.
+> Las casillas de esta ficha describen el plan histórico y **no** se reescriben; la evidencia real
+> vive en `memoria.md` y en las pruebas de `tests/unit/{dynamo,application,transport}`. El
+> despliegue AWS y la aceptación por HTTP siguen pendientes de su Gate.
 
 > Todas las tareas de implementación están **TODO** hasta H08. Este archivo es especificación, no evidencia de código.
 

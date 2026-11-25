@@ -244,7 +244,7 @@ func TestE023HTTPCuotaExcedida(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("respuesta no es JSON: %v", err)
 	}
-	if envelope.Error.Code != "TOO_MANY_REQUESTS" {
+	if envelope.Error.Code != "RATE_LIMITED" {
 		t.Fatalf("codigo de error inesperado: %q", envelope.Error.Code)
 	}
 	if len(cuota.clases) != 1 || cuota.clases[0] != "e023" {

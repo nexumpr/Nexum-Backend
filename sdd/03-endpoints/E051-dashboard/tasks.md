@@ -55,3 +55,5 @@
 - Norma aplicable: RFC-022 v1.2.1 (APPROVED). Release inicial `v0.19.0+3baa15840a2e`; release vigente `v0.19.2+3098f379d7ab`.
 - Artefacto HTTP individual por endpoint: `EVIDENCIA_FUNCIONAL_INDIVIDUAL_NO_LOCALIZADA`; la certificacion consta de forma agregada en memoria y Gate.
 - Cualquier contradiccion entre bloques anteriores y esta nota se resuelve a favor de esta nota.
+
+> **RFC-026 (2026-11-25):** la caché Redis de respuesta queda descartada por RFC-022 D-W3-07; Redis se conserva solo como limitador de cuota. Ver `sdd/_control/H08/RFC-026-ENMIENDA_E051_CACHE.md. Esta nota no altera el cuerpo aprobado; el RFC es el instrumento de enmienda.

@@ -71,7 +71,7 @@ func e009HTTPHandler(store *e009HTTPStore) *internalhttp.SessionRevokeHandler {
 		servicio = appIdentity.NewSessionRevokeService(store).
 			WithClock(func() time.Time { return e004HTTPAhora })
 	}
-	return internalhttp.NewSessionRevokeHandler(servicio, e004TokensValidos(), newE004Sesiones(), silencioso())
+	return internalhttp.NewSessionRevokeHandler(servicio, e004TokensValidos(), newE004Sesiones(), nil, silencioso())
 }
 
 func e009HTTPPeticion(token, sessionID string) *http.Request {
@@ -182,7 +182,7 @@ func TestE009HTTP400UUIDInvalido(t *testing.T) {
 
 // TestE009HTTP503SinDependencias cubre el fail-closed de la composición.
 func TestE009HTTP503SinDependencias(t *testing.T) {
-	handler := internalhttp.NewSessionRevokeHandler(nil, nil, nil, silencioso())
+	handler := internalhttp.NewSessionRevokeHandler(nil, nil, nil, nil, silencioso())
 
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, e009HTTPPeticion("jwt-valido", e004HTTPSesion))

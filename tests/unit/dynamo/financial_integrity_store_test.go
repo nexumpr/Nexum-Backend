@@ -187,7 +187,8 @@ func (m *memoriaFinanciera) Query(_ context.Context, params *dynamodb.QueryInput
 	return salida, nil
 }
 
-// cumpleFiltroFinanciero solo admite el filtro EXACTO de E051. Cualquier otra forma falla.
+// cumpleFiltroFinanciero solo admite los filtros EXACTOS de E051 y de las lecturas de movimientos
+// con exclusión de tombstones de E031. Cualquier otra forma falla.
 func cumpleFiltroFinanciero(filtro string, item map[string]types.AttributeValue, valores map[string]types.AttributeValue) (bool, error) {
 	switch filtro {
 	case "#status = :active AND (attribute_not_exists(#deleted) OR #deleted = :false)":
@@ -203,6 +204,17 @@ func cumpleFiltroFinanciero(filtro string, item map[string]types.AttributeValue,
 			return true, nil
 		}
 		return !borrada.Value, nil
+	case "(attribute_not_exists(#deleted) OR #deleted = :false)":
+		// E031: un ítem sin `deleted` (histórico anterior a E031) cuenta como no borrado.
+		esperado, ok := valores[":false"].(*types.AttributeValueMemberBOOL)
+		if !ok || esperado.Value {
+			return false, errors.New("valor :false invalido en el filtro de tombstones")
+		}
+		borrado, existe := item["deleted"].(*types.AttributeValueMemberBOOL)
+		if !existe {
+			return true, nil
+		}
+		return !borrado.Value, nil
 	default:
 		return false, errors.New("filtro no soportado: " + filtro)
 	}
