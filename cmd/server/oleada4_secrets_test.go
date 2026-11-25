@@ -17,7 +17,7 @@ func claveDePruebaOleada4(t *testing.T, byteValue byte) string {
 
 func limpiarClavesOleada4(t *testing.T) {
 	t.Helper()
-	for _, nombre := range []string{envPushTokenKeyNueva, envPushTokenKeyAlias, envCursorKey} {
+	for _, nombre := range []string{envPushSelladorKeyNueva, envPushSelladorKeyAlias, envCursorKey} {
 		t.Setenv(nombre, "")
 	}
 }
@@ -32,7 +32,7 @@ func TestPushSealerOleada4FallaCerradoSinClave(t *testing.T) {
 func TestPushSealerOleada4AceptaClaveValidaYAlias(t *testing.T) {
 	limpiarClavesOleada4(t)
 	clave := claveDePruebaOleada4(t, 7)
-	t.Setenv(envPushTokenKeyAlias, clave)
+	t.Setenv(envPushSelladorKeyAlias, clave)
 	sealer := pushSealerOleada4()
 	if sealer == nil {
 		t.Fatal("el alias de clave válida debe construir el sellador")

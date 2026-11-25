@@ -98,14 +98,7 @@ func (p *Page) Wire() WirePage {
 	}
 	items := make([]WireInsight, 0, len(p.Items))
 	for _, insight := range p.Items {
-		items = append(items, WireInsight{
-			ID:            insight.ID,
-			Title:         insight.Title,
-			Explanation:   insight.Explanation,
-			Period:        insight.Period,
-			EvidenceCount: insight.EvidenceCount,
-			ModelVersion:  insight.ModelVersion,
-		})
+		items = append(items, WireInsight(insight))
 	}
 	return WirePage{
 		Items:          items,

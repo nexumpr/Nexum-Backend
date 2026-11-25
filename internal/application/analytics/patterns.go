@@ -51,12 +51,7 @@ func (p *SpendingPatternPage) Wire() WireSpendingPatternPage {
 	}
 	items := make([]WireSpendingPattern, 0, len(p.Items))
 	for _, item := range p.Items {
-		items = append(items, WireSpendingPattern{
-			CategoryID:  item.CategoryID,
-			Description: item.Description,
-			SampleSize:  item.SampleSize,
-			Period:      item.Period,
-		})
+		items = append(items, WireSpendingPattern(item))
 	}
 	return WireSpendingPatternPage{Items: items, NextCursor: p.NextCursor}
 }
@@ -75,7 +70,7 @@ func (s *Service) Patterns(ctx context.Context, userID, periodo string) (*Spendi
 	if titular == "" {
 		return nil, ErrUnauthorized
 	}
-	desde, hasta, err := s.periodoValidado(titular, periodo)
+	_, desde, hasta, err := s.periodoValidado(titular, periodo)
 	if err != nil {
 		return nil, err
 	}

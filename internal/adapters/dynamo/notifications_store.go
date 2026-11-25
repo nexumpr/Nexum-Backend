@@ -122,9 +122,22 @@ func (s *NotificationsStore) queryNotifications(
 	if soloCuenta {
 		entrada.Select = types.SelectCount
 	} else if limit > 0 {
-		entrada.Limit = aws.Int32(int32(limit))
+		entrada.Limit = aws.Int32(limiteConsultaNotificaciones(limit))
 	}
 	return s.client.Query(ctx, entrada)
+}
+
+// limiteConsultaNotificaciones acota el `Limit` de DynamoDB al rango contractual
+// (1..MaxLimit) antes de convertirlo a int32. Evita el desbordamiento G115 y un
+// valor fuera de contrato si un llamador interno se equivoca.
+func limiteConsultaNotificaciones(limit int) int32 {
+	if limit < 1 {
+		return 1
+	}
+	if limit > appNotifications.MaxLimit {
+		return int32(appNotifications.MaxLimit)
+	}
+	return int32(limit)
 }
 
 // List devuelve una página filtrada. El filtro se envía en FilterExpression y

@@ -3,11 +3,9 @@ package main
 import (
 	"log/slog"
 	"net/http"
-	"time"
 
 	dynamoAdapter "github.com/nexumpr/Nexum-Backend/internal/adapters/dynamo"
 	appPrefs "github.com/nexumpr/Nexum-Backend/internal/application/notificationprefs"
-	cacheinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/cache"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 )
 
@@ -39,10 +37,7 @@ func montarE057(d *dependenciasOleada4) {
 
 	store := dynamoAdapter.NewNotificationPreferencesStore(cliente, d.Tabla)
 	servicio := appPrefs.NewService(store)
-	var limitador nexumhttp.LimitadorRuta
-	if d.Redis != nil {
-		limitador = cacheinfra.NewAuthRateLimiter(d.Redis, cuotaAnalyticsPorMinuto, time.Minute)
-	}
+	limitador := limitadorOleada4(d)
 	handler := nexumhttp.NewNotificationPreferencesHandler(servicio, d.Tokens, d.Authorizer, limitador, logger)
 	d.Router.HandleFunc(http.MethodGet, "/notification-preferences", handler.ServeHTTP)
 }

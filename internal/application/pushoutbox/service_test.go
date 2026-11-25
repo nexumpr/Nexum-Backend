@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -155,15 +156,6 @@ func (s *storeFalso) estado(notificationID string) Registro {
 		}
 	}
 	return Registro{}
-}
-
-func (s *storeFalso) unicoID() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for id := range s.porID {
-		return id
-	}
-	return ""
 }
 
 func (s *storeFalso) totalReclamos() int {
@@ -379,7 +371,7 @@ func TestPUSHZonaIANAInvalidaBloqueaEnvio(t *testing.T) {
 func TestPUSHTokenRevocadoNoSeReutiliza(t *testing.T) {
 	store := nuevoStoreFalso()
 	emisor := &emisorFalso{fn: func(push.Mensaje) (push.Resultado, error) {
-		return push.Resultado{}, &push.ErrorClasificado{Clase: push.ClaseTokenNoRegistrado, CodigoHTTP: 404}
+		return push.Resultado{}, &push.ErrorClasificado{Clase: push.ClaseDestinoNoRegistrado, CodigoHTTP: 404}
 	}}
 	prefs := &prefsFalsas{valor: preferencias(true, "", nil)}
 	tokens := &tokensFalsos{porUsuario: map[string][]TokenDestino{"u1": {{ID: "d1", Valor: "token-invalido"}}}}
@@ -395,7 +387,7 @@ func TestPUSHTokenRevocadoNoSeReutiliza(t *testing.T) {
 	if tokens.totalRevocados() != 1 {
 		t.Fatalf("no se dio de baja el dispositivo: %d", tokens.totalRevocados())
 	}
-	if estado := store.estado(id); estado.Status != EstadoRevocado || estado.UltimaClase != ClaseTokenNoRegistrado {
+	if estado := store.estado(id); estado.Status != EstadoRevocado || estado.UltimaClase != ClaseDestinoNoRegistrado {
 		t.Fatalf("estado incorrecto: %+v", estado)
 	}
 	if bandeja.total() != 1 {
@@ -648,5 +640,47 @@ func TestPUSHAssertionFirmadoConClavePublica(t *testing.T) {
 	hash := sha256.Sum256([]byte(partes[0] + "." + partes[1]))
 	if err := rsa.VerifyPKCS1v15(&clave.PublicKey, crypto.SHA256, hash[:], firma); err != nil {
 		t.Fatal(fmt.Errorf("firma inválida: %w", err))
+	}
+}
+
+// TestPUSHNotificationIDCumplePatronE062 fija el contrato: E062 exige UUID con
+// guiones. La forma hex de 32 caracteres que se generaba antes era rechazada con
+// 400 invalid_uuid. No existen datos productivos con la forma antigua porque no
+// hay productor en producción; el patrón se prueba sobre el valor generado.
+func TestPUSHNotificationIDCumplePatronE062(t *testing.T) {
+	patron := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+
+	store := nuevoStoreFalso()
+	servicio := nuevoServicio(t, store, &emisorFalso{}, &prefsFalsas{valor: preferencias(true, "", nil)},
+		&tokensFalsos{}, &bandejaFalsa{})
+	id, creado, err := servicio.Encolar(context.Background(), Solicitud{
+		UserID: "u1", EventID: "evt-uuid", Title: "Aviso", Message: "Mensaje",
+	})
+	if err != nil || !creado {
+		t.Fatalf("encolar: id=%q creado=%v err=%v", id, creado, err)
+	}
+	if !patron.MatchString(id) {
+		t.Fatalf("notificationID no es UUID v5 valido para E062: %q", id)
+	}
+	if len(id) != 36 {
+		t.Fatalf("longitud inesperada del UUID: %d", len(id))
+	}
+	if strings.Contains(id, "u1") {
+		t.Fatalf("el ID no debe exponer el userID: %q", id)
+	}
+
+	// Determinista para el mismo (userID, eventID): se repite el cálculo interno
+	// para no depender de que el store acepte un segundo Crear.
+	if otra := notificationUUID("u1", "evt-uuid"); otra != id {
+		t.Fatalf("el UUID debe ser determinista: %q vs %q", id, otra)
+	}
+	if otra := notificationUUID("u1", "evt-otro"); otra == id {
+		t.Fatalf("otro evento no puede compartir UUID: %q", otra)
+	}
+	if otra := notificationUUID("u2", "evt-uuid"); otra == id {
+		t.Fatalf("otro usuario no puede compartir UUID: %q", otra)
+	}
+	if recortado := notificationUUID(" u1 ", " evt-uuid "); recortado != id {
+		t.Fatalf("los espacios no deben cambiar el UUID: %q", recortado)
 	}
 }

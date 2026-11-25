@@ -21,13 +21,12 @@ type fakeItem struct {
 }
 
 type fakeStore struct {
-	mu             sync.Mutex
-	porUsuario     map[string][]fakeItem
-	readall        map[string]*ReadAllState
-	beginCalls     int
-	advanceCalls   int
-	failAdvanceAt  int
-	readallFallido bool
+	mu            sync.Mutex
+	porUsuario    map[string][]fakeItem
+	readall       map[string]*ReadAllState
+	beginCalls    int
+	advanceCalls  int
+	failAdvanceAt int
 }
 
 func nuevoFakeStore() *fakeStore {
@@ -57,9 +56,7 @@ func (f *fakeStore) productos(userID string) []fakeItem {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	out := make([]fakeItem, 0, len(f.porUsuario[userID]))
-	for _, item := range f.porUsuario[userID] {
-		out = append(out, item)
-	}
+	out = append(out, f.porUsuario[userID]...)
 	return out
 }
 

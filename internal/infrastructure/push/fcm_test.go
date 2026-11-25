@@ -119,7 +119,7 @@ func servidorOAuthPrueba(t *testing.T, cred credencialPrueba, estado int, llamad
 		if err := r.ParseForm(); err != nil {
 			t.Errorf("formulario OAuth: %v", err)
 		}
-		if r.Form.Get("grant_type") != GrantTypeJWTBearer {
+		if r.Form.Get("grant_type") != GrantTypeJWTAssertion {
 			t.Errorf("grant_type incorrecto: %q", r.Form.Get("grant_type"))
 		}
 		verificarAssertion(t, r.Form.Get("assertion"), &cred.clave.PublicKey, r.Host)
@@ -131,8 +131,7 @@ func servidorOAuthPrueba(t *testing.T, cred credencialPrueba, estado int, llamad
 func TestFCMEnvioCorrectoHTTPV1YOAuth(t *testing.T) {
 	cred := nuevaCredencialPrueba(t)
 	var oauthLlamadas, fcmLlamadas atomic.Int32
-	var oauth *httptest.Server
-	oauth = servidorOAuthPrueba(t, cred, http.StatusOK, &oauthLlamadas)
+	oauth := servidorOAuthPrueba(t, cred, http.StatusOK, &oauthLlamadas)
 	defer oauth.Close()
 
 	fcm := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -253,7 +252,7 @@ func TestFCMUNREGISTEREDEsPermanente(t *testing.T) {
 				t.Fatalf("UNREGISTERED debió ser permanente: %v", err)
 			}
 			var clasificado *ErrorClasificado
-			if !errors.As(err, &clasificado) || clasificado.Clase != ClaseTokenNoRegistrado {
+			if !errors.As(err, &clasificado) || clasificado.Clase != ClaseDestinoNoRegistrado {
 				t.Fatalf("clase incorrecta: %v", err)
 			}
 			if fcmLlamadas.Load() != 1 {
@@ -357,5 +356,24 @@ func TestFCMMensajeInvalidoNoLlamaRed(t *testing.T) {
 	}
 	if _, err := cliente.Enviar(context.Background(), Mensaje{Token: "t"}); !errors.Is(err, ErrMensajeInvalido) {
 		t.Fatalf("mensaje incompleto debió rechazarse: %v", err)
+	}
+}
+
+// TestFCMJitterSeguroAcotado fija que el jitter del reintento usa el CSPRNG y
+// permanece siempre en [0, ancho). Sustituye a math/rand/v2 (G404).
+func TestFCMJitterSeguroAcotado(t *testing.T) {
+	if got := jitterSeguro(0); got != 0 {
+		t.Fatalf("ancho 0 debe producir 0: %v", got)
+	}
+	if got := jitterSeguro(-time.Second); got != 0 {
+		t.Fatalf("ancho negativo debe producir 0: %v", got)
+	}
+	for _, ancho := range []time.Duration{1, 2, 50 * time.Millisecond, 401 * time.Millisecond} {
+		for i := 0; i < 100; i++ {
+			got := jitterSeguro(ancho)
+			if got < 0 || got >= ancho {
+				t.Fatalf("jitter fuera de [0,%v): %v", ancho, got)
+			}
+		}
 	}
 }

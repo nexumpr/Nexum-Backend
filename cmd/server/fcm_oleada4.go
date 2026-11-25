@@ -5,9 +5,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -22,15 +24,20 @@ import (
 )
 
 const (
-	variableProjectIDNueva  = "NEXUM_FCM_PROJECT_ID"
-	variableProjectIDAlias  = "FIREBASE_PROJECT_ID"
-	variableCredencialNueva = "NEXUM_FCM_CREDENTIALS_JSON"
-	variableCredencialAlias = "FCM_SERVICE_ACCOUNT_JSON"
-	variableArchivoNueva    = "NEXUM_FCM_CREDENTIALS_FILE"
-	variableArchivoAlias    = "GOOGLE_APPLICATION_CREDENTIALS"
+	variableProjectIDNueva      = "NEXUM_FCM_PROJECT_ID"
+	variableProjectIDAlias      = "FIREBASE_PROJECT_ID"
+	variableCuentaServicioNueva = "NEXUM_FCM_CREDENTIALS_JSON"
+	variableCuentaServicioAlias = "FCM_SERVICE_ACCOUNT_JSON"
+	variableArchivoNueva        = "NEXUM_FCM_CREDENTIALS_FILE"
+	variableArchivoAlias        = "GOOGLE_APPLICATION_CREDENTIALS"
 
 	timeoutFCMPorDefecto = 5 * time.Second
 	timeoutFCMAximo      = 60 * time.Second
+
+	// directorioConfiguracionFCM es el único árbol desde el que se acepta una
+	// credencial en archivo. El valor de la variable de entorno no puede
+	// convertirse en una lectura arbitraria del sistema (G304).
+	directorioConfiguracionFCM = "/etc/nexum"
 )
 
 // configuracionFCMOleada4DesdeEntorno construye la configuración del emisor
@@ -44,21 +51,21 @@ func configuracionFCMOleada4DesdeEntorno() (push.Config, error) {
 			variableProjectIDNueva, variableProjectIDAlias)
 	}
 
-	contenido := primerValorEnv(variableCredencialNueva, variableCredencialAlias)
+	contenido := primerValorEnv(variableCuentaServicioNueva, variableCuentaServicioAlias)
 	ruta := strings.TrimSpace(primerValorEnv(variableArchivoNueva, variableArchivoAlias))
 	var credencial []byte
 	switch {
 	case contenido != "":
 		credencial = []byte(contenido)
 	case ruta != "":
-		leido, err := os.ReadFile(ruta)
+		leido, err := leerCredencialFCM(ruta, directorioConfiguracionFCM)
 		if err != nil {
 			return push.Config{}, errors.New("FCM Oleada 4: no se pudo leer la credencial de servicio configurada")
 		}
 		credencial = leido
 	default:
 		return push.Config{}, fmt.Errorf("FCM Oleada 4: se requiere %s o %s (o sus alias %s/%s)",
-			variableCredencialNueva, variableArchivoNueva, variableCredencialAlias, variableArchivoAlias)
+			variableCuentaServicioNueva, variableArchivoNueva, variableCuentaServicioAlias, variableArchivoAlias)
 	}
 
 	timeout := timeoutFCMPorDefecto
@@ -93,6 +100,41 @@ func primerValorEnv(nombres ...string) string {
 		}
 	}
 	return ""
+}
+
+// leerCredencialFCM lee una credencial de archivo con dos límites: la ruta debe ser
+// absoluta y debe estar dentro de `base`. `os.OpenRoot` impide además escapar del
+// árbol mediante symlinks. El contenido se acota a 1 MiB. Sin esta validación, un
+// valor de entorno podría convertirse en una lectura arbitraria (G304).
+func leerCredencialFCM(ruta, base string) ([]byte, error) {
+	ruta = strings.TrimSpace(ruta)
+	if ruta == "" || !filepath.IsAbs(ruta) {
+		return nil, errors.New("la ruta de credencial debe ser absoluta")
+	}
+	raizDir := filepath.Clean(base)
+	if !filepath.IsAbs(raizDir) {
+		return nil, errors.New("directorio de credenciales no configurado")
+	}
+	relativo, err := filepath.Rel(raizDir, filepath.Clean(ruta))
+	if err != nil || relativo == "." || relativo == ".." ||
+		strings.HasPrefix(relativo, ".."+string(filepath.Separator)) {
+		return nil, errors.New("la credencial debe estar dentro del directorio permitido")
+	}
+	raiz, err := os.OpenRoot(raizDir)
+	if err != nil {
+		return nil, errors.New("no se pudo abrir el directorio de credenciales")
+	}
+	defer raiz.Close()
+	archivo, err := raiz.Open(relativo)
+	if err != nil {
+		return nil, errors.New("no se pudo abrir la credencial")
+	}
+	defer archivo.Close()
+	contenido, err := io.ReadAll(io.LimitReader(archivo, 1<<20))
+	if err != nil {
+		return nil, errors.New("no se pudo leer la credencial")
+	}
+	return contenido, nil
 }
 
 // iniciarFCMWorkerOleada4 construye el cliente real, el outbox durable, el

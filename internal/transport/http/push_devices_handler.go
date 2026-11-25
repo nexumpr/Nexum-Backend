@@ -51,7 +51,7 @@ func NewPushDevicesHandler(
 	if service == nil || tokens == nil || sessions == nil {
 		return h
 	}
-	conCuota := LimitarPorUsuarioContrato(limitador, "analytics", h.serve)
+	conCuota := LimitarPorUsuarioContrato(limitador, "push", h.serve)
 	h.protected = middleware.AuthenticateBearerWithSession(tokens, sessions)(conCuota)
 	return h
 }
@@ -147,7 +147,7 @@ func NewPushDeviceDeleteHandler(
 	if service == nil || tokens == nil || sessions == nil {
 		return h
 	}
-	conCuota := LimitarPorUsuarioContrato(limitador, "analytics", h.serve)
+	conCuota := LimitarPorUsuarioContrato(limitador, "push", h.serve)
 	h.protected = middleware.AuthenticateBearerWithSession(tokens, sessions)(conCuota)
 	return h
 }
