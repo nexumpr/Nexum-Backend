@@ -172,6 +172,12 @@ func (s *EmailVerificationConfirmService) Confirmar(ctx context.Context, token s
 	if !strings.EqualFold(strings.TrimSpace(perfil.Status), StatusActive) {
 		return ErrEmailVerificationTokenInvalido
 	}
+	// El token queda ligado al correo con el que se emitio (E010): si el perfil ya no
+	// conserva ese correo, el token no puede verificar otro distinto. Se responde el rechazo
+	// generico para no revelar que el correo cambio.
+	if !strings.EqualFold(strings.TrimSpace(registro.Email), strings.TrimSpace(perfil.Email)) {
+		return ErrEmailVerificationTokenInvalido
+	}
 	if perfil.EmailVerified {
 		// Ya verificado por otra confirmacion: el token no se consume y se responde 409.
 		return ErrEmailVerificationConflicto
