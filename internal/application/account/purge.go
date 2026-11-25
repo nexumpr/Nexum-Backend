@@ -56,6 +56,11 @@ var errPurgeWithoutOwnership = errors.New("el trabajo fue reclamado por otro nod
 // se borra nunca bajo un envío activo.
 var errPurgeGlobalOcupado = errors.New("el trabajo global referenciado tiene un envio en curso")
 
+// errPurgePunteroMovido indica que el puntero cambió entre la lectura y el borrado (otra
+// transacción lo movió, p. ej. al reprogramar el outbox). Es transitorio: la página se
+// reintenta y el puntero se resuelve con la referencia nueva; nunca se borra a ciegas.
+var errPurgePunteroMovido = errors.New("el puntero cambio entre la lectura y el borrado")
+
 // PurgeCandidate es una entrada de cola descubierta y elegible.
 type PurgeCandidate struct {
 	UserID    string
@@ -101,9 +106,14 @@ type PartitionItem struct {
 	SK          string
 	EntityType  string
 	RefreshHash string
-	// GlobalSK es el atributo `skGlobal` de un puntero (`OUTBOXPTR#`, `SCHEDULEPTR#`):
-	// la SK del ítem que vive en una partición global del servicio. Vacío en el resto de
-	// entidades y en un puntero incompleto.
+	// Family es el atributo `family` de un puntero de token (`TOKENPTR#`): la familia
+	// del token global (`RESET` de E005/E006 o `ONE_USE` de E010/E011). Vacío en el
+	// resto de punteros y entidades.
+	Family string
+	// GlobalSK es el atributo `skGlobal` de un puntero: la SK exacta del ítem global en
+	// las particiones fijas (`OUTBOXPTR#`, `SCHEDULEPTR#`, `READALLPTR#`,
+	// `DELIVERYPTR#`) y la PK de la familia (`RESET#<sha256>` / `ONE_USE#<sha256>`) en
+	// `TOKENPTR#`. Vacío en el resto de entidades y en un puntero incompleto.
 	GlobalSK string
 }
 
@@ -171,6 +181,12 @@ type PurgeStore interface {
 	// condición de ausencia de lease vigente y comprobando que `userID` coincide. Nunca
 	// recibe una partición fuera de las declaradas en `domain/deletion`.
 	DeleteGlobalItem(ctx context.Context, partition, sk, userID string, now time.Time) (GlobalDeleteResult, error)
+	// DeleteGlobalPointer borra el puntero del titular sólo si sigue apuntando a la
+	// referencia global leída (`expectedGlobalRef`). Devuelve false cuando el puntero
+	// cambió entre la lectura y el borrado —por ejemplo, porque el outbox lo movió al
+	// reprogramar el trabajo en su propia transacción—: en ese caso no debe borrarse y
+	// la página se reintenta para resolver la referencia nueva.
+	DeleteGlobalPointer(ctx context.Context, userID, sk, expectedGlobalRef string) (bool, error)
 	// ListPasswordResetQueue consulta `QUEUE#PWRESET` filtrando por `userId` y pagina.
 	ListPasswordResetQueue(ctx context.Context, userID, startSK string, limit int) ([]RawItem, string, error)
 	// DeleteRawItem borra un ítem por su clave completa.
@@ -497,8 +513,16 @@ func (w *PurgeWorker) pasoPartition(ctx context.Context, control *PurgeControl) 
 				// ajeno, pero el puntero del titular debe desaparecer.
 				desconocidos++
 			}
-			if err := w.store.DeletePartitionItem(ctx, control.UserID, item.SK); err != nil {
-				return err
+			// El borrado del puntero exige que siga apuntando a la referencia leída: si
+			// otra transacción lo movió (reprogramación del outbox o del scheduler), se
+			// reintenta la página para resolver la referencia nueva y no dejar un ítem
+			// global huérfano.
+			aplicado, errBorrado := w.store.DeleteGlobalPointer(ctx, control.UserID, item.SK, item.GlobalSK)
+			if errBorrado != nil {
+				return errBorrado
+			}
+			if !aplicado {
+				return errPurgePunteroMovido
 			}
 			borrados++
 			continue
@@ -525,14 +549,13 @@ func (w *PurgeWorker) pasoPartition(ctx context.Context, control *PurgeControl) 
 // igualmente y se contabiliza como clave desconocida (nunca se borra datos de terceros).
 //
 // Sin `Scan`: la única lectura es el puntero (ya obtenido por ListPartition) y la clave
-// global exacta que éste declara.
+// global exacta que éste declara. Los punteros de token resuelven su partición desde el
+// propio ítem (`skGlobal` = PK de la familia) y validan que el hash coincida.
 func (w *PurgeWorker) borrarPunteroGlobal(ctx context.Context, userID string, item PartitionItem) (bool, error) {
-	partition, ok := domainDeletion.GlobalPartitionForPointer(item.SK)
+	partition, sk, ok := domainDeletion.ResolveGlobalTarget(item.SK, item.Family, item.GlobalSK)
 	if !ok {
-		return true, nil
-	}
-	sk := strings.TrimSpace(item.GlobalSK)
-	if sk == "" {
+		// Puntero incompleto, familia incoherente o partición no autorizada: no hay
+		// nada que borrar fuera de la partición del titular.
 		return true, nil
 	}
 	resultado, err := w.store.DeleteGlobalItem(ctx, partition, sk, userID, w.now().UTC())

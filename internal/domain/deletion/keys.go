@@ -50,6 +50,19 @@ const (
 	// PrefixReadAllPointer referencia el trabajo global de E063 (QUEUE#READALL) para
 	// que la purga lo encuentre sin Scan. El ítem apunta a una partición de servicio.
 	PrefixReadAllPointer = "READALLPTR#"
+	// PrefixTokenPointer referencia el token de un solo uso emitido por E005/E006
+	// (RESET#<sha256>/RESET) o por E010/E011 (ONE_USE#<sha256>/VERIFY). Sin el puntero,
+	// el token —que contiene `userId` y, en E010, el correo— sólo sería alcanzable con
+	// un Scan, que este flujo tiene prohibido.
+	//
+	//	USER#<sub> / TOKENPTR#<sha256(token)> -> skGlobal = RESET#<sha256> | ONE_USE#<sha256>
+	PrefixTokenPointer = "TOKENPTR#"
+	// PrefixDeliveryPointer referencia el registro de dedupe de entrega de E062
+	// (`OUTBOX#GLOBAL/IDEM#<sha256(userID|eventId)>`), que vincula userID, eventId y
+	// notificationID y sobrevive 90 días por TTL.
+	//
+	//	USER#<sub> / DELIVERYPTR#<sha256(eventId)> -> skGlobal = IDEM#<sha256(userID|eventId)>
+	PrefixDeliveryPointer = "DELIVERYPTR#"
 
 	// PartitionOutboxGlobal es la partición del outbox push (worker FCM, Oleada 4) y
 	// PartitionScheduleGlobal la reservada al scheduler durable de recordatorios. Las
@@ -60,10 +73,25 @@ const (
 	// PartitionQueueReadAll es la cola global del worker durable de E063.
 	PartitionQueueReadAll = "QUEUE#READALL"
 
+	// Familias de token. La familia es el prefijo de la PK del ítem global del token y
+	// también se persiste en el puntero, de modo que un puntero manipulado no pueda
+	// resolver una partición de otra familia.
+	TokenFamilyReset  = "RESET"
+	TokenFamilyOneUse = "ONE_USE"
+
+	// TokenResetSK y TokenVerifySK son las SK fijas del ítem global por familia
+	// (coinciden con los adaptadores de E005/E006 y E010/E011).
+	TokenResetSK  = "RESET"
+	TokenVerifySK = "VERIFY"
+
 	// EntityOutboxPointer y EntitySchedulePointer identifican los punteros, de modo que
 	// un barrido pueda distinguirlos de otras entidades de la partición.
 	EntityOutboxPointer   = "PUSH_OUTBOX_POINTER"
 	EntitySchedulePointer = "REMINDER_SCHEDULE_POINTER"
+	// EntityTokenPointer y EntityDeliveryPointer identifican los punteros de token y de
+	// dedupe de entrega.
+	EntityTokenPointer    = "TOKEN_POINTER"
+	EntityDeliveryPointer = "PUSH_DELIVERY_POINTER"
 
 	// CatalogVersion es la versión del catálogo de purga. Permite que las oleadas
 	// posteriores añadan entidades sin reescribir el worker: el control persistido guarda
@@ -159,19 +187,109 @@ func ReadAllPointerKeys(userID, requestID string) (pk, sk string) {
 	return UserPartition(userID), PrefixReadAllPointer + strings.TrimSpace(requestID)
 }
 
+// TokenPointerKeys devuelve PK y SK del puntero que referencia un token de un solo uso.
+// El hash es el SHA-256 hexadecimal del token: el valor en claro nunca se persiste.
+func TokenPointerKeys(userID, tokenHash string) (pk, sk string) {
+	return UserPartition(userID), PrefixTokenPointer + strings.TrimSpace(tokenHash)
+}
+
+// IsTokenPointerSK indica si una SK referencia un token global.
+func IsTokenPointerSK(sk string) bool {
+	return strings.HasPrefix(strings.TrimSpace(sk), PrefixTokenPointer)
+}
+
+// DeliveryPointerKeys devuelve PK y SK del puntero que referencia el registro de dedupe
+// de entrega de un evento. El SHA-256 se calcula sobre el `eventId`, no sobre datos
+// financieros.
+func DeliveryPointerKeys(userID, eventID string) (pk, sk string) {
+	suma := sha256.Sum256([]byte(strings.TrimSpace(eventID)))
+	return UserPartition(userID), PrefixDeliveryPointer + hex.EncodeToString(suma[:])
+}
+
+// IsDeliveryPointerSK indica si una SK referencia un dedupe de entrega global.
+func IsDeliveryPointerSK(sk string) bool {
+	return strings.HasPrefix(strings.TrimSpace(sk), PrefixDeliveryPointer)
+}
+
+// TokenPartition devuelve la PK del ítem global de un token (la «partición de la
+// familia»): `RESET#<sha256>` o `ONE_USE#<sha256>`.
+func TokenPartition(family, tokenHash string) (string, bool) {
+	family = strings.TrimSpace(family)
+	hash := strings.TrimSpace(tokenHash)
+	if !esSHA256Hex(hash) {
+		return "", false
+	}
+	switch family {
+	case TokenFamilyReset, TokenFamilyOneUse:
+		return family + "#" + hash, true
+	default:
+		return "", false
+	}
+}
+
+// TokenFamilyPartition reconoce una partición de token y devuelve su familia. Cualquier
+// otra PK no es una partición de token: la purga nunca borra fuera del catálogo.
+func TokenFamilyPartition(partition string) (string, bool) {
+	pk := strings.TrimSpace(partition)
+	for _, family := range []string{TokenFamilyReset, TokenFamilyOneUse} {
+		prefijo := family + "#"
+		if strings.HasPrefix(pk, prefijo) && esSHA256Hex(strings.TrimPrefix(pk, prefijo)) {
+			return family, true
+		}
+	}
+	return "", false
+}
+
+// TokenGlobalSK devuelve la SK fija del ítem global de token según la familia.
+func TokenGlobalSK(family string) (string, bool) {
+	switch strings.TrimSpace(family) {
+	case TokenFamilyReset:
+		return TokenResetSK, true
+	case TokenFamilyOneUse:
+		return TokenVerifySK, true
+	default:
+		return "", false
+	}
+}
+
+// TokenHashFromPointer extrae el hash del token de la SK de su puntero.
+func TokenHashFromPointer(sk string) string {
+	if !IsTokenPointerSK(sk) {
+		return ""
+	}
+	return strings.TrimPrefix(strings.TrimSpace(sk), PrefixTokenPointer)
+}
+
+// esSHA256Hex valida 64 dígitos hexadecimales en minúscula: la forma en que esta
+// implementación persiste un digest. Evita que un puntero manipulado construya una
+// partición arbitraria.
+func esSHA256Hex(valor string) bool {
+	if len(valor) != 64 {
+		return false
+	}
+	for _, r := range valor {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 // IsGlobalPointerSK indica si una SK es un puntero a una partición global del servicio.
 // El barrido de PARTITION trata estos ítems en dos pasos: primero borra el ítem global
 // referenciado (con condición) y sólo después el puntero.
 func IsGlobalPointerSK(sk string) bool {
-	return IsOutboxPointerSK(sk) || IsSchedulePointerSK(sk) || IsReadAllPointerSK(sk)
+	return IsOutboxPointerSK(sk) || IsSchedulePointerSK(sk) || IsReadAllPointerSK(sk) ||
+		IsTokenPointerSK(sk) || IsDeliveryPointerSK(sk)
 }
 
-// GlobalPartitionForPointer devuelve la partición global a la que apunta un puntero. El
-// segundo valor es falso si la SK no es un puntero conocido: la purga nunca borra fuera de
-// las dos particiones del servicio declaradas aquí.
+// GlobalPartitionForPointer devuelve la partición global a la que apunta un puntero cuya
+// partición es fija (outbox, scheduler, cola READALL y dedupe de entrega). El segundo valor
+// es falso si la SK no es un puntero de partición fija: los punteros de token resuelven su
+// partición desde el ítem (`skGlobal`) con ResolveGlobalTarget.
 func GlobalPartitionForPointer(sk string) (string, bool) {
 	switch {
-	case IsOutboxPointerSK(sk):
+	case IsOutboxPointerSK(sk), IsDeliveryPointerSK(sk):
 		return PartitionOutboxGlobal, true
 	case IsSchedulePointerSK(sk):
 		return PartitionScheduleGlobal, true
@@ -184,14 +302,47 @@ func GlobalPartitionForPointer(sk string) (string, bool) {
 
 // IsGlobalPartition indica si una PK pertenece a una partición global del servicio que la
 // purga puede tocar (y sólo mediante un puntero del titular). Es defensa en profundidad
-// frente a un puntero corrupto.
+// frente a un puntero corrupto: incluye las particiones dinámicas de token, siempre que su
+// forma sea `RESET#<sha256>` o `ONE_USE#<sha256>`.
 func IsGlobalPartition(pk string) bool {
 	switch strings.TrimSpace(pk) {
 	case PartitionOutboxGlobal, PartitionScheduleGlobal, PartitionQueueReadAll:
 		return true
-	default:
-		return false
 	}
+	_, ok := TokenFamilyPartition(pk)
+	return ok
+}
+
+// ResolveGlobalTarget resuelve la clave exacta del ítem global al que apunta un puntero del
+// titular. Devuelve ok=false cuando el puntero no declara una referencia utilizable o es
+// incoherente (familia desconocida, partición de token con otra familia o hash distinto):
+// en ese caso la purga retira el puntero sin tocar nada ajeno.
+//
+// `globalRef` es el atributo `skGlobal` del puntero: la SK del ítem global en las
+// particiones fijas y la PK de la familia en los punteros de token.
+func ResolveGlobalTarget(pointerSK, family, globalRef string) (partition, sk string, ok bool) {
+	ref := strings.TrimSpace(globalRef)
+	if ref == "" {
+		return "", "", false
+	}
+	if IsTokenPointerSK(pointerSK) {
+		familia, esToken := TokenFamilyPartition(ref)
+		if !esToken || familia != strings.TrimSpace(family) {
+			return "", "", false
+		}
+		// El hash de la partición debe coincidir con el del nombre del puntero: un
+		// puntero manipulado no puede resolver la partición de otro token.
+		if strings.TrimPrefix(ref, familia+"#") != TokenHashFromPointer(pointerSK) {
+			return "", "", false
+		}
+		sk, ok = TokenGlobalSK(family)
+		return ref, sk, ok
+	}
+	particionFija, okParticion := GlobalPartitionForPointer(pointerSK)
+	if !okParticion {
+		return "", "", false
+	}
+	return particionFija, ref, true
 }
 
 // IsDeletionQueueSK indica si una SK es un requestId utilizable en la cola.

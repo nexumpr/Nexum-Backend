@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	domainDeletion "github.com/nexumpr/Nexum-Backend/internal/domain/deletion"
 	"github.com/nexumpr/Nexum-Backend/internal/ports"
 )
 
@@ -49,7 +50,14 @@ func (s *PasswordResetStore) claveTrabajo(t ports.ResetTrabajo) map[string]types
 	}
 }
 
-// Admitir escribe token y trabajo en una transaccion de 2 acciones sobre 2 items.
+// Admitir escribe token, trabajo y —cuando la cuenta existe— el puntero de purga del
+// titular en una sola transacción (3 acciones sobre 3 ítems distintos).
+//
+// El puntero `USER#<sub>/TOKENPTR#<sha256(token)>` es lo que permite que E014 borre el
+// token global sin `Scan`: el ítem global `RESET#<sha256>` guarda `userId` y sólo caducaría
+// por TTL. El token en claro nunca se persiste; el puntero guarda el hash y la familia.
+// Con una cuenta inexistente no hay `userId` al que asociar el puntero: no se crea perfil
+// falso ni se escribe en una partición de usuario, y el token señuelo expira por TTL.
 func (s *PasswordResetStore) Admitir(ctx context.Context, adm ports.ResetAdmission) error {
 	claveTok, _ := claveToken(adm.TokenHash)
 	tokenItem := map[string]types.AttributeValue{
@@ -75,12 +83,17 @@ func (s *PasswordResetStore) Admitir(ctx context.Context, adm ports.ResetAdmissi
 		trabajoItem["tokenSello"] = &types.AttributeValueMemberB{Value: adm.TokenSello}
 	}
 
+	acciones := []types.TransactWriteItem{
+		{Put: &types.Put{TableName: aws.String(s.tabla), Item: tokenItem,
+			ConditionExpression: aws.String("attribute_not_exists(PK)")}},
+		{Put: &types.Put{TableName: aws.String(s.tabla), Item: trabajoItem}},
+	}
+	if puntero, ok := punteroDeToken(adm.UserID, domainDeletion.TokenFamilyReset, adm.TokenHash, adm.ExpiraEn, adm.Ahora); ok {
+		acciones = append(acciones, types.TransactWriteItem{Put: &types.Put{TableName: aws.String(s.tabla), Item: puntero}})
+	}
+
 	_, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-		TransactItems: []types.TransactWriteItem{
-			{Put: &types.Put{TableName: aws.String(s.tabla), Item: tokenItem,
-				ConditionExpression: aws.String("attribute_not_exists(PK)")}},
-			{Put: &types.Put{TableName: aws.String(s.tabla), Item: trabajoItem}},
-		},
+		TransactItems: acciones,
 	})
 	if err != nil {
 		return fmt.Errorf("admision de recuperacion: %w", err)

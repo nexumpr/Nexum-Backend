@@ -862,6 +862,7 @@ func (s *DeletionStore) ListPartition(ctx context.Context, userID, startSK strin
 			SK:          stringAttribute(item["SK"]),
 			EntityType:  stringAttribute(item["entityType"]),
 			RefreshHash: stringAttribute(item["refreshHash"]),
+			Family:      stringAttribute(item["family"]),
 			GlobalSK:    stringAttribute(item["skGlobal"]),
 		})
 	}
@@ -894,17 +895,22 @@ func (s *DeletionStore) DeletePartitionItem(ctx context.Context, userID, sk stri
 }
 
 // DeleteGlobalItem borra el ítem global al que apunta un puntero del titular, sin `Scan`:
-// la clave llega del puntero (`skGlobal`) y la partición del prefijo del puntero.
+// la clave llega del puntero (`skGlobal`) y la partición del prefijo del puntero o, en los
+// punteros de token, del propio `skGlobal` (PK de la familia).
 //
 // Controles:
-//   - Sólo se aceptan las dos particiones del servicio declaradas en `domain/deletion`.
+//   - Sólo se aceptan las particiones del servicio declaradas en `domain/deletion`
+//     (outbox, scheduler, cola READALL y las particiones de token `RESET#<sha256>` /
+//     `ONE_USE#<sha256>`).
 //   - Se lee el ítem antes de borrar para comprobar el titular: un puntero corrupto no
 //     puede borrar datos de otra cuenta (`GlobalItemForeign`).
-//   - Un envío en curso (atributo `owner` con `leaseUntil` vigente) bloquea el borrado
-//     (`GlobalItemBusy`) y el trabajo se reintenta cuando el lease vence. Cancelar un
-//     trabajo pendiente es, en esta fase, retirarlo del outbox con esa misma condición de
-//     lease: DynamoDB no admite dos acciones sobre el mismo ítem en una transacción, así
-//     que no se puede "marcar revocado" y borrar de forma atómica.
+//   - Un envío en curso (atributo `owner`/`leaseOwner` con `leaseUntil` vigente) bloquea el
+//     borrado (`GlobalItemBusy`) y el trabajo se reintenta cuando el lease vence.
+//   - El borrado es condicional: exige que el ítem siga existiendo y que `owner`/
+//     `leaseOwner`/`leaseUntil` sean los leídos, de modo que una reclamación concurrente
+//     entre la lectura y el borrado no destruya un envío recién reclamado
+//     (`GlobalItemBusy` y reintento). DynamoDB no admite dos acciones sobre el mismo ítem
+//     en una transacción, así que no se puede «marcar revocado» y borrar de forma atómica.
 func (s *DeletionStore) DeleteGlobalItem(ctx context.Context, partition, sk, userID string, now time.Time) (appAccount.GlobalDeleteResult, error) {
 	if !s.disponible() {
 		return appAccount.GlobalItemBusy, appAccount.ErrDeletionUnavailable
@@ -937,15 +943,24 @@ func (s *DeletionStore) DeleteGlobalItem(ctx context.Context, partition, sk, use
 		return appAccount.GlobalItemBusy, nil
 	}
 
-	// Tras el tombstone ninguna reclamación es legítima: se borra el ítem aunque otro
-	// worker lo haya reclamado entre la lectura y el borrado (su envío no debe continuar).
-	// El borrado por clave es idempotente.
+	// Tras el tombstone ninguna reclamación es legítima: se borra el ítem.
+	//
+	// El borrado es CONDICIONAL (nunca un borrado a ciegas por clave): exige que el ítem
+	// siga existiendo y que `owner`/`leaseOwner` y `leaseUntil` sean EXACTAMENTE los
+	// leídos. Si otro worker lo reclamó entre la lectura y el borrado, la condición falla
+	// y el trabajo se reintenta: no se borra un ítem bajo un envío recién reclamado. Un
+	// lease vencido en la lectura no bloquea (ya se comprobó con `enEnvio`), pero su valor
+	// exacto forma parte de la condición para detectar la reclamación concurrente.
+	condicion, nombres, valores := condicionBorradoGlobal(actual.Item)
 	_, err = s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(s.table),
 		Key: map[string]types.AttributeValue{
 			"PK": stringAttr(partition),
 			"SK": stringAttr(sk),
 		},
+		ConditionExpression:       aws.String(condicion),
+		ExpressionAttributeNames:  nombres,
+		ExpressionAttributeValues: valores,
 	})
 	if err == nil {
 		return appAccount.GlobalItemDeleted, nil
@@ -956,6 +971,75 @@ func (s *DeletionStore) DeleteGlobalItem(ctx context.Context, partition, sk, use
 		return appAccount.GlobalItemBusy, nil
 	}
 	return appAccount.GlobalItemBusy, appAccount.ErrDeletionUnavailable
+}
+
+// condicionBorradoGlobal construye la condición del borrado de un ítem global a partir del
+// ítem LEÍDO. Siempre exige `attribute_exists(PK)`; añade la igualdad de `owner` y
+// `leaseOwner` cuando el ítem los declara y la de `leaseUntil` con el valor exacto, sea
+// Number (epoch, cola READALL) o String (RFC3339, outbox). Devuelve nombres y valores vacíos
+// (nil) cuando no hacen falta, para no enviar mapas innecesarios.
+func condicionBorradoGlobal(item map[string]types.AttributeValue) (string, map[string]string, map[string]types.AttributeValue) {
+	condicion := "attribute_exists(PK)"
+	nombres := map[string]string{}
+	valores := map[string]types.AttributeValue{}
+	if propietario := strings.TrimSpace(stringAttribute(item["owner"])); propietario != "" {
+		condicion += " AND #owner = :owner"
+		nombres["#owner"] = "owner"
+		valores[":owner"] = stringAttr(propietario)
+	}
+	if arrendatario := strings.TrimSpace(stringAttribute(item["leaseOwner"])); arrendatario != "" {
+		condicion += " AND #leaseOwner = :leaseOwner"
+		nombres["#leaseOwner"] = "leaseOwner"
+		valores[":leaseOwner"] = stringAttr(arrendatario)
+	}
+	if arrendamiento, ok := item["leaseUntil"]; ok && arrendamiento != nil {
+		condicion += " AND #leaseUntil = :leaseUntil"
+		nombres["#leaseUntil"] = "leaseUntil"
+		valores[":leaseUntil"] = arrendamiento
+	}
+	if len(nombres) == 0 {
+		return condicion, nil, nil
+	}
+	return condicion, nombres, valores
+}
+
+// DeleteGlobalPointer borra el puntero del titular sólo si sigue apuntando a la referencia
+// global leída. La condición impide que una reprogramación concurrente (el outbox mueve el
+// ítem global y actualiza `skGlobal` en la MISMA transacción) deje el ítem global nuevo sin
+// puntero: si el puntero cambió, se informa `false` y el worker reintenta la página.
+//
+// Con `expectedGlobalRef` vacío (puntero corrupto sin referencia) el borrado no necesita
+// condición sobre `skGlobal`: sólo se protege el control de progreso.
+func (s *DeletionStore) DeleteGlobalPointer(ctx context.Context, userID, sk, expectedGlobalRef string) (bool, error) {
+	if !s.disponible() {
+		return false, appAccount.ErrDeletionUnavailable
+	}
+	if domainDeletion.IsControlSK(sk) {
+		// Nunca se borra el registro de progreso.
+		return true, nil
+	}
+	entrada := &dynamodb.DeleteItemInput{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(domainDeletion.UserPartition(userID)),
+			"SK": stringAttr(sk),
+		},
+	}
+	if esperado := strings.TrimSpace(expectedGlobalRef); esperado != "" {
+		entrada.ConditionExpression = aws.String("attribute_exists(PK) AND #skGlobal = :skGlobal")
+		entrada.ExpressionAttributeNames = map[string]string{"#skGlobal": "skGlobal"}
+		entrada.ExpressionAttributeValues = map[string]types.AttributeValue{":skGlobal": stringAttr(esperado)}
+	}
+	_, err := s.client.DeleteItem(ctx, entrada)
+	if err == nil {
+		return true, nil
+	}
+	var condicional *types.ConditionalCheckFailedException
+	if errors.As(err, &condicional) {
+		// El puntero se movió (o ya no existe): no se borra a ciegas; se reintenta.
+		return false, nil
+	}
+	return false, appAccount.ErrDeletionUnavailable
 }
 
 // enEnvio indica si el ítem global tiene un lease de envío vigente. Cubre el outbox

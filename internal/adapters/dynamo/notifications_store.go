@@ -462,6 +462,7 @@ func (s *NotificationsStore) BeginReadAll(ctx context.Context, userID, requestID
 		"SK":         stringAttr(readAllPointerSortKey(requestID)),
 		"entityType": stringAttr(ReadAllPointerEntityType),
 		"requestId":  stringAttr(requestID),
+		"skGlobal":   stringAttr(readAllQueueSortKey(creado, requestID)),
 		"createdAt":  stringAttr(creado.Format(time.RFC3339Nano)),
 	}
 
@@ -513,6 +514,7 @@ func (s *NotificationsStore) ensureReadAllQueued(ctx context.Context, userID str
 		"SK":         stringAttr(readAllPointerSortKey(estado.RequestID)),
 		"entityType": stringAttr(ReadAllPointerEntityType),
 		"requestId":  stringAttr(estado.RequestID),
+		"skGlobal":   stringAttr(readAllQueueSortKey(estado.CreatedAt, estado.RequestID)),
 		"createdAt":  stringAttr(estado.CreatedAt.UTC().Format(time.RFC3339Nano)),
 	}
 	_, _ = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
