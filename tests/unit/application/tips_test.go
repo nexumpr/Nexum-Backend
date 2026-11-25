@@ -10,10 +10,10 @@ import (
 )
 
 func TestContenidoTipsOchoEntradasReales(t *testing.T) {
-	if appContent.Version != "2026-11-v1" {
+	if appContent.Version != "2026-11-v2" {
 		t.Fatalf("version inesperada: %q", appContent.Version)
 	}
-	if appContent.CacheKeyTips != "nexum:v1:content:tips:2026-11-v1" {
+	if appContent.CacheKeyTips != "nexum:v1:content:tips:2026-11-v2" {
 		t.Fatalf("clave de cache inesperada: %q", appContent.CacheKeyTips)
 	}
 	if appContent.CacheTTL != 300*time.Second {

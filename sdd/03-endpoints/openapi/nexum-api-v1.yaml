@@ -248,6 +248,12 @@ paths:
                   emailVerified: false
                 onboarding:
                   configured: false
+        '401':
+          description: UNAUTHORIZED - credenciales invalidas (mensaje generico, sin enumeracion).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '400':
           description: INVALID_REQUEST
           content:
@@ -598,6 +604,12 @@ paths:
               example:
                 status: accepted
                 requestId: 018f90ef-08e5-7a68-b09f-2b67a47c92f0
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '400':
           description: INVALID_REQUEST
           content:

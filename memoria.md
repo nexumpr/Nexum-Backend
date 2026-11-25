@@ -2444,3 +2444,45 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Evidencia ejecutada:** `gofmt -l cmd internal pkg tests` sin salida; `go vet ./...`, `go build ./...`, `go test ./... -count=1 -timeout 240s`, `go mod verify`, `validar_h06.py`, `verificar_publicacion_i150.py paridad` y `verificar_iac_devsecops.py` PASS. Pruebas HTTP locales `httptest` para los 7 endpoints implementados, con A/B, errores y cabeceras del contrato.
 - **Evidencia negativa/no PASS:** `go test -race` `NOT_RUN_LOCAL` por ausencia de gcc/CGO en Windows; CI Linux `PENDIENTE`; `staticcheck` y `gosec` tienen hallazgos heredados de Oleada 4 o anterior y ninguno en archivos nuevos de Oleada 5; `gitleaks` reporta 4 `generic-api-key` en 4 archivos sin diff en esta rama, todos introducidos en commits de Oleada 4, por lo que no se declara secretoscan PASS. AWS_DEPLOYED=NO para Oleada 5, HTTPS_VERIFIED_AWS=NO, `FUNCTIONAL_VERIFIED=PARCIAL`, `FCM_E2E_PASS=NO`, `FCM_CONFIGURED=SI_SIN_E2E`, `ML_GATE_APPROVED=NO`.
 - **Checklists/tasks:** actualizados únicamente para los 9 E-ID de la oleada; las casillas sin evidencia real permanecen sin marcar. Manifiesto SHA256 regenerado con enumeración canónica del validador y blobs LF tras el cierre. Cero secretos en este archivo.
+
+### Auditoría extraordinaria Oleadas 4 y 5 - 2026-11-24
+
+- **Modo:** solo lectura. Informes en `C:\Nexum-Custodia\AUDITORIA-OLEADAS4-5-20261124\`; no se modificó código, contratos, ramas, AWS, Firebase ni SES.
+- **Producción:** `v0.20.0+4bf6758d372`; binario ARM64 22 755 777 B, SHA-256 `8f681d4ecf547bb40a45008a78bc683fe44aec5b19cdcea9858c8e51459ce94c`, reproducible bit a bit desde `4bf6758` con Go 1.27.4 y `-trimpath -buildvcs=true`; LT v19; ASG 2/2/2; instancias en `us-east-2a` y `us-east-2b`; 2/2 targets healthy.
+- **`main`:** `dbff5f8661010b9b3a6285fa89e08a4cd79ca21d` (v0.19.2). Producción **no coincide** con `main`.
+- **Ramas:** `liz-oleada4` `22d4aa9` (15 commits), `liz-oleada5` `b57a549` (1 commit sobre `22d4aa9`). `eea1358` es ancestro de `22d4aa9`: sin reescritura. Sin PR, sin tags, sin releases de GitHub y con **0 ejecuciones de CI** sobre `4bf6758`, `eea1358`, `22d4aa9` y `b57a549`.
+- **Gobierno:** binario local + PUT presignado + `terraform apply -auto-approve`; sin Gate formal de despliegue. `POLITICA_RELEASES.md` incumplida.
+- **SES:** producción verificada (`ProductionAccessEnabled=true`, 50 000/día, 14/s, HEALTHY, supresión BOUNCE+COMPLAINT).
+- **Oleada 4:** 12/12 implementados y desplegados; E052 `period` vacío; E062 UUID vs hex32; rate limit compartido; FCM sin productor, sin `OUTBOX#*` en IAM y sin egreso a Google; ML real con Gate pendiente y desviaciones.
+- **Oleada 5:** no desplegada; E065/E066/E067 rotos por `RemindersStore.Get` (SK plana vs compuesta); E064 con salto de paginación; E072/E073 no conformes a `Health`; sin scheduler durable.
+- **Transversal:** E014 cubre familias `USER#`, pero no `OUTBOX#GLOBAL`; E020 no exporta las familias nuevas.
+- **Seguridad:** 7 hallazgos Gitleaks, todos falsos positivos; Staticcheck 10 y Gosec 12 (G115/G404 HIGH) → CI habría fallado. ZIP `nexum/secrets/terraform-h08i.zip` no previsto, no revisado.
+- **Rollback:** `v0.19.2` almacenado, pero **bloqueado por IAM** (faltan sus ARN).
+- **Decisión:** no rollback; ruta A+C (conservar v0.20.0, congelar y publicar release correctiva con CI y Gate).
+
+### Regularización Oleadas 4 y 5 — autorizaciones 2026-11-24
+
+- **RFC-023** `APPROVED` con `APRUEBO_RFC_023_GOBIERNO_RELEASE_OLEADAS`; Gate `GATE_H08E_REGULARIZACION_OLEADAS_4_5.md` en estado `AUTHORIZED_DEVELOPMENT_ONLY`.
+- **Autorizado:** regularización, correcciones E052/E062/E064–E067/E072/E073, scheduler, E014/E020, ML, FCM, DevSecOps, IaC/IAM, revisión ZIP, PR y CI.
+- **No autorizado:** merge, release, `terraform apply`, despliegue, rollback, rotación de credenciales, borrado del ZIP, recursos de pago, aprobación legal E015, decisión E031 ni Gate final ML.
+- **Topología:** `fix/h08e-oleada4-regularizacion` desde `22d4aa9`; `fix/h08e-oleada5-regularizacion` desde `b57a549` (stacked); `fix/h08e-transversal-e014-e020` sobre O5; `feat/h08i-iam-egreso-propuesta` desde `main`; `fix/h08e-regularizacion-54-gobierno` desde `main`.
+- **Ramas de Liz:** `liz-oleada4` y `liz-oleada5` se conservan inmutables como evidencia.
+- **Estados:** `REGULARIZACION_OLEADAS_4_5=IN_PROGRESS`; `MERGE=NOT_AUTHORIZED`; `RELEASE=NOT_AUTHORIZED`; `AWS_MUTATION=NOT_AUTHORIZED`.
+
+### Fase correctiva - PR y resultados 2026-11-24
+
+- **PR #143** `fix/h08e-oleada4-regularizacion` (base main): regulariza Oleada 4. Incluye E052 con periodo normalizado, E062 con UUID v5 determinista, cuotas separadas por dominio, staticcheck/gosec/gitleaks en cero y K-Means v2. HEAD de referencia `ba3502c7027911dd6894ca6fd8956d9e6573c9be`.
+- **PR #144** `feat/h08i-iam-egreso-propuesta` (base main): IAM `OUTBOX#*`/`SCHEDULE#*`, ARN exactos de v0.19.2 y v0.20.0, modulo `egreso_fcm` deshabilitado, comparativa FinOps y propuesta de observabilidad. HEAD `28650360e3afe7472a6169535db2cdb864dfe0f8`; CI 13/13 PASS. ZIP de secretos `BLOCKED_AUTHORIZATION`.
+- **PR #145** `fix/h08e-oleada5-regularizacion` (stacked sobre #143): recordatorios con puntero `REMINDERPTR#`, paginacion, Health contractual, purga E014 de `OUTBOX#GLOBAL`/`SCHEDULE#GLOBAL` y exportacion E020 (OpenAPI aditivo, 104 esquemas, `COMPATIBLE`). HEAD en evolucion; CI en curso.
+- **PR #146** `fix/h08e-regularizacion-54-gobierno` (base main): RFC-023, Gate de regularizacion, RFC-025, traceId del middleware, E005 413/ErrorEnvelope, E011 token-correo, E041 no-op, E070 FAQ y prueba de regresion de las 75 operaciones. HEAD de referencia `c9b23b04516e6affa786ce5465416956f6b9b7f1`.
+- **ML v2:** `kmeans-v2` con recorte P0,5/P99,5 (`amount_clip` 4618.905/338244.24), mediana fija `trained_median_cents=24353.5`, artefactos con SHA `9670c91b...168c` (modelo), `dd40de5e...7e2e` (metricas) y `322f2d37...8930` (referencia); v1 conservado. Silueta 0,780848 (train) y 0,775027 (holdout), descriptivas. `ML_GATE_APPROVED=NO`.
+- **Pruebas:** `go test ./... -count=1` PASS en O4 y O5; Staticcheck v0.8.2, Gosec v2.30.0 y Gitleaks 8.30.1 en cero; SDD integral, H06 y paridad PASS; `tests/infra/publicacion` 110 PASS; Terraform 521 y FinOps 258 PASS en #144.
+- **Scheduler durable y productor FCM:** en implementacion al cierre de esta entrada; no se declaran terminados hasta tener pruebas y CI.
+- **Estados:** `OLEADA_4_PR_READY=YES`; `OLEADA_5_PR_READY=EN_CURSO`; `HISTORICOS_PR_READY=YES`; `IAC_PR_READY=YES`; `MERGE=NOT_AUTHORIZED`; `RELEASE=NOT_AUTHORIZED`; `DEPLOY=NOT_RUN`; `AWS_MUTATION=NOT_AUTHORIZED`.
+
+### Integración de main y autorizaciones 2026-11-25
+
+- **PR #146 MERGED:** HEAD autorizado `a1cc9406a2bf038641b2b436275eebe8a32a07e4`; merge commit `f3bccca8b2437dc154bedbef257a3cabc7620844`; `origin/main` actualizado.
+- **Autorizaciones de esta sesión:** continuación de regularización e integración; merge de #146 por SHA exacto; cierre de defectos residuales; Gate ML-155; enmienda ML de ventana de 90 días sin caché; FinOps de egreso FCM (solo diseño/IaC); revisión del ZIP; reconciliación contractual E002/E008/E009/E051; preparación de certificación funcional 75/75.
+- **Sigue no autorizado:** `terraform apply`, creación de recursos, publicación de artefactos, despliegue, instance refresh, rollback, rotación de credenciales, borrado del ZIP, E015 legal, cambios de semántica E031 y merge de PR sin Gate por su HEAD.
+- **Sincronización:** #145 integró `origin/main` (RFC-023/025 + históricos) conservando E020; OpenAPI fusionado con 401 E002, 413 E005, 104 esquemas y checksum de publicación recalculado.

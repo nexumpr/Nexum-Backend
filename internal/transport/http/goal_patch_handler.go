@@ -26,8 +26,9 @@ import (
 //     ⇒ 400), de modo que el cliente no puede reescribir historia ni saltarse el CAS.
 //   - La respuesta 200 devuelve el contrato `Goal` completo con el `ETag` de la nueva versión.
 
-// goalPatchRequest es `GoalPatch`. Todos los campos son opcionales, pero al menos uno debe
-// llegar: un PATCH sin cambios no incrementa la versión ni escribe nada.
+// goalPatchRequest es `GoalPatch`. Todos los campos son opcionales: un cuerpo `{}` es un
+// no-op valido (200 sin escritura). Un PATCH con cambios tampoco incrementa la version si
+// los valores enviados coinciden con los vigentes.
 type goalPatchRequest struct {
 	Name         *string `json:"name"`
 	TargetAmount *string `json:"targetAmount"`
@@ -37,10 +38,10 @@ type goalPatchRequest struct {
 
 // Validate aplica las comprobaciones de ESQUEMA del contrato (400 INVALID_REQUEST). Las reglas
 // de negocio —objetivo positivo, objetivo por debajo del ahorro, transiciones— se responden 422.
+//
+// Un cuerpo `{}` es valido: `GoalPatch.required` esta vacio en el OpenAPI, asi que el caso de
+// uso lo trata como no-op 200 sin escribir ni incrementar la version (ver Service.Update).
 func (r goalPatchRequest) Validate() error {
-	if r.Name == nil && r.TargetAmount == nil && r.TargetDate == nil && r.Status == nil {
-		return errors.New("la modificacion no contiene cambios")
-	}
 	if r.Name != nil {
 		if _, err := domainGoal.NormalizeName(*r.Name); err != nil {
 			return errors.New("name debe tener entre 1 y 120 caracteres")
