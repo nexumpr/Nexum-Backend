@@ -2538,3 +2538,11 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Regresiones: prueba de aplicación con Argon2id real y prueba HTTP con `ports.ErrInvalidPassword`, ambas sin aplicar la transacción.
 - Sin despliegue en esta unidad: release pendiente de publicación y Gates.
 
+### Hotfix movimientos filtrados y analítica — 2026-11-25
+
+- Defecto reproducido en producción `v0.21.0+b527f981c1d7`: `GET /api/v1/movements` con `from` y/o `to` devolvía **503 DEPENDENCY_UNAVAILABLE**; E052–E055 (analítica) devolvían 503 por la misma consulta.
+- Causa: `MovementsStore.ListMovements` combinaba `begins_with(SK, :prefijo)` con `SK >= :desde`/`SK < :hasta`. DynamoDB admite una sola condición sobre la sort key; la expresión producía `ValidationException`, traducida a `ErrUnavailable`.
+- Corrección: con rango se usa un único `SK BETWEEN :desde AND :hasta` con límites prefijados `MOVEMENT#`; el extremo superior cierra el milisegundo `to` con `\uffff`. Sin rango se conserva `begins_with`.
+- Regresión: el doble de DynamoDB rechaza combinar `begins_with` con un rango (como el servicio real) y `TestE027StoreFiltrosYLimites` cubre `from`/`to`.
+- Sin cambios de contrato, claves ni índices; no se modificó DynamoDB ni IAM.
+

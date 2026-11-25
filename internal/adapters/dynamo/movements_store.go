@@ -356,20 +356,30 @@ func (s *MovementsStore) ListMovements(ctx context.Context, query appMovements.L
 	}
 
 	pk := domainDynamo.PrefixUser + userID
-	condicion := "PK = :pk AND begins_with(SK, :prefijo)"
+	// DynamoDB admite una sola condición sobre la sort key. `begins_with` no puede
+	// combinarse con `>=`/`<`: cuando hay rango se usa un único `BETWEEN` con los
+	// límites ya prefijados por `MOVEMENT#`. Sin rango se conserva el `begins_with`.
+	condicion := ""
 	valores := map[string]types.AttributeValue{
-		":pk":      stringAttr(pk),
-		":prefijo": stringAttr(domainDynamo.PrefixMovement),
+		":pk": stringAttr(pk),
 	}
-	if query.HasFrom {
-		condicion += " AND SK >= :desde"
-		valores[":desde"] = stringAttr(domainDynamo.PrefixMovement + appMovements.SortableTime(query.From))
-	}
-	if query.HasTo {
-		// `<` contra el milisegundo siguiente: incluye todo lo ocurrido en `to` exacto sin
-		// depender de un carácter centinela.
-		condicion += " AND SK < :hasta"
-		valores[":hasta"] = stringAttr(domainDynamo.PrefixMovement + appMovements.SortableTime(query.To.Add(time.Millisecond)))
+	if query.HasFrom || query.HasTo {
+		inicio := domainDynamo.PrefixMovement
+		fin := domainDynamo.PrefixMovement + "\uffff"
+		if query.HasFrom {
+			inicio = domainDynamo.PrefixMovement + appMovements.SortableTime(query.From)
+		}
+		if query.HasTo {
+			// `\uffff` cierra el milisegundo `to` completo y excluye cualquier timestamp
+			// posterior sin necesitar una segunda condición de sort key.
+			fin = domainDynamo.PrefixMovement + appMovements.SortableTime(query.To) + "\uffff"
+		}
+		condicion = "PK = :pk AND SK BETWEEN :desde AND :hasta"
+		valores[":desde"] = stringAttr(inicio)
+		valores[":hasta"] = stringAttr(fin)
+	} else {
+		condicion = "PK = :pk AND begins_with(SK, :prefijo)"
+		valores[":prefijo"] = stringAttr(domainDynamo.PrefixMovement)
 	}
 
 	var filtros []string
