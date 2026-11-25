@@ -47,10 +47,28 @@ func WriteErrorEnvelope(w http.ResponseWriter, status int, code, message, traceI
 			Code:    code,
 			Message: message,
 			Details: details,
-			TraceID: traceID,
+			TraceID: traceIDDeEnvelope(traceID),
 		},
 	}
 	return WriteJSON(w, status, envelope)
+}
+
+// traceIDDeEnvelope presenta el identificador de correlación en el formato que declara el
+// contrato (`ApiErrorObject.traceId`, `format: uuid`). El middleware propaga el trace-id W3C
+// como 32 hex sin guiones para `traceparent`; aquí se agrupa como 8-4-4-4-12, que es el mismo
+// valor y satisface la validación del cliente sin perder correlación.
+func traceIDDeEnvelope(traceID string) string {
+	v := strings.TrimSpace(traceID)
+	if len(v) != 32 {
+		return v
+	}
+	for _, c := range v {
+		esHex := (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+		if !esHex {
+			return v
+		}
+	}
+	return v[0:8] + "-" + v[8:12] + "-" + v[12:16] + "-" + v[16:20] + "-" + v[20:32]
 }
 
 // WriteAPIResponse escribe una respuesta exitosa con envoltorio estándar (A-040 §2.1).
