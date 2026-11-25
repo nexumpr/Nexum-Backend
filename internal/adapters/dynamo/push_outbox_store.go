@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"github.com/nexumpr/Nexum-Backend/internal/application/pushoutbox"
+	domainDeletion "github.com/nexumpr/Nexum-Backend/internal/domain/deletion"
 	domainDynamo "github.com/nexumpr/Nexum-Backend/internal/domain/dynamo"
 )
 
@@ -826,8 +827,15 @@ func (s *PushOutboxStore) YaEntregado(ctx context.Context, userID, eventID strin
 	return out != nil && len(out.Item) > 0, nil
 }
 
-// MarcarEntregado graba el hecho de entrega con escritura condicional. Un replay
-// no altera el registro existente.
+// MarcarEntregado graba el hecho de entrega en una transacción de dos `Put`
+// condicionados: el registro de dedupe (partición del servicio) y su puntero de purga en
+// la partición del titular. Un replay no altera ninguno de los dos.
+//
+// El puntero `USER#<sub>/DELIVERYPTR#<sha256(eventId)>` es lo que permite a E014 borrar el
+// dedupe sin `Scan`: el registro global vincula userID, eventId y notificationID y sólo
+// caducaría por TTL, de modo que sin puntero sería inalcanzable desde la partición del
+// titular. El puntero guarda el `eventId` (identificador del evento, no dato financiero) y
+// la clave global exacta (`skGlobal`); ambos vencen a los 90 días.
 func (s *PushOutboxStore) MarcarEntregado(ctx context.Context, userID, eventID, notificationID string, ahora time.Time) error {
 	if !s.disponible() {
 		return ErrOutboxNoDisponible
@@ -835,28 +843,84 @@ func (s *PushOutboxStore) MarcarEntregado(ctx context.Context, userID, eventID, 
 	if ahora.IsZero() {
 		ahora = pushOutboxAhora(s)
 	}
-	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(s.table),
-		Item: map[string]types.AttributeValue{
-			"PK":             stringAttr(pushOutboxPartition),
-			"SK":             stringAttr(pushOutboxIdemSK(userID, eventID)),
-			"entityType":     stringAttr(pushOutboxIdemEntityType),
-			"userID":         stringAttr(userID),
-			"eventId":        stringAttr(eventID),
-			"notificationID": stringAttr(notificationID),
-			"createdAt":      stringAttr(ahora.UTC().Format(time.RFC3339Nano)),
-			// El dedupe de entrega contiene identificadores vinculables
-			// (userID/eventId/notificationID). TTL de 90 días: evita el residuo
-			// permanente; DynamoDB lo purga de forma best-effort, no exacta.
-			"expiresAt": numberAttr(ahora.UTC().Add(90 * 24 * time.Hour).Unix()),
+	idemSK := pushOutboxIdemSK(userID, eventID)
+	dedupe := map[string]types.AttributeValue{
+		"PK":             stringAttr(pushOutboxPartition),
+		"SK":             stringAttr(idemSK),
+		"entityType":     stringAttr(pushOutboxIdemEntityType),
+		"userID":         stringAttr(userID),
+		"eventId":        stringAttr(eventID),
+		"notificationID": stringAttr(notificationID),
+		"createdAt":      stringAttr(ahora.UTC().Format(time.RFC3339Nano)),
+		// El dedupe de entrega contiene identificadores vinculables
+		// (userID/eventId/notificationID). TTL de 90 días: evita el residuo
+		// permanente; DynamoDB lo purga de forma best-effort, no exacta.
+		"expiresAt": numberAttr(ahora.UTC().Add(90 * 24 * time.Hour).Unix()),
+	}
+	punteroPK, punteroSK := domainDeletion.DeliveryPointerKeys(userID, eventID)
+	puntero := map[string]types.AttributeValue{
+		"PK":         stringAttr(punteroPK),
+		"SK":         stringAttr(punteroSK),
+		"entityType": stringAttr(domainDeletion.EntityDeliveryPointer),
+		"userID":     stringAttr(strings.TrimSpace(userID)),
+		"eventId":    stringAttr(strings.TrimSpace(eventID)),
+		"skGlobal":   stringAttr(idemSK),
+		"createdAt":  stringAttr(ahora.UTC().Format(time.RFC3339Nano)),
+		// El puntero debe sobrevivir al dedupe: el TTL de DynamoDB es asíncrono y no
+		// garantiza orden. Mismo vencimiento que el registro global.
+		"expiresAt": numberAttr(ahora.UTC().Add(90 * 24 * time.Hour).Unix()),
+	}
+	_, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{
+			{Put: &types.Put{
+				TableName:           aws.String(s.table),
+				Item:                dedupe,
+				ConditionExpression: aws.String("attribute_not_exists(PK)"),
+			}},
+			{Put: &types.Put{
+				TableName:           aws.String(s.table),
+				Item:                puntero,
+				ConditionExpression: aws.String("attribute_not_exists(PK)"),
+			}},
 		},
-		ConditionExpression: aws.String("attribute_not_exists(PK)"),
 	})
 	if err == nil {
 		return nil
 	}
+	var cancelada *types.TransactionCanceledException
+	if !errors.As(err, &cancelada) {
+		return ErrOutboxNoDisponible
+	}
+	// Cancelación = replay legítimo o residuo parcial; nunca es un error fatal.
+	// El dedupe es la autoridad de idempotencia: si existe, la entrega ya estaba
+	// registrada y no se modifica nada.
+	out, errLectura := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(pushOutboxPartition),
+			"SK": stringAttr(idemSK),
+		},
+		ConsistentRead: aws.Bool(true),
+	})
+	if errLectura != nil {
+		return ErrOutboxNoDisponible
+	}
+	if out != nil && len(out.Item) > 0 {
+		return nil
+	}
+	// Sólo existía el puntero (residuo parcial o TTL asíncrono del dedupe): se completa
+	// el dedupe por separado, condicionado, para no perder la marca de entrega. Si otra
+	// ejecución lo crea antes, la condición falla y el resultado sigue siendo un replay.
+	_, errDedupe := s.client.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName:           aws.String(s.table),
+		Item:                dedupe,
+		ConditionExpression: aws.String("attribute_not_exists(PK)"),
+	})
+	if errDedupe == nil {
+		return nil
+	}
 	var condicional *types.ConditionalCheckFailedException
-	if errors.As(err, &condicional) {
+	if errors.As(errDedupe, &condicional) {
 		return nil
 	}
 	return ErrOutboxNoDisponible

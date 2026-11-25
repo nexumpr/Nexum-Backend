@@ -936,7 +936,7 @@ func (s *DeletionStore) DeleteGlobalItem(ctx context.Context, partition, sk, use
 	if actual == nil || len(actual.Item) == 0 {
 		return appAccount.GlobalItemDeleted, nil
 	}
-	if titular := strings.TrimSpace(stringAttribute(actual.Item["userID"])); titular != "" && titular != userID {
+	if titular := titularDeItem(actual.Item); titular != "" && titular != userID {
 		return appAccount.GlobalItemForeign, nil
 	}
 	if enEnvio(actual.Item, now) {
@@ -1001,6 +1001,17 @@ func condicionBorradoGlobal(item map[string]types.AttributeValue) (string, map[s
 		return condicion, nil, nil
 	}
 	return condicion, nombres, valores
+}
+
+// titularDeItem devuelve el titular de un ítem global. El outbox y la cola READALL usan
+// `userID`; los ítems de token de E005/E006 y E010/E011 usan `userId`. Sin esta segunda
+// forma, la comprobación de titular de un puntero de token quedaría vacía y un puntero
+// manipulado podría borrar el token de otra cuenta.
+func titularDeItem(item map[string]types.AttributeValue) string {
+	if titular := strings.TrimSpace(stringAttribute(item["userID"])); titular != "" {
+		return titular
+	}
+	return strings.TrimSpace(stringAttribute(item["userId"]))
 }
 
 // DeleteGlobalPointer borra el puntero del titular sólo si sigue apuntando a la referencia

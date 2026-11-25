@@ -32,6 +32,10 @@ type purgaDynamo struct {
 	// ignorarDelete responde éxito pero conserva el ítem (simula un borrado que no surte
 	// efecto; sirve para probar que VERIFY impide declarar PURGED).
 	ignorarDelete map[string]bool
+	// carreraDelete simula una transacción concurrente que muta la tabla justo entre la
+	// lectura y el borrado de la clave (pk, sk). Se invoca con el mutex tomado: el hook no
+	// puede llamar a los métodos públicos del doble, sólo devolver las mutaciones.
+	carreraDelete func(pk, sk string) []mutacionPurga
 
 	claims  int
 	deletes int
@@ -49,6 +53,31 @@ func newPurgaDynamo() *purgaDynamo {
 }
 
 func clavePurga(pk, sk string) string { return pk + "\x00" + sk }
+
+// mutacionPurga describe el efecto de una escritura concurrente simulada: con item nil
+// borra la clave; con item no nil la reemplaza.
+type mutacionPurga struct {
+	pk, sk string
+	item   map[string]types.AttributeValue
+}
+
+// mutar aplica una escritura directa sobre la tabla del doble. Sirve para preparar estados
+// que en producción sólo produce una transacción (TTL vencido, movimiento de un puntero).
+func (m *purgaDynamo) mutar(mutaciones ...mutacionPurga) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, mu := range mutaciones {
+		if mu.item == nil {
+			delete(m.items, clavePurga(mu.pk, mu.sk))
+			continue
+		}
+		item := map[string]types.AttributeValue{"PK": strAttr(mu.pk), "SK": strAttr(mu.sk)}
+		for k, v := range mu.item {
+			item[k] = v
+		}
+		m.items[clavePurga(mu.pk, mu.sk)] = item
+	}
+}
 
 func (m *purgaDynamo) sembrar(pk, sk string, attrs map[string]types.AttributeValue) {
 	m.mu.Lock()
@@ -128,6 +157,19 @@ func (m *purgaDynamo) DeleteItem(_ context.Context, in *dynamodb.DeleteItemInput
 	defer m.mu.Unlock()
 	pk := mapaString(in.Key, "PK")
 	sk := mapaString(in.Key, "SK")
+	if m.carreraDelete != nil {
+		for _, mu := range m.carreraDelete(pk, sk) {
+			if mu.item == nil {
+				delete(m.items, clavePurga(mu.pk, mu.sk))
+				continue
+			}
+			item := map[string]types.AttributeValue{"PK": strAttr(mu.pk), "SK": strAttr(mu.sk)}
+			for k, v := range mu.item {
+				item[k] = v
+			}
+			m.items[clavePurga(mu.pk, mu.sk)] = item
+		}
+	}
 	existente := m.items[clavePurga(pk, sk)]
 	if in.ConditionExpression != nil {
 		ok, err := evaluarExpresion(aws.ToString(in.ConditionExpression), existente, in.ExpressionAttributeNames, in.ExpressionAttributeValues)
