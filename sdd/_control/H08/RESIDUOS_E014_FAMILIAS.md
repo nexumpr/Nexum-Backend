@@ -37,3 +37,13 @@ Purga de A sin afectar B; 0 residuos en `USER#`, punteros y globales; purga dura
 - Un push **ya entregado** a un dispositivo externo no puede recuperarse; se borra el dato del backend, no la copia en el terminal.
 - El TTL de DynamoDB es best-effort: el ítem puede sobrevivir horas o días tras `expiresAt`.
 - La verificación real en AWS (`PURGED` con una cuenta sintética) sigue `NOT_RUN`.
+
+## Estado tras la corrección 2026-11-25 (segunda sesión)
+
+- **Cubierto ahora:** `READALLPTR#` → `QUEUE#READALL`. La purga reconoce el puntero como global (partición `QUEUE#READALL`), respeta el lease de la cola (`leaseOwner` + `leaseUntil` epoch) y borra el global y el puntero del titular sin tocar los de otro usuario. Probado en `TestE014PurgaPunteroReadAll`.
+- **Semántica del borrado:** tras el tombstone, una reclamación posterior de un worker es ilegítima; el borrado por clave del ítem global es idempotente y no requiere condición de owner. Se conserva la lectura consistente previa y la verificación de titular (`userID`).
+- **Residuos que NO se declaran eliminados por E014:**
+  - `ONE_USE#<sha256(token)>` (E010/E011) y `RESET#<sha256(token)>` (E005/E006): contienen `userId`/correo y solo caducan por TTL (30 min). **No son enumerables por usuario** sin un puntero. Propuesta: `USER#<id>/TOKENPTR#<hash>` escrito al emitir, purgado en `PARTITION`. **Pendiente de Gate.**
+  - Dedupe global `OUTBOX#GLOBAL/IDEM#<sha256(userID|eventId)>`: TTL de 90 días; sin puntero de usuario. Propuesta: `DELIVERYPTR#` escrito en la misma transacción. **Pendiente.**
+  - Caché Redis por HMAC correlacionable: TTL corto; `SCAN` denegado por ACL (se tolera `NOPERM`).
+- **Regla:** mientras esos punteros no existan, `PURGED` acredita la purga de las familias enumerables, **no** la ausencia total de identificadores vinculables.
