@@ -80,17 +80,6 @@ func (f *remFakeDynamo) item(pk, sk string) map[string]types.AttributeValue {
 	return remCopiar(f.items[remClave(pk, sk)])
 }
 
-func (f *remFakeDynamo) claves() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	salida := make([]string, 0, len(f.items))
-	for clave := range f.items {
-		salida = append(salida, clave)
-	}
-	sort.Strings(salida)
-	return salida
-}
-
 func (f *remFakeDynamo) claveExacta(llave map[string]types.AttributeValue) (string, error) {
 	if len(llave) != 2 {
 		return "", fmt.Errorf("clave no exacta: %d atributos (%v)", len(llave), llave)
