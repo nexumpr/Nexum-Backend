@@ -1,0 +1,74 @@
+{
+  "amount_clip": {
+    "lower_cents": 4618.905,
+    "lower_percentile": 0.5,
+    "upper_cents": 338244.24,
+    "upper_percentile": 99.5
+  },
+  "artifact_sha256": "9670c91be3480057361adefa297e6f248a7e83f80af0b0c9d55c6e112bff168c",
+  "holdout": {
+    "cluster_sizes": [
+      375,
+      125
+    ],
+    "inertia": 1422.398718,
+    "note": "silhouette y pureza son metricas descriptivas sobre datos sinteticos; no son precision predictiva",
+    "purity_profile": 0.5,
+    "purity_scale_group": 1.0,
+    "samples": 500,
+    "scale_groups": {
+      "alto": [
+        "vivienda"
+      ],
+      "bajo": [
+        "comida",
+        "transporte",
+        "servicios"
+      ]
+    },
+    "seed": 20261117,
+    "silhouette": 0.775027
+  },
+  "median_definition": "trained_median_of_clipped_amounts",
+  "model_version": "kmeans-v2",
+  "n_init": 10,
+  "numpy": "2.5.5",
+  "python": "3.13.17",
+  "python_implementation": "CPython",
+  "reference_sha256": "322f2d3787474e77313f1034e0afc7bdd1aa06b08a7c8e9df759b810ee788930",
+  "results": [
+    {
+      "inercia": 1382.11478,
+      "k": 2,
+      "silueta": 0.780848
+    },
+    {
+      "inercia": 733.565938,
+      "k": 3,
+      "silueta": 0.568068
+    },
+    {
+      "inercia": 460.69486,
+      "k": 4,
+      "silueta": 0.585681
+    },
+    {
+      "inercia": 401.792664,
+      "k": 5,
+      "silueta": 0.555756
+    },
+    {
+      "inercia": 355.790548,
+      "k": 6,
+      "silueta": 0.535717
+    }
+  ],
+  "samples": 500,
+  "schema_version": 2,
+  "seed": 20261116,
+  "selected_k": 2,
+  "selected_silhouette": 0.780848,
+  "sklearn": "1.9.1",
+  "synthetic_data_sha256": "8d2bf29691a08eee6a1cd1230ad81b8454712424721e5e3e21bb9e9bd99918fd",
+  "trained_median_cents": 24353.5
+}

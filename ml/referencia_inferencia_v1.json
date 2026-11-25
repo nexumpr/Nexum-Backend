@@ -1,0 +1,122 @@
+[
+  {
+    "expected_cluster": 0,
+    "record": {
+      "amount_cents": 17508,
+      "category": "comida",
+      "day_of_week": 3,
+      "hour": 14,
+      "recurring": false
+    }
+  },
+  {
+    "expected_cluster": 0,
+    "record": {
+      "amount_cents": 15861,
+      "category": "comida",
+      "day_of_week": 4,
+      "hour": 12,
+      "recurring": false
+    }
+  },
+  {
+    "expected_cluster": 0,
+    "record": {
+      "amount_cents": 31207,
+      "category": "servicios",
+      "day_of_week": 6,
+      "hour": 18,
+      "recurring": true
+    }
+  },
+  {
+    "expected_cluster": 1,
+    "record": {
+      "amount_cents": 321395,
+      "category": "vivienda",
+      "day_of_week": 0,
+      "hour": 9,
+      "recurring": true
+    }
+  },
+  {
+    "expected_cluster": 1,
+    "record": {
+      "amount_cents": 283789,
+      "category": "vivienda",
+      "day_of_week": 2,
+      "hour": 8,
+      "recurring": true
+    }
+  },
+  {
+    "expected_cluster": 0,
+    "record": {
+      "amount_cents": 48315,
+      "category": "servicios",
+      "day_of_week": 5,
+      "hour": 19,
+      "recurring": false
+    }
+  },
+  {
+    "expected_cluster": 1,
+    "record": {
+      "amount_cents": 329857,
+      "category": "vivienda",
+      "day_of_week": 1,
+      "hour": 9,
+      "recurring": true
+    }
+  },
+  {
+    "expected_cluster": 1,
+    "record": {
+      "amount_cents": 340280,
+      "category": "vivienda",
+      "day_of_week": 2,
+      "hour": 10,
+      "recurring": true
+    }
+  },
+  {
+    "expected_cluster": 0,
+    "record": {
+      "amount_cents": 17545,
+      "category": "comida",
+      "day_of_week": 6,
+      "hour": 12,
+      "recurring": false
+    }
+  },
+  {
+    "expected_cluster": 0,
+    "record": {
+      "amount_cents": 14318,
+      "category": "comida",
+      "day_of_week": 6,
+      "hour": 14,
+      "recurring": false
+    }
+  },
+  {
+    "expected_cluster": 1,
+    "record": {
+      "amount_cents": 265664,
+      "category": "vivienda",
+      "day_of_week": 1,
+      "hour": 9,
+      "recurring": true
+    }
+  },
+  {
+    "expected_cluster": 0,
+    "record": {
+      "amount_cents": 55339,
+      "category": "servicios",
+      "day_of_week": 5,
+      "hour": 20,
+      "recurring": true
+    }
+  }
+]
