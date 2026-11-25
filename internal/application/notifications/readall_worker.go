@@ -30,6 +30,20 @@ const (
 	readAllIntervaloPorDefecto = 5 * time.Second
 	readAllReintentoBase       = 2 * time.Second
 	readAllReintentoMax        = 30 * time.Second
+
+	// readAllCierrePresencia acota el retiro ordenado del heartbeat cuando el
+	// contexto de ejecución ya está cancelado. Si no hay Redis, el TTL de la
+	// presencia (60 s) termina de limpiarla sin depender de este cierre.
+	readAllCierrePresencia = 3 * time.Second
+)
+
+// Clases de log del heartbeat. Se registran sin identificadores de usuario ni
+// detalles internos: sólo indican si la capacidad de proceso está anunciada.
+const (
+	claseHeartbeatRenovado    = "READALL_HEARTBEAT_RENOVADO"
+	claseHeartbeatAusente     = "READALL_HEARTBEAT_AUSENTE"
+	claseHeartbeatRetirado    = "READALL_HEARTBEAT_RETIRADO"
+	claseHeartbeatRetiroFallo = "READALL_HEARTBEAT_RETIRO_FALLIDO"
 )
 
 // ReadAllJob es el ítem durable de la cola global de E063:
@@ -72,10 +86,12 @@ type WorkerStore interface {
 // en Redis: dos nodos pueden reclamar a la vez sin duplicar trabajo, y la
 // recuperación tras una caída es inmediata al vencer el lease.
 type ReadAllWorker struct {
-	store  WorkerStore
-	logger *slog.Logger
-	owner  string
-	now    func() time.Time
+	store     WorkerStore
+	logger    *slog.Logger
+	owner     string
+	now       func() time.Time
+	presencia PresenciaReadAll
+	latido    bool
 
 	// Intervalo es la pausa entre ciclos dentro de Run.
 	Intervalo time.Duration
@@ -129,7 +145,18 @@ func (w *ReadAllWorker) WithClock(now func() time.Time) *ReadAllWorker {
 	return w
 }
 
+// ConPresencia conecta el heartbeat compartido. Sin presencia el worker sigue
+// procesando la cola, pero ningún nodo anuncia capacidad de proceso y E063
+// rechaza trabajo nuevo con 503 (fail-closed).
+func (w *ReadAllWorker) ConPresencia(presencia PresenciaReadAll) *ReadAllWorker {
+	if w != nil {
+		w.presencia = presencia
+	}
+	return w
+}
+
 // Run procesa la cola hasta que se cancela el contexto (apagado controlado).
+// Publica el heartbeat al arrancar y en cada ciclo, y lo retira al cerrarse.
 func (w *ReadAllWorker) Run(ctx context.Context) {
 	if !w.Disponible() || ctx == nil {
 		return
@@ -140,15 +167,59 @@ func (w *ReadAllWorker) Run(ctx context.Context) {
 	}
 	ticker := time.NewTicker(intervalo)
 	defer ticker.Stop()
+	defer w.retirarPresencia()
+	w.latirPresencia(ctx)
 	w.Ciclo(ctx)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			w.latirPresencia(ctx)
 			w.Ciclo(ctx)
 		}
 	}
+}
+
+// latirPresencia renueva la presencia compartida. Un fallo no detiene el
+// procesamiento de trabajos ya encolados, pero el endpoint deja de aceptar
+// trabajo nuevo mientras no haya un worker activo visible.
+func (w *ReadAllWorker) latirPresencia(ctx context.Context) {
+	if w == nil || w.presencia == nil {
+		return
+	}
+	if err := w.presencia.Latir(ctx, w.owner); err != nil {
+		w.latido = false
+		w.logger.WarnContext(ctx, "E063: heartbeat del worker no renovado",
+			slog.String("clase", claseHeartbeatAusente),
+			slog.String("error_class", claseErrorReadAll(err)))
+		return
+	}
+	if !w.latido {
+		w.logger.InfoContext(ctx, "E063: heartbeat del worker renovado",
+			slog.String("clase", claseHeartbeatRenovado))
+		w.latido = true
+	}
+}
+
+// retirarPresencia elimina el heartbeat propio al cerrar. Usa un contexto
+// independiente del cancelado para no dejar presencia fantasma hasta el TTL; si
+// falla, el TTL de 60 s la elimina igualmente.
+func (w *ReadAllWorker) retirarPresencia() {
+	if w == nil || w.presencia == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), readAllCierrePresencia)
+	defer cancel()
+	if err := w.presencia.Retirar(ctx, w.owner); err != nil {
+		w.logger.WarnContext(ctx, "E063: heartbeat del worker no se pudo retirar",
+			slog.String("clase", claseHeartbeatRetiroFallo),
+			slog.String("error_class", claseErrorReadAll(err)))
+		return
+	}
+	w.latido = false
+	w.logger.InfoContext(ctx, "E063: heartbeat del worker retirado",
+		slog.String("clase", claseHeartbeatRetirado))
 }
 
 // Ciclo hace una pasada acotada: reclama como máximo `Lote` trabajos y dedica

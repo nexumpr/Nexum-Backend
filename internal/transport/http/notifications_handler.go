@@ -25,6 +25,7 @@ type NotificationsHandler struct {
 	cursorKey []byte
 	logger    *slog.Logger
 	protected http.Handler
+	capacidad notifications.CapacidadReadAll
 }
 
 // NewNotificationsHandler construye el handler. Sin servicio, tokens,
@@ -47,6 +48,16 @@ func NewNotificationsHandler(
 	}
 	conCuota := LimitarPorUsuarioContrato(limitador, "notifications", h.serve)
 	h.protected = middleware.AuthenticateBearerWithSession(tokens, sessions)(conCuota)
+	return h
+}
+
+// ConCapacidadReadAll conecta la comprobación de capacidad de proceso de E063.
+// Antes de aceptar trabajo se exige al menos un worker READALL activo conocido;
+// sin capacidad, el endpoint responde 503 y no persiste nada (fail-closed).
+func (h *NotificationsHandler) ConCapacidadReadAll(capacidad notifications.CapacidadReadAll) *NotificationsHandler {
+	if h != nil {
+		h.capacidad = capacidad
+	}
 	return h
 }
 
@@ -162,6 +173,32 @@ func (h *NotificationsHandler) serveMarkRead(w http.ResponseWriter, r *http.Requ
 func (h *NotificationsHandler) serveReadAll(w http.ResponseWriter, r *http.Request, userID string) {
 	if len(r.URL.Query()) != 0 || !notificacionesSinCuerpo(r) {
 		writeNotificationsViolation(w, r, "body", "body_not_allowed")
+		return
+	}
+	// Capacidad de proceso compartida: cualquier nodo con heartbeat vigente
+	// habilita la admisión. No se exige que este nodo sea el worker local.
+	// Sin capacidad o con Redis inaccesible no se persiste READALL ni cola.
+	if h.capacidad == nil {
+		h.logger.WarnContext(r.Context(), "E063: capacidad de proceso no configurada",
+			slog.String("clase", "READALL_HEARTBEAT_AUSENTE"),
+			slog.String("trace_id", traceID(r)))
+		writeRegisterError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "servicio no disponible", nil)
+		return
+	}
+	activos, err := h.capacidad.WorkersActivos(r.Context())
+	if err != nil {
+		h.logger.WarnContext(r.Context(), "E063: no se pudo comprobar la capacidad de proceso",
+			slog.String("clase", "READALL_HEARTBEAT_AUSENTE"),
+			slog.String("error_class", "DEPENDENCY_UNAVAILABLE"),
+			slog.String("trace_id", traceID(r)))
+		writeRegisterError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "servicio no disponible", nil)
+		return
+	}
+	if activos < 1 {
+		h.logger.WarnContext(r.Context(), "E063: sin workers READALL activos",
+			slog.String("clase", "READALL_HEARTBEAT_AUSENTE"),
+			slog.String("trace_id", traceID(r)))
+		writeRegisterError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "servicio no disponible", nil)
 		return
 	}
 	aceptado, err := h.service.StartReadAll(r.Context(), userID)

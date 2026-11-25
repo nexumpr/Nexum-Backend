@@ -6,6 +6,7 @@ import (
 
 	dynamoAdapter "github.com/nexumpr/Nexum-Backend/internal/adapters/dynamo"
 	appNotifications "github.com/nexumpr/Nexum-Backend/internal/application/notifications"
+	cacheinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/cache"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 )
 
@@ -43,6 +44,13 @@ func montarE063(d *dependenciasOleada4) {
 	store := dynamoAdapter.NewNotificationsStore(cliente, d.Tabla)
 	servicio := appNotifications.NewService(store, clave)
 	limitador := limitadorOleada4(d)
-	handler := nexumhttp.NewNotificationsHandler(servicio, d.Tokens, d.Authorizer, limitador, clave, logger)
+	capacidad := cacheinfra.NewReadAllPresence(d.Redis)
+	if d.Redis == nil {
+		logger.Warn("E063: Redis no configurado; no habra heartbeat de workers y el endpoint respondera 503",
+			slog.String("clase", "READALL_HEARTBEAT_AUSENTE"),
+			slog.String("motivo", "redis_no_configurado"))
+	}
+	handler := nexumhttp.NewNotificationsHandler(servicio, d.Tokens, d.Authorizer, limitador, clave, logger).
+		ConCapacidadReadAll(capacidad)
 	d.Router.HandleFunc(http.MethodPost, "/notifications/read-all", handler.ServeHTTP)
 }

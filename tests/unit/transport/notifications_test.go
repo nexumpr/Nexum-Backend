@@ -197,6 +197,41 @@ func e061HTTPStoreValido() *e061HTTPStore {
 	return store
 }
 
+// e063Capacidad simula el registro compartido de workers READALL. `activos`
+// representa heartbeats vigentes, no la identidad del nodo que atiende.
+type e063Capacidad struct {
+	mu       sync.Mutex
+	activos  int64
+	err      error
+	llamadas int
+}
+
+func (c *e063Capacidad) WorkersActivos(context.Context) (int64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.llamadas++
+	return c.activos, c.err
+}
+
+func (c *e063Capacidad) fijar(activos int64, err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.activos = activos
+	c.err = err
+}
+
+func (c *e063Capacidad) consultas() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.llamadas
+}
+
+// e063HTTPHandler monta E063 con la comprobación de capacidad de proceso
+// compartida. GET/PATCH no la necesitan.
+func e063HTTPHandler(store appNotifications.Store, limitador internalhttp.LimitadorRuta, clave []byte, capacidad appNotifications.CapacidadReadAll) *internalhttp.NotificationsHandler {
+	return e061HTTPHandler(store, limitador, clave).ConCapacidadReadAll(capacidad)
+}
+
 func e061HTTPPeticion(metodo, ruta, token string) *http.Request {
 	return e004Peticion(metodo, ruta, token, "")
 }
@@ -405,8 +440,9 @@ func TestE062HTTPContratoYAjeno(t *testing.T) {
 
 func TestE063HTTPAceptadoConTrabajoReal(t *testing.T) {
 	store := e061HTTPStoreValido()
+	capacidad := &e063Capacidad{activos: 1}
 	rec := httptest.NewRecorder()
-	e061HTTPHandler(store, e053Limitador{permitido: true}, e061HTTPClave).ServeHTTP(
+	e063HTTPHandler(store, e053Limitador{permitido: true}, e061HTTPClave, capacidad).ServeHTTP(
 		rec, e061HTTPPeticion(http.MethodPost, "/api/v1/notifications/read-all", "jwt-valido"))
 
 	if rec.Code != http.StatusAccepted {
@@ -443,13 +479,115 @@ func TestE063HTTPAceptadoConTrabajoReal(t *testing.T) {
 
 	// Un segundo 202 es idempotente y tampoco procesa en la petición.
 	rec2 := httptest.NewRecorder()
-	e061HTTPHandler(store, e053Limitador{permitido: true}, e061HTTPClave).ServeHTTP(
+	e063HTTPHandler(store, e053Limitador{permitido: true}, e061HTTPClave, capacidad).ServeHTTP(
 		rec2, e061HTTPPeticion(http.MethodPost, "/api/v1/notifications/read-all", "jwt-valido"))
 	if rec2.Code != http.StatusAccepted {
 		t.Fatalf("segundo read-all: %d %s", rec2.Code, rec2.Body.String())
 	}
 	if total, err := store.CountUnread(context.Background(), e004HTTPUsuario); err != nil || total != 17 {
 		t.Fatalf("el segundo 202 no debe procesar: unreadCount=%d %v", total, err)
+	}
+}
+
+func TestE063HTTPSinWorkerActivoNoPersiste(t *testing.T) {
+	store := e061HTTPStoreValido()
+	capacidad := &e063Capacidad{}
+	rec := httptest.NewRecorder()
+	e063HTTPHandler(store, e053Limitador{permitido: true}, e061HTTPClave, capacidad).ServeHTTP(
+		rec, e061HTTPPeticion(http.MethodPost, "/api/v1/notifications/read-all", "jwt-valido"))
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("sin worker conocido: esperado 503, obtenido %d: %s", rec.Code, rec.Body.String())
+	}
+	e061HTTPEnvelope(t, rec, "DEPENDENCY_UNAVAILABLE")
+	if len(store.readall) != 0 {
+		t.Fatalf("no debe persistirse READALL sin capacidad de proceso: %d", len(store.readall))
+	}
+	if total, _ := store.CountUnread(context.Background(), e004HTTPUsuario); total != 17 {
+		t.Fatalf("la bandeja no debe cambiar: %d", total)
+	}
+	if capacidad.consultas() != 1 {
+		t.Fatalf("debe consultarse la capacidad una vez: %d", capacidad.consultas())
+	}
+}
+
+func TestE063HTTPRedisCaidoNoPersiste(t *testing.T) {
+	store := e061HTTPStoreValido()
+	capacidad := &e063Capacidad{err: context.DeadlineExceeded}
+	rec := httptest.NewRecorder()
+	e063HTTPHandler(store, e053Limitador{permitido: true}, e061HTTPClave, capacidad).ServeHTTP(
+		rec, e061HTTPPeticion(http.MethodPost, "/api/v1/notifications/read-all", "jwt-valido"))
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("Redis caído: esperado 503, obtenido %d: %s", rec.Code, rec.Body.String())
+	}
+	e061HTTPEnvelope(t, rec, "DEPENDENCY_UNAVAILABLE")
+	if len(store.readall) != 0 {
+		t.Fatal("un fallo de Redis no puede dejar trabajo encolado")
+	}
+}
+
+func TestE063HTTPHeartbeatVencidoVuelveA503(t *testing.T) {
+	store := e061HTTPStoreValido()
+	capacidad := &e063Capacidad{activos: 1}
+	handler := e063HTTPHandler(store, e053Limitador{permitido: true}, e061HTTPClave, capacidad)
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, e061HTTPPeticion(http.MethodPost, "/api/v1/notifications/read-all", "jwt-valido"))
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("con worker vigente: esperado 202, obtenido %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(store.readall) != 1 {
+		t.Fatalf("el primer 202 debe persistir un trabajo: %d", len(store.readall))
+	}
+
+	// El heartbeat vence sin que nadie lo renueve: deja de aceptarse trabajo.
+	capacidad.fijar(0, nil)
+	rec2 := httptest.NewRecorder()
+	handler.ServeHTTP(rec2, e061HTTPPeticion(http.MethodPost, "/api/v1/notifications/read-all", "jwt-valido"))
+	if rec2.Code != http.StatusServiceUnavailable {
+		t.Fatalf("heartbeat vencido: esperado 503, obtenido %d: %s", rec2.Code, rec2.Body.String())
+	}
+	if len(store.readall) != 1 {
+		t.Fatalf("el 503 no debe crear un segundo trabajo: %d", len(store.readall))
+	}
+}
+
+func TestE063HTTPDosNodosConUnoCaidoSigueAceptando(t *testing.T) {
+	store := e061HTTPStoreValido()
+	// El registro compartido ve un único worker vigente de los dos desplegados:
+	// basta uno para aceptar; no se exige que atienda este nodo.
+	capacidad := &e063Capacidad{activos: 1}
+	rec := httptest.NewRecorder()
+	e063HTTPHandler(store, e053Limitador{permitido: true}, e061HTTPClave, capacidad).ServeHTTP(
+		rec, e061HTTPPeticion(http.MethodPost, "/api/v1/notifications/read-all", "jwt-valido"))
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("un nodo activo debe habilitar la admisión: %d %s", rec.Code, rec.Body.String())
+	}
+	if len(store.readall) != 1 {
+		t.Fatal("el trabajo debe quedar persistido")
+	}
+}
+
+func TestE063HTTPSinCapacidadConfiguradaFallaCerrado(t *testing.T) {
+	store := e061HTTPStoreValido()
+	// Handler sin ConCapacidadReadAll: GET sigue operativo, POST read-all no.
+	handler := e061HTTPHandler(store, e053Limitador{permitido: true}, e061HTTPClave)
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, e061HTTPPeticion(http.MethodPost, "/api/v1/notifications/read-all", "jwt-valido"))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("sin capacidad configurada: esperado 503, obtenido %d: %s", rec.Code, rec.Body.String())
+	}
+	e061HTTPEnvelope(t, rec, "DEPENDENCY_UNAVAILABLE")
+	if len(store.readall) != 0 {
+		t.Fatal("no debe persistirse trabajo sin capacidad configurada")
+	}
+
+	recGet := httptest.NewRecorder()
+	handler.ServeHTTP(recGet, e061HTTPPeticion(http.MethodGet, "/api/v1/notifications?limit=5", "jwt-valido"))
+	if recGet.Code != http.StatusOK {
+		t.Fatalf("E061 no debe verse afectado: %d %s", recGet.Code, recGet.Body.String())
 	}
 }
 
