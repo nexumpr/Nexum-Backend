@@ -936,7 +936,8 @@ func (s *DeletionStore) DeleteGlobalItem(ctx context.Context, partition, sk, use
 	if actual == nil || len(actual.Item) == 0 {
 		return appAccount.GlobalItemDeleted, nil
 	}
-	if titular := titularDeItem(actual.Item); titular != "" && titular != userID {
+	titular, titularCoherente := titularDeItem(actual.Item)
+	if !titularCoherente || (titular != "" && titular != userID) {
 		return appAccount.GlobalItemForeign, nil
 	}
 	if enEnvio(actual.Item, now) {
@@ -1003,15 +1004,28 @@ func condicionBorradoGlobal(item map[string]types.AttributeValue) (string, map[s
 	return condicion, nombres, valores
 }
 
-// titularDeItem devuelve el titular de un ítem global. El outbox y la cola READALL usan
-// `userID`; los ítems de token de E005/E006 y E010/E011 usan `userId`. Sin esta segunda
-// forma, la comprobación de titular de un puntero de token quedaría vacía y un puntero
-// manipulado podría borrar el token de otra cuenta.
-func titularDeItem(item map[string]types.AttributeValue) string {
-	if titular := strings.TrimSpace(stringAttribute(item["userID"])); titular != "" {
-		return titular
+// titularDeItem devuelve el titular de un ítem global y si la lectura es fiable. El outbox y
+// la cola READALL usan `userID`; los ítems de token de E005/E006 y E010/E011 usan `userId`. Sin
+// esta segunda forma, la comprobación de titular de un puntero de token quedaría vacía y un
+// puntero manipulado podría borrar el token de otra cuenta.
+//
+// Si el ítem declara AMBAS formas con valores distintos, la lectura es contradictoria y se
+// informa `coherente=false`: la purga no borra ese ítem (falla cerrado) y el puntero se retira
+// contabilizándolo como clave desconocida. Elegir una de las dos formas permitiría que un ítem
+// manipulado —`userID` del titular con `userId` de un tercero— borrara datos ajenos.
+func titularDeItem(item map[string]types.AttributeValue) (string, bool) {
+	conMayusculas := strings.TrimSpace(stringAttribute(item["userID"]))
+	conMinusculas := strings.TrimSpace(stringAttribute(item["userId"]))
+	if conMayusculas != "" && conMinusculas != "" {
+		if conMayusculas != conMinusculas {
+			return "", false
+		}
+		return conMayusculas, true
 	}
-	return strings.TrimSpace(stringAttribute(item["userId"]))
+	if conMayusculas != "" {
+		return conMayusculas, true
+	}
+	return conMinusculas, true
 }
 
 // DeleteGlobalPointer borra el puntero del titular sólo si sigue apuntando a la referencia
