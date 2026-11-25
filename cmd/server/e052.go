@@ -3,11 +3,9 @@ package main
 import (
 	"log/slog"
 	"net/http"
-	"time"
 
 	dynamoAdapter "github.com/nexumpr/Nexum-Backend/internal/adapters/dynamo"
 	appAnalytics "github.com/nexumpr/Nexum-Backend/internal/application/analytics"
-	cacheinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/cache"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 )
 
@@ -44,10 +42,7 @@ func montarE052(d *dependenciasOleada4) {
 	}
 
 	servicio := appAnalytics.NewService(dynamoAdapter.NewMovementsStore(cliente, d.Tabla))
-	var limitador nexumhttp.LimitadorRuta
-	if d.Redis != nil {
-		limitador = cacheinfra.NewAuthRateLimiter(d.Redis, cuotaAnalyticsPorMinuto, time.Minute)
-	}
+	limitador := limitadorOleada4(d)
 	handler := nexumhttp.NewAnalyticsInsightsHandler(servicio, d.Tokens, d.Authorizer, limitador, logger)
 	d.Router.HandleFunc(http.MethodGet, "/analytics/insights", handler.ServeHTTP)
 }

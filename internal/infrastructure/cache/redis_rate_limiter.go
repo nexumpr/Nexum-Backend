@@ -25,26 +25,65 @@ return {count, ttl}
 `)
 
 // AuthRateLimiter aplica ventanas fijas por clase de endpoint e identificador usando
-// Redis real. El identificador (IP) se hashea para no almacenar PII en claves.
+// Redis real. El identificador (IP o usuario) se hashea para no almacenar PII en claves.
+//
+// Cada clase usa su propio contador: un usuario agotado en `notifications` no consume
+// la cuota de `analytics` ni la de `push`. `porClase` permite fijar un límite distinto
+// por dominio; las clases ausentes usan `max`.
 type AuthRateLimiter struct {
-	client *redis.Client
-	max    int64
-	window time.Duration
+	client   *redis.Client
+	max      int64
+	porClase map[string]int64
+	window   time.Duration
 }
 
-// NewAuthRateLimiter construye el limitador. Si el cliente es nil, Allow falla cerrado.
+// NewAuthRateLimiter construye el limitador con un límite único para todas las clases.
+// Si el cliente es nil, Allow falla cerrado.
 func NewAuthRateLimiter(client *redis.Client, max int64, window time.Duration) *AuthRateLimiter {
-	if max <= 0 {
-		max = 5
+	return NewAuthRateLimiterPorClase(client, max, nil, window)
+}
+
+// NewAuthRateLimiterPorClase construye el limitador con un mapa explícito de límites
+// por clase. Las claves se normalizan igual que la clave de Redis; un límite no
+// positivo se ignora y la clase cae al valor por defecto.
+func NewAuthRateLimiterPorClase(client *redis.Client, porDefecto int64, porClase map[string]int64, window time.Duration) *AuthRateLimiter {
+	if porDefecto <= 0 {
+		porDefecto = 5
 	}
 	if window <= 0 {
 		window = 15 * time.Minute
 	}
-	return &AuthRateLimiter{
-		client: client,
-		max:    max,
-		window: window,
+	limpios := make(map[string]int64, len(porClase))
+	for clase, limite := range porClase {
+		if limite <= 0 {
+			continue
+		}
+		limpios[sanitizeRateLimitClass(clase)] = limite
 	}
+	return &AuthRateLimiter{
+		client:   client,
+		max:      porDefecto,
+		porClase: limpios,
+		window:   window,
+	}
+}
+
+// limitePorClase resuelve el máximo aplicable a la clase. Es determinista y no
+// consulta Redis: el aislamiento real lo da la clave, no este valor.
+func (l *AuthRateLimiter) limitePorClase(class string) int64 {
+	if l == nil {
+		return 0
+	}
+	if limite, ok := l.porClase[sanitizeRateLimitClass(class)]; ok {
+		return limite
+	}
+	return l.max
+}
+
+// claveRateLimit deriva la clave de Redis. Incluye la clase y el hash del sujeto:
+// dos dominios o dos usuarios nunca comparten contador.
+func claveRateLimit(class, identifier string) string {
+	return fmt.Sprintf("nexum:v1:ratelimit:%s:%s", sanitizeRateLimitClass(class), hashRateLimitIdentifier(identifier))
 }
 
 // Allow incrementa el contador de forma atomica y devuelve si la peticion cabe en la ventana.
@@ -53,7 +92,8 @@ func (l *AuthRateLimiter) Allow(ctx context.Context, class, identifier string) (
 		return false, 0, errors.New("limitador de autenticacion no configurado")
 	}
 
-	key := fmt.Sprintf("nexum:v1:ratelimit:%s:%s", sanitizeRateLimitClass(class), hashRateLimitIdentifier(identifier))
+	key := claveRateLimit(class, identifier)
+	maximo := l.limitePorClase(class)
 	seconds := int64(l.window / time.Second)
 	if seconds <= 0 {
 		seconds = 1
@@ -74,7 +114,7 @@ func (l *AuthRateLimiter) Allow(ctx context.Context, class, identifier string) (
 		return false, 0, errors.New("respuesta invalida del script de rate limit")
 	}
 
-	if count > l.max {
+	if count > maximo {
 		if ttl <= 0 {
 			ttl = seconds
 		}

@@ -159,7 +159,7 @@ type WireAccepted struct {
 
 // Wire convierte la aceptación al contrato de transporte.
 func (a Accepted) Wire() WireAccepted {
-	return WireAccepted{Status: a.Status, RequestID: a.RequestID}
+	return WireAccepted(a)
 }
 
 // NotificationKey identifica un item de forma inequívoca dentro de la tabla

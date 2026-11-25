@@ -126,9 +126,7 @@ func (f *e061FakeClient) Query(_ context.Context, params *dynamodb.QueryInput, _
 	if string(params.Select) == string(types.SelectCount) {
 		salida.Items = nil
 	} else {
-		for _, item := range filtrados {
-			salida.Items = append(salida.Items, item)
-		}
+		salida.Items = append(salida.Items, filtrados...)
 	}
 	if quedan && ultimaEvaluada != nil {
 		salida.LastEvaluatedKey = map[string]types.AttributeValue{
@@ -463,5 +461,37 @@ func TestE061AdaptadorFallosCerrados(t *testing.T) {
 	}
 	if err := NewNotificationsStore(nil, "nexum-table").CompleteReadAll(context.Background(), "user-a", "req", "", 0, time.Now()); !errors.Is(err, appNotifications.ErrUnavailable) {
 		t.Fatalf("Complete sin cliente: %v", err)
+	}
+}
+
+// TestE061LimiteConsultaAcotado fija el rango contractual 1..100 antes de int32.
+func TestE061LimiteConsultaAcotado(t *testing.T) {
+	casos := []struct {
+		entrada  int
+		esperado int32
+	}{
+		{-1000, 1},
+		{0, 1},
+		{1, 1},
+		{100, 100},
+		{101, int32(appNotifications.MaxLimit)},
+		{1 << 30, int32(appNotifications.MaxLimit)},
+	}
+	for _, caso := range casos {
+		if got := limiteConsultaNotificaciones(caso.entrada); got != caso.esperado {
+			t.Fatalf("limiteConsultaNotificaciones(%d)=%d, esperado %d", caso.entrada, got, caso.esperado)
+		}
+	}
+
+	fake := nuevoE061Fake()
+	store := NewNotificationsStore(fake, "NEXUM_CORE_TEST")
+	if _, err := store.queryNotifications(context.Background(), notificationUserPK("u1"), nil, "", nil, 1<<30, false); err != nil {
+		t.Fatalf("queryNotifications: %v", err)
+	}
+	if len(fake.queries) != 1 {
+		t.Fatalf("queries capturadas: %d", len(fake.queries))
+	}
+	if limite := aws.ToInt32(fake.queries[0].Limit); limite != int32(appNotifications.MaxLimit) {
+		t.Fatalf("Limit enviado a DynamoDB fuera de rango: %d", limite)
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -221,7 +223,7 @@ type fcmEmisor struct {
 
 func (e *fcmEmisor) Enviar(_ context.Context, mensaje push.Mensaje) (push.Resultado, error) {
 	e.ultimo = mensaje
-	return push.Resultado{}, &push.ErrorClasificado{Clase: push.ClaseTokenNoRegistrado, CodigoHTTP: 404}
+	return push.Resultado{}, &push.ErrorClasificado{Clase: push.ClaseDestinoNoRegistrado, CodigoHTTP: 404}
 }
 
 func TestFCMFuenteE059TokenCipherYRevocacionUNREGISTERED(t *testing.T) {
@@ -289,7 +291,7 @@ func TestFCMFuenteE059TokenCipherYRevocacionUNREGISTERED(t *testing.T) {
 		t.Fatalf("eventId alterado: %q", emisor.ultimo.EventID)
 	}
 	for _, id := range store.porID {
-		if id.Status != pushoutbox.EstadoRevocado || id.UltimaClase != pushoutbox.ClaseTokenNoRegistrado {
+		if id.Status != pushoutbox.EstadoRevocado || id.UltimaClase != pushoutbox.ClaseDestinoNoRegistrado {
 			t.Fatalf("trabajo no marcado como revocado tras UNREGISTERED: %+v", id)
 		}
 	}
@@ -319,5 +321,36 @@ func TestFCMFuenteE059TokenCipherYRevocacionUNREGISTERED(t *testing.T) {
 		if !strings.Contains(update, fragmento) {
 			t.Fatalf("expresión de baja incompleta (%q): %s", fragmento, update)
 		}
+	}
+}
+
+// TestFCMCredencialArchivoAcotado fija la frontera G304: solo rutas absolutas
+// dentro del directorio permitido. La credencial es sintetica ({}), sin secretos.
+func TestFCMCredencialArchivoAcotado(t *testing.T) {
+	dir := t.TempDir()
+	ruta := filepath.Join(dir, "credencial-sintetica.json")
+	if err := os.WriteFile(ruta, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	leido, err := leerCredencialFCM(ruta, dir)
+	if err != nil || string(leido) != "{}" {
+		t.Fatalf("lectura valida: %q err=%v", string(leido), err)
+	}
+
+	casos := []struct {
+		nombre string
+		ruta   string
+	}{
+		{"relativa", "credencial-sintetica.json"},
+		{"fuera_del_arbol", filepath.Join(dir, "..", "fuera.json")},
+		{"directorio", dir},
+		{"vacia", ""},
+	}
+	for _, caso := range casos {
+		t.Run(caso.nombre, func(t *testing.T) {
+			if _, err := leerCredencialFCM(caso.ruta, dir); err == nil {
+				t.Fatalf("ruta %q debio rechazarse", caso.ruta)
+			}
+		})
 	}
 }

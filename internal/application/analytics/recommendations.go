@@ -71,13 +71,7 @@ func (p *RecommendationPage) Wire() WireRecommendationPage {
 	}
 	items := make([]WireRecommendation, 0, len(p.Items))
 	for _, item := range p.Items {
-		items = append(items, WireRecommendation{
-			ID:           item.ID,
-			Title:        item.Title,
-			Reason:       item.Reason,
-			Disclaimer:   item.Disclaimer,
-			ModelVersion: item.ModelVersion,
-		})
+		items = append(items, WireRecommendation(item))
 	}
 	return WireRecommendationPage{Items: items, NextCursor: p.NextCursor, HasEnoughData: p.HasEnoughData}
 }
@@ -235,11 +229,7 @@ func (s *Service) ventanaRecomendaciones(userID, periodo string) (time.Time, tim
 		ahora = s.now().UTC()
 	}
 	if strings.TrimSpace(periodo) != "" {
-		desde, hasta, err := s.periodoValidado(userID, periodo)
-		if err != nil {
-			return time.Time{}, time.Time{}, "", err
-		}
-		normalizado, err := NormalizePeriod(periodo, ahora)
+		normalizado, desde, hasta, err := s.periodoValidado(userID, periodo)
 		if err != nil {
 			return time.Time{}, time.Time{}, "", err
 		}

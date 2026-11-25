@@ -81,7 +81,7 @@ func (s *Service) Categories(ctx context.Context, userID, periodo string) (*Cate
 	if titular == "" {
 		return nil, ErrUnauthorized
 	}
-	desde, hasta, err := s.periodoValidado(titular, periodo)
+	_, desde, hasta, err := s.periodoValidado(titular, periodo)
 	if err != nil {
 		return nil, err
 	}

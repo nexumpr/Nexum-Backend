@@ -12,7 +12,6 @@ package pushoutbox
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -37,18 +36,18 @@ const (
 
 // Clases de decisión que se persisten como lastErrorClass (sin PII ni tokens).
 const (
-	ClaseSinConsentimiento   = "NO_CONSENT"
-	ClaseZonaInvalida        = "ZONA_INVALIDA"
-	ClaseHorarioInvalido     = "HORARIO_INVALIDO"
-	ClaseQuietHours          = "QUIET_HOURS"
-	ClaseSinDispositivos     = "SIN_DISPOSITIVOS"
-	ClaseTokensNoDisponibles = "TOKENS_NO_DISPONIBLES"
-	ClaseBandejaNoDisponible = "BANDEJA_NO_DISPONIBLE"
-	ClaseEntregaDuplicada    = "ENTREGA_DUPLICADA"
-	ClaseConfigFCM           = "CONFIG_FCM"
-	ClaseTokenNoRegistrado   = "UNREGISTERED"
-	ClaseArgumentoInvalido   = "INVALID_ARGUMENT"
-	ClaseReintentable        = "REINTENTABLE"
+	ClaseSinConsentimiento     = "NO_CONSENT"
+	ClaseZonaInvalida          = "ZONA_INVALIDA"
+	ClaseHorarioInvalido       = "HORARIO_INVALIDO"
+	ClaseQuietHours            = "QUIET_HOURS"
+	ClaseSinDispositivos       = "SIN_DISPOSITIVOS"
+	ClaseDestinosNoDisponibles = "TOKENS_NO_DISPONIBLES"
+	ClaseBandejaNoDisponible   = "BANDEJA_NO_DISPONIBLE"
+	ClaseEntregaDuplicada      = "ENTREGA_DUPLICADA"
+	ClaseConfigFCM             = "CONFIG_FCM"
+	ClaseDestinoNoRegistrado   = "UNREGISTERED"
+	ClaseArgumentoInvalido     = "INVALID_ARGUMENT"
+	ClaseReintentable          = "REINTENTABLE"
 )
 
 // Solicitud es la entrada para encolar una notificación desde un evento de dominio.
@@ -226,8 +225,7 @@ func (s *Service) Encolar(ctx context.Context, solicitud Solicitud) (string, boo
 	}
 	notificationID := strings.TrimSpace(solicitud.NotificationID)
 	if notificationID == "" {
-		suma := sha256.Sum256([]byte(solicitud.UserID + "|" + solicitud.EventID))
-		notificationID = hex.EncodeToString(suma[:16])
+		notificationID = notificationUUID(solicitud.UserID, solicitud.EventID)
 	}
 	ahora := s.opciones.Ahora().UTC()
 	due := solicitud.OcurridoEn
@@ -248,6 +246,21 @@ func (s *Service) Encolar(ctx context.Context, solicitud Solicitud) (string, boo
 	}
 	creado, err := s.store.Crear(ctx, registro)
 	return notificationID, creado, err
+}
+
+// notificationUUID deriva un UUID determinista (v5-like) de (userID, eventID).
+//
+// E062 exige el patrón `^[0-9a-fA-F]{8}-...$`; un hex de 32 caracteres sin guiones
+// (la forma anterior) era rechazado por 400 invalid_uuid. Se toman 16 bytes de
+// SHA-256 sobre la misma clave que usa la deduplicación, se fija versión 5 y la
+// variante RFC 4122 y se formatea 8-4-4-4-12. El valor no contiene el identificador
+// del titular y es estable entre reintentos del mismo evento.
+func notificationUUID(userID, eventID string) string {
+	suma := sha256.Sum256([]byte(strings.TrimSpace(userID) + "|" + strings.TrimSpace(eventID)))
+	b := suma[:16]
+	b[6] = (b[6] & 0x0f) | 0x50 // versión 5
+	b[8] = (b[8] & 0x3f) | 0x80 // variante RFC 4122
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
 // Ciclo hace una pasada y devuelve cuántos mensajes fueron aceptados por FCM.
@@ -303,12 +316,12 @@ func (s *Service) procesar(ctx context.Context, registro Registro, ahora time.Ti
 	}
 
 	if s.tokens == nil {
-		_ = s.store.Reprogramar(ctx, registro.ID, registro.Attempts, ClaseTokensNoDisponibles, ahora.Add(5*time.Minute), ahora)
+		_ = s.store.Reprogramar(ctx, registro.ID, registro.Attempts, ClaseDestinosNoDisponibles, ahora.Add(5*time.Minute), ahora)
 		return false
 	}
 	tokens, err := s.tokens.TokensActivos(ctx, registro.UserID)
 	if err != nil {
-		_ = s.store.Reprogramar(ctx, registro.ID, registro.Attempts, ClaseTokensNoDisponibles, ahora.Add(5*time.Minute), ahora)
+		_ = s.store.Reprogramar(ctx, registro.ID, registro.Attempts, ClaseDestinosNoDisponibles, ahora.Add(5*time.Minute), ahora)
 		return false
 	}
 	if len(tokens) == 0 {
@@ -404,7 +417,7 @@ func esErrorPermanente(err error) bool {
 	if !errors.As(err, &clasificado) {
 		return false
 	}
-	return clasificado.Clase == push.ClaseTokenNoRegistrado || clasificado.Clase == push.ClaseArgumentoInvalido
+	return clasificado.Clase == push.ClaseDestinoNoRegistrado || clasificado.Clase == push.ClaseArgumentoInvalido
 }
 
 func claseFalloFCM(err error) string {
@@ -412,7 +425,7 @@ func claseFalloFCM(err error) string {
 	if errors.As(err, &clasificado) && clasificado.Clase == push.ClaseArgumentoInvalido {
 		return ClaseArgumentoInvalido
 	}
-	return ClaseTokenNoRegistrado
+	return ClaseDestinoNoRegistrado
 }
 
 // autorizado aplica E057/E058. Un item ausente nunca se inventa aquí: si el

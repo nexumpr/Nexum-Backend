@@ -3,11 +3,9 @@ package main
 import (
 	"log/slog"
 	"net/http"
-	"time"
 
 	dynamoLocal "github.com/nexumpr/Nexum-Backend/internal/adapters/dynamo"
 	appPush "github.com/nexumpr/Nexum-Backend/internal/application/pushdevices"
-	cacheinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/cache"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 )
 
@@ -29,10 +27,7 @@ func montarE059(d *dependenciasOleada4) {
 	}
 	logger := loggerPushDevices(d)
 	servicio := servicioPushDevices(d, logger)
-	var limitador nexumhttp.LimitadorRuta
-	if d.Redis != nil {
-		limitador = cacheinfra.NewAuthRateLimiter(d.Redis, cuotaAnalyticsPorMinuto, time.Minute)
-	}
+	limitador := limitadorOleada4(d)
 	handler := nexumhttp.NewPushDevicesHandler(servicio, d.Tokens, d.Authorizer, limitador, logger)
 	d.Router.HandleFunc(http.MethodPost, "/devices/push-tokens", handler.ServeHTTP)
 }

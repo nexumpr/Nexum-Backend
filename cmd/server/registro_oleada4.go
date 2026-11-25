@@ -100,20 +100,6 @@ func (r *registroOleada4) registrar(m montajeOleada4) {
 	r.porID[id] = montajeOleada4{ID: id, Metodo: metodo, Ruta: ruta, Montar: m.Montar}
 }
 
-func (r *registroOleada4) ids() []string {
-	if r == nil {
-		return nil
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	ids := make([]string, 0, len(r.porID))
-	for id := range r.porID {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
-}
-
 func (r *registroOleada4) montar(d *dependenciasOleada4) {
 	if r == nil || d == nil || d.Router == nil {
 		return

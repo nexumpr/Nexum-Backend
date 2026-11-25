@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -154,5 +156,55 @@ func TestE052HTTPFailClosedYAislamiento(t *testing.T) {
 	}
 	if !strings.Contains(recB.Body.String(), `"enoughData":false`) || strings.Contains(recB.Body.String(), "comida") {
 		t.Fatalf("usuario B recibio datos de A: %s", recB.Body.String())
+	}
+}
+
+// TestE052SchemaPeriodRequeridoYPatron contrasta el contrato aprobado con la
+// respuesta real. `period` es requerido y con pattern; el handler recibe `period`
+// omitido y aun asi debe publicarlo normalizado (nunca "").
+func TestE052SchemaPeriodRequeridoYPatron(t *testing.T) {
+	root := repoRoot(t)
+	yamlData, err := os.ReadFile(filepath.Join(root, "sdd", "03-endpoints", "openapi", "nexum-api-v1.yaml"))
+	if err != nil {
+		t.Fatalf("no se pudo leer el OpenAPI: %v", err)
+	}
+	bloque := sliceBetween(string(yamlData), "    Insight:", "    PageOfInsight:")
+	if bloque == "" {
+		t.Fatal("no se encontro el esquema Insight en el OpenAPI")
+	}
+	if !strings.Contains(bloque, "pattern: ^\\d{4}-(0[1-9]|1[0-2])$") {
+		t.Fatalf("Insight.period no declara el pattern aprobado:\n%s", bloque)
+	}
+	requeridos := sliceBetween(bloque, "      required:", "      description:")
+	if !strings.Contains(requeridos, "- period") {
+		t.Fatalf("Insight.period debe ser requerido:\n%s", requeridos)
+	}
+
+	fuente := &e052HTTPSource{byUser: map[string][]appMovements.Movement{
+		e004HTTPUsuario: e052HTTPMovimientos(e004HTTPUsuario, 12),
+	}}
+	h := e052HTTPHandler(fuente)
+	rec := httptest.NewRecorder()
+	// Sin `period`: el servicio debe usar el mes UTC del reloj inyectado (2026-11).
+	h.ServeHTTP(rec, e004Peticion(http.MethodGet, "/api/v1/analytics/insights", "jwt-valido", ""))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("esperado 200, obtenido %d: %s", rec.Code, rec.Body.String())
+	}
+	var cuerpo struct {
+		Items []struct {
+			Period string `json:"period"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &cuerpo); err != nil {
+		t.Fatalf("JSON invalido: %v", err)
+	}
+	if len(cuerpo.Items) != 1 || cuerpo.Items[0].Period == "" {
+		t.Fatalf("el JSON debe incluir period no vacio: %s", rec.Body.String())
+	}
+	if cuerpo.Items[0].Period != "2026-11" {
+		t.Fatalf("period omitido debe normalizarse a 2026-11: %q", cuerpo.Items[0].Period)
+	}
+	if strings.Contains(rec.Body.String(), `"period":""`) {
+		t.Fatalf("period no puede serializarse vacio: %s", rec.Body.String())
 	}
 }

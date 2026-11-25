@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	envPushTokenKeyNueva = "NEXUM_PUSH_TOKEN_KEY_B64"
-	envPushTokenKeyAlias = "NEXUM_PUSH_TOKEN_KEY"
-	envCursorKey         = "NEXUM_NOTIFICATION_CURSOR_KEY_B64"
+	envPushSelladorKeyNueva = "NEXUM_PUSH_TOKEN_KEY_B64"
+	envPushSelladorKeyAlias = "NEXUM_PUSH_TOKEN_KEY"
+	envCursorKey            = "NEXUM_NOTIFICATION_CURSOR_KEY_B64"
 )
 
 // claveBase64Oleada4 devuelve la primera variable configurada, sin incluir
@@ -36,7 +36,7 @@ func claveBase64Oleada4(nombres ...string) ([]byte, error) {
 // pushSealerOleada4 construye el sellador AES-GCM usado por E059/E060 y por el
 // worker FCM. Sin clave válida devuelve nil y los endpoints fallan cerrados.
 func pushSealerOleada4() appPushDevices.TokenSealer {
-	cruda, err := claveBase64Oleada4(envPushTokenKeyNueva, envPushTokenKeyAlias)
+	cruda, err := claveBase64Oleada4(envPushSelladorKeyNueva, envPushSelladorKeyAlias)
 	if err != nil {
 		return nil
 	}

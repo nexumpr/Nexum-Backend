@@ -71,7 +71,7 @@ func (s *Service) Insights(ctx context.Context, userID, periodo string) (*Page, 
 	if titular == "" {
 		return nil, ErrUnauthorized
 	}
-	desde, hasta, err := s.periodoValidado(titular, periodo)
+	periodo, desde, hasta, err := s.periodoValidado(titular, periodo)
 	if err != nil {
 		return nil, err
 	}
@@ -158,19 +158,25 @@ func insightID(userID, periodo, categoria string) string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
-// periodoValidado normaliza `period` con el reloj inyectado y devuelve los límites UTC
-// del mes. Lo comparten E052 y E053 para que un mismo parámetro produzca exactamente el
-// mismo conjunto de movimientos en ambos endpoints.
-func (s *Service) periodoValidado(userID, periodo string) (time.Time, time.Time, error) {
+// periodoValidado normaliza `period` UNA sola vez con el reloj inyectado y devuelve
+// el valor normalizado junto con los límites UTC del mes. Devolver el valor normalizado
+// evita que la respuesta o la explicación usen el parámetro crudo (p. ej. vacío cuando
+// se omite). Lo comparten E052 y E053 para que un mismo parámetro produzca exactamente
+// el mismo conjunto de movimientos en ambos endpoints.
+func (s *Service) periodoValidado(userID, periodo string) (string, time.Time, time.Time, error) {
 	ahora := time.Now().UTC()
 	if s != nil && s.now != nil {
 		ahora = s.now().UTC()
 	}
-	periodo, err := NormalizePeriod(periodo, ahora)
+	normalizado, err := NormalizePeriod(periodo, ahora)
 	if err != nil {
-		return time.Time{}, time.Time{}, err
+		return "", time.Time{}, time.Time{}, err
 	}
-	return PeriodBounds(periodo)
+	desde, hasta, err := PeriodBounds(normalizado)
+	if err != nil {
+		return "", time.Time{}, time.Time{}, err
+	}
+	return normalizado, desde, hasta, nil
 }
 
 // loadMovements recorre la partición del titular en páginas acotadas. Es la única

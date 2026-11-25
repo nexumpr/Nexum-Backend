@@ -2,9 +2,7 @@ package main
 
 import (
 	"net/http"
-	"time"
 
-	cacheinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/cache"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 )
 
@@ -26,10 +24,7 @@ func montarE060(d *dependenciasOleada4) {
 	}
 	logger := loggerPushDevices(d)
 	servicio := servicioPushDevices(d, logger)
-	var limitador nexumhttp.LimitadorRuta
-	if d.Redis != nil {
-		limitador = cacheinfra.NewAuthRateLimiter(d.Redis, cuotaAnalyticsPorMinuto, time.Minute)
-	}
+	limitador := limitadorOleada4(d)
 	handler := nexumhttp.NewPushDeviceDeleteHandler(servicio, d.Tokens, d.Authorizer, limitador, logger)
 	d.Router.HandleFunc(http.MethodDelete, "/devices/push-tokens/{deviceRegistrationId}", handler.ServeHTTP)
 }

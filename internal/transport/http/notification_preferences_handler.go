@@ -66,7 +66,7 @@ func NewNotificationPreferencesHandler(
 	if service == nil || tokens == nil || sessions == nil {
 		return h
 	}
-	conCuota := LimitarPorUsuarioContrato(limitador, "analytics", h.serve)
+	conCuota := LimitarPorUsuarioContrato(limitador, "preferences", h.serve)
 	h.protected = middleware.AuthenticateBearerWithSession(tokens, sessions)(conCuota)
 	return h
 }

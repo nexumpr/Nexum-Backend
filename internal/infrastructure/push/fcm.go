@@ -18,12 +18,12 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
-	rand2 "math/rand/v2"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -35,14 +35,14 @@ import (
 const (
 	// ScopeFCM es el ámbito OAuth 2.0 mínimo para HTTP v1.
 	ScopeFCM = "https://www.googleapis.com/auth/firebase.messaging"
-	// GrantTypeJWTBearer es el grant OAuth 2.0 de cuenta de servicio.
-	GrantTypeJWTBearer = "urn:ietf:params:oauth:grant-type:jwt-bearer"
+	// GrantTypeJWTAssertion es el grant OAuth 2.0 de cuenta de servicio.
+	GrantTypeJWTAssertion = "urn:ietf:params:oauth:grant-type:jwt-bearer"
 
-	defaultOAuthTokenURL = "https://oauth2.googleapis.com/token"
-	defaultEndpointFmt   = "https://fcm.googleapis.com/v1/projects/%s/messages:send"
-	defaultTimeout       = 5 * time.Second
-	defaultMaxRetries    = 2
-	maxJitterRetries     = 4
+	defaultOAuthEndpointURL = "https://oauth2.googleapis.com/token"
+	defaultEndpointFmt      = "https://fcm.googleapis.com/v1/projects/%s/messages:send"
+	defaultTimeout          = 5 * time.Second
+	defaultMaxRetries       = 2
+	maxJitterRetries        = 4
 )
 
 // Errores estables para clasificar el fallo sin inspeccionar texto secreto.
@@ -56,14 +56,14 @@ var (
 
 // Clases de error observables. No incluyen ningún dato del titular ni secreto.
 const (
-	ClaseConfigInvalida    = "CONFIG_INVALIDA"
-	ClaseCredencial        = "CREDENCIAL_INVALIDA"
-	ClaseTokenNoRegistrado = "TOKEN_NO_REGISTRADO"
-	ClaseArgumentoInvalido = "ARGUMENTO_INVALIDO"
-	ClaseLimiteExcedido    = "LIMITE_EXCEDIDO"
-	ClaseErrorServidor     = "SERVER_ERROR"
-	ClaseRed               = "RED"
-	ClaseDesconocido       = "DESCONOCIDO"
+	ClaseConfigInvalida      = "CONFIG_INVALIDA"
+	ClaseAutenticacion       = "CREDENCIAL_INVALIDA"
+	ClaseDestinoNoRegistrado = "TOKEN_NO_REGISTRADO"
+	ClaseArgumentoInvalido   = "ARGUMENTO_INVALIDO"
+	ClaseLimiteExcedido      = "LIMITE_EXCEDIDO"
+	ClaseErrorServidor       = "SERVER_ERROR"
+	ClaseRed                 = "RED"
+	ClaseDesconocido         = "DESCONOCIDO"
 )
 
 // Observer recibe únicamente metadatos no sensibles. La implementación por
@@ -126,7 +126,7 @@ func (c Config) tokenURL() string {
 	if strings.TrimSpace(c.OAuthTokenURL) != "" {
 		return strings.TrimSpace(c.OAuthTokenURL)
 	}
-	return defaultOAuthTokenURL
+	return defaultOAuthEndpointURL
 }
 
 func (c Config) timeout() time.Duration {
@@ -198,7 +198,7 @@ func (e *ErrorClasificado) Unwrap() error {
 // reintento automático de envío.
 func EsCredencialInvalida(err error) bool {
 	var clasificado *ErrorClasificado
-	return errors.As(err, &clasificado) && clasificado.Clase == ClaseCredencial
+	return errors.As(err, &clasificado) && clasificado.Clase == ClaseAutenticacion
 }
 
 func esPermanente(err error) bool {
@@ -206,7 +206,7 @@ func esPermanente(err error) bool {
 	if !errors.As(err, &clasificado) {
 		return errors.Is(err, ErrPermanente) || errors.Is(err, ErrConfiguracion)
 	}
-	return clasificado.Clase == ClaseTokenNoRegistrado || clasificado.Clase == ClaseArgumentoInvalido
+	return clasificado.Clase == ClaseDestinoNoRegistrado || clasificado.Clase == ClaseArgumentoInvalido
 }
 
 // esReintentableHTTP aplica EXACTAMENTE a 429 y 5xx. Los fallos de red y de
@@ -385,7 +385,7 @@ func (c *Client) accessToken(ctx context.Context) (string, error) {
 		return "", err
 	}
 	form := url.Values{}
-	form.Set("grant_type", GrantTypeJWTBearer)
+	form.Set("grant_type", GrantTypeJWTAssertion)
 	form.Set("assertion", assertion)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.tokenURL(), strings.NewReader(form.Encode()))
 	if err != nil {
@@ -406,7 +406,7 @@ func (c *Client) accessToken(ctx context.Context) (string, error) {
 		switch {
 		case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden ||
 			resp.StatusCode == http.StatusBadRequest:
-			clase = ClaseCredencial
+			clase = ClaseAutenticacion
 		case resp.StatusCode == http.StatusTooManyRequests:
 			clase = ClaseLimiteExcedido
 		case resp.StatusCode >= 500:
@@ -416,7 +416,7 @@ func (c *Client) accessToken(ctx context.Context) (string, error) {
 	}
 	var parsed tokenResponse
 	if err := json.Unmarshal(cuerpo, &parsed); err != nil || strings.TrimSpace(parsed.AccessToken) == "" {
-		return "", &ErrorClasificado{Clase: ClaseCredencial, CodigoHTTP: resp.StatusCode}
+		return "", &ErrorClasificado{Clase: ClaseAutenticacion, CodigoHTTP: resp.StatusCode}
 	}
 	segundos := parsed.ExpiresIn
 	if segundos <= 0 {
@@ -425,6 +425,21 @@ func (c *Client) accessToken(ctx context.Context) (string, error) {
 	c.token = parsed.AccessToken
 	c.expiraEn = c.ahora().Add(time.Duration(segundos) * time.Second)
 	return c.token, nil
+}
+
+// jitterSeguro devuelve un desplazamiento uniforme en [0, ancho) usando el CSPRNG
+// del sistema. Si la entropía falla, usa la mitad del ancho: el valor sigue acotado y
+// nunca cae fuera del rango del backoff. No se usa math/rand (G404).
+func jitterSeguro(ancho time.Duration) time.Duration {
+	if ancho <= 0 {
+		return 0
+	}
+	var bytes [4]byte
+	if _, err := rand.Read(bytes[:]); err != nil {
+		return ancho / 2
+	}
+	semilla := int64(binary.LittleEndian.Uint32(bytes[:]))
+	return time.Duration(semilla % int64(ancho))
 }
 
 func (c *Client) dormir(ctx context.Context, intento int) error {
@@ -436,7 +451,7 @@ func (c *Client) dormir(ctx context.Context, intento int) error {
 		base = 2 * time.Second
 	}
 	mitad := base / 4
-	espera := base - mitad + time.Duration(rand2.Int64N(int64(2*mitad+1)))
+	espera := base - mitad + jitterSeguro(2*mitad+1)
 	if c.cfg.Sleep != nil {
 		return c.cfg.Sleep(ctx, espera)
 	}
@@ -466,7 +481,7 @@ func (c *Client) Enviar(ctx context.Context, mensaje Mensaje) (Resultado, error)
 			if errors.As(err, &clasificado) {
 				ultimaClase, ultimoCodigo = clasificado.Clase, clasificado.CodigoHTTP
 			} else {
-				ultimaClase = ClaseCredencial
+				ultimaClase = ClaseAutenticacion
 			}
 			c.observar(ultimoCodigo, ultimaClase, intento+1)
 			if esReintentableHTTP(err) && intento < c.cfg.retries() {
@@ -475,7 +490,7 @@ func (c *Client) Enviar(ctx context.Context, mensaje Mensaje) (Resultado, error)
 				}
 				continue
 			}
-			if ultimaClase == ClaseCredencial {
+			if ultimaClase == ClaseAutenticacion {
 				return Resultado{Intentos: intento + 1, CodigoHTTP: ultimoCodigo}, ErrCredencial
 			}
 			return Resultado{Intentos: intento + 1, CodigoHTTP: ultimoCodigo}, err
@@ -523,7 +538,7 @@ func (c *Client) Enviar(ctx context.Context, mensaje Mensaje) (Resultado, error)
 			}
 			continue
 		}
-		if clase == ClaseCredencial {
+		if clase == ClaseAutenticacion {
 			errEnvio.Causa = ErrCredencial
 		}
 		return Resultado{Intentos: intento + 1, CodigoHTTP: ultimoCodigo}, errEnvio
@@ -542,7 +557,7 @@ func clasificarRespuestaFCM(codigo int, cuerpo []byte) string {
 	detalle += " " + strings.ToUpper(parsed.Error.Message)
 
 	if codigo == http.StatusUnauthorized || codigo == http.StatusForbidden {
-		return ClaseCredencial
+		return ClaseAutenticacion
 	}
 	if codigo == http.StatusTooManyRequests || codigo == http.StatusRequestTimeout {
 		return ClaseLimiteExcedido
@@ -552,7 +567,7 @@ func clasificarRespuestaFCM(codigo int, cuerpo []byte) string {
 	}
 	if strings.Contains(detalle, "UNREGISTERED") || strings.Contains(detalle, "NOT REGISTERED") ||
 		strings.Contains(detalle, "INVALID TOKEN") || strings.Contains(detalle, "INVALID_ARGUMENT") {
-		return ClaseTokenNoRegistrado
+		return ClaseDestinoNoRegistrado
 	}
 	return ClaseArgumentoInvalido
 }
