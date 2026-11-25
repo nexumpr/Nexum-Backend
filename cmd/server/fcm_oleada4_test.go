@@ -132,6 +132,12 @@ func (f *fcmDispositivosFake) item(userID, deviceID string) map[string]types.Att
 	return f.items["USER#"+userID+"|DEVICE#"+deviceID]
 }
 
+// TransactWriteItems completa la interfaz PushOutboxAPI. Esta fuente de tokens
+// sólo lee dispositivos; el outbox tiene su propio doble.
+func (f *fcmDispositivosFake) TransactWriteItems(context.Context, *dynamodb.TransactWriteItemsInput, ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {
+	return &dynamodb.TransactWriteItemsOutput{}, nil
+}
+
 // fcmOutboxFake es el mínimo storage del worker; la prueba se centra en la
 // integración con el item real de E059.
 type fcmOutboxFake struct {

@@ -144,9 +144,12 @@ func (s *Service) Recommendations(ctx context.Context, userID, periodo string) (
 			Recurring: strings.TrimSpace(movimiento.RecurringPaymentID) != "",
 		})
 	}
-	// El modelo calcula internamente el recorte global y la mediana de importes
-	// recortados del titular. No se le pasa una mediana externa para que la
-	// definición de train y serve sea exactamente la misma.
+	// El modelo aplica el recorte global y la mediana FIJA del entrenamiento
+	// (`trained_median_cents`) definidos en el artefacto. La mediana NO se
+	// recalcula con los importes del titular: hacerlo cambiaría el espacio de
+	// features y descolocaría los centroides (skew train/serve). La mediana que
+	// se muestra en `reason` es otra distinta: se calcula sobre los importes de
+	// cada grupo del propio titular y se declara como tal.
 	asignaciones, err := modelo.Assign(registros)
 	if err != nil {
 		return nil, ErrUnavailable

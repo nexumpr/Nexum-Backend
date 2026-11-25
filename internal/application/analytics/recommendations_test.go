@@ -323,6 +323,73 @@ func TestE055ImportesNoPositivosNoCuentan(t *testing.T) {
 	}
 }
 
+// TestE055ExplicacionNoAtribuyeLaMedianaDeEntrenamientoAlTitular fija la
+// separación entre dos medianas distintas:
+//   - `trained_median_cents` es un parámetro FIJO del artefacto que sólo alimenta
+//     la feature `ratio_sobre_mediana`; no es una estadística del titular.
+//   - la mediana que aparece en `reason` se calcula sobre los importes del grupo
+//     del propio titular en la capa determinista de explicación.
+//
+// El modelo instrumentado fuerza dos grupos por escala para conocer de antemano
+// qué importes forman cada uno; así se puede exigir el valor exacto de la mediana
+// mostrada y la ausencia del valor entrenado cuando ambos difieren.
+func TestE055ExplicacionNoAtribuyeLaMedianaDeEntrenamientoAlTitular(t *testing.T) {
+	modelo, err := ml.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	copia := *modelo
+	dimension := len(modelo.FeatureOrder)
+	copia.K = 2
+	copia.Centroids = make([][]float64, 2)
+	for i := range copia.Centroids {
+		copia.Centroids[i] = make([]float64, dimension)
+	}
+	// El grupo 0 queda en ratio ~0 y el grupo 1 en ratio 10 (el recorte hace que
+	// el importe alto sature el ratio). El resto de dimensiones es idéntico entre
+	// ambos centroides, de modo que la asignación depende sólo de la escala.
+	copia.Centroids[1][dimension-1] = 10
+
+	fuente := e055Fuente("user-a",
+		e055Movimientos("user-a", "comida", 6, 1000),
+		e055Movimientos("user-a", "vivienda", 6, 900000),
+	)
+	pagina, err := e055Servicio(fuente).WithModelo(&copia).Recommendations(context.Background(), "user-a", "2026-11")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pagina.HasEnoughData || len(pagina.Items) < 2 {
+		t.Fatalf("esperados dos grupos con masa suficiente: %+v", pagina)
+	}
+
+	patron := regexp.MustCompile(`mediana ([0-9]+\.[0-9]{2}) MXN`)
+	medianasVistas := map[string]bool{}
+	for _, item := range pagina.Items {
+		coincidencia := patron.FindStringSubmatch(item.Reason)
+		if coincidencia == nil {
+			t.Fatalf("la razón no declara una mediana calculada: %q", item.Reason)
+		}
+		mediana := coincidencia[1]
+		// Las medianas reales de los dos grupos son 10.00 y 9000.00. Si la
+		// explicación usara `trained_median_cents` aparecería 243.53/243.54.
+		if mediana != "10.00" && mediana != "9000.00" {
+			t.Fatalf("mediana %q no es la del grupo del titular: %q", mediana, item.Reason)
+		}
+		medianasVistas[mediana] = true
+		for _, valorEntrenado := range []string{"243.53", "243.54", "243.535"} {
+			if strings.Contains(item.Reason, valorEntrenado) {
+				t.Fatalf("la razón atribuye trained_median_cents al titular: %q", item.Reason)
+			}
+		}
+		if strings.Contains(strings.ToLower(item.Reason), "tu mediana") {
+			t.Fatalf("la razón afirma una mediana personal: %q", item.Reason)
+		}
+	}
+	if !medianasVistas["10.00"] || !medianasVistas["9000.00"] {
+		t.Fatalf("no se citaron ambas medianas del titular: %+v", medianasVistas)
+	}
+}
+
 func TestE055RecomendacionesDependenDelClustering(t *testing.T) {
 	ctx := context.Background()
 	modelo, err := ml.Load()

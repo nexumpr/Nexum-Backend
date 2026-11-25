@@ -5,9 +5,9 @@
 | Documento | `sdd/_control/H08/ML_E055_CONTRATO_Y_DISENO.md` |
 | Endpoint consumidor | `GET /api/v1/analytics/recommendations` (`nexum_e055`) |
 | Algoritmo | **K-Means** (aprendizaje no supervisado, agrupamiento) |
-| Estado del diseño | **DISEÑADO — pendiente de aprobación (RFC-016 §6)** |
-| `ML_DESIGNED` | **PENDIENTE_APROBACION** (no `VERIFIED` hasta firma humana) |
-| `ML_IMPLEMENTED` | `NOT_RUN` |
+| Estado del diseño | **APROBADO (2026-11-25)** — ver §14 «Decisión ratificada 2026-11-25» |
+| `ML_DESIGNED` | **APPROVED** (`ML_DESIGN_APPROVED=YES`, 2026-11-25) |
+| `ML_IMPLEMENTED` | `CODE_COMPLETE_LOCAL` (v2, 2026-11-22); AWS `NOT_RUN` |
 | `ML_DEPLOYED` | `NOT_RUN` |
 | AWS / Terraform | `NOT_RUN` (ninguna mutación; ninguna consulta) |
 
@@ -154,11 +154,12 @@ con otros usuarios, cualquier cifra no calculada en el paso 5.
 
 | Estado | Valor |
 |---|---|
-| `ML_DESIGNED` | **PENDIENTE_APROBACION** (este documento es propuesta) |
-| `ML_IMPLEMENTED` | `CODE_COMPLETE_LOCAL` (2026-11-22); no desplegado ni aprobado |
+| `ML_DESIGNED` | **APPROVED** (2026-11-25; ver §14) |
+| `ML_IMPLEMENTED` | `CODE_COMPLETE_LOCAL` (v2, 2026-11-22); AWS `NOT_RUN` |
 | `ML_DEPLOYED` | `NOT_RUN` |
 | Enmienda de contrato requerida | `hasEnoughData` (ESENCIAL) + 3 opcionales pospuestos |
-| Gate | `APRUEBO_RFC_016_CONTRATOS_E005_E075` |
+| Gate del diseño ML | `APRUEBO_GATE_ML_155` (2026-11-25) |
+| Enmiendas del diseño | D-ML-01 (trimestre en curso) y D-ML-02 (sin caché), §15 |
 
 ## 13. Evidencia local de implementación — NO constituye Gate
 
@@ -175,3 +176,73 @@ con otros usuarios, cualquier cifra no calculada en el paso 5.
 | Gates | `ML_GATE_APPROVED=NO`; `ML_DESIGNED=PENDIENTE_APROBACION`; `AWS_DEPLOYED=NO`. |
 
 Esta sección documenta ejecución local verificable. No firma, no aprueba el RFC y no autoriza despliegue.
+
+---
+
+## 14. Decisión ratificada 2026-11-25
+
+**Autoridad:** decisión humana expresa del responsable con las frases
+`APRUEBO_GATE_ML_155` y `APRUEBO_ENMIENDA_ML_VENTANA_90_DIAS_SIN_CACHE_RESPUESTA`.
+Esta sección **fija** el diseño aprobado y prevalece sobre cualquier línea anterior de este
+documento que diga lo contrario; las enmiendas D-ML-01 y D-ML-02 de §15 la formalizan.
+
+### 14.1 Diseño aprobado (valores exactos)
+
+| Elemento | Decisión ratificada |
+|---|---|
+| Algoritmo | **K-Means real** (no reglas fijas, no umbrales presentados como modelo) |
+| Artefacto activo | `ml/modelo_kmeans_v2.json`, `modelVersion = kmeans-v2` |
+| SHA-256 del modelo | `9670c91be3480057361adefa297e6f248a7e83f80af0b0c9d55c6e112bff168c` |
+| Ventana de cálculo | **móvil de 90 días**, con el **trimestre en curso incluido** |
+| Recorte de outliers | percentiles **P0,5 / P99,5** globales del entrenamiento, aplicados antes de normalizar |
+| Mediana | **fija del entrenamiento** (`trained_median_of_clipped_amounts`); **no** se recalcula por titular |
+| Caché de respuestas ML | **sin caché Redis** de respuestas; cada petición calcula con el artefacto y los datos del titular |
+| Datos de entrenamiento | **sintéticos**, versionados y con SHA-256 verificado |
+| Evaluación | **independiente** (holdout separado del conjunto de entrenamiento) |
+| Proveedores de IA de pago | **ninguno**; la inferencia es Go nativo y no llama a servicios externos |
+| Silueta | métrica **descriptiva** del agrupamiento; **no** es precisión predictiva ni garantía de acierto |
+| `modelVersion` | valor del artefacto cargado (`kmeans-v2`) en cada ítem |
+
+### 14.2 Estados registrados
+
+| Estado | Valor |
+|---|---|
+| `ML_DESIGN_APPROVED` | **YES** (2026-11-25) |
+| `ML_FUNCTIONAL_VERIFIED_AWS` | **NO** — no se ejecutó una consulta autenticada a `GET /api/v1/analytics/recommendations` en AWS |
+| `ML_DEPLOYED` | **NOT_RUN** — el binario desplegado es `v0.20.0+4bf6758d372`, que contiene `kmeans-v1`; v2 no se ha desplegado |
+| `ML_IMPLEMENTED` | `CODE_COMPLETE_LOCAL` (v2) |
+| Entrenamiento en esta sesión | **NO** — no se reentrenó; se verificaron los artefactos existentes |
+
+### 14.3 Verificación de artefactos (sin reentrenar)
+
+| Archivo | SHA-256 verificado |
+|---|---|
+| `ml/modelo_kmeans_v2.json` | `9670c91be3480057361adefa297e6f248a7e83f80af0b0c9d55c6e112bff168c` |
+| `ml/metricas_v2.json` | `dd40de5ef28f3c91fdd751a7b7708372485f8da8764f227dd82216193d367e2e` |
+| `ml/referencia_inferencia_v2.json` | `322f2d3787474e77313f1034e0afc7bdd1aa06b08a7c8e9df759b810ee788930` |
+
+`ml/metricas_v2.json` declara `selected_silhouette = 0.780848` (selección de `k` en
+entrenamiento) y `holdout.silhouette = 0.775027` (evaluación independiente). Ambas son
+**descriptivas**; no se presentan como precisión predictiva.
+
+### 14.4 Explicabilidad: la mediana del entrenamiento no es del titular
+
+La inferencia usa `trained_median_cents` como **parámetro fijo** para construir la feature
+`ratio_sobre_mediana`; no es una estadística del titular. El texto de `reason` sólo puede citar
+la **mediana de los importes del grupo del propio titular**, calculada en la capa determinista
+de explicación. Queda prohibido presentar la mediana del entrenamiento como «tu mediana» o como
+una estadística personal. La prueba
+`TestE055ExplicacionNoAtribuyeLaMedianaDeEntrenamientoAlTitular` lo verifica con un modelo
+instrumentado y datos donde ambas medianas difieren.
+
+## 15. Enmiendas formales D-ML-01 y D-ML-02 (2026-11-25)
+
+**Frase que las autoriza:** `APRUEBO_ENMIENDA_ML_VENTANA_90_DIAS_SIN_CACHE_RESPUESTA`.
+
+| ID | Texto derogado o eliminado | Decisión vigente |
+|---|---|---|
+| **D-ML-01** | §5, fila «Sesgo: se excluyen el trimestre en curso si está incompleto, salvo `period` explícito» | **DEROGADO**. La ventana es móvil de 90 días y **el trimestre en curso cuenta**. La implementación ya lo aplica en `ventanaRecomendaciones` y la prueba `TestE055Ventana90DiasPorDefecto` lo fija. |
+| **D-ML-02** | §8, fila «Caché: Redis con TTL 30 s y clave por usuario (A-080), invalidada al escribir movimientos» | **ELIMINADO**. No hay caché Redis de respuestas ML. Cada petición lee los movimientos del titular con `Query` y ejecuta la inferencia; no existe clave de caché que invalidar. |
+
+No se modifican `spec.md`, `plan.md`, el OpenAPI, el artefacto ni las métricas por estas
+enmiendas: son correcciones del documento de diseño y del comportamiento ya implementado.
