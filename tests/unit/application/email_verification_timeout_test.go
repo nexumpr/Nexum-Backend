@@ -84,7 +84,10 @@ func TestE010CancelacionDelClienteCortaElEnvio(t *testing.T) {
 }
 
 func TestE010LimitePorDefectoEsAcotado(t *testing.T) {
-	if appIdentity.EmailVerificationSendTimeout <= 0 || appIdentity.EmailVerificationSendTimeout >= 15*time.Second {
-		t.Fatalf("el limite por defecto debe ser positivo y menor que el WriteTimeout HTTP: %s", appIdentity.EmailVerificationSendTimeout)
+	limite := appIdentity.EmailVerificationSendTimeout
+	// El limite debe dejar margen al envio real medido en AWS (mas de 8 s) y, a la vez,
+	// responder antes del WriteTimeout HTTP de 15 s para no provocar un 502 del balanceador.
+	if limite <= 8*time.Second || limite >= 15*time.Second {
+		t.Fatalf("el limite por defecto debe superar la latencia medida de SES y ser menor que el WriteTimeout HTTP: %s", limite)
 	}
 }
