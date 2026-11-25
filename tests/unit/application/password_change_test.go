@@ -156,6 +156,31 @@ func TestE007ActualIncorrectaRechaza422(t *testing.T) {
 	}
 }
 
+// TestE007ActualIncorrectaConArgon2idRechaza422 reproduce el comportamiento real del hasher:
+// `VerifyPassword` devuelve `ports.ErrInvalidPassword` cuando la contraseña no coincide. Ese
+// error es una violación de regla (422), no una caída de dependencia (503).
+func TestE007ActualIncorrectaConArgon2idRechaza422(t *testing.T) {
+	hasher := security.NewArgon2Hasher(nil)
+	hashVigente, err := hasher.HashPassword("OldPassphrase#2026")
+	if err != nil {
+		t.Fatalf("no se pudo derivar el hash vigente: %v", err)
+	}
+	store := &e007Store{profile: e007PerfilValido()}
+	store.profile.PasswordHash = hashVigente
+	cmd := e007Comando()
+	cmd.CurrentPassword = "OtraPassphrase#2026"
+
+	err = appIdentity.NewPasswordChangeService(store, hasher).
+		WithClock(func() time.Time { return e007Ahora }).
+		Change(context.Background(), cmd)
+	if !errors.Is(err, appIdentity.ErrPasswordChangeActualIncorrecta) {
+		t.Fatalf("se esperaba ErrPasswordChangeActualIncorrecta, obtenido %v", err)
+	}
+	if store.aplicado != nil {
+		t.Fatalf("una contrasena actual incorrecta no puede aplicar la transaccion")
+	}
+}
+
 // TestE007CambioRealConArgon2id usa el hasher de producción: el valor persistido es Argon2id
 // verificable, nunca la contraseña en claro, y la época se incrementa en la misma aplicación.
 func TestE007CambioRealConArgon2id(t *testing.T) {
