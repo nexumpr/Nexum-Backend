@@ -209,7 +209,14 @@ func (s *Service) loadMovements(ctx context.Context, userID string, desde, hasta
 		if errLista != nil {
 			return nil, traducirError(errLista)
 		}
-		movimientos = append(movimientos, filas...)
+		for _, fila := range filas {
+			if fila.Deleted {
+				// Defensa en profundidad (E031): el adaptador ya excluye tombstones; si
+				// llegara uno, no debe contar como muestra de analítica ni de ML.
+				continue
+			}
+			movimientos = append(movimientos, fila)
+		}
 		if strings.TrimSpace(siguiente) == "" {
 			return movimientos, nil
 		}
