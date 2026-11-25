@@ -13,8 +13,10 @@ Convenciones:
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Iterable, Mapping
 
 import nucleo as n
@@ -61,6 +63,9 @@ class Escenario:
     depende_de: tuple[str, ...] = ()
     pasos: tuple[str, ...] = ()
     idempotencia: bool = False
+    # `nucleo.Cliente.pedir` consulta este atributo para decidir si exige cuerpo.
+    # El registro no duplica el schema: el validador lo toma del OpenAPI.
+    solicitud: Any = None
 
 
 # --------------------------------------------------------------------------- #
@@ -129,6 +134,24 @@ def _detalle_json(valor: Any) -> str:
     if isinstance(valor, (dict, list)):
         return json.dumps(valor, ensure_ascii=False)[:200]
     return str(valor)[:120]
+
+
+def _instante(texto: Any) -> datetime | None:
+    """Interpreta una marca ISO-8601 con zona; devuelve None si no es utilizable.
+
+    Se usa para correlacionar la ocurrencia de E061 con el evento real del
+    recordatorio (``dueAt``), sin depender del título del aviso.
+    """
+    if not isinstance(texto, str) or not texto.strip():
+        return None
+    valor = texto.strip()
+    if valor.endswith("Z"):
+        valor = valor[:-1] + "+00:00"
+    try:
+        instante = datetime.fromisoformat(valor)
+    except ValueError:
+        return None
+    return instante if instante.tzinfo is not None else instante.replace(tzinfo=timezone.utc)
 
 
 # --------------------------------------------------------------------------- #
@@ -289,9 +312,13 @@ def e001(ctx: n.Contexto) -> None:
         p = ctx.pedir("E001", cuerpo=cuerpo, idempotencia=clave)
         if _error_de_red(ctx, "E001", p, r):
             return
-        if p.codigo == 201:
-            if not _exigir(ctx, "E001", p, r, (201,)):
-                continue
+        if p.codigo == 409:
+            r.bloqueo(
+                "registro 201",
+                f"cuenta {etiqueta} ya existente; no se recrea ni se adivina su contraseña",
+                n.BLOCKED_EXTERNAL,
+            )
+        elif _exigir(ctx, "E001", p, r, (201,)):
             r.ok(f"registro 201 cuenta {etiqueta}")
             user_id = p.campo("user", "id")
             if isinstance(user_id, str) and user_id:
@@ -310,14 +337,6 @@ def e001(ctx: n.Contexto) -> None:
             conflicto = ctx.pedir("E001", cuerpo=distinto, idempotencia=clave)
             if _exigir(ctx, "E001", conflicto, r, (409,)):
                 r.ok(f"409 con otra carga y la misma clave {etiqueta}")
-        elif p.codigo == 409:
-            r.bloqueo(
-                "registro 201",
-                f"cuenta {etiqueta} ya existente; no se recrea ni se adivina su contraseña",
-                n.BLOCKED_EXTERNAL,
-            )
-        else:
-            _exigir(ctx, "E001", p, r, (201,))
     if r.bloqueado() and any(c["check"].startswith("registro 201") for c in r.checks):
         ctx.bloqueos.append("E001: cuenta preexistente")
 
@@ -344,7 +363,6 @@ def e002(ctx: n.Contexto) -> None:
         r.ok(f"session.id == sessionId {etiqueta}") if p.campo("session", "id") == p.campo("sessionId") else r.fallo(
             f"session.id == sessionId {etiqueta}", "no coinciden", n.CONTENT_MISMATCH
         )
-    incorrecta = n.idempotencia()
     p = ctx.pedir("E002", cuerpo={"email": ctx.a.email, "password": "Incorrecta#Sintetica#2026"})
     if _exigir(ctx, "E002", p, r, (401,)):
         r.ok("401 con contraseña incorrecta")
@@ -974,7 +992,7 @@ def e030(ctx: n.Contexto) -> None:
             "E030",
             ruta=f"/api/v1/movements/{mid}",
             token=ctx.a.access,
-            cuerpo={"occurredAt": n.iso_utc(n.ahora_utc() - n.__dict__.get("_un_dia", __import__("datetime").timedelta(days=1)))},
+            cuerpo={"occurredAt": n.iso_utc(n.ahora_utc() - timedelta(days=1))},
             cabeceras={"If-Match": nuevo_etag},
         )
         if _exigir(ctx, "E030", movido, r, (200,)):
@@ -1470,8 +1488,14 @@ def e026(ctx: n.Contexto) -> None:
     r = ctx.reg("E026")
     if not _sesion_a(ctx, r):
         return
-    if not _mutaciones(ctx, r, "E026"):
+    # E026 no muta por sí mismo: siembra con E028/E039/E044. La puerta se consulta
+    # con el escenario sembrador real, no con E026 (que siempre permitiría).
+    if not _mutaciones(ctx, r, "E028"):
         return
+    ctx.advertencias.append(
+        "E026 siembra movimientos sintéticos (ingreso, gasto y ahorro) que permanecen en la cuenta A: "
+        "cada reejecución acumula datos y altera los agregados"
+    )
     periodo = n.periodo_desplazado(-3)
     instante = n.instante_en_periodo(periodo, dia=15, hora=12)
     sembrados = (
@@ -1678,8 +1702,13 @@ def e052(ctx: n.Contexto) -> None:
     r = ctx.reg("E052")
     if not _sesion_a(ctx, r):
         return
-    if not _mutaciones(ctx, r, "E052"):
+    # E052 siembra con E028; la autorización se decide con el escenario que muta.
+    if not _mutaciones(ctx, r, "E028"):
         return
+    ctx.advertencias.append(
+        "E052 siembra 14 gastos sintéticos en el periodo analizado: cada reejecución los acumula "
+        "en la cuenta A y cambia los totales de E053/E054"
+    )
     periodo = n.periodo_desplazado(-1)
     categorias = [ctx.category_id()]
     catalogo = ctx.pedir("E022")
@@ -1785,14 +1814,20 @@ def e055(ctx: n.Contexto) -> None:
             isinstance(i, dict) and isinstance(i.get("disclaimer"), str) and i["disclaimer"] for i in items
         ) else r.fallo("disclaimer en cada recomendación", "ausente", n.CONTENT_MISMATCH)
     else:
-        r.bloqueo("recomendaciones con estructura", "hasEnoughData=true e items vacío: sin patrón", n.BLOCKED_DEPENDENCY)
+        # RFC-016 fija tres estados: hasEnoughData=false + items=[] (historial
+        # insuficiente), true + [] (suficiente, sin patrones) y true + items.
+        # El segundo es un resultado válido, no un bloqueo.
+        r.ok(
+            "estado sin patrones documentado",
+            "hasEnoughData=true e items=[]: historial suficiente sin patrones que recomendar",
+        )
     repetida = ctx.pedir("E055", ruta=f"/api/v1/analytics/recommendations?period={periodo}", token=ctx.a.access)
     if _exigir(ctx, "E055", repetida, r, (200,)):
         r.ok("determinismo en dos llamadas") if repetida.cuerpo == p.cuerpo else r.fallo(
             "determinismo en dos llamadas", "respuestas distintas", n.CONTENT_MISMATCH
         )
     # Ventana: B con historial solo fuera de los últimos 90 días no debe tener datos suficientes.
-    if not _mutaciones(ctx, r, "E055") or not _sesion_b(ctx, r):
+    if not _mutaciones(ctx, r, "E028") or not _sesion_b(ctx, r):
         return
     antiguo = n.periodo_desplazado(-8)
     categorias = ctx.datos.get("analitica_categorias") or [ctx.category_id()]
@@ -1915,7 +1950,7 @@ def e065(ctx: n.Contexto) -> None:
         }
     cuerpo = {
         "title": "Recordatorio sintético de certificación",
-        "dueAt": n.iso_utc(n.ahora_utc().__class__.now(n.ahora_utc().tzinfo) + __import__("datetime").timedelta(seconds=45)),
+        "dueAt": n.iso_utc(n.ahora_utc() + timedelta(seconds=45)),
         "timezone": "America/Mexico_City",
     }
     clave = n.idempotencia()
@@ -1961,8 +1996,13 @@ def e064(ctx: n.Contexto) -> None:
         ) else r.fallo("filtro active", "hay inactivos", n.CONTENT_MISMATCH)
 
 
-def _esperar_ocurrencia(ctx: n.Contexto, resultado: n.Resultado) -> str:
-    """Polling acotado de E061. No muta y no reenvía correo ni push."""
+def _esperar_ocurrencia(ctx: n.Contexto, resultado: n.Resultado) -> dict[str, Any] | None:
+    """Polling acotado de E061. No muta y no reenvía correo ni push.
+
+    Devuelve la notificación nueva completa: la correlación posterior usa su ID
+    (nuevo respecto de la captura previa) y su ``createdAt`` frente al ``dueAt``
+    del recordatorio, nunca el título del aviso.
+    """
     previas = ctx.datos.get("notificaciones_previas")
     if previas is None:
         previas = set()
@@ -1974,9 +2014,9 @@ def _esperar_ocurrencia(ctx: n.Contexto, resultado: n.Resultado) -> str:
         if p.codigo == 200:
             for item in _lista(p):
                 if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"] not in previas:
-                    return item["id"]
+                    return item
         time.sleep(intervalo)
-    return ""
+    return None
 
 
 def e061(ctx: n.Contexto) -> None:
@@ -1987,15 +2027,37 @@ def e061(ctx: n.Contexto) -> None:
     if not rid:
         r.bloqueo("recordatorio próximo", "E065 no aportó id", n.BLOCKED_DEPENDENCY)
         return
-    notificacion = _esperar_ocurrencia(ctx, r)
-    if not notificacion:
+    if ctx.datos.get("notificaciones_previas") is None:
+        r.bloqueo(
+            "captura previa de la bandeja",
+            "E065 no pudo capturarla; no se puede distinguir la ocurrencia de avisos previos",
+            n.BLOCKED_DEPENDENCY,
+        )
+        return
+    ocurrencia = _esperar_ocurrencia(ctx, r)
+    if not ocurrencia:
         r.bloqueo(
             "ocurrencia observada",
             "sin notificación nueva en la ventana; revise scheduler/FCM (no es un fallo de contrato)",
             n.BLOCKED_DEPENDENCY,
         )
         return
+    notificacion = str(ocurrencia.get("id") or "")
     ctx.datos["notification_id"] = notificacion
+    r.ok("id nuevo respecto de la captura previa")
+    debido = _instante(ctx.datos.get("reminder_due"))
+    if debido is None:
+        r.bloqueo(
+            "evento del recordatorio disponible",
+            "E065 no aportó dueAt en esta corrida (¿reanudado?); no se correlaciona por título",
+            n.BLOCKED_DEPENDENCY,
+        )
+        return
+    creado = _instante(ocurrencia.get("createdAt"))
+    correlaciona = creado is not None and creado >= debido - timedelta(seconds=5)
+    r.ok("ocurrencia correlacionada con el evento", "createdAt >= dueAt") if correlaciona else r.fallo(
+        "ocurrencia correlacionada con el evento", "createdAt ausente o anterior a dueAt", n.CONTENT_MISMATCH
+    )
     p = ctx.pedir("E061", ruta="/api/v1/notifications?limit=100", token=ctx.a.access)
     if not _exigir(ctx, "E061", p, r, (200,)):
         return
@@ -2105,7 +2167,7 @@ def e066(ctx: n.Contexto) -> None:
         "título persistido", str(ok.campo("title")), n.CONTENT_MISMATCH
     )
     nuevo_etag = _etag(ok) or etag
-    nuevo_due = n.iso_utc(n.ahora_utc() + __import__("datetime").timedelta(minutes=30))
+    nuevo_due = n.iso_utc(n.ahora_utc() + timedelta(minutes=30))
     movido = ctx.pedir(
         "E066", ruta=f"/api/v1/reminders/{rid}", token=ctx.a.access, cuerpo={"dueAt": nuevo_due}, cabeceras={"If-Match": nuevo_etag}
     )
@@ -2185,8 +2247,10 @@ def e060(ctx: n.Contexto) -> None:
             "cuerpo vacío", f"len={len(p.texto)}", n.CONTENT_MISMATCH
         )
     replay = ctx.pedir("E060", ruta=f"/api/v1/devices/push-tokens/{device}", token=ctx.a.access)
-    if _exigir(ctx, "E060", replay, r, (404, 409)):
-        r.ok("segunda revocación no es 204")
+    # El contrato declara 204 (revocación idempotente), 404 y 409 (ya revocado).
+    # Exigir sólo 404/409 convertiría en fallo una respuesta 204 válida.
+    if _exigir(ctx, "E060", replay, r, (204, 404, 409)):
+        r.ok("segunda revocación idempotente")
     if _sesion_b(ctx, r):
         ajeno = ctx.pedir("E060", ruta=f"/api/v1/devices/push-tokens/{device}", token=ctx.b.access)
         if _exigir(ctx, "E060", ajeno, r, (404,)):
@@ -2223,6 +2287,9 @@ def e020(ctx: n.Contexto) -> None:
     if not _sesion_a(ctx, r):
         return
     agregado: list[dict[str, Any]] = []
+    perfil: dict[str, Any] = {}
+    familias: set[str] = set()
+    textos: list[str] = []
     cursor = ""
     vistos: set[str] = set()
     for _ in range(50):
@@ -2230,8 +2297,13 @@ def e020(ctx: n.Contexto) -> None:
         p = ctx.pedir("E020", ruta=ruta, token=ctx.a.access)
         if not _exigir(ctx, "E020", p, r, (200,)):
             return
-        for familia, valor in _cuerpo(p).items():
+        contenido = _cuerpo(p)
+        textos.append(json.dumps(contenido, ensure_ascii=False))
+        if not perfil and isinstance(contenido.get("profile"), dict):
+            perfil = contenido["profile"]
+        for familia, valor in contenido.items():
             if isinstance(valor, list):
+                familias.add(familia)
                 for elemento in valor:
                     if isinstance(elemento, dict) and isinstance(elemento.get("id"), str):
                         if elemento["id"] in vistos:
@@ -2245,11 +2317,9 @@ def e020(ctx: n.Contexto) -> None:
             r.fallo("cursor no repetido", "nextCursor igual al anterior", n.CONTRACT_MISMATCH)
             return
         cursor = siguiente
-    cuerpo = _cuerpo(p)
-    r.ok("profile presente") if isinstance(cuerpo.get("profile"), dict) else r.fallo(
-        "profile presente", "ausente", n.CONTENT_MISMATCH
+    r.ok("profile presente") if perfil else r.fallo(
+        "profile presente", "ausente en todas las páginas", n.CONTENT_MISMATCH
     )
-    perfil = cuerpo.get("profile") if isinstance(cuerpo.get("profile"), dict) else {}
     r.ok("profile.id coincide") if perfil.get("id") == ctx.a.user_id else r.fallo(
         "profile.id coincide", "distinto", n.CONTENT_MISMATCH
     )
@@ -2258,10 +2328,10 @@ def e020(ctx: n.Contexto) -> None:
         "profile.email coincide", "distinto", n.CONTENT_MISMATCH
     )
     for familia in ("movements", "goals", "consents"):
-        r.ok(f"{familia}[]") if isinstance(cuerpo.get(familia), list) else r.fallo(
-            f"{familia}[]", "ausente", n.CONTRACT_MISMATCH
+        r.ok(f"{familia}[]") if familia in familias else r.fallo(
+            f"{familia}[]", "ausente en todas las páginas", n.CONTRACT_MISMATCH
         )
-    texto = json.dumps(cuerpo, ensure_ascii=False).lower()
+    texto = " ".join(textos).lower()
     for prohibido in ("accesstoken", "refreshtoken", "passwordhash", "tokencipher", "tokenfingerprint", "leaseuntil", "refreshhash"):
         r.ok(f"sin {prohibido}") if prohibido not in texto else r.fallo(
             f"sin {prohibido}", "aparece en la exportación", n.CONTENT_MISMATCH
@@ -2437,11 +2507,7 @@ def e014(ctx: n.Contexto) -> None:
     acceso = ctx.pedir("E012", token=ctx.a.access)
     if _exigir(ctx, "E012", acceso, r, (401,)):
         r.ok("access posterior 401")
-    evidencia = ctx.opciones.reanudar  # reutiliza el campo solo como marcador de configuración
-    del evidencia
-    import os as _os
-
-    ruta = _os.environ.get("NEXUM_E014_PURGED_EVIDENCE", "").strip()
+    ruta = os.environ.get("NEXUM_E014_PURGED_EVIDENCE", "").strip()
     if not ruta:
         r.bloqueo(
             "PURGED verificado",
