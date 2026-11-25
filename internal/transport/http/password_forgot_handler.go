@@ -12,7 +12,13 @@ import (
 
 	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
 	"github.com/nexumpr/Nexum-Backend/internal/ports"
+	"github.com/nexumpr/Nexum-Backend/pkg/httputil"
 )
+
+// passwordForgotMaxRequestBodyBytes acota el cuerpo de E005. El unico campo del contrato
+// es un correo (254 caracteres como maximo): 4 KiB deja margen para JSON bien formado y
+// rechaza el resto con el 413 que el contrato declara.
+const passwordForgotMaxRequestBodyBytes int64 = 4096
 
 // PasswordForgotHandler implementa POST /api/v1/auth/password/forgot (E005).
 //
@@ -46,25 +52,34 @@ type acceptedResponse struct {
 
 func (h *PasswordForgotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.servicio == nil || !h.servicio.Disponible() {
-		writeResetError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "Servicio no disponible.")
+		writeResetError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "Servicio no disponible.", nil)
 		return
 	}
 
-	cuerpo, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 4096))
+	cuerpo, err := io.ReadAll(http.MaxBytesReader(w, r.Body, passwordForgotMaxRequestBodyBytes))
 	if err != nil {
-		writeResetError(w, http.StatusRequestEntityTooLarge, "PAYLOAD_TOO_LARGE", "Solicitud demasiado grande.")
+		// 413 declarado por el contrato: el cuerpo supera el limite o no se puede leer.
+		writeResetError(w, r, http.StatusRequestEntityTooLarge, "PAYLOAD_TOO_LARGE", "Solicitud demasiado grande.", nil)
 		return
 	}
 	var req passwordForgotRequest
 	dec := json.NewDecoder(bytes.NewReader(cuerpo))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil || req.Email == "" || !appIdentity.ValidarEmail(req.Email) {
-		writeResetError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Solicitud invalida.")
+	if err := dec.Decode(&req); err != nil {
+		// JSON malformado, campo desconocido, tipo incorrecto o cuerpo vacio: 400 canonico.
+		writeResetError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "Solicitud no completada.", nil)
 		return
 	}
 	// Rechaza JSON adicional tras el objeto (p. ej. dos cuerpos concatenados).
 	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		writeResetError(w, http.StatusBadRequest, "INVALID_JSON", "Solicitud invalida.")
+		writeResetError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "Solicitud no completada.", nil)
+		return
+	}
+	// El contenido del correo es una regla de negocio (422) y no revela si la cuenta existe.
+	if req.Email == "" || !appIdentity.ValidarEmail(req.Email) {
+		writeResetError(w, r, http.StatusUnprocessableEntity, "BUSINESS_RULE_VIOLATION", "Solicitud no completada.", []httputil.ErrorDetail{
+			{Field: "email", Reason: "invalid_format"},
+		})
 		return
 	}
 
@@ -72,14 +87,14 @@ func (h *PasswordForgotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		switch {
 		case errors.Is(err, ports.ErrResetCuota):
 			w.Header().Set("Retry-After", "900")
-			writeResetError(w, http.StatusTooManyRequests, "RATE_LIMITED", "Demasiadas solicitudes.")
+			writeResetError(w, r, http.StatusTooManyRequests, "RATE_LIMITED", "Demasiadas solicitudes.", nil)
 		case errors.Is(err, ports.ErrResetNoDisponible):
-			writeResetError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "Servicio no disponible.")
+			writeResetError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "Servicio no disponible.", nil)
 		default:
 			if h.logger != nil {
 				h.logger.ErrorContext(r.Context(), "fallo en recuperacion de contrasena", "motivo", "interno")
 			}
-			writeResetError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Error interno.")
+			writeResetError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "Error interno.", nil)
 		}
 		return
 	}
@@ -111,11 +126,10 @@ func nuevoRequestID() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
-func writeResetError(w http.ResponseWriter, codigo int, code, mensaje string) {
-	w.Header().Set("Content-Type", "application/json")
+// writeResetError emite el ErrorEnvelope canonico de A-040 con el traceId de la
+// peticion. Antes se construia un mapa propio sin `traceId`, lo que rompia la
+// correlacion con `traceparent`/`X-Request-ID` en los errores de E005.
+func writeResetError(w http.ResponseWriter, r *http.Request, codigo int, code, mensaje string, detalles []httputil.ErrorDetail) {
 	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(codigo)
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"error": map[string]any{"code": code, "message": mensaje, "details": []any{}},
-	})
+	_ = httputil.WriteErrorEnvelope(w, codigo, code, mensaje, traceID(r), detalles)
 }

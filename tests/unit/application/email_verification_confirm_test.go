@@ -176,6 +176,54 @@ func TestE011PerfilNoApto(t *testing.T) {
 	}
 }
 
+// TestE011TokenLigadoAlCorreoDelPerfil fija la vinculacion del token con el correo con el que
+// se emitio (E010). Un token emitido para un correo no puede verificar otro distinto del mismo
+// usuario: se responde el rechazo generico (400) y no se aplica la transaccion. El caso de
+// replay (409) y el de expiracion ya estan cubiertos por TestE011ReplayDevuelveConflicto y por
+// el caso "expirado" de TestE011TokenExpiradoInexistenteOAjeno.
+func TestE011TokenLigadoAlCorreoDelPerfil(t *testing.T) {
+	casos := []struct {
+		nombre       string
+		correoToken  string
+		correoPerfil string
+	}{
+		{"correo de otro usuario en el mismo perfil", "cuenta-a@example.invalid", "cuenta-b@example.invalid"},
+		{"correo del perfil cambiado", "anterior@example.invalid", "nuevo@example.invalid"},
+		{"token sin correo", "", "cuenta-a@example.invalid"},
+	}
+	for _, caso := range casos {
+		t.Run(caso.nombre, func(t *testing.T) {
+			token := e011TokenValido()
+			token.Email = caso.correoToken
+			perfil := e011PerfilActivo()
+			perfil.Email = caso.correoPerfil
+			store := &e011Store{token: token, profile: perfil}
+
+			err := e011Servicio(store).Confirmar(context.Background(), e011Token)
+			if !errors.Is(err, appIdentity.ErrEmailVerificationTokenInvalido) {
+				t.Fatalf("se esperaba rechazo generico, obtenido %v", err)
+			}
+			if len(store.applied) != 0 {
+				t.Fatalf("un token de otro correo no puede aplicar la transaccion")
+			}
+		})
+	}
+
+	// Control positivo: el mismo correo con distinta capitalizacion o espacios sigue siendo
+	// el mismo correo (el contrato normaliza a minusculas).
+	token := e011TokenValido()
+	token.Email = "  Cuenta-A@Example.Invalid "
+	perfil := e011PerfilActivo()
+	perfil.Email = "cuenta-a@example.invalid"
+	store := &e011Store{token: token, profile: perfil}
+	if err := e011Servicio(store).Confirmar(context.Background(), e011Token); err != nil {
+		t.Fatalf("el mismo correo normalizado debe confirmar: %v", err)
+	}
+	if len(store.applied) != 1 {
+		t.Fatalf("el control positivo debe aplicar la transaccion")
+	}
+}
+
 func TestE011ConflictoDeTransaccion(t *testing.T) {
 	store := &e011Store{token: e011TokenValido(), profile: e011PerfilActivo(), confirmErr: appIdentity.ErrEmailVerificationConflicto}
 	if err := e011Servicio(store).Confirmar(context.Background(), e011Token); !errors.Is(err, appIdentity.ErrEmailVerificationConflicto) {

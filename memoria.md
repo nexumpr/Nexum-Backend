@@ -2269,3 +2269,27 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Discrepancias documentales/contractuales registradas:** E002 sin 401 en OpenAPI y con 409/422 no emitidos; E005 con error envelope sin traceId y 413 no declarado; E008/E009 con 429 declarado y no emitido; E011 con token ligado solo a userId; E031 con borrado fisico frente a soft delete; E041 con `{}` 400; E051 con cache Redis exigida en spec y descartada por RFC-022 D-W3-07; D-429 sin cablear en 9 endpoints; ETag no declarado en E013/E024/E025/E069; E069 acepta UTC pese a D-E069; E025 admite `0.00` en el patron y devuelve 422.
 - **Evidencia:** E019 y E037 conservan `EVIDENCIA_FUNCIONAL_INDIVIDUAL_NO_LOCALIZADA`; Oleada 3 se acredita de forma agregada en `memoria.md:2238` y `GATE_H08E_OLEADA_3.md` §12.1, sin artefacto HTTP individual versionado.
 - **Sin cambios funcionales:** no se modifico codigo Go, tests, OpenAPI, Terraform, IAM, CI/CD, SES ni AWS. `v0.19.2+3098f379d7ab`, LT v17, ASG 2/2/2, 2/2 targets y E014 `PURGED` permanecen intactos. Oleada 4 no autorizada.
+
+### Auditoría extraordinaria Oleadas 4 y 5 — 2026-11-24
+
+- **Modo:** solo lectura. Informes en `C:\Nexum-Custodia\AUDITORIA-OLEADAS4-5-20261124\`; no se modificó código, contratos, ramas, AWS, Firebase ni SES.
+- **Producción:** `v0.20.0+4bf6758d372`; binario ARM64 22 755 777 B, SHA-256 `8f681d4ecf547bb40a45008a78bc683fe44aec5b19cdcea9858c8e51459ce94c`, reproducible bit a bit desde `4bf6758` con Go 1.27.4 y `-trimpath -buildvcs=true`; LT v19; ASG 2/2/2; instancias en `us-east-2a` y `us-east-2b`; 2/2 targets healthy.
+- **`main`:** `dbff5f8661010b9b3a6285fa89e08a4cd79ca21d` (v0.19.2). Producción **no coincide** con `main`.
+- **Ramas:** `liz-oleada4` `22d4aa9` (15 commits), `liz-oleada5` `b57a549` (1 commit sobre `22d4aa9`). `eea1358` es ancestro de `22d4aa9`: sin reescritura. Sin PR, sin tags, sin releases de GitHub y con **0 ejecuciones de CI** sobre `4bf6758`, `eea1358`, `22d4aa9` y `b57a549`.
+- **Gobierno:** binario local + PUT presignado + `terraform apply -auto-approve`; sin Gate formal de despliegue. `POLITICA_RELEASES.md` incumplida.
+- **SES:** producción verificada (`ProductionAccessEnabled=true`, 50 000/día, 14/s, HEALTHY, supresión BOUNCE+COMPLAINT).
+- **Oleada 4:** 12/12 implementados y desplegados; E052 `period` vacío; E062 UUID vs hex32; rate limit compartido; FCM sin productor, sin `OUTBOX#*` en IAM y sin egreso a Google; ML real con Gate pendiente y desviaciones.
+- **Oleada 5:** no desplegada; E065/E066/E067 rotos por `RemindersStore.Get` (SK plana vs compuesta); E064 con salto de paginación; E072/E073 no conformes a `Health`; sin scheduler durable.
+- **Transversal:** E014 cubre familias `USER#`, pero no `OUTBOX#GLOBAL`; E020 no exporta las familias nuevas.
+- **Seguridad:** 7 hallazgos Gitleaks, todos falsos positivos; Staticcheck 10 y Gosec 12 (G115/G404 HIGH) → CI habría fallado. ZIP `nexum/secrets/terraform-h08i.zip` no previsto, no revisado.
+- **Rollback:** `v0.19.2` almacenado, pero **bloqueado por IAM** (faltan sus ARN).
+- **Decisión:** no rollback; ruta A+C (conservar v0.20.0, congelar y publicar release correctiva con CI y Gate).
+
+### Regularización Oleadas 4 y 5 — autorizaciones 2026-11-24
+
+- **RFC-023** `APPROVED` con `APRUEBO_RFC_023_GOBIERNO_RELEASE_OLEADAS`; Gate `GATE_H08E_REGULARIZACION_OLEADAS_4_5.md` en estado `AUTHORIZED_DEVELOPMENT_ONLY`.
+- **Autorizado:** regularización, correcciones E052/E062/E064–E067/E072/E073, scheduler, E014/E020, ML, FCM, DevSecOps, IaC/IAM, revisión ZIP, PR y CI.
+- **No autorizado:** merge, release, `terraform apply`, despliegue, rollback, rotación de credenciales, borrado del ZIP, recursos de pago, aprobación legal E015, decisión E031 ni Gate final ML.
+- **Topología:** `fix/h08e-oleada4-regularizacion` desde `22d4aa9`; `fix/h08e-oleada5-regularizacion` desde `b57a549` (stacked); `fix/h08e-transversal-e014-e020` sobre O5; `feat/h08i-iam-egreso-propuesta` desde `main`; `fix/h08e-regularizacion-54-gobierno` desde `main`.
+- **Ramas de Liz:** `liz-oleada4` y `liz-oleada5` se conservan inmutables como evidencia.
+- **Estados:** `REGULARIZACION_OLEADAS_4_5=IN_PROGRESS`; `MERGE=NOT_AUTHORIZED`; `RELEASE=NOT_AUTHORIZED`; `AWS_MUTATION=NOT_AUTHORIZED`.

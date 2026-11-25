@@ -174,7 +174,6 @@ func TestE041Validaciones(t *testing.T) {
 		{"sin usuario", appGoals.UpdateCommand{GoalID: "meta-01", ExpectedVersion: 1, Name: e041Texto("x")}, appGoals.ErrUnauthorized},
 		{"sin meta", appGoals.UpdateCommand{UserID: e038Usuario, ExpectedVersion: 1, Name: e041Texto("x")}, appGoals.ErrInvalidRequest},
 		{"sin version", appGoals.UpdateCommand{UserID: e038Usuario, GoalID: "meta-01", Name: e041Texto("x")}, appGoals.ErrInvalidRequest},
-		{"sin cambios", appGoals.UpdateCommand{UserID: e038Usuario, GoalID: "meta-01", ExpectedVersion: 1}, appGoals.ErrInvalidRequest},
 		{"nombre vacio", appGoals.UpdateCommand{UserID: e038Usuario, GoalID: "meta-01", ExpectedVersion: 1, Name: &nombreVacio}, appGoals.ErrInvalidRequest},
 		{"objetivo cero", appGoals.UpdateCommand{UserID: e038Usuario, GoalID: "meta-01", ExpectedVersion: 1, TargetAmount: &objetivoCero}, appGoals.ErrTargetNotPositive},
 		{"objetivo excesivo", appGoals.UpdateCommand{UserID: e038Usuario, GoalID: "meta-01", ExpectedVersion: 1, TargetAmount: &objetivoExcesivo}, appGoals.ErrInvalidRequest},
@@ -231,6 +230,39 @@ func TestE041Conflicto404Y503(t *testing.T) {
 			t.Fatalf("esperado ErrUnavailable, obtenido %v", err)
 		}
 	})
+}
+
+// TestE041PatchVacioEsNoOp fija la decision contractual: `GoalPatch.required` esta vacio en
+// el OpenAPI, de modo que un cuerpo `{}` es valido. Debe responder 200 con el recurso actual,
+// sin escribir, sin incrementar la version y conservando el ETag (misma Version). Si el
+// `If-Match` no coincide con la version vigente, la precondicion sigue siendo 412 aunque el
+// cuerpo no pida cambios (RFC 9110 evalua If-Match antes del metodo).
+func TestE041PatchVacioEsNoOp(t *testing.T) {
+	store := e041Sembrada(t)
+	servicio := e041Servicio(store)
+
+	actual, err := servicio.Update(context.Background(), appGoals.UpdateCommand{
+		UserID: e038Usuario, GoalID: "meta-01", ExpectedVersion: 1,
+	})
+	if err != nil {
+		t.Fatalf("un patch vacio debe ser no-op 200, obtenido %v", err)
+	}
+	if actual == nil || actual.Version != 1 {
+		t.Fatalf("el no-op debe preservar la version 1, obtenido %+v", actual)
+	}
+	if actual.Name != store.porUsuario[e038Usuario][0].Goal.Name {
+		t.Fatalf("el no-op no puede renombrar la meta: %q", actual.Name)
+	}
+
+	_, err = servicio.Update(context.Background(), appGoals.UpdateCommand{
+		UserID: e038Usuario, GoalID: "meta-01", ExpectedVersion: 9,
+	})
+	if !errors.Is(err, appGoals.ErrVersionConflict) {
+		t.Fatalf("un If-Match obsoleto debe ser 412 aun con cuerpo vacio, obtenido %v", err)
+	}
+	if got := store.porUsuario[e038Usuario][0].Goal.Version; got != 1 {
+		t.Fatalf("ninguna de las dos llamadas puede escribir: version %d", got)
+	}
 }
 
 // TestE041ConcurrenciaDosEscrituras simula dos nodos: la primera gana y la segunda recibe 412.

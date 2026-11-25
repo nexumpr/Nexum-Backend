@@ -167,3 +167,53 @@ condition = "AND"
 paths = ['''^tests/unit/application/recurring_test\.go$''']
 regexTarget = "line"
 regexes = ['''^\s*otro\.IdempotencyKey\s*=\s*"clave-vencida-e032-0001"\s*$''']
+
+# Oleadas 4 y 5 (auditoria 2026-11-24): 7 falsos positivos de `generic-api-key`
+# confirmados uno a uno. Son nombres de variable de entorno o literales sinteticos de
+# pruebas; ninguno autentica contra un servicio. La excepcion exige archivo exacto y
+# linea exacta: otra linea, otro valor u otro archivo siguen generando hallazgo.
+
+[[rules.allowlists]]
+description = "Nombre de variable de entorno de cursor, no un valor secreto (Oleada 4)"
+condition = "AND"
+paths = ['''^cmd/server/oleada4_secrets\.go$''']
+regexTarget = "line"
+regexes = ['''^\s*envCursorKey\s*=\s*"NEXUM_NOTIFICATION_CURSOR_KEY_B64"\s*$''']
+
+[[rules.allowlists]]
+description = "Llamada de prueba al sellador con identificadores sinteticos (Oleada 4)"
+condition = "AND"
+paths = ['''^cmd/server/fcm_oleada4_test\.go$''']
+regexTarget = "line"
+regexes = ['''^\s*sobre,\s*errSellar\s*:=\s*sellador\.Sellar\(token,\s*fcmTestUsuario\+"\|"\+deviceID\)\s*$''']
+
+[[rules.allowlists]]
+description = "Idempotency-Key sintetica de la prueba de dispositivos (Oleada 4)"
+condition = "AND"
+paths = ['''^internal/adapters/dynamo/push_devices_store_test\.go$''']
+regexTarget = "line"
+regexes = ['''^\s*IdempotencyKey:\s*"clave-idempotencia-0001",\s*$''']
+
+[[rules.allowlists]]
+description = "Fila de tabla sintetica de la prueba HTTP de dispositivos (Oleada 4)"
+condition = "AND"
+paths = ['''^tests/unit/transport/push_devices_test\.go$''']
+regexTarget = "line"
+regexes = ['''^\s*\{"sin_token", "018f90ef-08e5-7a68-b09f-2b67a47c92f0", "", e053Limitador\{permitido: true\}, http\.StatusUnauthorized, "UNAUTHORIZED"\},\s*$''']
+
+[[rules.allowlists]]
+description = "Idempotency-Key sintetica de la prueba de recordatorios (Oleada 5)"
+condition = "AND"
+paths = ['''^internal/application/reminders/service_test\.go$''']
+regexTarget = "line"
+regexes = ['''^\s*UserID:\s*"user-a",\s*IdempotencyKey:\s*"clave-idempotencia-de-prueba-02",\s*Title:\s*"Pagar luz",\s*$''']
+
+[[rules.allowlists]]
+description = "Cabeceras Idempotency-Key sinteticas de la prueba HTTP de recordatorios (Oleada 5)"
+condition = "AND"
+paths = ['''^internal/transport/http/reminders_handler_test\.go$''']
+regexTarget = "line"
+regexes = [
+  '''^\s*headers\s*:=\s*map\[string\]string\{HeaderIdempotencyKey:\s*"clave-idempotencia-de-prueba-01"\}\s*$''',
+  '''^\s*headers2\s*:=\s*map\[string\]string\{HeaderIdempotencyKey:\s*"clave-idempotencia-de-prueba-02"\}\s*$''',
+]

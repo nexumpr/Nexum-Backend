@@ -16,7 +16,7 @@ import (
 )
 
 // Version identifica el contenido curado. Cambia cuando cambia cualquier texto.
-const Version = "2026-11-v1"
+const Version = "2026-11-v2"
 
 // Claves de cache publica. No llevan identidad: el mismo contenido se sirve a
 // cualquier visitante y nunca se mezcla con datos de usuario.
@@ -103,11 +103,12 @@ var faqs = []Faq{
 	},
 	{
 		ID:       "faq-06",
-		Question: "¿Cómo actualizo mi nombre o mi correo sin pisar cambios de otro dispositivo?",
+		Question: "¿Cómo actualizo mi nombre sin pisar cambios de otro dispositivo?",
 		Answer: "El perfil se consulta y se modifica con control de versión: cada lectura devuelve una versión y cada " +
 			"cambio debe indicar la versión que leyó. Si otro dispositivo guardó antes, la actualización se rechaza con " +
-			"un conflicto en lugar de sobrescribir el cambio ajeno; vuelve a leer y aplica tu ajuste. El perfil indica " +
-			"además si el correo ya está verificado.",
+			"un conflicto en lugar de sobrescribir el cambio ajeno; vuelve a leer y aplica tu ajuste. En esta versión " +
+			"solo se modifica el nombre visible: el correo de registro no se edita desde la app y el perfil indica si " +
+			"ese correo ya está verificado.",
 	},
 	{
 		ID:       "faq-07",
@@ -129,17 +130,17 @@ var faqs = []Faq{
 		ID:       "faq-09",
 		Question: "¿Cómo se registra y se actualiza mi ingreso habitual?",
 		Answer: "Se captura como monto con dos decimales, sin símbolo de moneda, junto con la frecuencia con la que lo " +
-			"recibes: semanal, quincenal, mensual o anual. Se guarda en centavos para evitar errores de redondeo y el " +
-			"cálculo del mes usa el valor vigente con su frecuencia, no un promedio de meses anteriores. Actualízalo " +
-			"cuando cambie: el nuevo valor aplica en el siguiente cálculo.",
+			"recibes: semanal, quincenal, mensual, bimestral, trimestral, semestral o anual. Se guarda en centavos para " +
+			"evitar errores de redondeo y el cálculo del mes usa el valor vigente con su frecuencia, no un promedio de " +
+			"meses anteriores. Actualízalo cuando cambie: el nuevo valor aplica en el siguiente cálculo.",
 	},
 	{
 		ID:       "faq-10",
-		Question: "¿Cómo ajusto idioma, zona horaria y notificaciones?",
-		Answer: "En preferencias eliges el idioma, tu zona horaria IANA y qué avisos quieres recibir, incluido el " +
-			"horario silencioso y las alertas de presupuesto, metas o recordatorios. Los valores se validan en el " +
-			"servidor y se guardan con versión para no pisar ajustes hechos en otro dispositivo. Los recordatorios " +
-			"programados se interpretan en la zona horaria configurada.",
+		Question: "¿Cómo ajusto el idioma y la zona horaria?",
+		Answer: "En preferencias eliges el idioma y tu zona horaria IANA. Los valores se validan en el servidor y se " +
+			"guardan con versión para no pisar ajustes hechos en otro dispositivo. En esta versión todavía no se envían " +
+			"notificaciones ni alertas push, de presupuesto o de recordatorios: las preferencias de avisos no están " +
+			"disponibles y ningún aviso se activa por omisión.",
 	},
 }
 
