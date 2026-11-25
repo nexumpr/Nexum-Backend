@@ -217,3 +217,16 @@ regexes = [
   '''^\s*headers\s*:=\s*map\[string\]string\{HeaderIdempotencyKey:\s*"clave-idempotencia-de-prueba-01"\}\s*$''',
   '''^\s*headers2\s*:=\s*map\[string\]string\{HeaderIdempotencyKey:\s*"clave-idempotencia-de-prueba-02"\}\s*$''',
 ]
+
+# Oleada 5 (2026-11-25): dos Idempotency-Key sinteticas de la prueba de recordatorios
+# (commit 7ca22ef) que generic-api-key interpreta como credencial. Excepcion acotada a
+# archivo exacto y linea exacta; otro valor u otra ruta siguen generando hallazgo.
+[[rules.allowlists]]
+description = "Idempotency-Key sinteticas de la prueba de frecuencia de recordatorios"
+condition = "AND"
+paths = ['''^internal/application/reminders/service_test\.go$''']
+regexTarget = "line"
+regexes = [
+  '''^\s*UserID: "user-a", IdempotencyKey: "clave-idempotencia-frecuencia-01", Title: "Pagar luz",\s*$''',
+  '''^\s*UserID: "user-a", IdempotencyKey: "clave-idempotencia-frecuencia-03", Title: "Ahorro",\s*$''',
+]
