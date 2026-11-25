@@ -262,41 +262,80 @@ func (m *movDynamo) aplicarUpdate(update *types.Update) {
 	if item == nil {
 		item = map[string]types.AttributeValue{"PK": strAttr(pk), "SK": strAttr(sk)}
 	}
-	expresion := strings.TrimSpace(aws.ToString(update.UpdateExpression))
-	set, add := expresion, ""
-	if indice := strings.Index(expresion, " ADD "); indice >= 0 {
-		set, add = expresion[:indice], strings.TrimSpace(expresion[indice+len(" ADD "):])
-	}
-	set = strings.TrimPrefix(strings.TrimSpace(set), "SET ")
-	for _, asignacion := range strings.Split(set, ", ") {
+	set, add, remove := partirUpdate(aws.ToString(update.UpdateExpression))
+	for _, asignacion := range set {
 		partes := strings.SplitN(asignacion, " = ", 2)
 		if len(partes) != 2 {
 			continue
 		}
 		item[resolverNombre(partes[0], update.ExpressionAttributeNames)] = update.ExpressionAttributeValues[partes[1]]
 	}
-	if add != "" {
-		for _, incremento := range strings.Split(add, ", ") {
-			partes := strings.SplitN(incremento, " ", 2)
-			if len(partes) != 2 {
-				continue
-			}
-			nombre := resolverNombre(partes[0], update.ExpressionAttributeNames)
-			delta := update.ExpressionAttributeValues[strings.TrimSpace(partes[1])]
-			actual, hayActual := item[nombre].(*types.AttributeValueMemberN)
-			salto, haySalto := delta.(*types.AttributeValueMemberN)
-			if !haySalto {
-				continue
-			}
-			var base int64
-			if hayActual {
-				base, _ = strconv.ParseInt(actual.Value, 10, 64)
-			}
-			incrementoValor, _ := strconv.ParseInt(salto.Value, 10, 64)
-			item[nombre] = numAttr(base + incrementoValor)
+	for _, incremento := range add {
+		partes := strings.SplitN(incremento, " ", 2)
+		if len(partes) != 2 {
+			continue
 		}
+		nombre := resolverNombre(partes[0], update.ExpressionAttributeNames)
+		delta := update.ExpressionAttributeValues[strings.TrimSpace(partes[1])]
+		actual, hayActual := item[nombre].(*types.AttributeValueMemberN)
+		salto, haySalto := delta.(*types.AttributeValueMemberN)
+		if !haySalto {
+			continue
+		}
+		var base int64
+		if hayActual {
+			base, _ = strconv.ParseInt(actual.Value, 10, 64)
+		}
+		incrementoValor, _ := strconv.ParseInt(salto.Value, 10, 64)
+		item[nombre] = numAttr(base + incrementoValor)
+	}
+	// REMOVE de E031: el tombstone retira `description` y la proyección en GSI1.
+	for _, nombre := range remove {
+		delete(item, resolverNombre(nombre, update.ExpressionAttributeNames))
 	}
 	m.items[claveDe(pk, sk)] = item
+}
+
+// partirUpdate separa una expresión `SET ... [ADD ...] [REMOVE ...]` en sus cláusulas. El orden
+// real de DynamoDB es SET, REMOVE, ADD o SET, ADD, REMOVE; se aceptan ambos.
+func partirUpdate(expresion string) (set, add, remove []string) {
+	texto := strings.TrimSpace(expresion)
+	seccion := "SET"
+	texto = strings.TrimPrefix(texto, "SET ")
+	acumulado := map[string][]string{"SET": {}, "ADD": {}, "REMOVE": {}}
+	for {
+		indice := -1
+		etiqueta := ""
+		for _, candidata := range []string{" ADD ", " REMOVE "} {
+			if pos := strings.Index(texto, candidata); pos >= 0 && (indice < 0 || pos < indice) {
+				indice, etiqueta = pos, strings.TrimSpace(candidata)
+			}
+		}
+		if indice < 0 {
+			acumulado[seccion] = append(acumulado[seccion], partirComas(texto)...)
+			break
+		}
+		acumulado[seccion] = append(acumulado[seccion], partirComas(texto[:indice])...)
+		texto = strings.TrimSpace(texto[indice+len(" "+etiqueta+" "):])
+		seccion = etiqueta
+	}
+	return acumulado["SET"], acumulado["ADD"], acumulado["REMOVE"]
+}
+
+// partirComas separa por comas sin romper valores: los alias y marcadores no contienen comas.
+func partirComas(texto string) []string {
+	limpio := strings.TrimSpace(texto)
+	if limpio == "" {
+		return nil
+	}
+	partes := strings.Split(limpio, ", ")
+	salida := make([]string, 0, len(partes))
+	for _, parte := range partes {
+		if recortado := strings.TrimSpace(parte); recortado != "" {
+			salida = append(salida, recortado)
+		}
+	}
+	return salida
 }
 
 // movValorTexto devuelve el valor textual de un placeholder ("" si no existe).

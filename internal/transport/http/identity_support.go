@@ -139,5 +139,5 @@ func aplicarLimite(w http.ResponseWriter, r *http.Request, limitador LimitadorRu
 		segundos = 1
 	}
 	w.Header().Set("Retry-After", strconv.FormatInt(segundos, 10))
-	writeRegisterError(w, r, http.StatusTooManyRequests, "TOO_MANY_REQUESTS", "limite de solicitudes excedido", nil)
+	writeRegisterError(w, r, http.StatusTooManyRequests, "RATE_LIMITED", "limite de solicitudes excedido", nil)
 }

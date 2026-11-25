@@ -129,6 +129,11 @@ type Movement struct {
 	// E030 la conserva al mover un ítem cuya SK cambia: sin ella, una modificación reescribiría
 	// el ítem con la hora actual y perdería la fecha original.
 	CreatedAt time.Time
+	// Deleted indica que el ítem es el tombstone lógico de E031 (`deleted=true`). Un ítem sin
+	// el atributo `deleted` es NO borrado: así se leen todos los movimientos históricos sin
+	// migración (DECISION_E031_BORRADO §3.1). El campo no forma parte del contrato de
+	// respuesta: E029/E030 lo tratan como 404 y E031 como borrado ya aplicado.
+	Deleted bool
 }
 
 // Patch es el cuerpo de E030 (`MovementPatch`). Los tres campos son opcionales: un puntero nulo

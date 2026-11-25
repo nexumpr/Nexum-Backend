@@ -22,8 +22,8 @@ import (
 //
 // Contrato: 200 con `PageOfSession`, cabecera `Cache-Control: private, no-store` y, en error,
 // el sobre canónico `ErrorEnvelope`. Códigos contemplados: 200, 400, 401, 403, 404, 429, 500 y
-// 503. Este recorte no incorpora limitador distribuido (429 no se emite): la cuota por cuenta
-// requiere Redis y pertenece a una unidad con Gate propio; no se simula.
+// 503. La cuota D-429 se aplica por usuario con Redis; sin Redis se sirve la operacion
+// (fail-open de cuota) y nunca se simula el 429.
 type SessionsHandler struct {
 	service   *appIdentity.SessionsService
 	logger    *slog.Logger
@@ -32,11 +32,13 @@ type SessionsHandler struct {
 
 // NewSessionsHandler construye el handler. Si falta el servicio, el proveedor de tokens o el
 // autorizador de sesiones, el endpoint responde 503 (fail-closed): nunca se lista sin identidad
-// verificada ni sin persistencia.
+// verificada ni sin persistencia. La cuota D-429 (120 req/min por usuario) se aplica con la
+// clase `sessions`; sin Redis el limitador es nil y la lectura se sirve (fail-open de cuota).
 func NewSessionsHandler(
 	service *appIdentity.SessionsService,
 	tokens ports.TokenProvider,
 	sessions ports.SessionAuthorizer,
+	limitador LimitadorRuta,
 	logger *slog.Logger,
 ) *SessionsHandler {
 	if logger == nil {
@@ -44,7 +46,8 @@ func NewSessionsHandler(
 	}
 	h := &SessionsHandler{service: service, logger: logger}
 	if service != nil && tokens != nil && sessions != nil {
-		h.protected = middleware.AuthenticateBearerWithSession(tokens, sessions)(http.HandlerFunc(h.serve))
+		interior := LimitarPorUsuario(limitador, "sessions", h.serve)
+		h.protected = middleware.AuthenticateBearerWithSession(tokens, sessions)(http.HandlerFunc(interior))
 	}
 	return h
 }

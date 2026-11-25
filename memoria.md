@@ -2487,6 +2487,28 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Sigue no autorizado:** `terraform apply`, creación de recursos, publicación de artefactos, despliegue, instance refresh, rollback, rotación de credenciales, borrado del ZIP, E015 legal, E031 sin decisión y merge de PR cuyo HEAD no coincida con su Gate.
 - **Bases actualizadas:** #144 fusionó `origin/main` sin conflictos; #143 resolvió `memoria.md` conservando checkpoints de Liz + secciones nuevas y regenerará `BASELINE_SHA256.json`. #145 se sincronizará tras el cierre de #143.
 
+### Deuda histórica D-429 y reconciliación E002/E051 — 2026-11-25
+
+- **D-429-03 (defecto real, corregido):** `identity_support.go` emitía el 429 con `TOO_MANY_REQUESTS` mientras el contrato declara `RATE_LIMITED` en 73 operaciones. Corregido el código y actualizadas las pruebas que fijaban el anterior.
+- **D-429-01/02 (defecto real, corregido):** E008 y E009 no aplicaban la cuota de 120 req/min por usuario exigida por D-429 aunque Redis está configurado. Añadido `LimitadorRuta` a ambos constructores, clases `sessions` y `sessions_revoke`, cableado en `cmd/server/e008.go`, `e009.go` y `main.go`, y pruebas de 429 con `Retry-After`, código `RATE_LIMITED` y sujeto verificado.
+- **Defecto sistémico adicional (corregido):** once handlers (`sessions`, `sessions_revoke`, `dashboard`, `financial-summary`, `budgets` ×3, `contributions` ×3, `goals`) envolvían `LimitarPorUsuario` **por fuera** de la autenticación; como el helper necesita el `sub` del contexto, la cuota nunca se aplicaba. Corregido el orden (limitador dentro de la cadena autenticada) sin cambiar límites ni lógica.
+- **D-429-04 (enmienda aditiva aplicada):** cabecera `Retry-After` declarada inline en el 429 de E002/E008/E009/E051 (no se pudo usar `components.headers` porque H06 no resuelve esa sección; no se modificó el validador). H06 PASS, paridad OK y comparador `COMPATIBLE`.
+- **D-E002-01:** `409`/`422` de E002 anotados como reservados en `description` (sin retirar códigos).
+- **Pruebas de la rama:** `go build`, `go vet`, `go test ./... -count=1`, staticcheck v0.8.2 y gosec v2.30.0 PASS; `tests/infra/publicacion` 110 PASS con el checksum recalculado.
+- **Estados:** `D429_CODE_FIXED=YES`; `D429_E008_E009=IMPLEMENTED_LOCAL`; `E051_RFC026=PENDIENTE_DOCUMENTO`; `E031=PENDIENTE_DECISION`; `E015_V3=PROPUESTA`; sin merge, release, apply ni despliegue.
+
+### Ventana definitiva de merges 75/75 — 2026-11-25
+
+- **PR #144 MERGED:** HEAD `33839365ad4adb3d0c334ccac5c4010ffab335a6`; merge y nuevo `main` `b13becac31d3f25b09f36818bc620721d7644a59`. Incluye NAT 1 AZ (deshabilitado por defecto), FinOps de egreso, IAM `OUTBOX#*`/`SCHEDULE#*` con ARN exactos de v0.19.2 y v0.20.0, observabilidad y la excepcion acotada de Gitleaks.
+- **PR #143 MERGED:** HEAD `51f37b76fad2122b9e686cc7b2593be253fb74f0`; merge `2586416a44d6773df254484d93715e7aca12b81c`. Incorpora Oleada 4 con **E063 fail-closed**: presencia de workers en Redis (ZSET `nexum:v1:readall:workers`, TTL 60 s, `ZADD`/`ZREM`/`ZREMRANGEBYSCORE`/`ZCOUNT`/`PEXPIRE`, sin `SCAN`); sin worker conocido el endpoint responde **503** y no crea READALL/cola/puntero. ACL Redis verificada: `@read`/`@write`/`@keyspace` y `~nexum:*` cubren todos los comandos, **sin cambio de IaC**.
+- **Gitleaks:** los dos hallazgos del historial (`clave-idempotencia-frecuencia-01` y `-03`, commit `7ca22ef`) quedaron acotados por archivo y linea exactos en las tres ramas; gitleaks local 0 y 19 pruebas de configuracion OK.
+- **E014 (PR #145):** `MarcarEntregado` escribe dedupe global + `DELIVERYPTR#` en una transaccion; replay y residuo parcial resueltos con `ConsistentRead`. `DeleteGlobalItem` comprueba titular por `userID` **o** `userId` (tokens E005/E006/E010/E011), y el borrado conserva condiciones de titular y owner/lease (RFC3339 y epoch) con CAS sobre `skGlobal`. 6 pruebas nuevas incluida carrera real entre lectura y borrado. **Limitacion declarada:** los registros historicos sin puntero solo caducan por TTL; localizarlos exigiria Query acotada por particion, nunca `Scan`.
+- **E031 (PR #147):** tombstone con **204 idempotente y puntero conservado**; `DeleteMovement` transaccional (`SET`/`REMOVE`/`ADD`), `ReplaceMovement` con guardas, y exclusion en E026/E050/E051 (E051 pagina hasta reunir vivos); E020 hereda el filtro. `DECISION_E031_BORRADO.md` v1.1.0 aprobada.
+- **Contratos:** E063 ya declaraba `503 DEPENDENCY_UNAVAILABLE` y E031 `204`/`404`; no requieren enmienda. OpenAPI consolidado SHA-256 `3f0ec765fe5ea662e4c9223ca091c6cfbe67d2ddb47249c907ff34206dd232ba`.
+- **Ensayo acumulado** `ab874df`: build, vet, test, H06 (75 ops, 300 specs), paridad, publicacion 110, comparador COMPATIBLE (0 roturas), SDD 932 archivos, Terraform 543, FinOps 274 y certificacion 22, todo PASS. `-race` NOT_RUN en Windows por ausencia de gcc; autoridad CI Linux.
+- **FCM:** el worker exige `NEXUM_FCM_PROJECT_ID` y `NEXUM_FCM_CREDENTIALS_JSON` (o archivo); se verificara presencia real en el bundle v2 antes de la release. NAT Gateway de 1 AZ debe habilitarse para el egreso a `oauth2.googleapis.com` y `fcm.googleapis.com`.
+- **Sin cambios en AWS:** produccion sigue en `v0.20.0+4bf6758d372`, LT v19, bundle v2, ASG 2/2/2, dos AZ y SES fuera de sandbox. Sin release, apply, instance refresh, rollback ni mutacion de IAM.
+
 ### Cierre de integración 2026-11-25 (segunda sesión)
 
 - **PR #146 MERGED y CI verde:** `main` `f3bccca8b2437dc154bedbef257a3cabc7620844`; Go Backend CI `45534568903` SUCCESS y SDD `45534568852` SUCCESS.

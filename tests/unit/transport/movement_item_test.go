@@ -91,7 +91,18 @@ func (m *movItemHTTPStore) DeleteMovement(_ context.Context, write appMovements.
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	delete(m.movimientos, write.UserID+"\x00"+write.MovementID)
+	// Tombstone lógico de E031: el ítem se conserva marcado y sube la versión.
+	clave := write.UserID + "\x00" + write.MovementID
+	actual, ok := m.movimientos[clave]
+	if !ok {
+		return appMovements.ErrConflict
+	}
+	if actual.Version != write.ExpectedVersion {
+		return appMovements.ErrConflict
+	}
+	actual.Deleted = true
+	actual.Version++
+	m.movimientos[clave] = actual
 	return nil
 }
 
@@ -313,6 +324,62 @@ func TestE031HTTPErrores(t *testing.T) {
 	defer store.mu.Unlock()
 	if len(store.borrados) != 0 {
 		t.Fatal("ningun error puede llegar al almacen como borrado")
+	}
+}
+
+// TestE031HTTP204Idempotente cubre la autorización APRUEBO_E031_IDEMPOTENTE_204_CON_PUNTERO: el
+// segundo DELETE responde 204 sin cuerpo y sin volver a escribir; después, GET y PATCH dan 404.
+func TestE031HTTP204Idempotente(t *testing.T) {
+	store := newMovItemHTTPStore()
+	store.sembrar(e004HTTPUsuario, movItemHTTPMovimiento(itemHTTPID, e004HTTPAhora.Add(-time.Hour)))
+	handler := movItemHTTPHandler(store)
+
+	for intento := 1; intento <= 2; intento++ {
+		grabador := movHTTPEjecutar(handler, movItemHTTPPeticion(http.MethodDelete, itemHTTPID, "jwt-valido", "", ""))
+		if grabador.Code != http.StatusNoContent {
+			t.Fatalf("DELETE %d: se esperaba 204 y se obtuvo %d (%s)", intento, grabador.Code, grabador.Body.String())
+		}
+		if grabador.Body.Len() != 0 {
+			t.Fatalf("DELETE %d: 204 no puede llevar cuerpo", intento)
+		}
+	}
+	store.mu.Lock()
+	escrituras := len(store.borrados)
+	tombstone, existe := store.movimientos[e004HTTPUsuario+"\x00"+itemHTTPID]
+	store.mu.Unlock()
+	if escrituras != 1 {
+		t.Fatalf("el segundo DELETE no puede escribir: %d", escrituras)
+	}
+	if !existe || !tombstone.Deleted {
+		t.Fatalf("el movimiento debe conservarse como tombstone: %+v", tombstone)
+	}
+
+	if grabador := movHTTPEjecutar(handler, movItemHTTPPeticion(http.MethodGet, itemHTTPID, "jwt-valido", "", "")); grabador.Code != http.StatusNotFound {
+		t.Fatalf("leer un borrado debe ser 404 y se obtuvo %d", grabador.Code)
+	}
+	if grabador := movHTTPEjecutar(handler, movItemHTTPPeticion(http.MethodPatch, itemHTTPID, "jwt-valido", `{"description":"nueva"}`, `"v2"`)); grabador.Code != http.StatusNotFound {
+		t.Fatalf("editar un borrado debe ser 404 y se obtuvo %d", grabador.Code)
+	}
+}
+
+// TestE031HTTPAislamiento cubre que el borrado de A no afecta al movimiento de B.
+func TestE031HTTPAislamiento(t *testing.T) {
+	store := newMovItemHTTPStore()
+	store.sembrar(e004HTTPUsuario, movItemHTTPMovimiento(itemHTTPID, e004HTTPAhora.Add(-time.Hour)))
+	store.sembrar(e004HTTPOtroUser, movItemHTTPMovimiento(itemHTTPID, e004HTTPAhora.Add(-time.Hour)))
+	handler := movItemHTTPHandler(store)
+
+	if grabador := movHTTPEjecutar(handler, movItemHTTPPeticion(http.MethodDelete, itemHTTPID, "jwt-valido", "", "")); grabador.Code != http.StatusNoContent {
+		t.Fatalf("se esperaba 204 y se obtuvo %d", grabador.Code)
+	}
+	if grabador := movHTTPEjecutar(handler, movItemHTTPPeticion(http.MethodGet, itemHTTPID, "jwt-valido", "", "")); grabador.Code != http.StatusNotFound {
+		t.Fatalf("A ya no debe leerlo: %d", grabador.Code)
+	}
+	store.mu.Lock()
+	ajeno, existe := store.movimientos[e004HTTPOtroUser+"\x00"+itemHTTPID]
+	store.mu.Unlock()
+	if !existe || ajeno.Deleted {
+		t.Fatalf("el movimiento de B debe seguir intacto: %+v", ajeno)
 	}
 }
 

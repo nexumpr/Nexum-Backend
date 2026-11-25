@@ -3,11 +3,14 @@ package main
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/redis/go-redis/v9"
 
 	dynamoAdapter "github.com/nexumpr/Nexum-Backend/internal/adapters/dynamo"
 	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
+	cacheinfra "github.com/nexumpr/Nexum-Backend/internal/infrastructure/cache"
 	"github.com/nexumpr/Nexum-Backend/internal/ports"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 )
@@ -24,6 +27,7 @@ import (
 func montarE009(
 	router registradorHTTP,
 	clienteDynamo *dynamodb.Client,
+	clienteRedis *redis.Client,
 	tokens ports.TokenProvider,
 	sessions ports.SessionAuthorizer,
 	tabla string,
@@ -49,6 +53,10 @@ func montarE009(
 			slog.String("motivo", "sin_credenciales_autorizador_o_persistencia"))
 	}
 
-	handler := nexumhttp.NewSessionRevokeHandler(servicio, tokens, sessions, logger)
+	var limitador nexumhttp.LimitadorRuta
+	if clienteRedis != nil {
+		limitador = cacheinfra.NewAuthRateLimiter(clienteRedis, cuotaSesionesPorMinuto, time.Minute)
+	}
+	handler := nexumhttp.NewSessionRevokeHandler(servicio, tokens, sessions, limitador, logger)
 	router.HandleFunc(http.MethodDelete, "/auth/sessions/{sessionId}", handler.ServeHTTP)
 }

@@ -87,13 +87,17 @@ func (s *BudgetUsageStore) AggregateExpenses(ctx context.Context, userID string,
 		entrada := &dynamodb.QueryInput{
 			TableName:              aws.String(s.table),
 			KeyConditionExpression: aws.String("PK = :pk AND #sk BETWEEN :from AND :to"),
+			// E031: un movimiento borrado no consume presupuesto (E050).
+			FilterExpression: aws.String("(attribute_not_exists(#deleted) OR #deleted = :false)"),
 			ExpressionAttributeNames: map[string]string{
-				"#sk": "SK",
+				"#sk":      "SK",
+				"#deleted": "deleted",
 			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":pk":   stringAttr(pk),
-				":from": stringAttr("MOVEMENT#" + appMovements.SortableTime(from)),
-				":to":   stringAttr(hasta),
+				":pk":    stringAttr(pk),
+				":from":  stringAttr("MOVEMENT#" + appMovements.SortableTime(from)),
+				":to":    stringAttr(hasta),
+				":false": &types.AttributeValueMemberBOOL{Value: false},
 			},
 			ConsistentRead: aws.Bool(true),
 		}

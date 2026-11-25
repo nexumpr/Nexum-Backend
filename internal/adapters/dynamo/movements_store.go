@@ -45,7 +45,30 @@ const (
 	// E027 cuando hay filtro. Sin filtro basta una. Si se alcanza el tope se devuelve un cursor
 	// desde la ÚLTIMA CLAVE EVALUADA, de modo que no se pierde ni se duplica ningún elemento.
 	maxPaginasListado = 4
+
+	// movementDeletedByUser es el único valor admitido en `deletedBy` del tombstone de E031.
+	// Es un literal fijo: nunca se persiste sesión, token ni correo (R-31-04).
+	movementDeletedByUser = "USER"
+
+	// filtroNoBorrado es la condición de exclusión de tombstones que comparten E027 y E051.
+	// La ausencia del atributo significa «no borrado»: cubre todos los movimientos históricos
+	// sin backfill (DECISION_E031_BORRADO §5).
+	filtroNoBorrado = "(attribute_not_exists(#deleted) OR #deleted = :false)"
 )
+
+// deletedFilterNames son los alias que exige `filtroNoBorrado`.
+func deletedFilterNames() map[string]string {
+	return map[string]string{"#deleted": "deleted"}
+}
+
+// deletedFilterValues añade los valores que exige `filtroNoBorrado`.
+func deletedFilterValues(valores map[string]types.AttributeValue) map[string]types.AttributeValue {
+	if valores == nil {
+		valores = map[string]types.AttributeValue{}
+	}
+	valores[":false"] = &types.AttributeValueMemberBOOL{Value: false}
+	return valores
+}
 
 // MovementsStore implementa `movements.Store` sobre la tabla única existente.
 //
@@ -317,6 +340,9 @@ type filaMovimiento struct {
 // páginas. El coste es que una página puede requerir varias consultas; se acota con
 // `maxPaginasListado` y, al alcanzarlo, se devuelve un cursor desde la última clave EVALUADA, de
 // modo que la paginación sigue sin perder ni duplicar elementos.
+//
+// El filtro de borrado (`attribute_not_exists(deleted) OR deleted = false`) se aplica SIEMPRE:
+// los tombstones de E031 no se listan ni con filtros `type`/`from`/`to` ni en la última página.
 func (s *MovementsStore) ListMovements(ctx context.Context, query appMovements.ListQuery, startSK string, limit int) ([]appMovements.Movement, string, error) {
 	if s == nil || s.client == nil || s.table == "" {
 		return nil, "", appMovements.ErrUnavailable
@@ -346,21 +372,22 @@ func (s *MovementsStore) ListMovements(ctx context.Context, query appMovements.L
 		valores[":hasta"] = stringAttr(domainDynamo.PrefixMovement + appMovements.SortableTime(query.To.Add(time.Millisecond)))
 	}
 
-	var filtro *string
-	var nombres map[string]string
+	var filtros []string
+	nombres := deletedFilterNames()
+	valores = deletedFilterValues(valores)
+	filtros = append(filtros, filtroNoBorrado)
 	if query.Type != "" {
-		filtro = aws.String("#type = :type")
-		nombres = map[string]string{"#type": "type"}
+		filtros = append(filtros, "#type = :type")
+		nombres["#type"] = "type"
 		valores[":type"] = stringAttr(query.Type)
 	}
+	filtro := strings.Join(filtros, " AND ")
 
-	// Sin filtro se pide una fila de más: es la forma barata de saber si hay página siguiente.
-	// Con filtro el `Limit` cuenta ítems EVALUADOS, así que se pide exactamente `limit` y se
-	// itera hasta llenar la página.
-	pedido := limit
-	if filtro == nil {
-		pedido = limit + 1
-	}
+	// Sin filtro de tipo, la condición de borrado ya obliga a evaluar más de una fila por página:
+	// se pide siempre una fila de más para saber, sin una consulta extra, si hay página siguiente.
+	// El `Limit` cuenta ítems EVALUADOS, así que se itera hasta llenar la página y, al alcanzar el
+	// tope de páginas, se devuelve un cursor desde la última clave evaluada.
+	pedido := limit + 1
 
 	filas := make([]filaMovimiento, 0, limit+1)
 	desde := strings.TrimSpace(startSK)
@@ -369,7 +396,7 @@ func (s *MovementsStore) ListMovements(ctx context.Context, query appMovements.L
 		entrada := &dynamodb.QueryInput{
 			TableName:                 aws.String(s.table),
 			KeyConditionExpression:    aws.String(condicion),
-			FilterExpression:          filtro,
+			FilterExpression:          aws.String(filtro),
 			ExpressionAttributeNames:  nombres,
 			ExpressionAttributeValues: valores,
 			// Consistencia fuerte: el listado debe reflejar lo ya confirmado por este u otro
@@ -394,10 +421,10 @@ func (s *MovementsStore) ListMovements(ctx context.Context, query appMovements.L
 		}
 		for _, item := range salida.Items {
 			movimiento, ok := movimientoDesdeItem(item, userID)
-			if !ok {
-				// Ítem con otra entidad o sin los atributos mínimos: no se inventa un
-				// movimiento. El cursor se calcula sobre posiciones físicas, no sobre estas
-				// filas, así que no se saltan datos.
+			if !ok || movimiento.Deleted {
+				// Ítem con otra entidad, sin los atributos mínimos o tombstone de E031: no se
+				// inventa un movimiento. El cursor se calcula sobre posiciones físicas, no sobre
+				// estas filas, así que no se saltan datos.
 				continue
 			}
 			filas = append(filas, filaMovimiento{sk: stringAttribute(item["SK"]), movimiento: movimiento})
@@ -485,6 +512,9 @@ func movimientoDesdeItem(item map[string]types.AttributeValue, userID string) (a
 		ContributionID:     stringAttribute(item["contributionId"]),
 		RecurringPaymentID: stringAttribute(item["recurringPaymentId"]),
 		CreatedAt:          creado,
+		// `deleted` ausente = no borrado: así se leen todos los movimientos históricos escritos
+		// antes de E031, sin migración ni backfill.
+		Deleted: boolAttribute(item["deleted"]),
 	}, true
 }
 
@@ -665,9 +695,10 @@ func (s *MovementsStore) ReplaceMovement(ctx context.Context, write appMovements
 				"SK": stringAttr(skVieja),
 			},
 			UpdateExpression:    aws.String("SET categoryId = :categoria, description = :descripcion, occurredAt = :ocurrido, updatedAt = :actualizado, #version = :siguiente"),
-			ConditionExpression: aws.String("attribute_exists(PK) AND #version = :esperada"),
+			ConditionExpression: aws.String("attribute_exists(PK) AND #version = :esperada AND " + filtroNoBorrado),
 			ExpressionAttributeNames: map[string]string{
 				"#version": "version",
+				"#deleted": "deleted",
 			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":categoria":   stringAttr(siguiente.CategoryID),
@@ -676,6 +707,7 @@ func (s *MovementsStore) ReplaceMovement(ctx context.Context, write appMovements
 				":actualizado": stringAttr(ahoraISO),
 				":siguiente":   numberAttr(siguiente.Version),
 				":esperada":    numberAttr(write.ExpectedVersion),
+				":false":       &types.AttributeValueMemberBOOL{Value: false},
 			},
 		}}}
 	} else {
@@ -691,10 +723,14 @@ func (s *MovementsStore) ReplaceMovement(ctx context.Context, write appMovements
 					"PK": stringAttr(pk),
 					"SK": stringAttr(skVieja),
 				},
-				ConditionExpression:      aws.String("attribute_exists(PK) AND #version = :esperada"),
-				ExpressionAttributeNames: map[string]string{"#version": "version"},
+				ConditionExpression: aws.String("attribute_exists(PK) AND #version = :esperada AND " + filtroNoBorrado),
+				ExpressionAttributeNames: map[string]string{
+					"#version": "version",
+					"#deleted": "deleted",
+				},
 				ExpressionAttributeValues: map[string]types.AttributeValue{
 					":esperada": numberAttr(write.ExpectedVersion),
+					":false":    &types.AttributeValueMemberBOOL{Value: false},
 				},
 			}},
 			{Update: &types.Update{
@@ -704,11 +740,15 @@ func (s *MovementsStore) ReplaceMovement(ctx context.Context, write appMovements
 					"SK": stringAttr(ptrSK),
 				},
 				UpdateExpression:    aws.String("SET targetSK = :nueva, updatedAt = :actualizado"),
-				ConditionExpression: aws.String("attribute_exists(PK) AND targetSK = :vieja"),
+				ConditionExpression: aws.String("attribute_exists(PK) AND targetSK = :vieja AND " + filtroNoBorrado),
+				ExpressionAttributeNames: map[string]string{
+					"#deleted": "deleted",
+				},
 				ExpressionAttributeValues: map[string]types.AttributeValue{
 					":nueva":       stringAttr(skNueva),
 					":vieja":       stringAttr(skVieja),
 					":actualizado": stringAttr(ahoraISO),
+					":false":       &types.AttributeValueMemberBOOL{Value: false},
 				},
 			}},
 		}
@@ -736,12 +776,21 @@ func (s *MovementsStore) ReplaceMovement(ctx context.Context, write appMovements
 	return &resultado, nil
 }
 
-// DeleteMovement borra el ítem principal y su localizador en UNA transacción (E031).
+// DeleteMovement escribe el TOMBSTONE lógico de E031 (DECISION_E031_BORRADO §3.2) en UNA
+// transacción de dos acciones:
 //
-// La condición del principal es `attribute_exists(PK)`: la posición se tomó de una lectura previa
-// y, si un PATCH concurrente movió el ítem, el borrado se cancela y el servicio relee y reintenta.
-// Si sólo falta el localizador (el principal existe pero el puntero ya no), se repite únicamente
-// el borrado del principal, que es la autoridad.
+//  1. `Update` del ítem principal: marca `deleted=true`, `deletedAt`, `deletedBy` y `updatedAt`,
+//     incrementa `version` y RETIRA el texto libre (`description`) y la proyección en `GSI1`
+//     (`GSI1PK`/`GSI1SK`), de modo que el movimiento borrado desaparece del índice sin `Scan`.
+//     La condición exige la versión leída (`ExpectedVersion`) y que el ítem NO esté ya borrado:
+//     un PATCH concurrente o un segundo borrado cancelan la transacción.
+//  2. `Update` del localizador `MOVEMENTPTR#<id>`: se CONSERVA el puntero (autorización
+//     `APRUEBO_E031_IDEMPOTENTE_204_CON_PUNTERO`) y sólo se marca `deleted=true` y `updatedAt`,
+//     manteniendo `targetSK`. Un segundo DELETE debe poder resolver el mismo movimiento y
+//     devolver 204 idempotente sin volver a escribir.
+//
+// Ninguna expresión declara valores que no use: DynamoDB rechaza con ValidationException
+// cualquier `ExpressionAttributeValues` sobrante (defecto que ya rompió E003/E042).
 func (s *MovementsStore) DeleteMovement(ctx context.Context, write appMovements.DeleteWrite) error {
 	if s == nil || s.client == nil || s.table == "" {
 		return appMovements.ErrUnavailable
@@ -755,19 +804,59 @@ func (s *MovementsStore) DeleteMovement(ctx context.Context, write appMovements.
 	pk := domainDynamo.PrefixUser + titular
 	_, sk, _, _ := domainDynamo.MovementKeys(titular, id, write.Previous.Type, write.Previous.OccurredAt)
 	ptrPK, ptrSK := MovementPointerKeys(titular, id)
+	ahora := write.Now.UTC()
+	ahoraISO := ahora.Format(time.RFC3339)
+	esperada := write.ExpectedVersion
+	if esperada < 1 {
+		// Sin versión leída no hay CAS posible: la escritura falla cerrada en lugar de inventar
+		// una precondición que podría sobrescribir un cambio concurrente.
+		return appMovements.ErrUnavailable
+	}
 
-	principal := types.TransactWriteItem{Delete: &types.Delete{
+	principal := func() types.TransactWriteItem {
+		return types.TransactWriteItem{Update: &types.Update{
+			TableName: aws.String(s.table),
+			Key:       map[string]types.AttributeValue{"PK": stringAttr(pk), "SK": stringAttr(sk)},
+			UpdateExpression: aws.String("SET #deleted = :true, #deletedAt = :now, #deletedBy = :actor, #updatedAt = :now " +
+				"REMOVE #description, #gsi1pk, #gsi1sk ADD #version :one"),
+			ConditionExpression: aws.String("attribute_exists(PK) AND #version = :expected AND " + filtroNoBorrado),
+			ExpressionAttributeNames: map[string]string{
+				"#deleted":     "deleted",
+				"#deletedAt":   "deletedAt",
+				"#deletedBy":   "deletedBy",
+				"#updatedAt":   "updatedAt",
+				"#version":     "version",
+				"#description": "description",
+				"#gsi1pk":      "GSI1PK",
+				"#gsi1sk":      "GSI1SK",
+			},
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":true":     &types.AttributeValueMemberBOOL{Value: true},
+				":false":    &types.AttributeValueMemberBOOL{Value: false},
+				":now":      stringAttr(ahoraISO),
+				":actor":    stringAttr(movementDeletedByUser),
+				":expected": numberAttr(esperada),
+				":one":      numberAttr(1),
+			},
+		}}
+	}
+	puntero := types.TransactWriteItem{Update: &types.Update{
 		TableName:           aws.String(s.table),
-		Key:                 map[string]types.AttributeValue{"PK": stringAttr(pk), "SK": stringAttr(sk)},
+		Key:                 map[string]types.AttributeValue{"PK": stringAttr(ptrPK), "SK": stringAttr(ptrSK)},
+		UpdateExpression:    aws.String("SET #deleted = :true, #updatedAt = :now"),
 		ConditionExpression: aws.String("attribute_exists(PK)"),
-	}}
-	puntero := types.TransactWriteItem{Delete: &types.Delete{
-		TableName: aws.String(s.table),
-		Key:       map[string]types.AttributeValue{"PK": stringAttr(ptrPK), "SK": stringAttr(ptrSK)},
+		ExpressionAttributeNames: map[string]string{
+			"#deleted":   "deleted",
+			"#updatedAt": "updatedAt",
+		},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":true": &types.AttributeValueMemberBOOL{Value: true},
+			":now":  stringAttr(ahoraISO),
+		},
 	}}
 
 	_, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-		TransactItems: []types.TransactWriteItem{principal, puntero},
+		TransactItems: []types.TransactWriteItem{principal(), puntero},
 	})
 	if err == nil {
 		return nil
@@ -777,12 +866,17 @@ func (s *MovementsStore) DeleteMovement(ctx context.Context, write appMovements.
 		return appMovements.ErrUnavailable
 	}
 	if transactionItemFailed(err, 0) {
-		// El principal ya no está en esa posición: otra operación lo movió o lo borró.
+		// La versión cambió (PATCH concurrente) o el ítem ya era un tombstone. El servicio relee
+		// y decide: 204 si ya estaba borrado, 404 si desapareció, 409 si hay conflicto real.
 		return appMovements.ErrConflict
 	}
-	// Sólo falló el puntero (ya no existía): se repite el borrado del principal.
+	if !transactionItemFailed(err, 1) {
+		return appMovements.ErrUnavailable
+	}
+	// Sólo falló el localizador (ausente o movido): la autoridad es el ítem principal. Se repite
+	// la escritura del tombstone SIN el puntero; nunca se revierte un tombstone ya aplicado.
 	if _, errRetry := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-		TransactItems: []types.TransactWriteItem{principal},
+		TransactItems: []types.TransactWriteItem{principal()},
 	}); errRetry != nil {
 		if isConditionalCancel(errRetry) {
 			return appMovements.ErrConflict

@@ -40,8 +40,9 @@ type Store interface {
 	// ReplaceMovement aplica una modificación con compare-and-swap por versión. Si la clave
 	// cambia, mueve el ítem y actualiza el localizador en la misma transacción.
 	ReplaceMovement(ctx context.Context, write ReplaceWrite) (*Movement, error)
-	// DeleteMovement borra el ítem principal y su localizador. Devuelve ErrConflict si el ítem
-	// cambió de posición o desapareció entre la lectura y la transacción.
+	// DeleteMovement aplica el tombstone lógico de E031 al ítem principal y marca su localizador
+	// en la misma transacción. Devuelve ErrConflict si la versión cambió, el ítem desapareció o
+	// ya estaba borrado entre la lectura y la escritura.
 	DeleteMovement(ctx context.Context, write DeleteWrite) error
 }
 
@@ -80,12 +81,16 @@ type ReplaceWrite struct {
 	Now             time.Time
 }
 
-// DeleteWrite es la escritura de E031: la posición leída del ítem que se va a borrar.
+// DeleteWrite es la escritura de E031: la posición y la versión leídas del ítem sobre el que se
+// escribe el tombstone.
 type DeleteWrite struct {
 	UserID     string
 	MovementID string
-	Previous   Movement
-	Now        time.Time
+	// ExpectedVersion es la versión leída con consistencia fuerte inmediatamente antes: es la
+	// precondición CAS del tombstone. Un PATCH concurrente la invalida y el servicio relee.
+	ExpectedVersion int64
+	Previous        Movement
+	Now             time.Time
 }
 
 // Service contiene los casos de uso de movimientos. Es inmutable una vez construido: los
@@ -352,7 +357,9 @@ func (s *Service) Get(ctx context.Context, userID, movementID string) (*Movement
 	if err != nil {
 		return nil, err
 	}
-	if movimiento == nil {
+	if movimiento == nil || movimiento.Deleted {
+		// Un tombstone de E031 no es un recurso legible: la respuesta es idéntica a la de un
+		// identificador inexistente (404), sin revelar que existió ni cuándo se borró.
 		return nil, ErrNotFound
 	}
 	return movimiento, nil
@@ -385,6 +392,11 @@ func (s *Service) Patch(ctx context.Context, userID, movementID string, expected
 		return nil, err
 	}
 	if actual == nil {
+		return nil, ErrNotFound
+	}
+	// Un tombstone de E031 no se edita: el movimiento fue borrado y la respuesta es 404, no un
+	// 409/412 que revelaría su existencia. La versión del tombstone nunca retrocede.
+	if actual.Deleted {
 		return nil, ErrNotFound
 	}
 	// T-1 (RFC-022 v1.2.1 §10): un movimiento vinculado a una aportación es historia económica
@@ -470,6 +482,9 @@ func (s *Service) resolverConflictoReemplazo(ctx context.Context, userID, moveme
 	if actual == nil {
 		return nil, ErrNotFound
 	}
+	if actual.Deleted {
+		return nil, ErrNotFound
+	}
 	if actual.Version != esperada {
 		return nil, ErrVersionConflict
 	}
@@ -478,10 +493,16 @@ func (s *Service) resolverConflictoReemplazo(ctx context.Context, userID, moveme
 
 // Delete ejecuta `DELETE /api/v1/movements/{movementId}` (E031).
 //
-// Un movimiento ligado a una aportación confirmada (`contributionId` no nulo) no se borra: la
-// respuesta es 409 y la reversa corresponde a la operación de metas, no a este endpoint. Si el
-// ítem se movió entre la lectura y el borrado (un PATCH concurrente), se relee y se reintenta una
-// vez con la posición nueva.
+// Escribe un TOMBSTONE lógico, no un borrado físico (DECISION_E031_BORRADO, opción B): el ítem
+// conserva los hechos financieros mínimos y marca `deleted=true`, `deletedAt`, `deletedBy` y
+// `version+1`, retirando el texto libre y la proyección en `GSI1`. Todos los agregados excluyen
+// los tombstones. Un movimiento ligado a una aportación confirmada (`contributionId` no nulo) no
+// se borra: la respuesta es 409 y la reversa corresponde a la operación de metas, no a este
+// endpoint.
+//
+// La operación es IDEMPOTENTE: repetirla sobre un movimiento ya borrado devuelve 204 sin volver
+// a escribir ni incrementar la versión. Si el ítem cambió de versión entre la lectura y la
+// transacción (un PATCH concurrente), se relee y se reintenta con la versión vigente.
 func (s *Service) Delete(ctx context.Context, userID, movementID string) error {
 	if s == nil || s.store == nil {
 		return ErrUnavailable
@@ -504,14 +525,19 @@ func (s *Service) Delete(ctx context.Context, userID, movementID string) error {
 		if actual == nil {
 			return ErrNotFound
 		}
+		if actual.Deleted {
+			// Ya borrado por una petición anterior: mismo efecto, sin escritura ni versión nueva.
+			return nil
+		}
 		if strings.TrimSpace(actual.ContributionID) != "" {
 			return ErrContributionLinked
 		}
 		errBorrado := s.store.DeleteMovement(ctx, DeleteWrite{
-			UserID:     titular,
-			MovementID: id,
-			Previous:   *actual,
-			Now:        ahora,
+			UserID:          titular,
+			MovementID:      id,
+			ExpectedVersion: actual.Version,
+			Previous:        *actual,
+			Now:             ahora,
 		})
 		if errBorrado == nil {
 			return nil
@@ -519,7 +545,20 @@ func (s *Service) Delete(ctx context.Context, userID, movementID string) error {
 		if !errors.Is(errBorrado, ErrConflict) {
 			return errBorrado
 		}
-		// El ítem se movió o cambió: se relee y se decide en la siguiente vuelta.
+		// El ítem cambió de versión o de posición: se relee y se decide en la siguiente vuelta.
+	}
+
+	// Agotados los reintentos, una última lectura distingue el borrado ya aplicado (204) del
+	// recurso desaparecido (404) y del conflicto real (409). Nunca se devuelve 500.
+	final, err := s.store.LoadMovement(ctx, titular, id)
+	if err != nil {
+		return err
+	}
+	if final == nil {
+		return ErrNotFound
+	}
+	if final.Deleted {
+		return nil
 	}
 	return ErrConflict
 }
