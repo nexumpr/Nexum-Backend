@@ -526,6 +526,134 @@ func TestScheduleCompleteRetiraAgendaHuerfana(t *testing.T) {
 	}
 }
 
+// TestScheduleE066MueveFechaDuranteLeaseNoPierdePuntero reproduce el defecto real
+// del retiro de ocurrencias huérfanas: el puntero de agenda NO puede borrarse sin
+// comprobar a qué ocurrencia apunta.
+func TestScheduleE066MueveFechaDuranteLeaseNoPierdePuntero(t *testing.T) {
+	// Secuencia pedida: Claim -> E066 mueve dueAt -> cierre del scheduler.
+	// El puntero ya apunta a la ocurrencia NUEVA y debe conservarse para que E014
+	// la alcance; la ocurrencia antigua ya no existe, así que el cierre se resuelve
+	// como lease perdido y no como fallo de servicio.
+	t.Run("secuencia_real", func(t *testing.T) {
+		agenda, recordatorios, doble := schedEntorno(t, "nodo-a")
+		dueAt := time.Date(2026, 11, 24, 9, 0, 0, 0, time.UTC)
+		schedAlta(t, recordatorios, schedUsuarioA, "r-movido", dueAt.Format(time.RFC3339), nil)
+		oc := schedOcurrenciaPorID(t, agenda, "r-movido")
+		token := schedReclamar(t, agenda, oc, 30*time.Second)
+
+		nuevo := dueAt.Add(24 * time.Hour)
+		texto := nuevo.Format(time.RFC3339)
+		if _, err := recordatorios.Update(context.Background(), appReminders.UpdateInput{
+			UserID: schedUsuarioA, ID: "r-movido", ExpectedVersion: 1,
+			DueAt: &texto, Now: schedInstante,
+		}); err != nil {
+			t.Fatalf("E066 debía mover el vencimiento: %v", err)
+		}
+		nuevaSK := scheduleSortKey(nuevo, "r-movido")
+		pkPuntero, skPuntero := domainDeletion.SchedulePointerKeys(schedUsuarioA, "r-movido")
+		if stringAttribute(doble.item(pkPuntero, skPuntero)["skGlobal"]) != nuevaSK {
+			t.Fatal("E066 debía reapuntar el puntero a la ocurrencia nueva")
+		}
+
+		// El recordatorio de la fecha anterior ya no existe: la ocurrencia retirada
+		// por el scheduler es huérfana.
+		if err := agenda.Complete(context.Background(), token, schedInstante); !errors.Is(err, appReminders.ErrLeasePerdido) {
+			t.Fatalf("el cierre de una ocurrencia ya movida debe resolverse como lease perdido: %v", err)
+		}
+		if puntero := doble.item(pkPuntero, skPuntero); stringAttribute(puntero["skGlobal"]) != nuevaSK {
+			t.Fatalf("el puntero de la ocurrencia nueva se perdió: %v", puntero)
+		}
+		// El borrado del puntero no puede ser incondicional: el de la transacción
+		// emitida debe exigir que siga apuntando a la ocurrencia retirada.
+		if !schedBorraPunteroConCondicion(t, doble, pkPuntero, skPuntero, oc.SK) {
+			t.Fatal("el puntero de agenda se borraba sin condición: E066 podía dejarlo apuntando a otra ocurrencia")
+		}
+		ocurrencias := schedDue(t, agenda, nuevo, 10)
+		if len(ocurrencias) != 1 || ocurrencias[0].SK != nuevaSK {
+			t.Fatalf("la agenda nueva debe seguir siendo reclamable: %+v", ocurrencias)
+		}
+	})
+
+	// Estado que el guard protege: la ocurrencia antigua sobrevive al movimiento de
+	// fecha (retiro incompleto, reparación o índice parcial). Aquí el borrado
+	// incondicional sí destruía el puntero nuevo y dejaba la agenda inalcanzable
+	// para E014.
+	t.Run("ocurrencia_superviviente", func(t *testing.T) {
+		agenda, recordatorios, doble := schedEntorno(t, "nodo-a")
+		dueAt := time.Date(2026, 11, 24, 9, 0, 0, 0, time.UTC)
+		schedAlta(t, recordatorios, schedUsuarioA, "r-superviviente", dueAt.Format(time.RFC3339), nil)
+		oc := schedOcurrenciaPorID(t, agenda, "r-superviviente")
+		token := schedReclamar(t, agenda, oc, 30*time.Second)
+		arrendada := doble.item(domainDeletion.PartitionScheduleGlobal, oc.SK)
+		if arrendada == nil {
+			t.Fatal("falta la ocurrencia arrendada")
+		}
+
+		nuevo := dueAt.Add(48 * time.Hour)
+		texto := nuevo.Format(time.RFC3339)
+		if _, err := recordatorios.Update(context.Background(), appReminders.UpdateInput{
+			UserID: schedUsuarioA, ID: "r-superviviente", ExpectedVersion: 1,
+			DueAt: &texto, Now: schedInstante,
+		}); err != nil {
+			t.Fatalf("E066 debía mover el vencimiento: %v", err)
+		}
+		nuevaSK := scheduleSortKey(nuevo, "r-superviviente")
+		// Se repone la ocurrencia antigua tal como la dejó el Claim: el puntero y el
+		// recordatorio ya se movieron, pero la ocurrencia no se retiró.
+		doble.poner(arrendada)
+
+		if err := agenda.Complete(context.Background(), token, schedInstante); err != nil {
+			t.Fatalf("el cierre huérfano debía retirar la ocurrencia antigua: %v", err)
+		}
+		if doble.item(domainDeletion.PartitionScheduleGlobal, oc.SK) != nil {
+			t.Fatal("la ocurrencia antigua debía retirarse para no reintentarse para siempre")
+		}
+		// El reintento retiró SÓLO la ocurrencia: una acción, sin tocar el puntero.
+		ultima := doble.transaccionesVistas[len(doble.transaccionesVistas)-1].TransactItems
+		if len(ultima) != 1 || ultima[0].Delete == nil || stringAttribute(ultima[0].Delete.Key["SK"]) != oc.SK {
+			t.Fatalf("el reintento debía retirar sólo la ocurrencia antigua: %+v", ultima)
+		}
+		// Puntero -> ocurrencia nueva, y la ocurrencia existe: E014 la resuelve.
+		pkPuntero, skPuntero := domainDeletion.SchedulePointerKeys(schedUsuarioA, "r-superviviente")
+		puntero := doble.item(pkPuntero, skPuntero)
+		if stringAttribute(puntero["skGlobal"]) != nuevaSK {
+			t.Fatalf("el puntero nuevo se perdió: %v", puntero)
+		}
+		if doble.item(domainDeletion.PartitionScheduleGlobal, nuevaSK) == nil {
+			t.Fatal("el puntero quedó huérfano: su ocurrencia no existe")
+		}
+		if ocurrencias := schedDue(t, agenda, nuevo, 10); len(ocurrencias) != 1 || ocurrencias[0].SK != nuevaSK {
+			t.Fatalf("la agenda nueva debía seguir siendo reclamable: %+v", ocurrencias)
+		}
+	})
+}
+
+// schedBorraPunteroConCondicion comprueba que toda transacción emitida que borre el
+// puntero de agenda lo hace con una condición que lo ata a la ocurrencia retirada.
+func schedBorraPunteroConCondicion(t *testing.T, doble *remFakeDynamo, pk, sk, ocSK string) bool {
+	t.Helper()
+	visto := false
+	for _, tx := range doble.transaccionesVistas {
+		for _, accion := range tx.TransactItems {
+			if accion.Delete == nil {
+				continue
+			}
+			if stringAttribute(accion.Delete.Key["PK"]) != pk || stringAttribute(accion.Delete.Key["SK"]) != sk {
+				continue
+			}
+			visto = true
+			condicion := aws.ToString(accion.Delete.ConditionExpression)
+			if !strings.Contains(condicion, "skGlobal") {
+				return false
+			}
+			if stringAttribute(accion.Delete.ExpressionAttributeValues[":ocSK"]) != ocSK {
+				return false
+			}
+		}
+	}
+	return visto
+}
+
 func TestScheduleCompleteConFenceObsoletoEsLeasePerdido(t *testing.T) {
 	agenda, recordatorios, doble := schedEntorno(t, "nodo-a")
 	dueAt := schedInstante.Add(-time.Hour)

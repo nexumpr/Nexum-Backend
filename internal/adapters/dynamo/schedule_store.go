@@ -72,6 +72,11 @@ const (
 	condicionPunteroRecordatorio = "attribute_exists(PK) AND #reminderSK = :recordatorioSK AND #version = :expected"
 	// El puntero de agenda debe seguir apuntando a la ocurrencia que se avanza.
 	condicionPunteroAgendaSK = "attribute_exists(PK) AND #skGlobal = :viejaSK"
+	// El puntero de agenda sólo puede retirarse si sigue apuntando a la ocurrencia
+	// que se retira. Si el titular movió el vencimiento (E066) el puntero ya apunta
+	// a la ocurrencia nueva: borrarlo la dejaría inalcanzable para la purga de E014
+	// y el recordatorio no volvería a dispararse.
+	condicionPunteroAgendaHuerfana = "attribute_not_exists(PK) OR #skGlobal = :ocSK"
 )
 
 // ScheduleAPI es el subconjunto de DynamoDB que usa el scheduler. No incluye
@@ -565,29 +570,55 @@ func (s *ScheduleStore) Complete(ctx context.Context, lease reminders.Lease, aho
 // retirarAgendaHuerfana elimina la ocurrencia cuando su recordatorio ya no existe
 // o está borrado. Sin esta salida, una purga concurrente (E014) dejaría la
 // ocurrencia en un bucle de reintentos que nunca podría completarse.
+//
+// El puntero de agenda se retira con condición: sólo si sigue apuntando a ESTA
+// ocurrencia. Si el titular movió el vencimiento (E066) el puntero ya apunta a la
+// ocurrencia nueva y borrarlo la dejaría inalcanzable para la purga de E014,
+// además de perder el disparo. Cuando esa condición falla se reintenta retirando
+// únicamente la ocurrencia antigua; el puntero nuevo nunca se toca.
 func (s *ScheduleStore) retirarAgendaHuerfana(ctx context.Context, lease reminders.Lease, ahora time.Time) error {
 	oc := lease.Ocurrencia
 	pkPuntero, skPuntero := domainDeletion.SchedulePointerKeys(oc.UserID, oc.ReminderID)
-	acciones := []types.TransactWriteItem{
+	retirarOcurrencia := types.TransactWriteItem{Delete: &types.Delete{
+		TableName:           aws.String(s.table),
+		Key:                 map[string]types.AttributeValue{"PK": stringAttr(domainDeletion.PartitionScheduleGlobal), "SK": stringAttr(oc.SK)},
+		ConditionExpression: aws.String(condicionAgendaArrendada),
+		ExpressionAttributeNames: map[string]string{
+			"#owner": "owner", "#fence": "fence", "#version": "version",
+		},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":owner":         stringAttr(strings.TrimSpace(lease.Owner)),
+			":fence":         numberAttr(lease.Fence),
+			":agendaVersion": numberAttr(lease.Version),
+		},
+	}}
+	err := s.ejecutarTransaccion(ctx, []types.TransactWriteItem{
+		retirarOcurrencia,
 		{Delete: &types.Delete{
 			TableName:           aws.String(s.table),
-			Key:                 map[string]types.AttributeValue{"PK": stringAttr(domainDeletion.PartitionScheduleGlobal), "SK": stringAttr(oc.SK)},
-			ConditionExpression: aws.String(condicionAgendaArrendada),
+			Key:                 map[string]types.AttributeValue{"PK": stringAttr(pkPuntero), "SK": stringAttr(skPuntero)},
+			ConditionExpression: aws.String(condicionPunteroAgendaHuerfana),
 			ExpressionAttributeNames: map[string]string{
-				"#owner": "owner", "#fence": "fence", "#version": "version",
+				"#skGlobal": "skGlobal",
 			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":owner":         stringAttr(strings.TrimSpace(lease.Owner)),
-				":fence":         numberAttr(lease.Fence),
-				":agendaVersion": numberAttr(lease.Version),
+				":ocSK": stringAttr(oc.SK),
 			},
 		}},
-		{Delete: &types.Delete{
-			TableName: aws.String(s.table),
-			Key:       map[string]types.AttributeValue{"PK": stringAttr(pkPuntero), "SK": stringAttr(skPuntero)},
-		}},
+	})
+	if err == nil {
+		return nil
 	}
-	return s.ejecutarTransaccion(ctx, acciones)
+	if !errors.Is(err, reminders.ErrLeasePerdido) {
+		return err
+	}
+	// Una condición canceló la transacción. Si la que falló fue la del puntero (ya
+	// apunta a otra ocurrencia) basta con retirar la ocurrencia antigua; si fue la
+	// de la ocurrencia, el reintento vuelve a fallar y se propaga ErrLeasePerdido.
+	if errRetirar := s.ejecutarTransaccion(ctx, []types.TransactWriteItem{retirarOcurrencia}); errRetirar != nil {
+		return errRetirar
+	}
+	return nil
 }
 
 // leerRecordatorio lee el ítem exacto del recordatorio con consistencia fuerte.

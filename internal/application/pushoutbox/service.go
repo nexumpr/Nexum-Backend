@@ -484,9 +484,22 @@ func cargarZonaIANA(valor string) (*time.Location, error) {
 
 // enVentanaSilencio calcula si ahora cae en quietHours y cuándo termina la
 // franja. Soporta rangos que cruzan la medianoche.
+//
+// El fin se construye con la hora de PARED local del día correspondiente y no
+// sumando minutos a la medianoche: sumar una duración absoluta desplaza una hora
+// en los cambios de horario de verano (en marzo el fin quedaba una hora tarde; en
+// noviembre, una hora temprano y la reprogramación caía dentro de la misma franja,
+// provocando reintentos en bucle hasta el cierre real). El instante devuelto es
+// siempre estrictamente futuro, de modo que una única reprogramación por ventana
+// basta para que el envío se reintente fuera del silencio.
 func enVentanaSilencio(ahora time.Time, q *appPrefs.QuietHours, zona *time.Location) (bool, time.Time, error) {
 	if q == nil || !q.Enabled || zona == nil {
 		return false, time.Time{}, nil
+	}
+	// Formato estricto HH:MM: `time.Parse("15:04", "9:00")` acepta una hora de un
+	// dígito, pero el contrato exige dos y el handler ya lo rechaza con 422.
+	if len(q.Start) != 5 || len(q.End) != 5 || q.Start[2] != ':' || q.End[2] != ':' {
+		return false, time.Time{}, fmt.Errorf("horario con formato invalido")
 	}
 	inicio, err := time.Parse("15:04", q.Start)
 	if err != nil {
@@ -503,18 +516,17 @@ func enVentanaSilencio(ahora time.Time, q *appPrefs.QuietHours, zona *time.Locat
 	}
 	local := ahora.In(zona)
 	minActual := local.Hour()*60 + local.Minute()
-	medianoche := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, zona)
-	finAbsoluto := medianoche.Add(time.Duration(minFin) * time.Minute)
+	enFranja := minActual >= minInicio && minActual < minFin
 	if minFin < minInicio { // cruza medianoche
-		if minActual >= minInicio {
-			finAbsoluto = finAbsoluto.AddDate(0, 0, 1)
-		}
-		return minActual >= minInicio || minActual < minFin, finAbsoluto, nil
+		enFranja = minActual >= minInicio || minActual < minFin
 	}
-	if minActual >= minFin {
-		finAbsoluto = finAbsoluto.AddDate(0, 0, 1)
+
+	// Fin de pared local de hoy; si no queda por delante, el de mañana.
+	finVentana := time.Date(local.Year(), local.Month(), local.Day(), fin.Hour(), fin.Minute(), 0, 0, zona)
+	if !finVentana.After(ahora) {
+		finVentana = time.Date(local.Year(), local.Month(), local.Day()+1, fin.Hour(), fin.Minute(), 0, 0, zona)
 	}
-	return minActual >= minInicio && minActual < minFin, finAbsoluto, nil
+	return enFranja, finVentana, nil
 }
 
 func backoff(intentos int) time.Duration {

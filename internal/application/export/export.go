@@ -1017,6 +1017,24 @@ func notificationContract(fila NotificationRow) (NotificationContract, error) {
 	}, nil
 }
 
+// NormalizeReminderFrequency normaliza el valor persistido de `frequency`. Vacío o
+// sólo espacios significa «sin recurrencia» (`nil`) y únicamente los tres valores del
+// enum de `Reminder`/`ExportReminder` son representables. El segundo resultado indica
+// si el valor pertenece al contrato: un valor desconocido se rechaza, nunca se emite.
+func NormalizeReminderFrequency(raw string) (*string, bool) {
+	valor := strings.TrimSpace(raw)
+	if valor == "" {
+		return nil, true
+	}
+	switch valor {
+	case "daily", "weekly", "monthly":
+		copia := valor
+		return &copia, true
+	default:
+		return nil, false
+	}
+}
+
 // reminderContract valida y proyecta un recordatorio. `frequency` es `null` cuando no hay
 // recurrencia y, si existe, debe ser uno de los tres valores del contrato.
 func reminderContract(fila ReminderRow) (ReminderContract, error) {
@@ -1035,13 +1053,11 @@ func reminderContract(fila ReminderRow) (ReminderContract, error) {
 	}
 	var frecuencia *string
 	if fila.Frequency != nil {
-		switch valor := strings.TrimSpace(*fila.Frequency); valor {
-		case "daily", "weekly", "monthly":
-			copia := valor
-			frecuencia = &copia
-		default:
+		normalizada, valida := NormalizeReminderFrequency(*fila.Frequency)
+		if !valida {
 			return ReminderContract{}, fmt.Errorf("%w: frecuencia de recordatorio invalida", ErrInconsistent)
 		}
+		frecuencia = normalizada
 	}
 	return ReminderContract{
 		ID:        id,

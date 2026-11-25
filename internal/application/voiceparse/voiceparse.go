@@ -125,7 +125,8 @@ func formatearCents(cents int64) string {
 
 var (
 	// Se prueba primero el signo menos para no interpretar "-100" como importe positivo.
-	negativeNumericPattern = regexp.MustCompile(`(^|[^0-9A-Za-z])-[ \t]*[0-9]`)
+	// El símbolo de peso es opcional entre el signo y la cifra ("- $50").
+	negativeNumericPattern = regexp.MustCompile(`(^|[^0-9A-Za-z])-[ \t]*\$?[ \t]*[0-9]`)
 	negativeWordPattern    = regexp.MustCompile(`(?i)(?:^|[^a-záéíóúñ])menos[ \t]+(?:[0-9]|cien|ciento|doscient|trescient|cuatrocient|quinient|seiscient|setecient|ochocient|novecient|mil|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|veinte|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa)`)
 
 	// Alternativas ordenadas de mayor a menor especificidad: "1,234.50",
@@ -133,6 +134,13 @@ var (
 	amountPattern = regexp.MustCompile(`(^|[^0-9.,-])([0-9]{1,3}(?:,[0-9]{3})+(?:\.[0-9]{2})?|[0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]{2})?|[0-9]+(?:[.,][0-9]{1,2})?)([^0-9.,]|$)`)
 	centsPattern  = regexp.MustCompile(`(?i)\bcon\b[ \t]+([0-9]{1,2}|[a-záéíóúñ]+)[ \t]*(?:centavos?)?\b`)
 	wordPattern   = regexp.MustCompile(`[a-záéíóúñ]+`)
+
+	// Fechas habladas o escritas. No describen un monto, así que se retiran antes de
+	// buscar cifras: "el 5 de noviembre" no es un gasto de 5.00 y "2026-11-05" no es
+	// un gasto de 2026.00.
+	datePattern        = regexp.MustCompile(`(?i)\b(?:el[ \t]+)?[0-9]{1,2}[ \t]+de[ \t]+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:[ \t]+(?:de|del)[ \t]+[0-9]{4}|[ \t]*,[ \t]*[0-9]{4})?`)
+	numericDatePattern = regexp.MustCompile(`\b[0-9]{1,2}/[0-9]{1,2}(?:/[0-9]{2,4})?\b`)
+	isoDatePattern     = regexp.MustCompile(`\b[0-9]{4}-[0-9]{2}-[0-9]{2}\b`)
 )
 
 func contieneMontoNegativo(texto string) bool {
@@ -140,6 +148,7 @@ func contieneMontoNegativo(texto string) bool {
 }
 
 func extraerCents(texto string) (int64, bool) {
+	texto = sinFechas(texto)
 	if match := amountPattern.FindStringSubmatch(texto); len(match) == 4 {
 		cents, ok := parseNumericAmount(match[2])
 		if ok {
@@ -152,6 +161,15 @@ func extraerCents(texto string) (int64, bool) {
 		}
 	}
 	return parseSpanishWords(texto)
+}
+
+// sinFechas retira las expresiones de fecha (habladas, d/m o ISO) para que ninguna
+// cifra de calendario se interprete como importe.
+func sinFechas(texto string) string {
+	for _, patron := range []*regexp.Regexp{datePattern, isoDatePattern, numericDatePattern} {
+		texto = patron.ReplaceAllString(texto, " ")
+	}
+	return texto
 }
 
 func parseNumericAmount(raw string) (int64, bool) {
@@ -298,12 +316,24 @@ func parseSpanishWords(texto string) (int64, bool) {
 
 	// Sólo se considera la corrida contigua de palabras-numero inmediatamente
 	// anterior a la divisa; así "un gasto de cien pesos" vale 100 y no 101.
+	// «y» es un conector numérico ("treinta y cuatro"): se omite únicamente cuando
+	// está entre dos palabras-número, nunca al principio ni tras una palabra ajena.
 	var words []string
 	for i := currencyIndex - 1; i >= 0; i-- {
-		if _, ok := spanishWordValues[tokens[i]]; !ok {
+		token := tokens[i]
+		if token == "y" {
+			if i == 0 || len(words) == 0 {
+				break
+			}
+			if _, esNumero := spanishWordValues[tokens[i-1]]; !esNumero {
+				break
+			}
+			continue
+		}
+		if _, ok := spanishWordValues[token]; !ok {
 			break
 		}
-		words = append([]string{tokens[i]}, words...)
+		words = append([]string{token}, words...)
 	}
 	if len(words) == 0 {
 		return 0, false

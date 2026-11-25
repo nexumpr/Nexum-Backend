@@ -108,6 +108,101 @@ func TestE075NegativosYLocaleSonRechazosDistintos(t *testing.T) {
 	}
 }
 
+// TestE075FormatosEsMXAmpliados cubre los formatos que Android puede enviar desde el
+// reconocimiento local en es-MX: agrupación con coma o punto, símbolo de peso, palabras
+// con el conector «y», fecha en el texto (que NO es un importe), categoría hablada,
+// negativos y cero. Toda interpretación exige confirmación y nada se persiste.
+func TestE075FormatosEsMXAmpliados(t *testing.T) {
+	casos := []struct {
+		texto   string
+		importe string
+	}{
+		{"Pagué 1,234.50 en café", "1234.50"},
+		{"Pagué 1.234,50 en transporte", "1234.50"},
+		{"Gasté $1,234 en café", "1234.00"},
+		{"mil doscientos treinta y cuatro pesos", "1234.00"},
+		{"Gasté cuarenta y cinco pesos en café", "45.00"},
+		{"Pagué 120 en transporte", "120.00"},
+		{"Cincuenta y dos pesos con cincuenta centavos", "52.50"},
+		{"Anteayer gasté 300 en transporte", "300.00"},
+		{"El 5 de noviembre pagué 250 en café", "250.00"},
+		{"Pagué 90.99 el 5 de noviembre de 2026", "90.99"},
+	}
+	for _, caso := range casos {
+		t.Run(caso.texto, func(t *testing.T) {
+			resultado, err := Parse(VoiceParseRequestWire{Text: caso.texto, Locale: LocaleESMX})
+			if err != nil {
+				t.Fatalf("Parse(%q): %v", caso.texto, err)
+			}
+			if resultado.Intent != IntentCreateMovement {
+				t.Fatalf("intent=%q, esperado %q", resultado.Intent, IntentCreateMovement)
+			}
+			if resultado.ParsedAmount != caso.importe {
+				t.Fatalf("importe=%q, esperado %q", resultado.ParsedAmount, caso.importe)
+			}
+			if resultado.Currency != CurrencyMXN || !resultado.RequiresConfirmation {
+				t.Fatalf("respuesta fuera de contrato: %+v", resultado)
+			}
+		})
+	}
+}
+
+// TestE075FechaNoEsImporte comprueba que una fecha hablada o escrita no se convierte en
+// el importe del movimiento: sin cifra monetaria la intención es «unknown» con 0.00.
+func TestE075FechaNoEsImporte(t *testing.T) {
+	for _, texto := range []string{
+		"ayer",
+		"Ayer pagué la luz",
+		"el 5 de noviembre",
+		"El 5 de noviembre de 2026",
+		"el 5/11 pagué la luz",
+		"gasté el 2026-11-05",
+		"hoy",
+	} {
+		t.Run(texto, func(t *testing.T) {
+			resultado, err := Parse(VoiceParseRequestWire{Text: texto, Locale: LocaleESMX})
+			if err != nil {
+				t.Fatalf("Parse(%q): %v", texto, err)
+			}
+			if resultado.Intent != IntentUnknown || resultado.ParsedAmount != "0.00" {
+				t.Fatalf("una fecha no es un importe: %+v", resultado)
+			}
+			if !resultado.RequiresConfirmation || resultado.Currency != CurrencyMXN {
+				t.Fatalf("respuesta fuera de contrato: %+v", resultado)
+			}
+		})
+	}
+}
+
+// TestE075NegativosYCeroAmpliados mantiene separado el rechazo de negocio (422) del
+// resultado ambiguo: cero no es un movimiento y el signo negativo nunca se normaliza.
+func TestE075NegativosYCeroAmpliados(t *testing.T) {
+	for _, texto := range []string{
+		"-1,234.50 en café",
+		"- $50 en transporte",
+		"menos mil pesos",
+		"menos doscientos pesos en café",
+	} {
+		t.Run("negativo "+texto, func(t *testing.T) {
+			if _, err := Parse(VoiceParseRequestWire{Text: texto, Locale: LocaleESMX}); !errors.Is(err, ErrNegativeAmount) {
+				t.Fatalf("%q: esperado ErrNegativeAmount, obtenido %v", texto, err)
+			}
+		})
+	}
+
+	for _, texto := range []string{"0 pesos", "0.00", "$0 en café", "cero pesos", "cero en transporte"} {
+		t.Run("cero "+texto, func(t *testing.T) {
+			resultado, err := Parse(VoiceParseRequestWire{Text: texto, Locale: LocaleESMX})
+			if err != nil {
+				t.Fatalf("Parse(%q): %v", texto, err)
+			}
+			if resultado.Intent != IntentUnknown || resultado.ParsedAmount != "0.00" || !resultado.RequiresConfirmation {
+				t.Fatalf("cero no debe ser un movimiento: %+v", resultado)
+			}
+		})
+	}
+}
+
 // TestE075SinPersistenciaNiEfectos comprueba que el servicio es puro: no tiene
 // dependencias, no muta la entrada y es determinista bajo concurrencia.
 func TestE075SinPersistenciaNiEfectos(t *testing.T) {

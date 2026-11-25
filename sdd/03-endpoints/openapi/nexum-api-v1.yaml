@@ -10987,6 +10987,7 @@ components:
           - daily
           - weekly
           - monthly
+          - null
         active:
           type: boolean
         createdAt:
@@ -12368,6 +12369,7 @@ components:
           - daily
           - weekly
           - monthly
+          - null
           example: monthly
       required:
       - id

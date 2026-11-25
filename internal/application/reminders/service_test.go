@@ -267,3 +267,81 @@ func TestDeleteEsIdempotenteYAisladoPorUsuario(t *testing.T) {
 
 func strPtr(v string) *string { return &v }
 func boolPtr(v bool) *bool    { return &v }
+func freqPtr(v Frequency) *Frequency {
+	copia := v
+	return &copia
+}
+
+// TestE065E066RechazanFrecuenciaFueraDelEnum comprueba que «hourly» (u otro valor no
+// publicado) es una solicitud inválida en creación y en parche: no se persiste, no se
+// normaliza a un valor cercano y la versión no cambia.
+func TestE065E066RechazanFrecuenciaFueraDelEnum(t *testing.T) {
+	svc, store := servicioDePrueba(t)
+
+	_, err := svc.Create(context.Background(), CreateCommand{
+		UserID: "user-a", IdempotencyKey: "clave-idempotencia-frecuencia-01", Title: "Pagar luz",
+		DueAt: "2026-11-24T10:00:00Z", Timezone: "America/Mexico_City",
+		Frequency: freqPtr(Frequency("hourly")),
+	})
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("creación con hourly: esperado ErrInvalidRequest, obtenido %v", err)
+	}
+	if len(store.items) != 0 || len(store.idem) != 0 {
+		t.Fatalf("una frecuencia inválida no debe persistir nada: items=%d idem=%d", len(store.items), len(store.idem))
+	}
+
+	creado := crearDePrueba(t, svc, "user-a", "clave-idempotencia-frecuencia-02", "Ahorro")
+	_, err = svc.Update(context.Background(), PatchCommand{
+		UserID: "user-a", ReminderID: creado.ID, ExpectedVersion: creado.Version,
+		Frequency: FrequencyPatch{Set: true, Value: freqPtr(Frequency("hourly"))},
+	})
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("parche con hourly: esperado ErrInvalidRequest, obtenido %v", err)
+	}
+	actual, err := svc.Get(context.Background(), "user-a", creado.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if actual.Version != creado.Version || actual.Frequency != nil {
+		t.Fatalf("el rechazo no debe mutar el recurso: %+v", actual)
+	}
+}
+
+// TestE066FrecuenciaAusenteConservaYNullCancela separa los dos casos que el contrato
+// distingue: omitir `frequency` conserva la recurrencia; `frequency:null` la cancela.
+func TestE066FrecuenciaAusenteConservaYNullCancela(t *testing.T) {
+	svc, _ := servicioDePrueba(t)
+	svc.WithIDGenerator(func() (string, error) { return "11111111-2222-4333-8444-555555555555", nil })
+	creado, err := svc.Create(context.Background(), CreateCommand{
+		UserID: "user-a", IdempotencyKey: "clave-idempotencia-frecuencia-03", Title: "Ahorro",
+		DueAt: "2026-11-24T10:00:00Z", Timezone: "America/Mexico_City",
+		Frequency: freqPtr(FrequencyWeekly),
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if creado.Frequency == nil || *creado.Frequency != FrequencyWeekly {
+		t.Fatalf("frecuencia inicial: %+v", creado)
+	}
+
+	sinFrecuencia, err := svc.Update(context.Background(), PatchCommand{
+		UserID: "user-a", ReminderID: creado.ID, ExpectedVersion: creado.Version, Title: strPtr("Ahorro vacaciones"),
+	})
+	if err != nil {
+		t.Fatalf("PATCH sin frequency: %v", err)
+	}
+	if sinFrecuencia.Frequency == nil || *sinFrecuencia.Frequency != FrequencyWeekly {
+		t.Fatalf("omitir frequency debe conservar la recurrencia: %+v", sinFrecuencia)
+	}
+
+	cancelada, err := svc.Update(context.Background(), PatchCommand{
+		UserID: "user-a", ReminderID: creado.ID, ExpectedVersion: sinFrecuencia.Version,
+		Frequency: FrequencyPatch{Set: true, Value: nil},
+	})
+	if err != nil {
+		t.Fatalf("PATCH frequency:null: %v", err)
+	}
+	if cancelada.Frequency != nil || cancelada.Version != sinFrecuencia.Version+1 {
+		t.Fatalf("frequency:null debe cancelar y subir la versión: %+v", cancelada)
+	}
+}

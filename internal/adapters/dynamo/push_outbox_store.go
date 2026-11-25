@@ -596,6 +596,10 @@ func (s *PushOutboxStore) MarcarEntregado(ctx context.Context, userID, eventID, 
 			"eventId":        stringAttr(eventID),
 			"notificationID": stringAttr(notificationID),
 			"createdAt":      stringAttr(ahora.UTC().Format(time.RFC3339Nano)),
+			// El dedupe de entrega contiene identificadores vinculables
+			// (userID/eventId/notificationID). TTL de 90 días: evita el residuo
+			// permanente; DynamoDB lo purga de forma best-effort, no exacta.
+			"expiresAt": numberAttr(ahora.UTC().Add(90 * 24 * time.Hour).Unix()),
 		},
 		ConditionExpression: aws.String("attribute_not_exists(PK)"),
 	})

@@ -520,6 +520,21 @@ func TestOUTBOXIdempotenciaYBandejaE061(t *testing.T) {
 		t.Fatal("eventos distintos no deben compartir idempotencia")
 	}
 
+	// El registro de dedupe contiene identificadores vinculables: debe llevar TTL
+	// (90 días) para no quedar permanentemente en la tabla.
+	idem := fake.items[pushOutboxPartition+"|"+pushOutboxIdemSK("u1", "evt-1")]
+	if idem == nil {
+		t.Fatal("no se encontró el registro de idempotencia")
+	}
+	expira, ok := attributeInt(idem["expiresAt"])
+	if !ok {
+		t.Fatal("el dedupe global no declara expiresAt")
+	}
+	esperado := ahora.Add(90 * 24 * time.Hour).Unix()
+	if expira != esperado {
+		t.Fatalf("expiresAt=%d, esperado %d", expira, esperado)
+	}
+
 	if err := store.GuardarBandeja(ctx, pushoutbox.RegistroBandeja{
 		UserID: "u1", ID: "n1", Title: "Aviso", Message: "Mensaje", Type: "REMINDER", CreatedAt: ahora,
 	}); err != nil {

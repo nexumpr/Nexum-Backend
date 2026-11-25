@@ -452,6 +452,13 @@ func remEvaluaCondicion(item map[string]types.AttributeValue, expresion string, 
 			return false, nil
 		}
 		return remTextoEsperado(item, nombres["#skGlobal"], valores[":viejaSK"]), nil
+	case condicionPunteroAgendaHuerfana:
+		// `attribute_not_exists(PK) OR #skGlobal = :ocSK`: el puntero puede no
+		// existir, pero si existe debe seguir apuntando a la ocurrencia retirada.
+		if !remExiste(item) {
+			return true, nil
+		}
+		return remTextoEsperado(item, nombres["#skGlobal"], valores[":ocSK"]), nil
 	default:
 		return false, fmt.Errorf("condición no soportada por el doble de recordatorios: %q", expresion)
 	}

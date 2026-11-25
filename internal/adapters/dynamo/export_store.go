@@ -859,10 +859,13 @@ func exportReminderRow(item map[string]types.AttributeValue, userID string) (app
 		CreatedAt: creado,
 		UpdatedAt: actualizado,
 	}
-	if crudo := strings.TrimSpace(stringAttribute(item["frequency"])); crudo != "" {
-		frecuencia := crudo
-		fila.Frequency = &frecuencia
+	// Frecuencia: ausente o vacía significa «sin recurrencia»; un valor fuera del enum
+	// es un item incoherente y se rechaza aquí, antes de proyectarlo al contrato.
+	frecuencia, valida := appExport.NormalizeReminderFrequency(stringAttribute(item["frequency"]))
+	if !valida {
+		return appExport.ReminderRow{}, appExport.ErrInconsistent
 	}
+	fila.Frequency = frecuencia
 	return fila, nil
 }
 
