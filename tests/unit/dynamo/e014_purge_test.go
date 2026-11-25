@@ -113,6 +113,13 @@ func e014SembrarCuenta(m *purgaDynamo, userID string) []string {
 	m.sembrar(pk, "INCOME", map[string]types.AttributeValue{"entityType": strAttr("USER_INCOME")})
 	m.sembrar(pk, "CONSENT#2026-11-v2", map[string]types.AttributeValue{"entityType": strAttr("USER_CONSENT")})
 	m.sembrar(pk, "MOVEMENT#2026-11-01#a", map[string]types.AttributeValue{"entityType": strAttr("MOVEMENT")})
+	// R-3: el puntero de E031 vive en la partición del titular y no es un puntero global;
+	// E014 debe borrarlo como ítem normal para no dejar un localizador del tombstone.
+	m.sembrar(pk, "MOVEMENTPTR#a", map[string]types.AttributeValue{
+		"entityType": strAttr("MOVEMENT_POINTER"),
+		"movementId": strAttr("a"),
+		"targetSK":   strAttr("MOVEMENT#2026-11-01#a"),
+	})
 	m.sembrar(pk, "GOAL#g", map[string]types.AttributeValue{"entityType": strAttr("GOAL")})
 	m.sembrar(pk, "RECURRING#r", map[string]types.AttributeValue{"entityType": strAttr("RECURRING")})
 	m.sembrar(pk, "IDEM#e014#abc", map[string]types.AttributeValue{"entityType": strAttr("IDEMPOTENCY")})
@@ -148,7 +155,7 @@ func e014SembrarCuenta(m *purgaDynamo, userID string) []string {
 
 	return []string{
 		"PROFILE", "PREFERENCES", "ONBOARDING", "INCOME", "CONSENT#2026-11-v2",
-		"MOVEMENT#2026-11-01#a", "GOAL#g", "RECURRING#r", "IDEM#e014#abc", "SESSION#s1",
+		"MOVEMENT#2026-11-01#a", "MOVEMENTPTR#a", "GOAL#g", "RECURRING#r", "IDEM#e014#abc", "SESSION#s1",
 	}
 }
 
@@ -266,6 +273,9 @@ func TestE014PurgaCompletaTombstone(t *testing.T) {
 	control := e014Control(m, e014Usuario, e014RequestID)
 	if estado := stringAttrDe(control, "state"); estado != appAccount.PurgeStatePurged {
 		t.Fatalf("estado esperado PURGED, obtenido %q", estado)
+	}
+	if resto := m.leer(domainDynamo.PrefixUser+e014Usuario, "MOVEMENTPTR#a"); resto != nil {
+		t.Fatalf("E014 debe purgar el puntero MOVEMENTPTR# del tombstone de E031")
 	}
 	if requestID := stringAttrDe(control, "requestId"); requestID != e014RequestID {
 		t.Fatalf("el tombstone conserva requestId, obtenido %q", requestID)

@@ -15,6 +15,7 @@ import (
 	"github.com/nexumpr/Nexum-Backend/internal/infrastructure/telemetry"
 	transporthttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 	"github.com/nexumpr/Nexum-Backend/internal/transport/http/middleware"
+	"github.com/nexumpr/Nexum-Backend/pkg/httputil"
 )
 
 // TestTraceContextPropagationAndCorrelation valida AC-A-090-01:
@@ -115,7 +116,7 @@ func TestReadinessProbeDegradation503(t *testing.T) {
 		return nil
 	})
 
-	// Caso 1: Todas las dependencias sanas -> 200 OK
+	// Caso 1: Todas las dependencias sanas -> 200 OK con el esquema Health.
 	{
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/health/ready", nil)
 		rec := httptest.NewRecorder()
@@ -125,12 +126,15 @@ func TestReadinessProbeDegradation503(t *testing.T) {
 			t.Fatalf("Esperaba 200 OK cuando todo sano, obtuvo %d", rec.Code)
 		}
 
-		var resp transporthttp.ReadyResponse
+		var resp transporthttp.HealthResponse
 		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 			t.Fatalf("Error al deserializar respuesta: %v", err)
 		}
-		if resp.Status != "UP" || resp.Dependencies["dynamodb"] != "UP" || resp.Dependencies["redis"] != "UP" {
+		if resp.Status != "ok" || resp.Service != transporthttp.HealthServiceName {
 			t.Errorf("Respuesta inesperada cuando todo sano: %+v", resp)
+		}
+		if _, err := time.Parse(time.RFC3339, resp.Timestamp); err != nil {
+			t.Errorf("timestamp no RFC3339: %q", resp.Timestamp)
 		}
 	}
 
@@ -138,6 +142,7 @@ func TestReadinessProbeDegradation503(t *testing.T) {
 	{
 		redisHealthy = false
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/health/ready", nil)
+		req.Header.Set(telemetry.RequestIDHeader, "trace-readiness-degradada")
 		rec := httptest.NewRecorder()
 		registry.ReadyHandler().ServeHTTP(rec, req)
 
@@ -145,20 +150,20 @@ func TestReadinessProbeDegradation503(t *testing.T) {
 			t.Fatalf("AC-A-090-02 Fallo: Esperaba 503 con Redis caído, obtuvo %d", rec.Code)
 		}
 
-		var resp transporthttp.ReadyResponse
-		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("Error al deserializar respuesta: %v", err)
+		var envelope httputil.ErrorEnvelope
+		if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+			t.Fatalf("Error al deserializar ErrorEnvelope: %v", err)
 		}
-		if resp.Status != "DOWN" {
-			t.Errorf("Esperaba status DOWN en ready degradado, obtuvo %s", resp.Status)
+		if envelope.Error.Code != "DEPENDENCY_UNAVAILABLE" || envelope.Error.TraceID != "trace-readiness-degradada" {
+			t.Errorf("Envelope inesperado en ready degradado: %+v", envelope)
 		}
-		if resp.Dependencies["redis"] != "DOWN" || resp.Dependencies["dynamodb"] != "UP" {
-			t.Errorf("Mapeo de dependencias incorrecto: %+v", resp)
+		if strings.Contains(rec.Body.String(), "dependencies") {
+			t.Errorf("la respuesta 503 no debe exponer dependencias: %s", rec.Body.String())
 		}
 		t.Logf("AC-A-090-02 Verificado: ready=503 cuando Redis se encuentra degradado")
 	}
 
-	// Caso 3: Liveness probe (/live) siempre responde 200 UP independientemente de dependencias
+	// Caso 3: Liveness probe (/live) siempre responde 200 ok independientemente de dependencias
 	{
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/health/live", nil)
 		rec := httptest.NewRecorder()
@@ -167,7 +172,11 @@ func TestReadinessProbeDegradation503(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Errorf("Liveness probe /live debe ser 200 incluso con dependencias caídas, obtuvo %d", rec.Code)
 		}
-		if !strings.Contains(rec.Body.String(), `"status":"UP"`) {
+		var resp transporthttp.HealthResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("cuerpo de /live no es JSON: %v", err)
+		}
+		if resp.Status != "ok" || resp.Service != transporthttp.HealthServiceName {
 			t.Errorf("Cuerpo de /live inesperado: %s", rec.Body.String())
 		}
 	}

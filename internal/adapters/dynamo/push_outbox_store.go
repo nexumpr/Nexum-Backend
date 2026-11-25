@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"github.com/nexumpr/Nexum-Backend/internal/application/pushoutbox"
+	domainDeletion "github.com/nexumpr/Nexum-Backend/internal/domain/deletion"
 	domainDynamo "github.com/nexumpr/Nexum-Backend/internal/domain/dynamo"
 )
 
@@ -47,6 +49,21 @@ import (
 // La idempotencia por eventId+userID vive en la MISMA partición con
 // SK IDEM#<sha256>. La bandeja E061 se escribe aparte en
 // USER#<sub>/NOTIFICATION#<UTC>#<id>.
+//
+// Los reprocesos no reescriben la clave: `nextAttemptAt` es el atributo
+// autoritativo y se filtra en la consulta. La idempotencia por
+// eventId+userID vive en la MISMA partición con SK IDEM#<sha256>.
+// La bandeja E061 se escribe aparte en USER#<sub>/NOTIFICATION#<UTC>#<id>.
+//
+// Puntero de purga (contrato en `dist/transversal/CONTRATO_PUNTEROS.md`):
+//
+//	PK = USER#<sub>
+//	SK = OUTBOXPTR#<notificationID>
+//	skGlobal = <SK del ítem en OUTBOX#GLOBAL>
+//
+// Se escribe en la MISMA transacción que el ítem global y se retira cuando el
+// trabajo termina. Así E014 purga el outbox sin `Scan` y sin tocar datos de
+// otras cuentas.
 const (
 	pushOutboxPartition        = "OUTBOX#GLOBAL"
 	pushOutboxDuePrefix        = "DUE#"
@@ -65,6 +82,15 @@ const (
 	// pushOutboxPaginasMax acota el barrido por ciclo. Sin este tope, un
 	// backlog patológico de ítems no elegibles retendría al worker.
 	pushOutboxPaginasMax = 5
+
+	// Puntero de purga dentro de la partición del titular.
+	pushOutboxPointerPrefix = "OUTBOXPTR#"
+	pushOutboxPointerEntity = "PUSH_OUTBOX_POINTER"
+
+	// estadoPerfilActivo es el único estado del perfil que autoriza encolar y enviar
+	// (E002/E003). `DELETION_PENDING` o la ausencia del perfil bloquean ambas acciones:
+	// es la garantía de que ni el productor ni el worker recrean datos tras el tombstone.
+	estadoPerfilActivo = "ACTIVE"
 )
 
 var (
@@ -73,6 +99,11 @@ var (
 	ErrOutboxNoDisponible = errors.New("outbox push no disponible")
 	// ErrConflictoLease significa que otro nodo ganó la reclamación.
 	ErrConflictoLease = errors.New("conflicto de lease del outbox push")
+	// ErrCuentaNoActiva indica que el titular no está ACTIVE (eliminado o en purga).
+	// El trabajo no se encola: se falla cerrado en lugar de crear datos de una cuenta
+	// dada de baja. Envuelve pushoutbox.ErrCuentaNoActiva para que la señal cruce el
+	// puerto de aplicación sin que ésta importe este paquete.
+	ErrCuentaNoActiva = fmt.Errorf("la cuenta no esta activa: %w", pushoutbox.ErrCuentaNoActiva)
 )
 
 // PushOutboxAPI es el subconjunto de DynamoDB que usa el outbox. No incluye
@@ -83,6 +114,7 @@ type PushOutboxAPI interface {
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
+	DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
 	TransactWriteItems(ctx context.Context, params *dynamodb.TransactWriteItemsInput, optFns ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error)
 }
 
@@ -169,6 +201,11 @@ func pushOutboxIdemSK(userID, eventID string) string {
 	return pushOutboxIdemPrefix + hex.EncodeToString(suma[:])
 }
 
+// pushOutboxPointerKeys devuelve la clave del puntero de purga del titular.
+func pushOutboxPointerKeys(userID, notificationID string) (string, string) {
+	return domainDynamo.PrefixUser + strings.TrimSpace(userID), pushOutboxPointerPrefix + strings.TrimSpace(notificationID)
+}
+
 func pushOutboxAhora(s *PushOutboxStore) time.Time {
 	if s != nil && s.now != nil {
 		return s.now().UTC()
@@ -180,8 +217,13 @@ func (s *PushOutboxStore) disponible() bool {
 	return s != nil && s.client != nil && s.table != ""
 }
 
-// Crear inserta el trabajo de forma condicional. Devuelve false si ya existía
-// la misma clave (replay legítimo), sin sobrescribir su estado.
+// Crear inserta el trabajo de forma condicional y, en la MISMA transacción, su puntero de
+// purga y la comprobación de que el titular sigue ACTIVE. Devuelve false si ya existía la
+// misma clave (replay legítimo), sin sobrescribir su estado.
+//
+// El `ConditionCheck` sobre `USER#<sub>/PROFILE` es la garantía de que ni un evento tardío
+// ni un reintento del productor recrean datos de una cuenta eliminada: tras el tombstone el
+// perfil deja de estar ACTIVE y la transacción se cancela con ErrCuentaNoActiva.
 func (s *PushOutboxStore) Crear(ctx context.Context, registro pushoutbox.Registro) (bool, error) {
 	if !s.disponible() {
 		return false, ErrOutboxNoDisponible
@@ -195,9 +237,10 @@ func (s *PushOutboxStore) Crear(ctx context.Context, registro pushoutbox.Registr
 		registro.CreatedAt = ahora
 	}
 	registro.UpdatedAt = ahora
+	skGlobal := pushOutboxSK(due, registro.NotificationID)
 	item := map[string]types.AttributeValue{
 		"PK":             stringAttr(pushOutboxPartition),
-		"SK":             stringAttr(pushOutboxSK(due, registro.NotificationID)),
+		"SK":             stringAttr(skGlobal),
 		"entityType":     stringAttr(pushOutboxEntityType),
 		"userID":         stringAttr(registro.UserID),
 		"notificationID": stringAttr(registro.NotificationID),
@@ -212,16 +255,51 @@ func (s *PushOutboxStore) Crear(ctx context.Context, registro pushoutbox.Registr
 		"createdAt":      stringAttr(pushOutboxInstante(registro.CreatedAt)),
 		"updatedAt":      stringAttr(pushOutboxInstante(ahora)),
 	}
-	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName:           aws.String(s.table),
-		Item:                item,
-		ConditionExpression: aws.String("attribute_not_exists(PK)"),
+
+	pointerPK, pointerSK := pushOutboxPointerKeys(registro.UserID, registro.NotificationID)
+	pointer := map[string]types.AttributeValue{
+		"PK":             stringAttr(pointerPK),
+		"SK":             stringAttr(pointerSK),
+		"entityType":     stringAttr(pushOutboxPointerEntity),
+		"userID":         stringAttr(strings.TrimSpace(registro.UserID)),
+		"notificationID": stringAttr(registro.NotificationID),
+		"skGlobal":       stringAttr(skGlobal),
+		"createdAt":      stringAttr(registro.CreatedAt.UTC().Format(time.RFC3339Nano)),
+	}
+	perfilPK, perfilSK := domainDynamo.UserKeys(strings.TrimSpace(registro.UserID))
+
+	_, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{
+			{Put: &types.Put{
+				TableName:           aws.String(s.table),
+				Item:                item,
+				ConditionExpression: aws.String("attribute_not_exists(PK)"),
+			}},
+			{Put: &types.Put{
+				TableName:           aws.String(s.table),
+				Item:                pointer,
+				ConditionExpression: aws.String("attribute_not_exists(PK)"),
+			}},
+			{ConditionCheck: &types.ConditionCheck{
+				TableName:                 aws.String(s.table),
+				Key:                       map[string]types.AttributeValue{"PK": stringAttr(perfilPK), "SK": stringAttr(perfilSK)},
+				ConditionExpression:       aws.String("#estado = :activo"),
+				ExpressionAttributeNames:  map[string]string{"#estado": "status"},
+				ExpressionAttributeValues: map[string]types.AttributeValue{":activo": stringAttr(estadoPerfilActivo)},
+			}},
+		},
 	})
 	if err == nil {
 		return true, nil
 	}
-	var condicional *types.ConditionalCheckFailedException
-	if errors.As(err, &condicional) {
+	var cancelada *types.TransactionCanceledException
+	if errors.As(err, &cancelada) {
+		// El perfil no ACTIVE cancela la transacción completa: no se crea ni el ítem
+		// global ni el puntero.
+		if pushFailureCode(cancelada.CancellationReasons, 2) == "ConditionalCheckFailed" {
+			return false, ErrCuentaNoActiva
+		}
+		// Un replay de la misma clave (ítem global o puntero ya presentes) es inocuo.
 		return false, nil
 	}
 	return false, ErrOutboxNoDisponible
@@ -305,11 +383,41 @@ func pushOutboxElegible(registro pushoutbox.Registro, ahora time.Time) bool {
 
 // Reclamar toma el lease bajo condición: sólo si está pendiente/fallido, ya
 // venció y nadie lo tiene arrendado. Devuelve el número de intento resultante.
+//
+// Antes de reclamar se comprueba el estado del titular (`USER#<sub>/PROFILE`). Si la cuenta
+// no está ACTIVE (eliminada o en purga) NO se envía nada: el trabajo y su puntero se retiran
+// del outbox para no conservar contenido de una cuenta dada de baja. Ese es el punto exacto
+// que impide al worker recrear o servir datos después del tombstone.
 func (s *PushOutboxStore) Reclamar(ctx context.Context, id string, ahora time.Time, lease time.Duration) (int, bool, error) {
 	if !s.disponible() {
 		return 0, false, ErrOutboxNoDisponible
 	}
 	ahora = ahora.UTC()
+	item, errLectura := s.leerGlobal(ctx, id)
+	if errLectura != nil {
+		return 0, false, ErrOutboxNoDisponible
+	}
+	if len(item) == 0 {
+		return 0, false, nil
+	}
+	userID := strings.TrimSpace(stringAttribute(item["userID"]))
+	notificationID := strings.TrimSpace(stringAttribute(item["notificationID"]))
+	activo, errPerfil := s.perfilActivo(ctx, userID)
+	if errPerfil != nil {
+		return 0, false, ErrOutboxNoDisponible
+	}
+	if !activo {
+		// Retención por baja de cuenta: se cancela el trabajo antes de cualquier envío.
+		if userID == "" {
+			_, _ = s.borrarGlobal(ctx, id, ahora)
+			return 0, false, nil
+		}
+		if err := s.descartarTrabajo(ctx, id, userID, notificationID, ahora); err != nil {
+			return 0, false, ErrOutboxNoDisponible
+		}
+		return 0, false, nil
+	}
+
 	out, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(s.table),
 		Key: map[string]types.AttributeValue{
@@ -353,6 +461,111 @@ func (s *PushOutboxStore) Reclamar(ctx context.Context, id string, ahora time.Ti
 		}
 	}
 	return int(intentos), true, nil
+}
+
+// leerGlobal lee el ítem del outbox con consistencia fuerte.
+func (s *PushOutboxStore) leerGlobal(ctx context.Context, id string) (map[string]types.AttributeValue, error) {
+	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(pushOutboxPartition),
+			"SK": stringAttr(id),
+		},
+		ConsistentRead: aws.Bool(true),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if out == nil {
+		return nil, nil
+	}
+	return out.Item, nil
+}
+
+// perfilActivo comprueba con consistencia fuerte que el titular sigue ACTIVE. Un perfil
+// ausente cuenta como inactivo: tras la purga no existe y no se puede autorizar un envío.
+func (s *PushOutboxStore) perfilActivo(ctx context.Context, userID string) (bool, error) {
+	if strings.TrimSpace(userID) == "" {
+		return false, nil
+	}
+	pk, sk := domainDynamo.UserKeys(strings.TrimSpace(userID))
+	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(pk),
+			"SK": stringAttr(sk),
+		},
+		ConsistentRead: aws.Bool(true),
+	})
+	if err != nil {
+		return false, err
+	}
+	if out == nil || len(out.Item) == 0 {
+		return false, nil
+	}
+	return stringAttribute(out.Item["status"]) == estadoPerfilActivo, nil
+}
+
+// descartarTrabajo retira un trabajo de una cuenta no activa: primero el ítem global (con
+// condición de ausencia de lease) y sólo después el puntero. Si el global no se pudo borrar
+// porque otro nodo lo reclamó, el puntero se conserva para que E014 lo resuelva al vencer
+// el lease.
+func (s *PushOutboxStore) descartarTrabajo(ctx context.Context, id, userID, notificationID string, ahora time.Time) error {
+	borrado, err := s.borrarGlobal(ctx, id, ahora)
+	if err != nil {
+		return err
+	}
+	if !borrado {
+		return nil
+	}
+	return s.borrarPuntero(ctx, userID, notificationID)
+}
+
+// borrarGlobal borra el ítem del outbox si no tiene un envío en curso.
+func (s *PushOutboxStore) borrarGlobal(ctx context.Context, id string, ahora time.Time) (bool, error) {
+	_, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(pushOutboxPartition),
+			"SK": stringAttr(id),
+		},
+		ConditionExpression: aws.String("attribute_exists(PK) AND (attribute_not_exists(#owner) OR #lease < :ahora)"),
+		ExpressionAttributeNames: map[string]string{
+			"#owner": "owner",
+			"#lease": "leaseUntil",
+		},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":ahora": stringAttr(ahora.UTC().Format(time.RFC3339Nano)),
+		},
+	})
+	if err == nil {
+		return true, nil
+	}
+	var condicional *types.ConditionalCheckFailedException
+	if errors.As(err, &condicional) {
+		return false, nil
+	}
+	return false, ErrOutboxNoDisponible
+}
+
+// borrarPuntero retira el puntero de purga del titular. Es idempotente: si no existe, la
+// operación no tiene efecto.
+func (s *PushOutboxStore) borrarPuntero(ctx context.Context, userID, notificationID string) error {
+	if strings.TrimSpace(userID) == "" || strings.TrimSpace(notificationID) == "" {
+		return nil
+	}
+	pk, sk := pushOutboxPointerKeys(userID, notificationID)
+	_, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(pk),
+			"SK": stringAttr(sk),
+		},
+	})
+	if err != nil {
+		return ErrOutboxNoDisponible
+	}
+	return nil
 }
 
 // MarcarEnviado cierra el trabajo sólo si este nodo sigue siendo el dueño del lease.
@@ -420,27 +633,59 @@ func (s *PushOutboxStore) Reprogramar(ctx context.Context, id string, attempts i
 	delete(nuevo, "leaseUntil")
 	delete(nuevo, "owner")
 
-	_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-		TransactItems: []types.TransactWriteItem{
-			{Put: &types.Put{
+	acciones := []types.TransactWriteItem{
+		{Put: &types.Put{
+			TableName:           aws.String(s.table),
+			Item:                nuevo,
+			ConditionExpression: aws.String("attribute_not_exists(PK)"),
+		}},
+		{Delete: &types.Delete{
+			TableName:           aws.String(s.table),
+			Key:                 map[string]types.AttributeValue{"PK": stringAttr(pushOutboxPartition), "SK": stringAttr(id)},
+			ConditionExpression: aws.String("#owner = :owner AND #intentos = :intentos"),
+			ExpressionAttributeNames: map[string]string{
+				"#owner":    "owner",
+				"#intentos": "attempts",
+			},
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":owner":    stringAttr(s.owner),
+				":intentos": numberAttr(pushOutboxIntentos(item)),
+			},
+		}},
+	}
+
+	// El puntero de purga guarda la SK global: si el trabajo se mueve, el puntero
+	// debe moverse con él en la MISMA transacción; de lo contrario E014 buscaría
+	// una SK ya borrada y dejaría el global huérfano. Los ítems históricos sin
+	// puntero (creados antes del contrato) no lo crean aquí: se migran al
+	// reprogramarse sólo si ya existía.
+	userIDItem := strings.TrimSpace(stringAttribute(item["userID"]))
+	if userIDItem != "" && idNotificacion != "" {
+		punteroPK, punteroSK := pushOutboxPointerKeys(userIDItem, idNotificacion)
+		puntero, errPuntero := s.leerItemPorClave(ctx, punteroPK, punteroSK)
+		if errPuntero != nil {
+			return errPuntero
+		}
+		if puntero != nil {
+			acciones = append(acciones, types.TransactWriteItem{Update: &types.Update{
 				TableName:           aws.String(s.table),
-				Item:                nuevo,
-				ConditionExpression: aws.String("attribute_not_exists(PK)"),
-			}},
-			{Delete: &types.Delete{
-				TableName:           aws.String(s.table),
-				Key:                 map[string]types.AttributeValue{"PK": stringAttr(pushOutboxPartition), "SK": stringAttr(id)},
-				ConditionExpression: aws.String("#owner = :owner AND #intentos = :intentos"),
+				Key:                 map[string]types.AttributeValue{"PK": stringAttr(punteroPK), "SK": stringAttr(punteroSK)},
+				UpdateExpression:    aws.String("SET #skGlobal = :nueva, #dueAt = :siguiente"),
+				ConditionExpression: aws.String("#skGlobal = :vieja"),
 				ExpressionAttributeNames: map[string]string{
-					"#owner":    "owner",
-					"#intentos": "attempts",
+					"#skGlobal": "skGlobal", "#dueAt": "dueAt",
 				},
 				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":owner":    stringAttr(s.owner),
-					":intentos": numberAttr(pushOutboxIntentos(item)),
+					":nueva":     stringAttr(nuevaSK),
+					":vieja":     stringAttr(id),
+					":siguiente": stringAttr(pushOutboxInstante(siguiente)),
 				},
-			}},
-		},
+			}})
+		}
+	}
+
+	_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: acciones,
 	})
 	if err == nil {
 		return nil
@@ -453,6 +698,22 @@ func (s *PushOutboxStore) Reprogramar(ctx context.Context, id string, attempts i
 		return ErrConflictoLease
 	}
 	return ErrOutboxNoDisponible
+}
+
+// leerItemPorClave devuelve un ítem por PK/SK con lectura consistente.
+func (s *PushOutboxStore) leerItemPorClave(ctx context.Context, pk, sk string) (map[string]types.AttributeValue, error) {
+	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName:      aws.String(s.table),
+		ConsistentRead: aws.Bool(true),
+		Key:            map[string]types.AttributeValue{"PK": stringAttr(pk), "SK": stringAttr(sk)},
+	})
+	if err != nil {
+		return nil, ErrOutboxNoDisponible
+	}
+	if out == nil || len(out.Item) == 0 {
+		return nil, nil
+	}
+	return out.Item, nil
 }
 
 // leerItem devuelve el ítem completo con lectura consistente. Un ítem ausente se
@@ -515,7 +776,7 @@ func (s *PushOutboxStore) actualizarCierre(ctx context.Context, id string, estad
 		valores[":intentos"] = numberAttr(int64(reprogramacion.intentos))
 		valores[":siguiente"] = stringAttr(pushOutboxInstante(reprogramacion.siguiente))
 	}
-	_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+	salida, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(s.table),
 		Key: map[string]types.AttributeValue{
 			"PK": stringAttr(pushOutboxPartition),
@@ -525,6 +786,7 @@ func (s *PushOutboxStore) actualizarCierre(ctx context.Context, id string, estad
 		ConditionExpression:       aws.String("#owner = :owner"),
 		ExpressionAttributeNames:  nombres,
 		ExpressionAttributeValues: valores,
+		ReturnValues:              types.ReturnValueAllOld,
 	})
 	if err != nil {
 		var condicional *types.ConditionalCheckFailedException
@@ -532,6 +794,17 @@ func (s *PushOutboxStore) actualizarCierre(ctx context.Context, id string, estad
 			return ErrConflictoLease
 		}
 		return ErrOutboxNoDisponible
+	}
+	if estado == pushoutbox.EstadoEnviado || estado == pushoutbox.EstadoRevocado {
+		// Trabajo terminado: el ítem global ya no debe conservar título ni mensaje y su
+		// puntero dejaría de tener sentido. Se retiran ambos (idempotente). El registro de
+		// idempotencia `IDEM#` (sin contenido personal) permanece.
+		_, _ = s.borrarGlobal(ctx, id, ahora)
+		if salida != nil {
+			userID := strings.TrimSpace(stringAttribute(salida.Attributes["userID"]))
+			notificationID := strings.TrimSpace(stringAttribute(salida.Attributes["notificationID"]))
+			_ = s.borrarPuntero(ctx, userID, notificationID)
+		}
 	}
 	return nil
 }
@@ -554,8 +827,15 @@ func (s *PushOutboxStore) YaEntregado(ctx context.Context, userID, eventID strin
 	return out != nil && len(out.Item) > 0, nil
 }
 
-// MarcarEntregado graba el hecho de entrega con escritura condicional. Un replay
-// no altera el registro existente.
+// MarcarEntregado graba el hecho de entrega en una transacción de dos `Put`
+// condicionados: el registro de dedupe (partición del servicio) y su puntero de purga en
+// la partición del titular. Un replay no altera ninguno de los dos.
+//
+// El puntero `USER#<sub>/DELIVERYPTR#<sha256(eventId)>` es lo que permite a E014 borrar el
+// dedupe sin `Scan`: el registro global vincula userID, eventId y notificationID y sólo
+// caducaría por TTL, de modo que sin puntero sería inalcanzable desde la partición del
+// titular. El puntero guarda el `eventId` (identificador del evento, no dato financiero) y
+// la clave global exacta (`skGlobal`); ambos vencen a los 90 días.
 func (s *PushOutboxStore) MarcarEntregado(ctx context.Context, userID, eventID, notificationID string, ahora time.Time) error {
 	if !s.disponible() {
 		return ErrOutboxNoDisponible
@@ -563,24 +843,84 @@ func (s *PushOutboxStore) MarcarEntregado(ctx context.Context, userID, eventID, 
 	if ahora.IsZero() {
 		ahora = pushOutboxAhora(s)
 	}
-	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(s.table),
-		Item: map[string]types.AttributeValue{
-			"PK":             stringAttr(pushOutboxPartition),
-			"SK":             stringAttr(pushOutboxIdemSK(userID, eventID)),
-			"entityType":     stringAttr(pushOutboxIdemEntityType),
-			"userID":         stringAttr(userID),
-			"eventId":        stringAttr(eventID),
-			"notificationID": stringAttr(notificationID),
-			"createdAt":      stringAttr(ahora.UTC().Format(time.RFC3339Nano)),
+	idemSK := pushOutboxIdemSK(userID, eventID)
+	dedupe := map[string]types.AttributeValue{
+		"PK":             stringAttr(pushOutboxPartition),
+		"SK":             stringAttr(idemSK),
+		"entityType":     stringAttr(pushOutboxIdemEntityType),
+		"userID":         stringAttr(userID),
+		"eventId":        stringAttr(eventID),
+		"notificationID": stringAttr(notificationID),
+		"createdAt":      stringAttr(ahora.UTC().Format(time.RFC3339Nano)),
+		// El dedupe de entrega contiene identificadores vinculables
+		// (userID/eventId/notificationID). TTL de 90 días: evita el residuo
+		// permanente; DynamoDB lo purga de forma best-effort, no exacta.
+		"expiresAt": numberAttr(ahora.UTC().Add(90 * 24 * time.Hour).Unix()),
+	}
+	punteroPK, punteroSK := domainDeletion.DeliveryPointerKeys(userID, eventID)
+	puntero := map[string]types.AttributeValue{
+		"PK":         stringAttr(punteroPK),
+		"SK":         stringAttr(punteroSK),
+		"entityType": stringAttr(domainDeletion.EntityDeliveryPointer),
+		"userID":     stringAttr(strings.TrimSpace(userID)),
+		"eventId":    stringAttr(strings.TrimSpace(eventID)),
+		"skGlobal":   stringAttr(idemSK),
+		"createdAt":  stringAttr(ahora.UTC().Format(time.RFC3339Nano)),
+		// El puntero debe sobrevivir al dedupe: el TTL de DynamoDB es asíncrono y no
+		// garantiza orden. Mismo vencimiento que el registro global.
+		"expiresAt": numberAttr(ahora.UTC().Add(90 * 24 * time.Hour).Unix()),
+	}
+	_, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{
+			{Put: &types.Put{
+				TableName:           aws.String(s.table),
+				Item:                dedupe,
+				ConditionExpression: aws.String("attribute_not_exists(PK)"),
+			}},
+			{Put: &types.Put{
+				TableName:           aws.String(s.table),
+				Item:                puntero,
+				ConditionExpression: aws.String("attribute_not_exists(PK)"),
+			}},
 		},
-		ConditionExpression: aws.String("attribute_not_exists(PK)"),
 	})
 	if err == nil {
 		return nil
 	}
+	var cancelada *types.TransactionCanceledException
+	if !errors.As(err, &cancelada) {
+		return ErrOutboxNoDisponible
+	}
+	// Cancelación = replay legítimo o residuo parcial; nunca es un error fatal.
+	// El dedupe es la autoridad de idempotencia: si existe, la entrega ya estaba
+	// registrada y no se modifica nada.
+	out, errLectura := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(pushOutboxPartition),
+			"SK": stringAttr(idemSK),
+		},
+		ConsistentRead: aws.Bool(true),
+	})
+	if errLectura != nil {
+		return ErrOutboxNoDisponible
+	}
+	if out != nil && len(out.Item) > 0 {
+		return nil
+	}
+	// Sólo existía el puntero (residuo parcial o TTL asíncrono del dedupe): se completa
+	// el dedupe por separado, condicionado, para no perder la marca de entrega. Si otra
+	// ejecución lo crea antes, la condición falla y el resultado sigue siendo un replay.
+	_, errDedupe := s.client.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName:           aws.String(s.table),
+		Item:                dedupe,
+		ConditionExpression: aws.String("attribute_not_exists(PK)"),
+	})
+	if errDedupe == nil {
+		return nil
+	}
 	var condicional *types.ConditionalCheckFailedException
-	if errors.As(err, &condicional) {
+	if errors.As(errDedupe, &condicional) {
 		return nil
 	}
 	return ErrOutboxNoDisponible

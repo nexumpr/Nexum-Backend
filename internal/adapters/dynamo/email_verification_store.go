@@ -2,7 +2,6 @@ package dynamo
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
+	domainDeletion "github.com/nexumpr/Nexum-Backend/internal/domain/deletion"
 	domainDynamo "github.com/nexumpr/Nexum-Backend/internal/domain/dynamo"
 )
 
@@ -94,7 +94,9 @@ func (s *EmailVerificationStore) LoadEmailVerificationProfile(ctx context.Contex
 }
 
 // SaveEmailVerificationToken escribe `ONE_USE#<sha256(token)>/VERIFY` con
-// `attribute_not_exists(PK)`: nunca sobrescribe un token existente y solo persiste el hash.
+// `attribute_not_exists(PK)` y, en la MISMA transacción, el puntero de purga
+// `USER#<sub>/TOKENPTR#<sha256(token)>`: nunca sobrescribe un token existente, sólo persiste
+// el hash y la purga puede borrar el token global sin `Scan` si el titular se da de baja.
 func (s *EmailVerificationStore) SaveEmailVerificationToken(ctx context.Context, token appIdentity.EmailVerificationToken) error {
 	if s == nil || s.client == nil || s.table == "" {
 		return appIdentity.ErrEmailVerificationNoDisponible
@@ -114,14 +116,27 @@ func (s *EmailVerificationStore) SaveEmailVerificationToken(ctx context.Context,
 	item["expiresAtISO"] = stringAttr(token.ExpiresAt.UTC().Format(time.RFC3339))
 	item["used"] = boolAttr(false)
 
-	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName:           aws.String(s.table),
-		Item:                item,
-		ConditionExpression: aws.String("attribute_not_exists(PK)"),
-	})
+	acciones := []types.TransactWriteItem{
+		{Put: &types.Put{
+			TableName:           aws.String(s.table),
+			Item:                item,
+			ConditionExpression: aws.String("attribute_not_exists(PK)"),
+		}},
+	}
+	puntero, ok := punteroDeToken(token.UserID, domainDeletion.TokenFamilyOneUse, token.TokenHash, token.ExpiresAt, token.CreatedAt)
+	if !ok {
+		// Sin una clave de token o de titular válida no se crea nada: un token sin puntero
+		// sería invisible para la purga y sobreviviría por TTL sin poder borrarse.
+		return appIdentity.ErrEmailVerificationNoDisponible
+	}
+	acciones = append(acciones, types.TransactWriteItem{Put: &types.Put{
+		TableName: aws.String(s.table),
+		Item:      puntero,
+	}})
+
+	_, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: acciones})
 	if err != nil {
-		var condicional *types.ConditionalCheckFailedException
-		if errors.As(err, &condicional) {
+		if transactionItemFailed(err, 0) {
 			return appIdentity.ErrEmailVerificationTokenDuplicado
 		}
 		return appIdentity.ErrEmailVerificationNoDisponible

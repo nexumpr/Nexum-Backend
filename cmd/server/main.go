@@ -235,6 +235,22 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	depsOleada4.Preferencias = preferenciasWorkerOleada4(depsOleada4)
 	montarOleada4(depsOleada4)
 
+	// Oleada 5: registro cerrado E021/E064-E067/E074/E075. E072/E073 ya están
+	// montados por RegisterHealth y no se duplican aquí. Sólo se registran los
+	// E-ID con implementación presente; sin dependencias reales responden 503.
+	depsOleada5 := &dependenciasOleada5{
+		Router:      router,
+		Dynamo:      dynamoAPI,
+		Redis:       clienteRedis,
+		Tabla:       cfgDeps.TablaDynamoDB,
+		Logger:      logger,
+		Tokens:      verificadorTokens,
+		Authorizer:  logoutStore,
+		CursorKey:   claveCursorDesdeEntorno(),
+		DemoEnabled: demoHabilitadoOleada5(),
+	}
+	montarOleada5(depsOleada5)
+
 	// E063: el worker durable procesa la cola READALL fuera de la petición. Sin
 	// persistencia no se arranca; el endpoint seguiría aceptando trabajo que nadie
 	// ejecutaría, por lo que el fallo se registra y no se simula.
@@ -259,6 +275,17 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 		} else {
 			defer cerrarFCM()
 		}
+	}
+
+	// Scheduler durable de recordatorios (Oleada 5): recupera ocurrencias vencidas,
+	// las encola en el outbox push y avanza la siguiente. Sin DynamoDB/tabla no se
+	// inicia; el resto del servidor sigue disponible.
+	cerrarScheduler, errScheduler := iniciarSchedulerOleada5(ctx, depsOleada5)
+	if errScheduler != nil {
+		logger.WarnContext(ctx, "scheduler Oleada 5: no iniciado",
+			slog.String("clase", "SCHEDULER_NO_INICIADO"))
+	} else {
+		defer cerrarScheduler()
 	}
 
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)

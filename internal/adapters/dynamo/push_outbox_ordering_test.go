@@ -43,6 +43,7 @@ func crearTrabajo(t *testing.T, store *PushOutboxStore, id string, vence time.Ti
 // Los 20 deben entregarse en <= 5 páginas, sin saltos ni pérdidas.
 func TestOUTBOXBacklogDeReprogramadosNoProduceInanicion(t *testing.T) {
 	fake := nuevoOutboxFake()
+	sembrarPerfilActivo(fake, "u1")
 	store := NewPushOutboxStore(fake, "NEXUM_CORE_TEST")
 	ahora := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
 
@@ -100,6 +101,7 @@ func TestOUTBOXBacklogDeReprogramadosNoProduceInanicion(t *testing.T) {
 // futuro, sin depender de que se drenen los primeros.
 func TestOUTBOXNewPendienteVisibleConCienFuturos(t *testing.T) {
 	fake := nuevoOutboxFake()
+	sembrarPerfilActivo(fake, "u1")
 	store := NewPushOutboxStore(fake, "NEXUM_CORE_TEST")
 	ahora := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
 	for i := 0; i < 100; i++ {
@@ -127,6 +129,7 @@ func TestOUTBOXNewPendienteVisibleConCienFuturos(t *testing.T) {
 // y su primera reprogramación los migra al formato con ancho fijo.
 func TestOUTBOXCompatibilidadConSkHistorica(t *testing.T) {
 	fake := nuevoOutboxFake()
+	sembrarPerfilActivo(fake, "u1")
 	store := NewPushOutboxStore(fake, "NEXUM_CORE_TEST").WithOwner("nodo-a")
 	ahora := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
 	legado := "DUE#2026-11-22T11:59:00Z#legado-1"
@@ -174,6 +177,7 @@ func TestOUTBOXCompatibilidadConSkHistorica(t *testing.T) {
 // inválida (dos acciones sobre el mismo ítem) cuando el destino coincide.
 func TestOUTBOXReprogramarMismoInstanteNoMueveLaClave(t *testing.T) {
 	fake := nuevoOutboxFake()
+	sembrarPerfilActivo(fake, "u1")
 	store := NewPushOutboxStore(fake, "NEXUM_CORE_TEST").WithOwner("nodo-a")
 	ahora := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
 	crearTrabajo(t, store, "n1", ahora, ahora)
@@ -181,11 +185,12 @@ func TestOUTBOXReprogramarMismoInstanteNoMueveLaClave(t *testing.T) {
 	if _, ok, err := store.Reclamar(context.Background(), id, ahora, 30*time.Second); err != nil || !ok {
 		t.Fatalf("reclamo: ok=%v err=%v", ok, err)
 	}
+	antes := len(fake.transacciones)
 	if err := store.Reprogramar(context.Background(), id, 2, "REINTENTABLE", ahora, ahora); err != nil {
 		t.Fatalf("reprogramar al mismo instante: %v", err)
 	}
-	if len(fake.transacciones) != 0 {
-		t.Fatalf("no debía mover la clave: %d transacciones", len(fake.transacciones))
+	if len(fake.transacciones) != antes {
+		t.Fatalf("no debía mover la clave: %d transacciones nuevas", len(fake.transacciones)-antes)
 	}
 	if _, existe := fake.items["OUTBOX#GLOBAL|"+id]; !existe {
 		t.Fatal("el trabajo debía seguir en su clave")
@@ -196,6 +201,7 @@ func TestOUTBOXReprogramarMismoInstanteNoMueveLaClave(t *testing.T) {
 // destino ya existe) del trabajo perdido o ajeno.
 func TestOUTBOXReprogramarIdempotenteYConflicto(t *testing.T) {
 	fake := nuevoOutboxFake()
+	sembrarPerfilActivo(fake, "u1")
 	store := NewPushOutboxStore(fake, "NEXUM_CORE_TEST").WithOwner("nodo-a")
 	ahora := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
 	siguiente := ahora.Add(5 * time.Minute)
@@ -226,6 +232,7 @@ func TestOUTBOXReprogramarIdempotenteYConflicto(t *testing.T) {
 // terminales no se entregan.
 func TestOUTBOXLeaseYEstadosSeFiltranEnMemoria(t *testing.T) {
 	fake := nuevoOutboxFake()
+	sembrarPerfilActivo(fake, "u1")
 	store := NewPushOutboxStore(fake, "NEXUM_CORE_TEST").WithOwner("nodo-a")
 	ahora := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
 	casos := []struct {

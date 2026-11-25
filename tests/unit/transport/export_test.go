@@ -173,6 +173,38 @@ func (f *e020HTTPFuente) Preferencias(_ context.Context, userID string) (*appPre
 	return f.preferencias, nil
 }
 
+func (f *e020HTTPFuente) Notificaciones(_ context.Context, userID, after string, limit int) ([]appExport.NotificationRow, string, error) {
+	f.registrar("notifications:"+userID, limit)
+	if f.err != nil {
+		return nil, "", f.err
+	}
+	return nil, "", nil
+}
+
+func (f *e020HTTPFuente) Recordatorios(_ context.Context, userID, after string, limit int) ([]appExport.ReminderRow, string, error) {
+	f.registrar("reminders:"+userID, limit)
+	if f.err != nil {
+		return nil, "", f.err
+	}
+	return nil, "", nil
+}
+
+func (f *e020HTTPFuente) Dispositivos(_ context.Context, userID, after string, limit int) ([]appExport.PushDeviceRow, string, error) {
+	f.registrar("devices:"+userID, limit)
+	if f.err != nil {
+		return nil, "", f.err
+	}
+	return nil, "", nil
+}
+
+func (f *e020HTTPFuente) PreferenciasNotificacion(_ context.Context, userID string) (*appExport.NotificationPreferencesRow, error) {
+	f.registrar("notificationPrefs:"+userID, 0)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return nil, nil
+}
+
 func (f *e020HTTPFuente) llamadasRealizadas() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -10970,6 +10970,75 @@ components:
           maxLength: 64
       required: []
       description: Contrato formal Nexum UserPreferencesPatch
+    ExportPushDevice:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          enum:
+          - fcm
+        deviceLabel:
+          type: string
+        registeredAt:
+          type: string
+          format: date-time
+        active:
+          type: boolean
+      required:
+      - id
+      - provider
+      - deviceLabel
+      - registeredAt
+      - active
+      description: Proyeccion segura de dispositivo push para exportacion; nunca incluye token ni cifrado.
+    ExportReminder:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        dueAt:
+          type: string
+          format: date-time
+        timezone:
+          type: string
+          minLength: 3
+          maxLength: 64
+        frequency:
+          type:
+          - string
+          - 'null'
+          enum:
+          - daily
+          - weekly
+          - monthly
+          - null
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - title
+      - dueAt
+      - timezone
+      - active
+      - createdAt
+      - updatedAt
+      description: Recordatorio exportado con marcas de auditoria; version interna no se exporta.
     UserExport:
       type: object
       additionalProperties: false
@@ -11021,6 +11090,25 @@ components:
         preferences:
           anyOf:
           - $ref: '#/components/schemas/UserPreferences'
+          - type: 'null'
+        notifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+          minItems: 0
+        reminders:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportReminder'
+          minItems: 0
+        pushDevices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportPushDevice'
+          minItems: 0
+        notificationPreferences:
+          anyOf:
+          - $ref: '#/components/schemas/NotificationPreferences'
           - type: 'null'
         nextCursor:
           type: string
@@ -12315,6 +12403,7 @@ components:
           - daily
           - weekly
           - monthly
+          - null
           example: monthly
       required:
       - id

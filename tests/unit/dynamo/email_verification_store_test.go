@@ -14,6 +14,7 @@ import (
 
 	dynamoAdapter "github.com/nexumpr/Nexum-Backend/internal/adapters/dynamo"
 	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
+	domainDeletion "github.com/nexumpr/Nexum-Backend/internal/domain/deletion"
 	domainDynamo "github.com/nexumpr/Nexum-Backend/internal/domain/dynamo"
 )
 
@@ -53,13 +54,15 @@ func (a *almacenEV) PutItem(_ context.Context, params *dynamodb.PutItemInput, _ 
 	return &dynamodb.PutItemOutput{}, nil
 }
 
-// evRegistro captura la entrada exacta de PutItem/GetItem sin mantener estado.
+// evRegistro captura la entrada exacta de PutItem/GetItem/TransactWriteItems sin mantener
+// estado. E010 persiste el token y su puntero de purga en una transacción de dos `Put`.
 type evRegistro struct {
 	put      *dynamodb.PutItemInput
 	putErr   error
 	get      *dynamodb.GetItemInput
 	getOut   *dynamodb.GetItemOutput
 	getErr   error
+	tx       *dynamodb.TransactWriteItemsInput
 	llamadas int
 }
 
@@ -84,8 +87,15 @@ func (r *evRegistro) GetItem(_ context.Context, params *dynamodb.GetItemInput, _
 	return &dynamodb.GetItemOutput{}, nil
 }
 
-func (r *evRegistro) TransactWriteItems(context.Context, *dynamodb.TransactWriteItemsInput, ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {
-	return nil, errors.New("transaccion no esperada en E010")
+// TransactWriteItems captura la transacción real de E010 (token `ONE_USE#` + puntero
+// `TOKENPTR#`) y traduce el fallo inyectado igual que el resto de operaciones.
+func (r *evRegistro) TransactWriteItems(_ context.Context, in *dynamodb.TransactWriteItemsInput, _ ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {
+	r.llamadas++
+	r.tx = in
+	if r.putErr != nil {
+		return nil, r.putErr
+	}
+	return &dynamodb.TransactWriteItemsOutput{}, nil
 }
 
 func e010Token() appIdentity.EmailVerificationToken {
@@ -105,17 +115,21 @@ func TestE010PersistenciaEmiteCondicionYAtributos(t *testing.T) {
 	if err := store.SaveEmailVerificationToken(context.Background(), e010Token()); err != nil {
 		t.Fatalf("persistencia valida fallo: %v", err)
 	}
-	if registro.put == nil {
-		t.Fatalf("debe emitirse PutItem")
+	if registro.tx == nil || len(registro.tx.TransactItems) != 2 {
+		t.Fatalf("el token y su puntero deben escribirse en una transaccion de 2 acciones")
 	}
-	if aws.ToString(registro.put.TableName) != e010Tabla {
-		t.Fatalf("tabla inesperada: %q", aws.ToString(registro.put.TableName))
+	accionToken := registro.tx.TransactItems[0].Put
+	if accionToken == nil {
+		t.Fatalf("la primera accion debe ser el Put del token")
 	}
-	if condicion := aws.ToString(registro.put.ConditionExpression); condicion != "attribute_not_exists(PK)" {
+	if aws.ToString(accionToken.TableName) != e010Tabla {
+		t.Fatalf("tabla inesperada: %q", aws.ToString(accionToken.TableName))
+	}
+	if condicion := aws.ToString(accionToken.ConditionExpression); condicion != "attribute_not_exists(PK)" {
 		t.Fatalf("la condicion debe impedir sobrescribir el token, obtenido %q", condicion)
 	}
 
-	item := registro.put.Item
+	item := accionToken.Item
 	if pk := mapaString(item, "PK"); pk != "ONE_USE#"+appIdentity.HashToken("token-sintetico-de-verificacion-0123456789") {
 		t.Fatalf("PK esperada ONE_USE#<sha256>, obtenida %q", pk)
 	}
@@ -154,6 +168,36 @@ func TestE010PersistenciaEmiteCondicionYAtributos(t *testing.T) {
 	for nombre, valor := range item {
 		if texto, ok := valor.(*types.AttributeValueMemberS); ok && strings.Contains(texto.Value, "token-sintetico-de-verificacion-0123456789") {
 			t.Fatalf("el token en claro no puede persistirse en %q", nombre)
+		}
+	}
+
+	// El segundo Put es el puntero de purga: sin él, E014 sólo podría borrar el token con
+	// un Scan.
+	accionPuntero := registro.tx.TransactItems[1].Put
+	if accionPuntero == nil {
+		t.Fatalf("la segunda accion debe ser el Put del puntero")
+	}
+	puntero := accionPuntero.Item
+	hashToken := e010Token().TokenHash
+	ptrPK, ptrSK := domainDeletion.TokenPointerKeys(e010User, hashToken)
+	if pk := mapaString(puntero, "PK"); pk != ptrPK {
+		t.Fatalf("PK del puntero=%q, esperada %q", pk, ptrPK)
+	}
+	if sk := mapaString(puntero, "SK"); sk != ptrSK {
+		t.Fatalf("SK del puntero=%q, esperada %q", sk, ptrSK)
+	}
+	if entidad := mapaString(puntero, "entityType"); entidad != domainDeletion.EntityTokenPointer {
+		t.Fatalf("entityType del puntero=%q, esperado %q", entidad, domainDeletion.EntityTokenPointer)
+	}
+	if familia := mapaString(puntero, "family"); familia != domainDeletion.TokenFamilyOneUse {
+		t.Fatalf("family del puntero=%q, esperada %q", familia, domainDeletion.TokenFamilyOneUse)
+	}
+	if skGlobal := mapaString(puntero, "skGlobal"); skGlobal != "ONE_USE#"+hashToken {
+		t.Fatalf("skGlobal del puntero=%q", skGlobal)
+	}
+	for nombre, valor := range puntero {
+		if texto, ok := valor.(*types.AttributeValueMemberS); ok && strings.Contains(texto.Value, "token-sintetico-de-verificacion-0123456789") {
+			t.Fatalf("el token en claro no puede persistirse en el puntero (%q)", nombre)
 		}
 	}
 }

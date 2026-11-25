@@ -28,6 +28,7 @@ type outboxFake struct {
 	consultas     []*dynamodb.QueryInput
 	updates       []*dynamodb.UpdateItemInput
 	puts          []*dynamodb.PutItemInput
+	deletes       []*dynamodb.DeleteItemInput
 	transacciones []*dynamodb.TransactWriteItemsInput
 	fallarQuery   bool
 	// tamanoPagina fuerza páginas más cortas que el Limit pedido, como hace
@@ -40,7 +41,11 @@ func nuevoOutboxFake() *outboxFake {
 }
 
 func claveItemInput(params *dynamodb.PutItemInput) string {
-	return stringAttribute(params.Item["PK"]) + "|" + stringAttribute(params.Item["SK"])
+	return claveDeItem(params.Item)
+}
+
+func claveDeItem(item map[string]types.AttributeValue) string {
+	return stringAttribute(item["PK"]) + "|" + stringAttribute(item["SK"])
 }
 
 func claveUpdateInput(params *dynamodb.UpdateItemInput) string {
@@ -151,6 +156,15 @@ func (f *outboxFake) cumpleCondicion(clave, condicion string, valores map[string
 		return !existe, nil
 	case "#owner = :owner":
 		return f.propietario(clave, valores[":owner"]), nil
+	case "#skGlobal = :vieja":
+		item := f.items[clave]
+		if item == nil {
+			return false, nil
+		}
+		return stringAttribute(item["skGlobal"]) == stringAttribute(valores[":vieja"]), nil
+	case "attribute_exists(PK)":
+		_, existe := f.items[clave]
+		return existe, nil
 	case "#owner = :owner AND #intentos = :intentos":
 		item := f.items[clave]
 		if item == nil {
@@ -172,45 +186,96 @@ func (f *outboxFake) propietario(clave string, esperado types.AttributeValue) bo
 }
 
 // TransactWriteItems valida todas las condiciones antes de aplicar: o se mueven
-// las dos claves, o no se mueve ninguna.
-func (f *outboxFake) TransactWriteItems(_ context.Context, params *dynamodb.TransactWriteItemsInput, _ ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {
+// TransactWriteItems valida todas las condiciones antes de aplicar: o se mueven
+// todas las acciones, o no se mueve ninguna. Soporta Put, Delete, Update y
+// ConditionCheck, con una razón de cancelación por índice.
+func (f *outboxFake) TransactWriteItems(_ context.Context, in *dynamodb.TransactWriteItemsInput, _ ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.transacciones = append(f.transacciones, params)
-	for _, accion := range params.TransactItems {
-		if accion.Put != nil {
-			clave := claveItemInput(&dynamodb.PutItemInput{Item: accion.Put.Item})
-			ok, err := f.cumpleCondicion(clave, aws.ToString(accion.Put.ConditionExpression), accion.Put.ExpressionAttributeValues)
-			if err != nil {
-				return nil, err
-			}
-			if !ok {
-				return nil, &types.TransactionCanceledException{Message: aws.String("TransactionCanceledException")}
-			}
-			continue
-		}
-		if accion.Delete != nil {
-			clave := claveUpdateInput(&dynamodb.UpdateItemInput{Key: accion.Delete.Key})
-			ok, err := f.cumpleCondicion(clave, aws.ToString(accion.Delete.ConditionExpression), accion.Delete.ExpressionAttributeValues)
-			if err != nil {
-				return nil, err
-			}
-			if !ok {
-				return nil, &types.TransactionCanceledException{Message: aws.String("TransactionCanceledException")}
-			}
-			continue
-		}
-		return nil, errors.New("el doble de DynamoDB solo soporta Put y Delete en transacción")
+	f.transacciones = append(f.transacciones, in)
+
+	razones := make([]types.CancellationReason, len(in.TransactItems))
+	for i := range razones {
+		razones[i] = types.CancellationReason{Code: aws.String("None")}
 	}
-	for _, accion := range params.TransactItems {
-		if accion.Put != nil {
-			f.items[claveItemInput(&dynamodb.PutItemInput{Item: accion.Put.Item})] = accion.Put.Item
+	fallo := false
+	for i, accion := range in.TransactItems {
+		ok, err := f.condicionDeAccion(accion)
+		if err != nil {
+			return nil, err
 		}
-		if accion.Delete != nil {
+		if !ok {
+			razones[i] = types.CancellationReason{Code: aws.String("ConditionalCheckFailed")}
+			fallo = true
+		}
+	}
+	if fallo {
+		return nil, &types.TransactionCanceledException{CancellationReasons: razones}
+	}
+
+	for _, accion := range in.TransactItems {
+		switch {
+		case accion.Put != nil:
+			f.items[claveDeItem(accion.Put.Item)] = accion.Put.Item
+		case accion.Delete != nil:
 			delete(f.items, claveUpdateInput(&dynamodb.UpdateItemInput{Key: accion.Delete.Key}))
+		case accion.Update != nil:
+			clave := claveUpdateInput(&dynamodb.UpdateItemInput{Key: accion.Update.Key})
+			actualizado := map[string]types.AttributeValue{}
+			for k, v := range f.items[clave] {
+				actualizado[k] = v
+			}
+			for nombre, valor := range aplicarSetSimple(in, accion.Update) {
+				actualizado[nombre] = valor
+			}
+			f.items[clave] = actualizado
 		}
 	}
 	return &dynamodb.TransactWriteItemsOutput{}, nil
+}
+
+// condicionDeAccion evalúa la condición de cualquier acción transaccional.
+func (f *outboxFake) condicionDeAccion(accion types.TransactWriteItem) (bool, error) {
+	switch {
+	case accion.Put != nil:
+		return f.cumpleCondicion(claveDeItem(accion.Put.Item), aws.ToString(accion.Put.ConditionExpression), accion.Put.ExpressionAttributeValues)
+	case accion.Delete != nil:
+		clave := claveUpdateInput(&dynamodb.UpdateItemInput{Key: accion.Delete.Key})
+		return f.cumpleCondicion(clave, aws.ToString(accion.Delete.ConditionExpression), accion.Delete.ExpressionAttributeValues)
+	case accion.Update != nil:
+		clave := claveUpdateInput(&dynamodb.UpdateItemInput{Key: accion.Update.Key})
+		return f.cumpleCondicion(clave, aws.ToString(accion.Update.ConditionExpression), accion.Update.ExpressionAttributeValues)
+	case accion.ConditionCheck != nil:
+		item := f.items[claveDeItem(accion.ConditionCheck.Key)]
+		if item == nil {
+			return false, nil
+		}
+		esperado := stringAttribute(accion.ConditionCheck.ExpressionAttributeValues[":activo"])
+		return item["status"] != nil && stringAttribute(item["status"]) == esperado, nil
+	}
+	return false, fmt.Errorf("acción transaccional no soportada por el doble")
+}
+
+// aplicarSetSimple aplica `SET #x = :v, #y = :w` de una acción Update.
+func aplicarSetSimple(_ *dynamodb.TransactWriteItemsInput, accion *types.Update) map[string]types.AttributeValue {
+	salida := map[string]types.AttributeValue{}
+	expresion := strings.TrimPrefix(aws.ToString(accion.UpdateExpression), "SET ")
+	for _, clausula := range strings.Split(expresion, ",") {
+		pares := strings.SplitN(clausula, " = ", 2)
+		if len(pares) != 2 {
+			continue
+		}
+		nombre := strings.TrimSpace(pares[0])
+		if strings.HasPrefix(nombre, "#") {
+			nombre = accion.ExpressionAttributeNames[nombre]
+		}
+		valor, ok := accion.ExpressionAttributeValues[strings.TrimSpace(pares[1])]
+		if !ok || nombre == "" {
+			continue
+		}
+		salida[nombre] = valor
+	}
+	return salida
 }
 
 func (f *outboxFake) UpdateItem(_ context.Context, params *dynamodb.UpdateItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
@@ -221,6 +286,10 @@ func (f *outboxFake) UpdateItem(_ context.Context, params *dynamodb.UpdateItemIn
 	item := f.items[clave]
 	if item == nil {
 		return nil, &types.ConditionalCheckFailedException{}
+	}
+	anteriores := map[string]types.AttributeValue{}
+	for k, v := range item {
+		anteriores[k] = v
 	}
 	expresion := aws.ToString(params.ConditionExpression)
 	estado := stringAttribute(item["status"])
@@ -288,11 +357,50 @@ func (f *outboxFake) UpdateItem(_ context.Context, params *dynamodb.UpdateItemIn
 		}
 	}
 	f.items[clave] = actualizado
+	if params.ReturnValues == types.ReturnValueAllOld {
+		return &dynamodb.UpdateItemOutput{Attributes: anteriores}, nil
+	}
 	return &dynamodb.UpdateItemOutput{Attributes: actualizado}, nil
 }
 
+// DeleteItem interpreta las dos formas que usa el outbox: borrado del puntero (sin condición)
+// y borrado del ítem global con guarda de lease.
+func (f *outboxFake) DeleteItem(_ context.Context, params *dynamodb.DeleteItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.deletes = append(f.deletes, params)
+	clave := claveDeItem(params.Key)
+	item, existe := f.items[clave]
+	if params.ConditionExpression != nil {
+		expresion := aws.ToString(params.ConditionExpression)
+		if strings.Contains(expresion, "attribute_exists(PK)") && !existe {
+			return nil, &types.ConditionalCheckFailedException{}
+		}
+		if strings.Contains(expresion, "#owner") {
+			owner := ""
+			lease := ""
+			if existe {
+				owner = stringAttribute(item["owner"])
+				lease = stringAttribute(item["leaseUntil"])
+			}
+			ahora := stringAttribute(params.ExpressionAttributeValues[":ahora"])
+			libre := owner == ""
+			if !libre && lease != "" && lease < ahora {
+				libre = true
+			}
+			if !libre {
+				return nil, &types.ConditionalCheckFailedException{}
+			}
+		}
+	}
+	delete(f.items, clave)
+	return &dynamodb.DeleteItemOutput{}, nil
+}
+
+// TransactWriteItems interpreta las tres acciones de `Crear`: dos `Put` condicionales y un
 func TestOUTBOXCrearEscribeClaveDUEYCondicional(t *testing.T) {
 	fake := nuevoOutboxFake()
+	sembrarPerfilActivo(fake, "u1")
 	store := NewPushOutboxStore(fake, "NEXUM_CORE_TEST").WithOwner("nodo-a")
 	ahora := time.Date(2026, 11, 22, 12, 0, 0, 123456789, time.UTC)
 	store.WithClock(func() time.Time { return ahora })
@@ -304,20 +412,56 @@ func TestOUTBOXCrearEscribeClaveDUEYCondicional(t *testing.T) {
 	if err != nil || !creado {
 		t.Fatalf("crear: %v %v", creado, err)
 	}
-	if len(fake.puts) != 1 {
-		t.Fatalf("puts=%d", len(fake.puts))
+	if len(fake.transacciones) != 1 {
+		t.Fatalf("transacciones=%d", len(fake.transacciones))
 	}
-	put := fake.puts[0]
-	if got := stringAttribute(put.Item["PK"]); got != pushOutboxPartition {
+	acciones := fake.transacciones[0].TransactItems
+	if len(acciones) != 3 {
+		t.Fatalf("la transaccion debe tener 3 acciones (global, puntero, perfil): %d", len(acciones))
+	}
+	global := acciones[0].Put
+	if global == nil {
+		t.Fatal("la primera accion debe ser el Put del item global")
+	}
+	if got := stringAttribute(global.Item["PK"]); got != pushOutboxPartition {
 		t.Fatalf("PK=%q", got)
 	}
 	esperado := "DUE#" + ahora.Format(time.RFC3339Nano) + "#n1"
-	if got := stringAttribute(put.Item["SK"]); got != esperado {
+	if got := stringAttribute(global.Item["SK"]); got != esperado {
 		t.Fatalf("SK=%q esperado %q", got, esperado)
 	}
-	if aws.ToString(put.ConditionExpression) != "attribute_not_exists(PK)" {
-		t.Fatalf("condición=%q", aws.ToString(put.ConditionExpression))
+	if aws.ToString(global.ConditionExpression) != "attribute_not_exists(PK)" {
+		t.Fatalf("condicion=%q", aws.ToString(global.ConditionExpression))
 	}
+	puntero := acciones[1].Put
+	if puntero == nil {
+		t.Fatal("la segunda accion debe ser el Put del puntero de purga")
+	}
+	if got := stringAttribute(puntero.Item["PK"]); got != "USER#u1" {
+		t.Fatalf("PK del puntero=%q", got)
+	}
+	if got := stringAttribute(puntero.Item["SK"]); got != "OUTBOXPTR#n1" {
+		t.Fatalf("SK del puntero=%q", got)
+	}
+	if got := stringAttribute(puntero.Item["skGlobal"]); got != esperado {
+		t.Fatalf("skGlobal=%q esperado %q", got, esperado)
+	}
+	if got := stringAttribute(puntero.Item["userID"]); got != "u1" {
+		t.Fatalf("userID del puntero=%q", got)
+	}
+	if acciones[2].ConditionCheck == nil {
+		t.Fatal("la tercera accion debe ser el ConditionCheck del perfil")
+	}
+
+	// El puntero y el item global existen tras la transaccion: E014 puede encontrarlos.
+	if _, ok := fake.items["USER#u1|OUTBOXPTR#n1"]; !ok {
+		t.Fatal("el puntero debe persistirse en la misma transaccion")
+	}
+	if _, ok := fake.items[pushOutboxPartition+"|"+esperado]; !ok {
+		t.Fatal("el item global debe persistirse")
+	}
+
+	// Replay de la misma clave: no crea otro item ni otro puntero.
 	creadoOtraVez, err := store.Crear(context.Background(), pushoutbox.Registro{
 		UserID: "u1", NotificationID: "n1", EventID: "evt-1", NextAttemptAt: ahora,
 	})
@@ -326,8 +470,48 @@ func TestOUTBOXCrearEscribeClaveDUEYCondicional(t *testing.T) {
 	}
 }
 
+// TestOUTBOXCrearRechazaCuentaNoActiva comprueba la guarda de productor: sin perfil ACTIVE no
+// se encola nada (ni item global ni puntero).
+func TestOUTBOXCrearRechazaCuentaNoActiva(t *testing.T) {
+	for nombre, estado := range map[string]string{
+		"perfil ausente":   "",
+		"perfil en purga":  "DELETION_PENDING",
+		"perfil eliminado": "DELETED",
+	} {
+		fake := nuevoOutboxFake()
+		if estado != "" {
+			fake.items["USER#u1|PROFILE"] = map[string]types.AttributeValue{"status": stringAttr(estado)}
+		}
+		store := NewPushOutboxStore(fake, "NEXUM_CORE_TEST")
+		creado, err := store.Crear(context.Background(), pushoutbox.Registro{
+			UserID: "u1", NotificationID: "n1", EventID: "evt-1", Title: "A", Message: "M",
+		})
+		if !errors.Is(err, ErrCuentaNoActiva) || creado {
+			t.Fatalf("%s: esperado ErrCuentaNoActiva, obtenido creado=%v err=%v", nombre, creado, err)
+		}
+		esperados := 1
+		if estado == "" {
+			esperados = 0
+		}
+		if len(fake.items) != esperados {
+			t.Fatalf("%s: items=%d, esperados=%d (no debe quedar ningun item de outbox)", nombre, len(fake.items), esperados)
+		}
+		if _, ok := fake.items["USER#u1|OUTBOXPTR#n1"]; ok {
+			t.Fatalf("%s: no debe crearse el puntero", nombre)
+		}
+	}
+}
+
+// sembrarPerfilActivo crea el perfil mínimo que exige la guarda de cuenta.
+func sembrarPerfilActivo(fake *outboxFake, userID string) {
+	fake.items["USER#"+userID+"|PROFILE"] = map[string]types.AttributeValue{
+		"status": stringAttr("ACTIVE"),
+	}
+}
+
 func TestOUTBOXQueryPorVencimientoSinFilterNiScan(t *testing.T) {
 	fake := nuevoOutboxFake()
+	sembrarPerfilActivo(fake, "u1")
 	ahora := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
 	store := NewPushOutboxStore(fake, "NEXUM_CORE_TEST")
 	creado, err := store.Crear(context.Background(), pushoutbox.Registro{
@@ -373,11 +557,14 @@ func TestOUTBOXQueryPorVencimientoSinFilterNiScan(t *testing.T) {
 
 func TestOUTBOXReclamoCondicionalDosNodos(t *testing.T) {
 	fake := nuevoOutboxFake()
+	sembrarPerfilActivo(fake, "u1")
 	ahora := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
 	id := pushOutboxSK(ahora, "n1")
 	clave := "OUTBOX#GLOBAL|" + id
 	fake.items[clave] = map[string]types.AttributeValue{
+		"userID": stringAttr("u1"), "notificationID": stringAttr("n1"),
 		"status": stringAttr("pending"), "attempts": numberAttr(0),
+		"nextAttemptAt": stringAttr(pushOutboxInstante(ahora)),
 	}
 	nodoA := NewPushOutboxStore(fake, "NEXUM_CORE_TEST").WithOwner("nodo-a")
 	nodoB := NewPushOutboxStore(fake, "NEXUM_CORE_TEST").WithOwner("nodo-b")
@@ -434,6 +621,9 @@ func TestOUTBOXCIERRESExigenOwnerYReprogramarMueveLaClave(t *testing.T) {
 		if aws.ToString(update.ConditionExpression) != "#owner = :owner" {
 			t.Fatalf("update %d sin condición de owner: %q", i, aws.ToString(update.ConditionExpression))
 		}
+		if update.ReturnValues != types.ReturnValueAllOld {
+			t.Fatalf("update %d debe pedir los atributos anteriores para retirar el puntero", i)
+		}
 	}
 	if len(fake.updates) != 2 {
 		t.Fatalf("updates=%d", len(fake.updates))
@@ -478,6 +668,42 @@ func TestOUTBOXCIERRESExigenOwnerYReprogramarMueveLaClave(t *testing.T) {
 	}
 }
 
+// TestOUTBOXWorkerDescartaTrabajoDeCuentaNoActiva comprueba la guarda del worker: con el perfil
+// en purga o ausente no se reclama ni se envía; el trabajo y el puntero se retiran.
+func TestOUTBOXWorkerDescartaTrabajoDeCuentaNoActiva(t *testing.T) {
+	for nombre, estado := range map[string]string{
+		"perfil ausente":  "",
+		"perfil en purga": "DELETION_PENDING",
+	} {
+		fake := nuevoOutboxFake()
+		if estado != "" {
+			fake.items["USER#u1|PROFILE"] = map[string]types.AttributeValue{"status": stringAttr(estado)}
+		}
+		id := "DUE#2026-11-22T12:00:00Z#n1"
+		fake.items["OUTBOX#GLOBAL|"+id] = map[string]types.AttributeValue{
+			"status": stringAttr("pending"), "attempts": numberAttr(0),
+			"userID": stringAttr("u1"), "notificationID": stringAttr("n1"),
+		}
+		fake.items["USER#u1|OUTBOXPTR#n1"] = map[string]types.AttributeValue{
+			"skGlobal": stringAttr(id), "userID": stringAttr("u1"),
+		}
+		store := NewPushOutboxStore(fake, "NEXUM_CORE_TEST").WithOwner("nodo-a")
+		intentos, ok, err := store.Reclamar(context.Background(), id, time.Now().UTC(), 30*time.Second)
+		if err != nil || ok || intentos != 0 {
+			t.Fatalf("%s: no debe reclamarse el trabajo: intentos=%d ok=%v err=%v", nombre, intentos, ok, err)
+		}
+		if len(fake.updates) != 0 {
+			t.Fatalf("%s: no debe emitirse un Update de envio", nombre)
+		}
+		if _, existe := fake.items["OUTBOX#GLOBAL|"+id]; existe {
+			t.Fatalf("%s: el trabajo debe retirarse", nombre)
+		}
+		if _, existe := fake.items["USER#u1|OUTBOXPTR#n1"]; existe {
+			t.Fatalf("%s: el puntero debe retirarse", nombre)
+		}
+	}
+}
+
 func TestOUTBOXIdempotenciaYBandejaE061(t *testing.T) {
 	fake := nuevoOutboxFake()
 	store := NewPushOutboxStore(fake, "NEXUM_CORE_TEST")
@@ -500,6 +726,21 @@ func TestOUTBOXIdempotenciaYBandejaE061(t *testing.T) {
 	otroEvento, errOtro := store.YaEntregado(ctx, "u1", "evt-2")
 	if errOtro != nil || otroEvento {
 		t.Fatal("eventos distintos no deben compartir idempotencia")
+	}
+
+	// El registro de dedupe contiene identificadores vinculables: debe llevar TTL
+	// (90 días) para no quedar permanentemente en la tabla.
+	idem := fake.items[pushOutboxPartition+"|"+pushOutboxIdemSK("u1", "evt-1")]
+	if idem == nil {
+		t.Fatal("no se encontró el registro de idempotencia")
+	}
+	expira, ok := attributeInt(idem["expiresAt"])
+	if !ok {
+		t.Fatal("el dedupe global no declara expiresAt")
+	}
+	esperado := ahora.Add(90 * 24 * time.Hour).Unix()
+	if expira != esperado {
+		t.Fatalf("expiresAt=%d, esperado %d", expira, esperado)
 	}
 
 	if err := store.GuardarBandeja(ctx, pushoutbox.RegistroBandeja{
@@ -530,5 +771,35 @@ func TestOUTBOXSinClienteFallaCerrado(t *testing.T) {
 	}
 	if err := store.GuardarBandeja(context.Background(), pushoutbox.RegistroBandeja{}); !errors.Is(err, ErrOutboxNoDisponible) {
 		t.Fatalf("GuardarBandeja sin cliente: %v", err)
+	}
+}
+
+// TestOUTBOXTerminalRetiraGlobalYPuntero cubre la retirada segura del trabajo y de
+// su puntero de purga cuando el envío termina (E014 no debe encontrar punteros
+// colgando de ítems ya retirados).
+func TestOUTBOXTerminalRetiraGlobalYPuntero(t *testing.T) {
+	fake := nuevoOutboxFake()
+	store := NewPushOutboxStore(fake, "NEXUM_CORE_TEST").WithOwner("nodo-a")
+	ahora := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
+	id := pushOutboxSK(ahora, "n1")
+	fake.items["OUTBOX#GLOBAL|"+id] = map[string]types.AttributeValue{
+		"PK": stringAttr(pushOutboxPartition), "SK": stringAttr(id),
+		"entityType": stringAttr(pushOutboxEntityType), "notificationID": stringAttr("n1"),
+		"userID": stringAttr("u1"), "status": stringAttr(string(pushoutbox.EstadoEnviando)),
+		"owner": stringAttr("nodo-a"), "attempts": numberAttr(1),
+	}
+	fake.items["USER#u1|OUTBOXPTR#n1"] = map[string]types.AttributeValue{
+		"PK": stringAttr("USER#u1"), "SK": stringAttr("OUTBOXPTR#n1"),
+		"entityType": stringAttr(pushOutboxPointerEntity), "userID": stringAttr("u1"),
+		"notificationID": stringAttr("n1"), "skGlobal": stringAttr(id),
+	}
+	if err := store.MarcarEnviado(context.Background(), id, ahora); err != nil {
+		t.Fatal(err)
+	}
+	if _, existe := fake.items["OUTBOX#GLOBAL|"+id]; existe {
+		t.Fatal("el trabajo enviado debe retirarse")
+	}
+	if _, existe := fake.items["USER#u1|OUTBOXPTR#n1"]; existe {
+		t.Fatal("el puntero debe retirarse al cerrar el trabajo")
 	}
 }

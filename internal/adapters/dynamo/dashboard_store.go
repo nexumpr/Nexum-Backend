@@ -24,6 +24,10 @@ type DashboardStore struct {
 	table  string
 }
 
+// maxDashboardPaginas acota el número de consultas encadenadas de E051. Si un cursor no
+// progresa, el bucle termina con error en vez de quedar colgado o truncar en silencio.
+const maxDashboardPaginas = 50
+
 // NewDashboardStore construye el adaptador.
 func NewDashboardStore(client DashboardAPI, table string) *DashboardStore {
 	return &DashboardStore{client: client, table: strings.TrimSpace(table)}
@@ -39,7 +43,10 @@ func (s *DashboardStore) ListActiveGoals(ctx context.Context, userID string, lim
 	}
 	salida := make([]appDashboard.GoalRow, 0, limit)
 	var start map[string]types.AttributeValue
-	for {
+	for pagina := 0; ; pagina++ {
+		if pagina >= maxDashboardPaginas {
+			return nil, appDashboard.ErrUnavailable
+		}
 		entrada := &dynamodb.QueryInput{
 			TableName:              aws.String(s.table),
 			KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :prefix)"),
@@ -55,6 +62,9 @@ func (s *DashboardStore) ListActiveGoals(ctx context.Context, userID string, lim
 				":false":  &types.AttributeValueMemberBOOL{Value: false},
 			},
 			Limit: aws.Int32(int32(limit)),
+			// DEF-1: mismo motivo que en ListLatestMovements; las metas borradas
+			// tampoco deben reaparecer por consistencia eventual.
+			ConsistentRead: aws.Bool(true),
 		}
 		if len(start) > 0 {
 			entrada.ExclusiveStartKey = start
@@ -109,7 +119,10 @@ func (s *DashboardStore) ListLatestMovements(ctx context.Context, userID string,
 	titular := strings.TrimSpace(userID)
 	salida := make([]appMovements.Movement, 0, limit)
 	var start map[string]types.AttributeValue
-	for {
+	for pagina := 0; ; pagina++ {
+		if pagina >= maxDashboardPaginas {
+			return nil, appDashboard.ErrUnavailable
+		}
 		entrada := &dynamodb.QueryInput{
 			TableName:              aws.String(s.table),
 			KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :prefix)"),
@@ -124,6 +137,9 @@ func (s *DashboardStore) ListLatestMovements(ctx context.Context, userID string,
 			},
 			ScanIndexForward: aws.Bool(false),
 			Limit:            aws.Int32(int32(limit)),
+			// DEF-1: E051 exige agregados consistentes. Sin lectura fuerte una réplica
+			// puede devolver la versión previa al tombstone y servir un movimiento borrado.
+			ConsistentRead: aws.Bool(true),
 		}
 		if len(start) > 0 {
 			entrada.ExclusiveStartKey = start

@@ -132,14 +132,21 @@ func (f *fcmDispositivosFake) item(userID, deviceID string) map[string]types.Att
 	return f.items["USER#"+userID+"|DEVICE#"+deviceID]
 }
 
-// TransactWriteItems completa la interfaz PushOutboxAPI. Esta fuente de tokens
-// sólo lee dispositivos; el outbox tiene su propio doble.
-func (f *fcmDispositivosFake) TransactWriteItems(context.Context, *dynamodb.TransactWriteItemsInput, ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {
+// DeleteItem completa la interfaz PushOutboxAPI tras añadir la retirada del ítem
+// global y de su puntero al cerrar un trabajo.
+func (f *fcmDispositivosFake) DeleteItem(_ context.Context, params *dynamodb.DeleteItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	clave := fcmTexto(params.Key["PK"]) + "|" + fcmTexto(params.Key["SK"])
+	delete(f.items, clave)
+	return &dynamodb.DeleteItemOutput{}, nil
+}
+
+// TransactWriteItems completa la interfaz PushOutboxAPI; la fuente de tokens no la usa.
+func (f *fcmDispositivosFake) TransactWriteItems(_ context.Context, _ *dynamodb.TransactWriteItemsInput, _ ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {
 	return &dynamodb.TransactWriteItemsOutput{}, nil
 }
 
-// fcmOutboxFake es el mínimo storage del worker; la prueba se centra en la
-// integración con el item real de E059.
 type fcmOutboxFake struct {
 	porID     map[string]pushoutbox.Registro
 	entregado map[string]bool

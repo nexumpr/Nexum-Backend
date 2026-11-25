@@ -6,6 +6,7 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -58,10 +59,11 @@ const exportConsentsMaxPaginas = 50
 // sin ninguna fila falla cerrado.
 const exportPresupuestosMaxPaginas = 50
 
-// ExportDynamoAPI es el subconjunto del cliente DynamoDB que usa la exportación para las dos
+// ExportDynamoAPI es el subconjunto del cliente DynamoDB que usa la exportación para las
 // familias sin adaptador publicado. No incluye `Scan`.
 type ExportDynamoAPI interface {
 	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
+	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 }
 
 // ExportMovementsReader es el lector de movimientos que usa la exportación.
@@ -635,4 +637,273 @@ func presupuestoRowsFromItem(item map[string]types.AttributeValue, userID, perio
 		})
 	}
 	return filas, nil
+}
+
+// ---------------------------------------------------------------------------------------
+// Familias transversales: bandeja de notificaciones, recordatorios, dispositivos push y
+// preferencias de notificaciones. Todas viven en `USER#<id>` y se leen con `Query` por
+// prefijo de SK o `GetItem` exacto. Ninguna usa `Scan`.
+// ---------------------------------------------------------------------------------------
+
+// exportPaginaParticion recorre una colección de la partición del titular con `begins_with`
+// sobre la SK, orden ascendente y consistencia fuerte. Pide una fila de más para distinguir
+// «página llena con más datos» de «colección agotada» sin `Scan`.
+func (s *ExportStore) exportPaginaParticion(ctx context.Context, userID, prefijo, after string, limit int) ([]map[string]types.AttributeValue, string, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" || limit < 1 || limit > appExport.MaxLimit || prefijo == "" {
+		return nil, "", appExport.ErrUnavailable
+	}
+	pk := domainDynamo.PrefixUser + userID
+	entrada := &dynamodb.QueryInput{
+		TableName:              aws.String(s.tabla),
+		ConsistentRead:         aws.Bool(true),
+		KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :prefijo)"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":pk":      stringAttr(pk),
+			":prefijo": stringAttr(prefijo),
+		},
+		ScanIndexForward: aws.Bool(true),
+		Limit:            aws.Int32(int32(limit + 1)),
+	}
+	if after != "" {
+		if !strings.HasPrefix(after, prefijo) {
+			return nil, "", appExport.ErrUnavailable
+		}
+		entrada.ExclusiveStartKey = map[string]types.AttributeValue{
+			"PK": stringAttr(pk),
+			"SK": stringAttr(after),
+		}
+	}
+	salida, err := s.cliente.Query(ctx, entrada)
+	if err != nil {
+		return nil, "", appExport.ErrUnavailable
+	}
+	if salida == nil {
+		return nil, "", nil
+	}
+	if len(salida.Items) > limit {
+		// La fila extra confirma que queda al menos un elemento más.
+		return salida.Items[:limit], stringAttribute(salida.Items[limit-1]["SK"]), nil
+	}
+	if len(salida.LastEvaluatedKey) > 0 {
+		if len(salida.Items) == 0 {
+			// Sin progreso no hay clave de continuación válida.
+			return nil, "", appExport.ErrUnavailable
+		}
+		return salida.Items, stringAttribute(salida.Items[len(salida.Items)-1]["SK"]), nil
+	}
+	return salida.Items, "", nil
+}
+
+// Notificaciones devuelve la bandeja E061 del titular en orden ascendente por SK.
+func (s *ExportStore) Notificaciones(ctx context.Context, userID, after string, limit int) ([]appExport.NotificationRow, string, error) {
+	if s == nil || s.cliente == nil || s.tabla == "" {
+		return nil, "", appExport.ErrUnavailable
+	}
+	items, siguiente, err := s.exportPaginaParticion(ctx, userID, appExport.PrefijoNotificacion, after, limit)
+	if err != nil {
+		return nil, "", err
+	}
+	filas := make([]appExport.NotificationRow, 0, len(items))
+	for _, item := range items {
+		fila, errFila := exportNotificationRow(item, strings.TrimSpace(userID))
+		if errFila != nil {
+			return nil, "", errFila
+		}
+		filas = append(filas, fila)
+	}
+	return filas, siguiente, nil
+}
+
+// Recordatorios devuelve E064–E067 en orden ascendente por SK (vencimiento).
+func (s *ExportStore) Recordatorios(ctx context.Context, userID, after string, limit int) ([]appExport.ReminderRow, string, error) {
+	if s == nil || s.cliente == nil || s.tabla == "" {
+		return nil, "", appExport.ErrUnavailable
+	}
+	items, siguiente, err := s.exportPaginaParticion(ctx, userID, appExport.PrefijoRecordatorio, after, limit)
+	if err != nil {
+		return nil, "", err
+	}
+	filas := make([]appExport.ReminderRow, 0, len(items))
+	for _, item := range items {
+		fila, errFila := exportReminderRow(item, strings.TrimSpace(userID))
+		if errFila != nil {
+			return nil, "", errFila
+		}
+		filas = append(filas, fila)
+	}
+	return filas, siguiente, nil
+}
+
+// Dispositivos devuelve los dispositivos push del titular. La proyección descarta cualquier
+// atributo de token: no se leen `token`, `tokenCipher` ni `tokenFingerprint`.
+func (s *ExportStore) Dispositivos(ctx context.Context, userID, after string, limit int) ([]appExport.PushDeviceRow, string, error) {
+	if s == nil || s.cliente == nil || s.tabla == "" {
+		return nil, "", appExport.ErrUnavailable
+	}
+	items, siguiente, err := s.exportPaginaParticion(ctx, userID, appExport.PrefijoDispositivo, after, limit)
+	if err != nil {
+		return nil, "", err
+	}
+	filas := make([]appExport.PushDeviceRow, 0, len(items))
+	for _, item := range items {
+		fila, errFila := exportPushDeviceRow(item, strings.TrimSpace(userID))
+		if errFila != nil {
+			return nil, "", errFila
+		}
+		filas = append(filas, fila)
+	}
+	return filas, siguiente, nil
+}
+
+// PreferenciasNotificacion lee el singleton `USER#<id>/NOTIFICATION_PREFERENCES` con
+// consistencia fuerte. `(nil, nil)` si no existe o si la clave la ocupa otra entidad: el
+// contrato la declara anulable y la exportación no materializa defaults.
+func (s *ExportStore) PreferenciasNotificacion(ctx context.Context, userID string) (*appExport.NotificationPreferencesRow, error) {
+	if s == nil || s.cliente == nil || s.tabla == "" {
+		return nil, appExport.ErrUnavailable
+	}
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, appExport.ErrUnauthorized
+	}
+	salida, err := s.cliente.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(s.tabla),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(domainDynamo.PrefixUser + userID),
+			"SK": stringAttr(appExport.SKPreferenciasNotificacion),
+		},
+		ConsistentRead: aws.Bool(true),
+	})
+	if err != nil {
+		return nil, appExport.ErrUnavailable
+	}
+	if salida == nil || len(salida.Item) == 0 {
+		return nil, nil
+	}
+	entidad := stringAttribute(salida.Item["entityType"])
+	if entidad != "" && entidad != "USER_NOTIFICATION_PREFERENCES" {
+		return nil, nil
+	}
+	fila := &appExport.NotificationPreferencesRow{
+		PushEnabled:        boolAttribute(salida.Item["pushEnabled"]),
+		EmailEnabled:       boolAttribute(salida.Item["emailEnabled"]),
+		ReminderEnabled:    boolAttribute(salida.Item["reminderEnabled"]),
+		BudgetAlerts:       boolAttribute(salida.Item["budgetAlerts"]),
+		GoalUpdates:        boolAttribute(salida.Item["goalUpdates"]),
+		RecurringReminders: boolAttribute(salida.Item["recurringReminders"]),
+		StreakReminders:    boolAttribute(salida.Item["streakReminders"]),
+		TimeZone:           strings.TrimSpace(stringAttribute(salida.Item["timeZone"])),
+		Version:            1,
+	}
+	if version, ok := attributeInt(salida.Item["version"]); ok && version >= 1 {
+		fila.Version = version
+	}
+	if habilitado, ok := notificationBoolOptional(salida.Item["quietHoursEnabled"]); ok {
+		fila.QuietHours = &appExport.QuietHoursRow{
+			Enabled: habilitado,
+			Start:   stringAttribute(salida.Item["quietHoursStart"]),
+			End:     stringAttribute(salida.Item["quietHoursEnd"]),
+		}
+	}
+	return fila, nil
+}
+
+func exportNotificationRow(item map[string]types.AttributeValue, userID string) (appExport.NotificationRow, error) {
+	if entidad := stringAttribute(item["entityType"]); entidad != "NOTIFICATION" {
+		return appExport.NotificationRow{}, appExport.ErrInconsistent
+	}
+	if titular := stringAttribute(item["userId"]); titular != "" && titular != userID {
+		return appExport.NotificationRow{}, appExport.ErrInconsistent
+	}
+	id := strings.TrimSpace(stringAttribute(item["id"]))
+	if id == "" {
+		sk := strings.TrimPrefix(stringAttribute(item["SK"]), appExport.PrefijoNotificacion)
+		if i := strings.LastIndex(sk, "#"); i >= 0 {
+			id = sk[i+1:]
+		}
+	}
+	creado, ok := exportInstante(stringAttribute(item["createdAt"]))
+	if id == "" || !ok {
+		return appExport.NotificationRow{}, appExport.ErrInconsistent
+	}
+	return appExport.NotificationRow{
+		ID:        id,
+		Title:     stringAttribute(item["title"]),
+		Message:   stringAttribute(item["message"]),
+		IsRead:    boolAttribute(item["isRead"]),
+		CreatedAt: creado,
+	}, nil
+}
+
+func exportReminderRow(item map[string]types.AttributeValue, userID string) (appExport.ReminderRow, error) {
+	if entidad := stringAttribute(item["entityType"]); entidad != "USER_REMINDER" {
+		return appExport.ReminderRow{}, appExport.ErrInconsistent
+	}
+	if titular := stringAttribute(item["userId"]); titular != "" && titular != userID {
+		return appExport.ReminderRow{}, appExport.ErrInconsistent
+	}
+	id := strings.TrimSpace(stringAttribute(item["reminderID"]))
+	dueAt, okDue := exportInstante(stringAttribute(item["dueAt"]))
+	creado, okCreado := exportInstante(stringAttribute(item["createdAt"]))
+	actualizado, okActualizado := exportInstante(stringAttribute(item["updatedAt"]))
+	if id == "" || !okDue || !okCreado || !okActualizado {
+		return appExport.ReminderRow{}, appExport.ErrInconsistent
+	}
+	fila := appExport.ReminderRow{
+		ID:        id,
+		Title:     stringAttribute(item["title"]),
+		DueAt:     dueAt,
+		Timezone:  strings.TrimSpace(stringAttribute(item["timezone"])),
+		Active:    boolAttribute(item["active"]),
+		CreatedAt: creado,
+		UpdatedAt: actualizado,
+	}
+	// Frecuencia: ausente o vacía significa «sin recurrencia»; un valor fuera del enum
+	// es un item incoherente y se rechaza aquí, antes de proyectarlo al contrato.
+	frecuencia, valida := appExport.NormalizeReminderFrequency(stringAttribute(item["frequency"]))
+	if !valida {
+		return appExport.ReminderRow{}, appExport.ErrInconsistent
+	}
+	fila.Frequency = frecuencia
+	return fila, nil
+}
+
+// exportPushDeviceRow proyecta SÓLO los cinco campos publicables. Los atributos de token se
+// ignoran por completo: no se copian ni se validan.
+func exportPushDeviceRow(item map[string]types.AttributeValue, userID string) (appExport.PushDeviceRow, error) {
+	if entidad := stringAttribute(item["entityType"]); entidad != pushDeviceEntityType {
+		return appExport.PushDeviceRow{}, appExport.ErrInconsistent
+	}
+	if titular := stringAttribute(item["userId"]); titular != "" && titular != userID {
+		return appExport.PushDeviceRow{}, appExport.ErrInconsistent
+	}
+	id := strings.TrimPrefix(stringAttribute(item["SK"]), appExport.PrefijoDispositivo)
+	registrado, ok := exportInstante(stringAttribute(item["registeredAt"]))
+	if strings.TrimSpace(id) == "" || !ok {
+		return appExport.PushDeviceRow{}, appExport.ErrInconsistent
+	}
+	return appExport.PushDeviceRow{
+		ID:           strings.TrimSpace(id),
+		Provider:     stringAttribute(item["provider"]),
+		DeviceLabel:  stringAttribute(item["deviceLabel"]),
+		RegisteredAt: registrado,
+		Active:       boolAttribute(item["active"]),
+	}, nil
+}
+
+// exportInstante interpreta las dos formas de fecha que escriben los adaptadores
+// (`RFC3339Nano` de los workers y `RFC3339` de los endpoints HTTP).
+func exportInstante(valor string) (time.Time, bool) {
+	crudo := strings.TrimSpace(valor)
+	if crudo == "" {
+		return time.Time{}, false
+	}
+	if marca, err := time.Parse(time.RFC3339Nano, crudo); err == nil {
+		return marca.UTC(), true
+	}
+	if marca, err := time.Parse(time.RFC3339, crudo); err == nil {
+		return marca.UTC(), true
+	}
+	return time.Time{}, false
 }
