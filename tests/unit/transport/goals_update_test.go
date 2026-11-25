@@ -102,6 +102,47 @@ func TestE041HTTP200(t *testing.T) {
 	}
 }
 
+// TestE041HTTPPatchVacioNoEs400 fija la decision derivada del OpenAPI: `GoalPatch.required`
+// esta vacio, por lo que `{}` es una solicitud valida y debe responder 200 no-op conservando
+// la version y el ETag. Con un If-Match obsoleto la precondicion sigue dando 412.
+func TestE041HTTPPatchVacioNoEs400(t *testing.T) {
+	t.Run("cuerpo vacio es 200 no-op", func(t *testing.T) {
+		store := e040Coleccion(t)
+		rec := httptest.NewRecorder()
+		e041Handler(store).ServeHTTP(rec, e041Peticion("jwt-valido", e038UUID(1), `"v1"`, `{}`))
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("esperado 200, obtenido %d (%s)", rec.Code, rec.Body.String())
+		}
+		if got := rec.Header().Get("ETag"); got != `"v1"` {
+			t.Fatalf("el no-op debe conservar el ETag de la version vigente: %q", got)
+		}
+		var salida map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &salida); err != nil {
+			t.Fatalf("respuesta no es JSON: %v", err)
+		}
+		if salida["version"] != float64(1) {
+			t.Fatalf("el no-op no puede incrementar la version: %v", salida["version"])
+		}
+		if got := store.porUsuario[e004HTTPUsuario][0].Goal.Version; got != 1 {
+			t.Fatalf("el no-op no puede escribir: version %d", got)
+		}
+	})
+
+	t.Run("If-Match obsoleto sigue siendo 412", func(t *testing.T) {
+		store := e040Coleccion(t)
+		rec := httptest.NewRecorder()
+		e041Handler(store).ServeHTTP(rec, e041Peticion("jwt-valido", e038UUID(1), `"v9"`, `{}`))
+
+		if rec.Code != http.StatusPreconditionFailed {
+			t.Fatalf("esperado 412, obtenido %d (%s)", rec.Code, rec.Body.String())
+		}
+		if got := store.porUsuario[e004HTTPUsuario][0].Goal.Version; got != 1 {
+			t.Fatalf("una precondicion fallida no puede escribir: version %d", got)
+		}
+	})
+}
+
 // TestE041HTTPPrecondiciones cubre 428 sin cabecera, 412 débil y 412 obsoleto.
 func TestE041HTTPPrecondiciones(t *testing.T) {
 	casos := []struct {
@@ -137,7 +178,6 @@ func TestE041HTTP400(t *testing.T) {
 		{"If-Match no numerico", e038UUID(1), `"vX"`, `{"name":"x"}`},
 		{"json malformado", e038UUID(1), `"v1"`, `{"name":`},
 		{"campo desconocido", e038UUID(1), `"v1"`, `{"savedAmount":"9.99"}`},
-		{"sin cambios", e038UUID(1), `"v1"`, `{}`},
 		{"nombre vacio", e038UUID(1), `"v1"`, `{"name":"   "}`},
 		{"importe con un decimal", e038UUID(1), `"v1"`, `{"targetAmount":"400.0"}`},
 		{"fecha imposible", e038UUID(1), `"v1"`, `{"targetDate":"2026-02-30"}`},

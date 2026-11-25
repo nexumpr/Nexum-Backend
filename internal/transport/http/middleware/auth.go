@@ -45,7 +45,7 @@ func AuthenticateBearer(tokenProvider ports.TokenProvider, authorizers ...ports.
 					http.StatusUnauthorized,
 					"UNAUTHORIZED",
 					"cabecera de autorizacion requerida",
-					r.Header.Get("X-Trace-ID"),
+					TraceIDForResponse(r),
 					nil,
 				)
 				return
@@ -58,7 +58,7 @@ func AuthenticateBearer(tokenProvider ports.TokenProvider, authorizers ...ports.
 					http.StatusUnauthorized,
 					"INVALID_TOKEN_FORMAT",
 					"formato de autorizacion invalido: se requiere 'Bearer <token>'",
-					r.Header.Get("X-Trace-ID"),
+					TraceIDForResponse(r),
 					nil,
 				)
 				return
@@ -76,7 +76,7 @@ func AuthenticateBearer(tokenProvider ports.TokenProvider, authorizers ...ports.
 					http.StatusUnauthorized,
 					code,
 					"credenciales invalidas o token expirado",
-					r.Header.Get("X-Trace-ID"),
+					TraceIDForResponse(r),
 					nil,
 				)
 				return
@@ -89,7 +89,7 @@ func AuthenticateBearer(tokenProvider ports.TokenProvider, authorizers ...ports.
 					http.StatusUnauthorized,
 					"INVALID_TOKEN",
 					"credenciales invalidas o token expirado",
-					r.Header.Get("X-Trace-ID"),
+					TraceIDForResponse(r),
 					nil,
 				)
 				return
@@ -103,7 +103,7 @@ func AuthenticateBearer(tokenProvider ports.TokenProvider, authorizers ...ports.
 							http.StatusUnauthorized,
 							"UNAUTHORIZED",
 							"sesion no valida",
-							r.Header.Get("X-Trace-ID"),
+							TraceIDForResponse(r),
 							nil,
 						)
 						return
@@ -115,7 +115,7 @@ func AuthenticateBearer(tokenProvider ports.TokenProvider, authorizers ...ports.
 						http.StatusServiceUnavailable,
 						"DEPENDENCY_UNAVAILABLE",
 						"servicio no disponible",
-						r.Header.Get("X-Trace-ID"),
+						TraceIDForResponse(r),
 						nil,
 					)
 					return
@@ -146,7 +146,7 @@ func AuthenticateBearerWithSession(tokenProvider ports.TokenProvider, authorizer
 					http.StatusServiceUnavailable,
 					"DEPENDENCY_UNAVAILABLE",
 					"servicio no disponible",
-					r.Header.Get("X-Trace-ID"),
+					TraceIDForResponse(r),
 					nil,
 				)
 			})

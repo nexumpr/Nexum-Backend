@@ -19,10 +19,10 @@ import (
 const faqEsperadas = 10
 
 func TestContenidoFAQVersionYCache(t *testing.T) {
-	if appContent.Version != "2026-11-v1" {
+	if appContent.Version != "2026-11-v2" {
 		t.Fatalf("version inesperada: %q", appContent.Version)
 	}
-	if appContent.CacheKeyFAQ != "nexum:v1:content:faq:2026-11-v1" {
+	if appContent.CacheKeyFAQ != "nexum:v1:content:faq:2026-11-v2" {
 		t.Fatalf("clave de cache inesperada: %q", appContent.CacheKeyFAQ)
 	}
 	if appContent.CacheTTL != 300*time.Second {
@@ -141,6 +141,48 @@ func TestContenidoFAQPayloadExacto(t *testing.T) {
 	}
 	if string(datos) != string(segunda) {
 		t.Fatal("el payload debe ser determinista")
+	}
+}
+
+// TestContenidoFAQAfirmacionesVerificables fija que el texto publicado solo anuncie funciones
+// realmente desplegadas. La auditoria del 2026-11-24 detecto tres afirmaciones falsas: correo
+// editable (E013 ProfilePatch solo admite displayName), cuatro frecuencias cuando E023 publica
+// siete canonicas, y notificaciones/alertas push que no existen en esta version.
+func TestContenidoFAQAfirmacionesVerificables(t *testing.T) {
+	porID := make(map[string]appContent.Faq, len(appContent.FAQs()))
+	for _, faq := range appContent.FAQs() {
+		porID[faq.ID] = faq
+	}
+
+	perfil := strings.ToLower(porID["faq-06"].Answer)
+	if strings.Contains(perfil, "mi correo") || strings.Contains(porID["faq-06"].Question, "correo") {
+		t.Fatal("faq-06 no puede anunciar edicion de correo: el contrato de E013 no la admite")
+	}
+	if !strings.Contains(perfil, "no se edita") {
+		t.Fatalf("faq-06 debe declarar que el correo no se edita desde la app: %q", porID["faq-06"].Answer)
+	}
+	if !strings.Contains(perfil, "nombre") {
+		t.Fatalf("faq-06 debe limitar la edicion al nombre visible: %q", porID["faq-06"].Answer)
+	}
+
+	ingreso := strings.ToLower(porID["faq-09"].Answer)
+	for _, frecuencia := range []string{"semanal", "quincenal", "mensual", "bimestral", "trimestral", "semestral", "anual"} {
+		if !strings.Contains(ingreso, frecuencia) {
+			t.Fatalf("faq-09 debe listar las siete frecuencias canonicas; falta %q", frecuencia)
+		}
+	}
+
+	preferencias := strings.ToLower(porID["faq-10"].Answer)
+	if !strings.Contains(preferencias, "idioma") || !strings.Contains(preferencias, "zona horaria") {
+		t.Fatalf("faq-10 debe limitarse a idioma y zona horaria: %q", porID["faq-10"].Answer)
+	}
+	for _, prohibido := range []string{"horario silencioso", "alertas de presupuesto", "alertas push", "recordatorios programados"} {
+		if strings.Contains(preferencias, prohibido) && !strings.Contains(preferencias, "no se env") {
+			t.Fatalf("faq-10 no puede prometer %q sin declarar que no esta disponible", prohibido)
+		}
+	}
+	if !strings.Contains(preferencias, "no se env") {
+		t.Fatalf("faq-10 debe declarar que no se envian notificaciones ni alertas: %q", porID["faq-10"].Answer)
 	}
 }
 
