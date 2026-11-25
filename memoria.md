@@ -2293,3 +2293,14 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Topología:** `fix/h08e-oleada4-regularizacion` desde `22d4aa9`; `fix/h08e-oleada5-regularizacion` desde `b57a549` (stacked); `fix/h08e-transversal-e014-e020` sobre O5; `feat/h08i-iam-egreso-propuesta` desde `main`; `fix/h08e-regularizacion-54-gobierno` desde `main`.
 - **Ramas de Liz:** `liz-oleada4` y `liz-oleada5` se conservan inmutables como evidencia.
 - **Estados:** `REGULARIZACION_OLEADAS_4_5=IN_PROGRESS`; `MERGE=NOT_AUTHORIZED`; `RELEASE=NOT_AUTHORIZED`; `AWS_MUTATION=NOT_AUTHORIZED`.
+
+### Fase correctiva - PR y resultados 2026-11-24
+
+- **PR #143** `fix/h08e-oleada4-regularizacion` (base main): regulariza Oleada 4. Incluye E052 con periodo normalizado, E062 con UUID v5 determinista, cuotas separadas por dominio, staticcheck/gosec/gitleaks en cero y K-Means v2. HEAD de referencia `ba3502c7027911dd6894ca6fd8956d9e6573c9be`.
+- **PR #144** `feat/h08i-iam-egreso-propuesta` (base main): IAM `OUTBOX#*`/`SCHEDULE#*`, ARN exactos de v0.19.2 y v0.20.0, modulo `egreso_fcm` deshabilitado, comparativa FinOps y propuesta de observabilidad. HEAD `28650360e3afe7472a6169535db2cdb864dfe0f8`; CI 13/13 PASS. ZIP de secretos `BLOCKED_AUTHORIZATION`.
+- **PR #145** `fix/h08e-oleada5-regularizacion` (stacked sobre #143): recordatorios con puntero `REMINDERPTR#`, paginacion, Health contractual, purga E014 de `OUTBOX#GLOBAL`/`SCHEDULE#GLOBAL` y exportacion E020 (OpenAPI aditivo, 104 esquemas, `COMPATIBLE`). HEAD en evolucion; CI en curso.
+- **PR #146** `fix/h08e-regularizacion-54-gobierno` (base main): RFC-023, Gate de regularizacion, RFC-025, traceId del middleware, E005 413/ErrorEnvelope, E011 token-correo, E041 no-op, E070 FAQ y prueba de regresion de las 75 operaciones. HEAD de referencia `c9b23b04516e6affa786ce5465416956f6b9b7f1`.
+- **ML v2:** `kmeans-v2` con recorte P0,5/P99,5 (`amount_clip` 4618.905/338244.24), mediana fija `trained_median_cents=24353.5`, artefactos con SHA `9670c91b...168c` (modelo), `dd40de5e...7e2e` (metricas) y `322f2d37...8930` (referencia); v1 conservado. Silueta 0,780848 (train) y 0,775027 (holdout), descriptivas. `ML_GATE_APPROVED=NO`.
+- **Pruebas:** `go test ./... -count=1` PASS en O4 y O5; Staticcheck v0.8.2, Gosec v2.30.0 y Gitleaks 8.30.1 en cero; SDD integral, H06 y paridad PASS; `tests/infra/publicacion` 110 PASS; Terraform 521 y FinOps 258 PASS en #144.
+- **Scheduler durable y productor FCM:** en implementacion al cierre de esta entrada; no se declaran terminados hasta tener pruebas y CI.
+- **Estados:** `OLEADA_4_PR_READY=YES`; `OLEADA_5_PR_READY=EN_CURSO`; `HISTORICOS_PR_READY=YES`; `IAC_PR_READY=YES`; `MERGE=NOT_AUTHORIZED`; `RELEASE=NOT_AUTHORIZED`; `DEPLOY=NOT_RUN`; `AWS_MUTATION=NOT_AUTHORIZED`.
