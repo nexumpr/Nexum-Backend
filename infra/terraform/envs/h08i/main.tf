@@ -59,6 +59,17 @@ locals {
   arn_artefactos_publicador = "arn:aws:iam::${local.cuenta_id}:role/${local.nombre_artefactos_publicador}"
   arn_secretos_publicador   = "arn:aws:iam::${local.cuenta_id}:role/${local.nombre_secretos_publicador}"
   arn_secretos_gestor_iac   = "arn:aws:iam::${local.cuenta_id}:role/${local.nombre_secretos_gestor_iac}"
+
+  # Rollback mínimo que la lista de custodia debe conservar. v0.19.2 estuvo
+  # desplegado en LT v17 y v0.20.0 es el release posterior: si falta cualquiera,
+  # un instance_refresh hacia atrás falla con AccessDenied al descargar el
+  # binario o la unidad. El `check` de checks.tf avisa; no crea recursos.
+  artefactos_release_requeridos = [
+    "arn:aws:s3:::${local.bucket_artefactos_nombre}/releases/v0.19.2+3098f379d7ab/nexum-backend-linux-arm64",
+    "arn:aws:s3:::${local.bucket_artefactos_nombre}/releases/v0.19.2+3098f379d7ab/nexum-backend.service",
+    "arn:aws:s3:::${local.bucket_artefactos_nombre}/releases/v0.20.0+4bf6758d372/nexum-backend-linux-arm64",
+    "arn:aws:s3:::${local.bucket_artefactos_nombre}/releases/v0.20.0+4bf6758d372/nexum-backend.service",
+  ]
 }
 
 module "red" {

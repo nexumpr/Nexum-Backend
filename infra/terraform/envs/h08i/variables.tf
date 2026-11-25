@@ -155,10 +155,28 @@ variable "redis_password_aplicacion" {
 
 # --- I-060: IAM / OIDC ------------------------------------------------------
 
+# La lista efectiva se inyecta desde el tfvars de custodia (fuera del repositorio).
+# `ARTEFACTOS_RELEASE.md` documenta los ARN exactos que deben conservarse para el
+# release vigente y para el rollback. En particular, `v0.19.2+3098f379d7ab` estuvo
+# desplegado y debe seguir autorizado aunque ya no sea el release activo; omitirlo
+# rompe el rollback a LT v17.
 variable "iam_artifact_object_arns" {
-  description = "ARN exactos de los dos objetos S3 de I-020; vacío mientras I-080 no defina bucket y keys"
+  description = <<-EOT
+    ARN exactos de objetos S3 de releases (binario y unidad systemd). La lista
+    efectiva vive en el tfvars de custodia; `ARTEFACTOS_RELEASE.md` documenta los
+    ARN de v0.19.2 y v0.20.0. Sin comodines de bucket o prefijo: el módulo IAM
+    exige un objeto exacto por ARN.
+  EOT
   type        = list(string)
   default     = []
+
+  validation {
+    condition = alltrue([
+      for arn in var.iam_artifact_object_arns :
+      can(regex("^arn:aws:s3:::[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]/.+$", arn)) && !strcontains(arn, "*") && !endswith(arn, "/")
+    ])
+    error_message = "Cada ARN debe ser un objeto S3 exacto (sin '*', sin terminar en '/') para no ampliar el permiso al bucket o prefijo."
+  }
 }
 
 variable "iam_cloudwatch_log_group_arns" {

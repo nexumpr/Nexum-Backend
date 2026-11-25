@@ -33,6 +33,27 @@ check "identidades_publicacion_coherentes" {
   }
 }
 
+# Rollback de releases: el release v0.19.2 estuvo desplegado y v0.20.0 es el
+# posterior. La lista efectiva vive en el tfvars de custodia; este `check` avisa
+# si se retira alguno de los cuatro ARN exactos sin tocar IAM ni crear recursos.
+check "artefactos_release_rollback" {
+  assert {
+    condition = alltrue([
+      for arn in local.artefactos_release_requeridos :
+      contains(var.iam_artifact_object_arns, arn)
+    ])
+    error_message = "Faltan ARN de v0.19.2 o v0.20.0 en iam_artifact_object_arns; el rollback de LT fallará con AccessDenied."
+  }
+
+  assert {
+    condition = alltrue([
+      for arn in local.artefactos_release_requeridos :
+      !strcontains(arn, "*") && !endswith(arn, "/")
+    ])
+    error_message = "Los ARN de rollback deben ser objetos exactos, sin wildcard ni prefijo."
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Invariantes BLOQUEANTES (RFC-011).
 #

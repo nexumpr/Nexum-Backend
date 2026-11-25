@@ -56,6 +56,13 @@ locals {
       # E005 (RFC-016 17.2): token de recuperacion y cola durable del worker.
       "RESET#*",
       "QUEUE#*",
+      # H08-E: outbox global de push (FCM) y programacion global de recordatorios.
+      # Ambas son particiones de sistema (no de usuario) y se usan con GetItem/
+      # PutItem/UpdateItem/DeleteItem/Query/ConditionCheckItem; NO conceden Scan.
+      # Origen: PK=OUTBOX#GLOBAL del outbox push y PK=SCHEDULE#GLOBAL con
+      # SK=DUE#<RFC3339Nano>#<id> para el scheduler de recordatorios.
+      "OUTBOX#*",
+      "SCHEDULE#*",
       "PUBLIC#CATALOG",
       "PUBLIC#CONTENT",
     ],
