@@ -10,7 +10,10 @@ name: Go Backend CI
 
 on:
   pull_request:
-    branches: [main, 'release/**']
+    # `fix/**` y `feat/**` permiten que los PR apilados de la regularización
+    # (RFC-023) ejecuten los mismos checks que un PR contra main. No cambia
+    # jobs, permisos, umbrales ni required checks.
+    branches: [main, 'release/**', 'fix/**', 'feat/**']
   push:
     branches: [main]
 

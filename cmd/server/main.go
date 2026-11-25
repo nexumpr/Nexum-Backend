@@ -219,6 +219,48 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	}
 	montarOleada3(depsOleada3)
 
+	// Oleada 4: registro cerrado E052–E063. Hereda las mismas dependencias reales y
+	// sólo monta los E-ID con implementación presente en esta rama.
+	depsOleada4 := &dependenciasOleada4{
+		Router:     router,
+		Dynamo:     dynamoAPI,
+		Redis:      clienteRedis,
+		Tabla:      cfgDeps.TablaDynamoDB,
+		Logger:     logger,
+		Tokens:     verificadorTokens,
+		Authorizer: logoutStore,
+		PushSealer: pushSealerOleada4(),
+		CursorKey:  claveCursorDesdeEntorno(),
+	}
+	depsOleada4.Preferencias = preferenciasWorkerOleada4(depsOleada4)
+	montarOleada4(depsOleada4)
+
+	// E063: el worker durable procesa la cola READALL fuera de la petición. Sin
+	// persistencia no se arranca; el endpoint seguiría aceptando trabajo que nadie
+	// ejecutaría, por lo que el fallo se registra y no se simula.
+	if cerrarReadAll, errReadAll := iniciarReadAllWorkerOleada4(ctx, depsOleada4); errReadAll != nil {
+		logger.WarnContext(ctx, "E063: worker durable no iniciado",
+			slog.String("clase", "READALL_WORKER_NO_INICIADO"))
+	} else {
+		defer cerrarReadAll()
+	}
+
+	// Emisor FCM real: se arranca sólo si existe credencial de servidor válida en
+	// el secret store/entorno. Sin ella el worker queda inerte y no se afirma E2E.
+	cfgFCM, errFCM := configuracionFCMOleada4DesdeEntorno()
+	if errFCM != nil {
+		logger.WarnContext(ctx, "FCM Oleada 4: credencial no inyectada; worker no iniciado",
+			slog.String("clase", "FCM_CREDENCIAL_AUSENTE"))
+	} else {
+		cerrarFCM, errWorker := iniciarFCMWorkerOleada4(ctx, depsOleada4, cfgFCM)
+		if errWorker != nil {
+			logger.WarnContext(ctx, "FCM Oleada 4: worker no iniciado",
+				slog.String("clase", "FCM_WORKER_NO_INICIADO"))
+		} else {
+			defer cerrarFCM()
+		}
+	}
+
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
 	// Start bloquea hasta que el listener falla o se cierra; el canal transporta

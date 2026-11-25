@@ -1,0 +1,4185 @@
+{
+  "feature_order": [
+    "log_importe_z",
+    "hora_sin",
+    "hora_cos",
+    "dia_sin",
+    "dia_cos",
+    "categoria_ahorro",
+    "categoria_comida",
+    "categoria_ingreso",
+    "categoria_otros",
+    "categoria_servicios",
+    "categoria_transporte",
+    "categoria_vivienda",
+    "es_recurrente",
+    "ratio_sobre_mediana"
+  ],
+  "holdout": {
+    "records": [
+      {
+        "amount_cents": 46921,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 25375,
+        "category": "comida",
+        "day_of_week": 0,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 42751,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": false
+      },
+      {
+        "amount_cents": 296146,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 9456,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 229749,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 241356,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 45702,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": false
+      },
+      {
+        "amount_cents": 289304,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 265095,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 44471,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 14736,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 8257,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 6,
+        "recurring": true
+      },
+      {
+        "amount_cents": 54757,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 6512,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 260914,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 10091,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 39166,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": false
+      },
+      {
+        "amount_cents": 23474,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 40818,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 52864,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": false
+      },
+      {
+        "amount_cents": 21848,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 265841,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 9961,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 23170,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 15,
+        "recurring": true
+      },
+      {
+        "amount_cents": 10336,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 44415,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 5729,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 22031,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 265495,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 5910,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8853,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 17851,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 17396,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 7695,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 16772,
+        "category": "comida",
+        "day_of_week": 1,
+        "hour": 13,
+        "recurring": true
+      },
+      {
+        "amount_cents": 308285,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8600,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 9346,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 271177,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 7447,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 50859,
+        "category": "servicios",
+        "day_of_week": 4,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 18178,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 8108,
+        "category": "transporte",
+        "day_of_week": 5,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 281719,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 10808,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 33158,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 22,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8134,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 24060,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 3877,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 6,
+        "recurring": true
+      },
+      {
+        "amount_cents": 62121,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 17730,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 268668,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 274820,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 52643,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 21,
+        "recurring": true
+      },
+      {
+        "amount_cents": 291951,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 12875,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 67704,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 46611,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 21,
+        "recurring": false
+      },
+      {
+        "amount_cents": 9277,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 313369,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 12,
+        "recurring": true
+      },
+      {
+        "amount_cents": 4543,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 21054,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 55587,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 299490,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 17210,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 21862,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 43828,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 301852,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 25260,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 26086,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 16,
+        "recurring": false
+      },
+      {
+        "amount_cents": 214170,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 277538,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 6496,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 281512,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 49514,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 21,
+        "recurring": false
+      },
+      {
+        "amount_cents": 54666,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8172,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 21387,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 23738,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 66620,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 6540,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 14764,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 49766,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 6481,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 17057,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 11,
+        "recurring": false
+      },
+      {
+        "amount_cents": 17735,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 209128,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 12,
+        "recurring": true
+      },
+      {
+        "amount_cents": 30489,
+        "category": "servicios",
+        "day_of_week": 4,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 10378,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 39747,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": false
+      },
+      {
+        "amount_cents": 9373,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 17846,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 264891,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 36180,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 205867,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 43219,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": false
+      },
+      {
+        "amount_cents": 28442,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 45962,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 5248,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 291497,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 16926,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 11,
+        "recurring": false
+      },
+      {
+        "amount_cents": 7175,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 6,
+        "recurring": false
+      },
+      {
+        "amount_cents": 353802,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 207625,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 12,
+        "recurring": true
+      },
+      {
+        "amount_cents": 50320,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": false
+      },
+      {
+        "amount_cents": 48205,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 281324,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 6410,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 3558,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8395,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 6811,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 18910,
+        "category": "comida",
+        "day_of_week": 1,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 41609,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 9541,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 260006,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 38416,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 21,
+        "recurring": false
+      },
+      {
+        "amount_cents": 40226,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 18,
+        "recurring": false
+      },
+      {
+        "amount_cents": 19405,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 15144,
+        "category": "comida",
+        "day_of_week": 1,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 16459,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 11,
+        "recurring": false
+      },
+      {
+        "amount_cents": 34416,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": false
+      },
+      {
+        "amount_cents": 15340,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 261728,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 274668,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 33873,
+        "category": "servicios",
+        "day_of_week": 4,
+        "hour": 19,
+        "recurring": false
+      },
+      {
+        "amount_cents": 4814,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 10524,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 62723,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 55047,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": false
+      },
+      {
+        "amount_cents": 5110,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 21448,
+        "category": "comida",
+        "day_of_week": 1,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 11006,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 44697,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 21,
+        "recurring": true
+      },
+      {
+        "amount_cents": 26176,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 44358,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 22,
+        "recurring": true
+      },
+      {
+        "amount_cents": 321728,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 271014,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 313535,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": false
+      },
+      {
+        "amount_cents": 28520,
+        "category": "servicios",
+        "day_of_week": 3,
+        "hour": 17,
+        "recurring": true
+      },
+      {
+        "amount_cents": 297292,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 332248,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 254701,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 56266,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 246460,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 283439,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 12615,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 11,
+        "recurring": false
+      },
+      {
+        "amount_cents": 17503,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 46669,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 17,
+        "recurring": false
+      },
+      {
+        "amount_cents": 21050,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 5760,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 42651,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 15952,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 36930,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 13385,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 39052,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": false
+      },
+      {
+        "amount_cents": 299138,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 16149,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 9898,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 16272,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 316809,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 55032,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 21,
+        "recurring": true
+      },
+      {
+        "amount_cents": 16901,
+        "category": "comida",
+        "day_of_week": 1,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 50492,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": false
+      },
+      {
+        "amount_cents": 8586,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 14047,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8284,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 40999,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 275851,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 16279,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 28275,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 228295,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 18528,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 22263,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 240341,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 7440,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 22562,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 6261,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 220913,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 22177,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 10,
+        "recurring": false
+      },
+      {
+        "amount_cents": 233701,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 5829,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 10759,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 19817,
+        "category": "comida",
+        "day_of_week": 0,
+        "hour": 15,
+        "recurring": false
+      },
+      {
+        "amount_cents": 16511,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 19393,
+        "category": "comida",
+        "day_of_week": 1,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 321469,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 9163,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 4308,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 11,
+        "recurring": false
+      },
+      {
+        "amount_cents": 37066,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 249187,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 19743,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 16,
+        "recurring": false
+      },
+      {
+        "amount_cents": 11593,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 20523,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 16905,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 40293,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 18,
+        "recurring": true
+      },
+      {
+        "amount_cents": 14060,
+        "category": "comida",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": false
+      },
+      {
+        "amount_cents": 264367,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 37111,
+        "category": "servicios",
+        "day_of_week": 4,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 57289,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 22,
+        "recurring": true
+      },
+      {
+        "amount_cents": 252261,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 252860,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 269301,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 17949,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 203594,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 45047,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": false
+      },
+      {
+        "amount_cents": 334508,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 39046,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": false
+      },
+      {
+        "amount_cents": 11699,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 9619,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8951,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 13089,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 10012,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 49471,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 21,
+        "recurring": true
+      },
+      {
+        "amount_cents": 46299,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8771,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 33033,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 9120,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 50838,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 261976,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 10892,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 26012,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 15362,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 16,
+        "recurring": false
+      },
+      {
+        "amount_cents": 225168,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 37360,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 59947,
+        "category": "servicios",
+        "day_of_week": 3,
+        "hour": 17,
+        "recurring": true
+      },
+      {
+        "amount_cents": 222875,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 55485,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 309220,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 6439,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 10414,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 246275,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 9182,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 15386,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 9910,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 277320,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 286020,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 298575,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 231715,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 60508,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 18,
+        "recurring": true
+      },
+      {
+        "amount_cents": 41317,
+        "category": "servicios",
+        "day_of_week": 4,
+        "hour": 18,
+        "recurring": true
+      },
+      {
+        "amount_cents": 16106,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 36277,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": false
+      },
+      {
+        "amount_cents": 282406,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 46943,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8455,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 66922,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 40439,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": false
+      },
+      {
+        "amount_cents": 41325,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 30098,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 275919,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 7233,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 19728,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 16,
+        "recurring": false
+      },
+      {
+        "amount_cents": 212464,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 12161,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 9433,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 18181,
+        "category": "comida",
+        "day_of_week": 1,
+        "hour": 16,
+        "recurring": false
+      },
+      {
+        "amount_cents": 201089,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 7703,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 14349,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 12430,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 12947,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 15,
+        "recurring": false
+      },
+      {
+        "amount_cents": 51229,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 16,
+        "recurring": true
+      },
+      {
+        "amount_cents": 44452,
+        "category": "servicios",
+        "day_of_week": 4,
+        "hour": 17,
+        "recurring": false
+      },
+      {
+        "amount_cents": 17511,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 39131,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": false
+      },
+      {
+        "amount_cents": 52264,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": false
+      },
+      {
+        "amount_cents": 5658,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8365,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 241684,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 245910,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 309307,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 281719,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 339360,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 19720,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 9188,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 17549,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 23553,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 29072,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 52689,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 17,
+        "recurring": true
+      },
+      {
+        "amount_cents": 20243,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 15,
+        "recurring": false
+      },
+      {
+        "amount_cents": 330455,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 7582,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 42185,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 36711,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 15305,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 16,
+        "recurring": false
+      },
+      {
+        "amount_cents": 54825,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 45636,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 18,
+        "recurring": true
+      },
+      {
+        "amount_cents": 23032,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 18457,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 12121,
+        "category": "transporte",
+        "day_of_week": 6,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 21546,
+        "category": "comida",
+        "day_of_week": 1,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 60604,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 17,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8929,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 47267,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 282260,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 261936,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 4803,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 352024,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 20850,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 21659,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 267151,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 48803,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 21,
+        "recurring": true
+      },
+      {
+        "amount_cents": 21824,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 280649,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 6596,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 6,
+        "recurring": true
+      },
+      {
+        "amount_cents": 238187,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 34089,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 21,
+        "recurring": true
+      },
+      {
+        "amount_cents": 47959,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 21,
+        "recurring": true
+      },
+      {
+        "amount_cents": 323375,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 7752,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 36654,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 17,
+        "recurring": false
+      },
+      {
+        "amount_cents": 2774,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 18893,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": false
+      },
+      {
+        "amount_cents": 55742,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": false
+      },
+      {
+        "amount_cents": 17441,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 40025,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 21,
+        "recurring": true
+      },
+      {
+        "amount_cents": 58701,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 6720,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 283956,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 51371,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 21,
+        "recurring": false
+      },
+      {
+        "amount_cents": 59075,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 21,
+        "recurring": true
+      },
+      {
+        "amount_cents": 10267,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 37937,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": false
+      },
+      {
+        "amount_cents": 9561,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 308682,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 257117,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 37177,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 21725,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 15,
+        "recurring": true
+      },
+      {
+        "amount_cents": 19020,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 15,
+        "recurring": false
+      },
+      {
+        "amount_cents": 72710,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 17,
+        "recurring": false
+      },
+      {
+        "amount_cents": 248748,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 5070,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 6429,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 19546,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 41859,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 22,
+        "recurring": true
+      },
+      {
+        "amount_cents": 9578,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 45817,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 18,
+        "recurring": true
+      },
+      {
+        "amount_cents": 14983,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 10,
+        "recurring": false
+      },
+      {
+        "amount_cents": 23542,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 19288,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 6109,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 6,
+        "recurring": false
+      },
+      {
+        "amount_cents": 13947,
+        "category": "comida",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": false
+      },
+      {
+        "amount_cents": 16160,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 7676,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 25109,
+        "category": "comida",
+        "day_of_week": 0,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 18150,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 334522,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 24438,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 295533,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 11,
+        "recurring": false
+      },
+      {
+        "amount_cents": 270502,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 12,
+        "recurring": true
+      },
+      {
+        "amount_cents": 17102,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 6798,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 224358,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 268298,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 15490,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 11,
+        "recurring": false
+      },
+      {
+        "amount_cents": 41538,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 39938,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 22,
+        "recurring": false
+      },
+      {
+        "amount_cents": 7274,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8676,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 39577,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 40764,
+        "category": "servicios",
+        "day_of_week": 3,
+        "hour": 21,
+        "recurring": true
+      },
+      {
+        "amount_cents": 238902,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 9254,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 321336,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 321067,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 20071,
+        "category": "comida",
+        "day_of_week": 0,
+        "hour": 15,
+        "recurring": false
+      },
+      {
+        "amount_cents": 50246,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8064,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 6,
+        "recurring": true
+      },
+      {
+        "amount_cents": 7211,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 52060,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 18,
+        "recurring": true
+      },
+      {
+        "amount_cents": 4663,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8998,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 2995,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 258979,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 324732,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 24847,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 11513,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 15,
+        "recurring": false
+      },
+      {
+        "amount_cents": 6693,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 10526,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 10390,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 274282,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8889,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 8411,
+        "category": "transporte",
+        "day_of_week": 6,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 29128,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 17,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8201,
+        "category": "transporte",
+        "day_of_week": 5,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 11580,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 11545,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 15,
+        "recurring": false
+      },
+      {
+        "amount_cents": 6873,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 9204,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 22476,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 11,
+        "recurring": false
+      },
+      {
+        "amount_cents": 16937,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 8063,
+        "category": "transporte",
+        "day_of_week": 5,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 38415,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": false
+      },
+      {
+        "amount_cents": 54538,
+        "category": "servicios",
+        "day_of_week": 4,
+        "hour": 23,
+        "recurring": true
+      },
+      {
+        "amount_cents": 10752,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 10627,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 5,
+        "recurring": false
+      },
+      {
+        "amount_cents": 196509,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 258718,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 19271,
+        "category": "comida",
+        "day_of_week": 1,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 18320,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 8606,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 67602,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 46837,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 21282,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 299316,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 269384,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": false
+      },
+      {
+        "amount_cents": 265713,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 220854,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 7220,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 13023,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 13,
+        "recurring": true
+      },
+      {
+        "amount_cents": 6529,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": false
+      },
+      {
+        "amount_cents": 246548,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 306956,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 9556,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 5920,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 292775,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 6467,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 285633,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 83375,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 44916,
+        "category": "servicios",
+        "day_of_week": 4,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 42292,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 17,
+        "recurring": true
+      },
+      {
+        "amount_cents": 45774,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 21,
+        "recurring": true
+      },
+      {
+        "amount_cents": 48497,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 9310,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 247999,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 18382,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 10,
+        "recurring": false
+      },
+      {
+        "amount_cents": 19287,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 64334,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 18,
+        "recurring": false
+      },
+      {
+        "amount_cents": 186771,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 48151,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 16,
+        "recurring": true
+      },
+      {
+        "amount_cents": 252252,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 45238,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 53277,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 17,
+        "recurring": true
+      },
+      {
+        "amount_cents": 18785,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 260080,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": false
+      },
+      {
+        "amount_cents": 20212,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 8441,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 38877,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 15392,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 12,
+        "recurring": false
+      },
+      {
+        "amount_cents": 21519,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 11,
+        "recurring": false
+      },
+      {
+        "amount_cents": 9930,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 17547,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 11,
+        "recurring": false
+      },
+      {
+        "amount_cents": 25953,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 278029,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8980,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 7642,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 19532,
+        "category": "comida",
+        "day_of_week": 2,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 17574,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 11,
+        "recurring": false
+      },
+      {
+        "amount_cents": 6119,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 7299,
+        "category": "transporte",
+        "day_of_week": 1,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 49892,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 21,
+        "recurring": false
+      },
+      {
+        "amount_cents": 6355,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 10,
+        "recurring": false
+      },
+      {
+        "amount_cents": 232953,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 35798,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 302075,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 63595,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 22,
+        "recurring": false
+      },
+      {
+        "amount_cents": 7980,
+        "category": "transporte",
+        "day_of_week": 4,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 302427,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 243502,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 9179,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 73261,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 19,
+        "recurring": true
+      },
+      {
+        "amount_cents": 11745,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 22838,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 408325,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 6741,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 7,
+        "recurring": true
+      },
+      {
+        "amount_cents": 8836,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 7,
+        "recurring": false
+      },
+      {
+        "amount_cents": 19150,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 14,
+        "recurring": true
+      },
+      {
+        "amount_cents": 263696,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 257061,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 233280,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 232831,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 24531,
+        "category": "comida",
+        "day_of_week": 4,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 22232,
+        "category": "comida",
+        "day_of_week": 3,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 42845,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 246855,
+        "category": "vivienda",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 47108,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 19,
+        "recurring": false
+      },
+      {
+        "amount_cents": 27514,
+        "category": "comida",
+        "day_of_week": 0,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 6528,
+        "category": "transporte",
+        "day_of_week": 6,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 26881,
+        "category": "comida",
+        "day_of_week": 1,
+        "hour": 12,
+        "recurring": true
+      },
+      {
+        "amount_cents": 6846,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 8,
+        "recurring": true
+      },
+      {
+        "amount_cents": 21925,
+        "category": "comida",
+        "day_of_week": 0,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 18581,
+        "category": "comida",
+        "day_of_week": 1,
+        "hour": 13,
+        "recurring": false
+      },
+      {
+        "amount_cents": 68942,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 21,
+        "recurring": false
+      },
+      {
+        "amount_cents": 327220,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 256160,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 7496,
+        "category": "transporte",
+        "day_of_week": 0,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 300240,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 35471,
+        "category": "servicios",
+        "day_of_week": 5,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 39932,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": true
+      },
+      {
+        "amount_cents": 12938,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 9,
+        "recurring": false
+      },
+      {
+        "amount_cents": 15579,
+        "category": "comida",
+        "day_of_week": 5,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 315644,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 9,
+        "recurring": true
+      },
+      {
+        "amount_cents": 283065,
+        "category": "vivienda",
+        "day_of_week": 0,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 323293,
+        "category": "vivienda",
+        "day_of_week": 1,
+        "hour": 11,
+        "recurring": true
+      },
+      {
+        "amount_cents": 17302,
+        "category": "comida",
+        "day_of_week": 6,
+        "hour": 14,
+        "recurring": false
+      },
+      {
+        "amount_cents": 53011,
+        "category": "servicios",
+        "day_of_week": 6,
+        "hour": 20,
+        "recurring": false
+      },
+      {
+        "amount_cents": 8334,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 8,
+        "recurring": false
+      },
+      {
+        "amount_cents": 8714,
+        "category": "transporte",
+        "day_of_week": 3,
+        "hour": 10,
+        "recurring": true
+      },
+      {
+        "amount_cents": 11786,
+        "category": "transporte",
+        "day_of_week": 2,
+        "hour": 7,
+        "recurring": true
+      }
+    ],
+    "samples": [
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          0.201003372917,
+          -0.866025403784,
+          0.5,
+          -0.974927912182,
+          -0.222520933956,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          1.0,
+          1.926663518591
+        ],
+        "index": 0,
+        "record": {
+          "amount_cents": 46921,
+          "category": "servicios",
+          "day_of_week": 5,
+          "hour": 20,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          -0.257881055279,
+          -0.258819045103,
+          -0.965925826289,
+          0.0,
+          1.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.041944689675
+        ],
+        "index": 1,
+        "record": {
+          "amount_cents": 25375,
+          "category": "comida",
+          "day_of_week": 0,
+          "hour": 13,
+          "recurring": false
+        }
+      },
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          0.13152252639,
+          -0.866025403784,
+          0.5,
+          -0.781831482468,
+          0.623489801859,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.755435563677
+        ],
+        "index": 2,
+        "record": {
+          "amount_cents": 42751,
+          "category": "servicios",
+          "day_of_week": 6,
+          "hour": 20,
+          "recurring": false
+        }
+      },
+      {
+        "expected_cluster": 1,
+        "expected_features": [
+          1.576403140491,
+          0.707106781187,
+          -0.707106781187,
+          0.781831482468,
+          0.623489801859,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          10.0
+        ],
+        "index": 3,
+        "record": {
+          "amount_cents": 296146,
+          "category": "vivienda",
+          "day_of_week": 1,
+          "hour": 9,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          -0.994750945321,
+          0.866025403784,
+          -0.5,
+          0.433883739118,
+          -0.900968867902,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.388280945244
+        ],
+        "index": 4,
+        "record": {
+          "amount_cents": 9456,
+          "category": "transporte",
+          "day_of_week": 3,
+          "hour": 8,
+          "recurring": false
+        }
+      },
+      {
+        "expected_cluster": 1,
+        "expected_features": [
+          1.386883727023,
+          0.5,
+          -0.866025403784,
+          0.781831482468,
+          0.623489801859,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          9.433921202291
+        ],
+        "index": 5,
+        "record": {
+          "amount_cents": 229749,
+          "category": "vivienda",
+          "day_of_week": 1,
+          "hour": 10,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          -1.529557050372,
+          1.0,
+          0.0,
+          0.433883739118,
+          -0.900968867902,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.0,
+          0.189660829039
+        ],
+        "index": 49,
+        "record": {
+          "amount_cents": 3877,
+          "category": "transporte",
+          "day_of_week": 3,
+          "hour": 6,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          -1.529557050372,
+          0.707106781187,
+          -0.707106781187,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.189660829039
+        ],
+        "index": 61,
+        "record": {
+          "amount_cents": 4543,
+          "category": "transporte",
+          "day_of_week": 0,
+          "hour": 9,
+          "recurring": false
+        }
+      },
+      {
+        "expected_cluster": 1,
+        "expected_features": [
+          1.675629496654,
+          0.258819045103,
+          -0.965925826289,
+          0.781831482468,
+          0.623489801859,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          10.0
+        ],
+        "index": 103,
+        "record": {
+          "amount_cents": 353802,
+          "category": "vivienda",
+          "day_of_week": 1,
+          "hour": 11,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 1,
+        "expected_features": [
+          1.675629496654,
+          0.707106781187,
+          -0.707106781187,
+          0.974927912182,
+          -0.222520933956,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          10.0
+        ],
+        "index": 273,
+        "record": {
+          "amount_cents": 339360,
+          "category": "vivienda",
+          "day_of_week": 2,
+          "hour": 9,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          -1.529557050372,
+          0.866025403784,
+          -0.5,
+          0.781831482468,
+          0.623489801859,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.0,
+          0.189660829039
+        ],
+        "index": 312,
+        "record": {
+          "amount_cents": 2774,
+          "category": "transporte",
+          "day_of_week": 1,
+          "hour": 8,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 1,
+        "expected_features": [
+          1.675629496654,
+          0.5,
+          -0.866025403784,
+          0.974927912182,
+          -0.222520933956,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          10.0
+        ],
+        "index": 464,
+        "record": {
+          "amount_cents": 408325,
+          "category": "vivienda",
+          "day_of_week": 2,
+          "hour": 10,
+          "recurring": true
+        }
+      }
+    ],
+    "seed": 20261117
+  },
+  "median": {
+    "cents": 24353.5,
+    "definition": "trained_median_of_clipped_amounts"
+  },
+  "model_version": "kmeans-v2",
+  "schema_version": 2,
+  "train": {
+    "data_file": "datos_sinteticos_v1.json",
+    "data_sha256": "8d2bf29691a08eee6a1cd1230ad81b8454712424721e5e3e21bb9e9bd99918fd",
+    "samples": [
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          -0.534913170007,
+          -0.5,
+          -0.866025403784,
+          0.433883739118,
+          -0.900968867902,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.718911039481
+        ],
+        "index": 0,
+        "record": {
+          "amount_cents": 17508,
+          "category": "comida",
+          "day_of_week": 3,
+          "hour": 14,
+          "recurring": false
+        }
+      },
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          -0.608662763021,
+          0.0,
+          -1.0,
+          -0.433883739118,
+          -0.900968867902,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.651282156569
+        ],
+        "index": 1,
+        "record": {
+          "amount_cents": 15861,
+          "category": "comida",
+          "day_of_week": 4,
+          "hour": 12,
+          "recurring": false
+        }
+      },
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          -0.103444150947,
+          -1.0,
+          -0.0,
+          -0.781831482468,
+          0.623489801859,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          1.0,
+          1.281417455397
+        ],
+        "index": 2,
+        "record": {
+          "amount_cents": 31207,
+          "category": "servicios",
+          "day_of_week": 6,
+          "hour": 18,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 1,
+        "expected_features": [
+          1.637483475248,
+          0.707106781187,
+          -0.707106781187,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          10.0
+        ],
+        "index": 3,
+        "record": {
+          "amount_cents": 321395,
+          "category": "vivienda",
+          "day_of_week": 0,
+          "hour": 9,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 1,
+        "expected_features": [
+          1.544584602577,
+          0.866025403784,
+          -0.5,
+          0.974927912182,
+          -0.222520933956,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          10.0
+        ],
+        "index": 4,
+        "record": {
+          "amount_cents": 283789,
+          "category": "vivienda",
+          "day_of_week": 2,
+          "hour": 8,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          0.222859126115,
+          -0.965925826289,
+          0.258819045103,
+          -0.974927912182,
+          -0.222520933956,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.983903751001
+        ],
+        "index": 5,
+        "record": {
+          "amount_cents": 48315,
+          "category": "servicios",
+          "day_of_week": 5,
+          "hour": 19,
+          "recurring": false
+        }
+      },
+      {
+        "expected_cluster": 1,
+        "expected_features": [
+          1.675629496654,
+          0.5,
+          -0.866025403784,
+          0.974927912182,
+          -0.222520933956,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          10.0
+        ],
+        "index": 7,
+        "record": {
+          "amount_cents": 340280,
+          "category": "vivienda",
+          "day_of_week": 2,
+          "hour": 10,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          -1.529557050372,
+          0.5,
+          -0.866025403784,
+          0.433883739118,
+          -0.900968867902,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.189660829039
+        ],
+        "index": 56,
+        "record": {
+          "amount_cents": 3436,
+          "category": "transporte",
+          "day_of_week": 3,
+          "hour": 10,
+          "recurring": false
+        }
+      },
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          -1.529557050372,
+          0.866025403784,
+          -0.5,
+          0.974927912182,
+          -0.222520933956,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          1.0,
+          0.189660829039
+        ],
+        "index": 111,
+        "record": {
+          "amount_cents": 1460,
+          "category": "transporte",
+          "day_of_week": 2,
+          "hour": 8,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 1,
+        "expected_features": [
+          1.675629496654,
+          0.258819045103,
+          -0.965925826289,
+          0.781831482468,
+          0.623489801859,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          10.0
+        ],
+        "index": 329,
+        "record": {
+          "amount_cents": 348733,
+          "category": "vivienda",
+          "day_of_week": 1,
+          "hour": 11,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 1,
+        "expected_features": [
+          1.675629496654,
+          0.5,
+          -0.866025403784,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0,
+          10.0
+        ],
+        "index": 409,
+        "record": {
+          "amount_cents": 338268,
+          "category": "vivienda",
+          "day_of_week": 0,
+          "hour": 10,
+          "recurring": true
+        }
+      },
+      {
+        "expected_cluster": 0,
+        "expected_features": [
+          -1.529557050372,
+          0.5,
+          -0.866025403784,
+          0.781831482468,
+          0.623489801859,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.189660829039
+        ],
+        "index": 442,
+        "record": {
+          "amount_cents": 4461,
+          "category": "transporte",
+          "day_of_week": 1,
+          "hour": 10,
+          "recurring": false
+        }
+      }
+    ]
+  }
+}

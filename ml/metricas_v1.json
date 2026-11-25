@@ -1,0 +1,39 @@
+{
+  "artifact_sha256": "1997370f1c148df63e126e477d1f931c565d2b1f9b54dd57dc1e48b1a16d48cf",
+  "model_version": "kmeans-v1",
+  "n_init": 10,
+  "python": "3.14",
+  "results": [
+    {
+      "inercia": 1384.505562,
+      "k": 2,
+      "silueta": 0.780658
+    },
+    {
+      "inercia": 735.742927,
+      "k": 3,
+      "silueta": 0.567572
+    },
+    {
+      "inercia": 462.32957,
+      "k": 4,
+      "silueta": 0.585125
+    },
+    {
+      "inercia": 403.427855,
+      "k": 5,
+      "silueta": 0.554995
+    },
+    {
+      "inercia": 357.433737,
+      "k": 6,
+      "silueta": 0.534837
+    }
+  ],
+  "samples": 500,
+  "seed": 20261116,
+  "selected_k": 2,
+  "selected_silhouette": 0.780658,
+  "sklearn": "1.9.0",
+  "synthetic_data_sha256": "8d2bf29691a08eee6a1cd1230ad81b8454712424721e5e3e21bb9e9bd99918fd"
+}
