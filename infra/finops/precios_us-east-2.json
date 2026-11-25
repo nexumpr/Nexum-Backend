@@ -325,6 +325,46 @@
       "fecha_fuente": null,
       "nota": "Si el diseno requiere NAT debe recotizarse; null no es cero"
     },
+    "NAT_GATEWAY_HORA_SUPUESTO": {
+      "servicio": "Amazon VPC",
+      "sku": "NAT Gateway hora (supuesto de lista publica)",
+      "unidad": "gateway-hora",
+      "precio_usd": "0.045",
+      "estado": "SUPUESTO",
+      "fuente": "Lista publica de precios de AWS para us-east-2, no revalidada con Price List API en esta sesion",
+      "fecha_fuente": "2026-11-24",
+      "nota": "Solo para modelado FinOps; el SKU NAT_GATEWAY_HORA sigue UNKNOWN. No se declara verificado."
+    },
+    "NAT_GATEWAY_PROCESAMIENTO_GB_SUPUESTO": {
+      "servicio": "Amazon VPC",
+      "sku": "NAT Gateway procesamiento de datos (supuesto de lista publica)",
+      "unidad": "GB-procesado",
+      "precio_usd": "0.045",
+      "estado": "SUPUESTO",
+      "fuente": "Lista publica de precios de AWS para us-east-2, no revalidada con Price List API en esta sesion",
+      "fecha_fuente": "2026-11-24",
+      "nota": "Solo para modelado FinOps; no hay SKU verificado para NAT data processing."
+    },
+    "NAT_EGRESO_INTERNET_GB_SUPUESTO": {
+      "servicio": "Amazon VPC",
+      "sku": "NAT Gateway salida a Internet (supuesto de lista publica)",
+      "unidad": "GB-salida",
+      "precio_usd": "0.09",
+      "estado": "SUPUESTO",
+      "fuente": "Lista publica de precios de AWS para us-east-2, no revalidada con Price List API en esta sesion",
+      "fecha_fuente": "2026-11-24",
+      "nota": "La franquicia mensual de 100 GB no se aplica en el modelo; el trafico FCM/OAuth es muy inferior. No se declara verificado."
+    },
+    "TRANSFERENCIA_INTERAZ_GB": {
+      "servicio": "AWS Data Transfer",
+      "sku": "transferencia regional entre zonas de disponibilidad",
+      "unidad": "GB",
+      "precio_usd": "0.01",
+      "estado": "VERIFIED_AWS",
+      "fuente": "aws pricing get-products precio_interaz (serviceCode=AWSDataTransfer, usagetype=USE2-DataTransfer-Regional-Bytes)",
+      "fecha_fuente": "2026-11-06",
+      "nota": "Misma tarifa regional que ELASTICACHE_INTERAZ_GB; se aplica si el NAT y la EC2 estan en AZ distintas"
+    },
     "INTERFACE_ENDPOINT_HORA": {
       "servicio": "Amazon VPC",
       "sku": "interface endpoint",

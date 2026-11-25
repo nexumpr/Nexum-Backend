@@ -32,9 +32,15 @@ class LogsYRetencion(unittest.TestCase):
         self.assertIn("var.retencion_dias <= 30", self.main)
         self.assertIn("no debe superar 30 d", self.main)
 
-    def test_cuatro_metric_filters_canonicos(self) -> None:
+    def test_metric_filters_canonicos_y_fcm_condicionales(self) -> None:
         filtros = [n for t, n in self.r if t == "aws_cloudwatch_log_metric_filter"]
-        self.assertEqual(sorted(filtros), ["auth_401", "errores_5xx", "rate_limit_429", "readiness_no_200"])
+        for base in ("auth_401", "errores_5xx", "rate_limit_429", "readiness_no_200"):
+            self.assertIn(base, filtros, base)
+        for fcm in ("arranques_proceso", "arranque_version_esperada",
+                    "arranque_version_inesperada", "fcm_worker_heartbeat",
+                    "scheduler_heartbeat", "fcm_errores_envio", "access_denied",
+                    "scheduler_lag"):
+            self.assertIn(fcm, filtros, fcm)
         for patron in ('{ $.status >= 500 }', '{ $.status = 401 }', '{ $.status = 429 }',
                        '{ $.route = \\"/api/v1/health/ready\\" && $.status != 200 }'):
             self.assertIn(patron, self.main, patron)
@@ -47,10 +53,14 @@ class AlarmasYPresupuesto(unittest.TestCase):
         cls.vars = _leer(MODULO / "variables.tf")
         cls.r = recursos(cls.main)
 
-    def test_cinco_alarmas_con_umbral_y_runbook(self) -> None:
+    def test_alarmas_existentes_y_fcm_condicionales(self) -> None:
         alarmas = {n for t, n in self.r if t == "aws_cloudwatch_metric_alarm"}
-        self.assertEqual(alarmas, {"targets_sanos", "errores_5xx", "auth_401", "readiness_no_200",
-                                   "rate_limit_429", "redis_conexiones", "dynamodb_throttles", "logs_sin_eventos"})
+        for base in ("targets_sanos", "errores_5xx", "auth_401", "readiness_no_200",
+                     "rate_limit_429", "redis_conexiones", "dynamodb_throttles", "logs_sin_eventos"):
+            self.assertIn(base, alarmas, base)
+        for fcm in ("fcm_worker_sin_latido", "scheduler_sin_latido", "fcm_errores_envio",
+                    "access_denied", "scheduler_lag", "arranque_version_inesperada"):
+            self.assertIn(fcm, alarmas, fcm)
         self.assertRegex(self.main, r'metric_name\s*=\s*"HealthyHostCount"')
         self.assertRegex(self.main, r"threshold\s*=\s*2")
         self.assertIn('comparison_operator = "LessThanThreshold"', self.main)

@@ -61,6 +61,100 @@ variable "etiquetas" {
   default     = {}
 }
 
+# --- Observabilidad FCM/scheduler (deshabilitada por defecto) ---------------
+
+variable "observabilidad_fcm_habilitar_metricas" {
+  description = "Crea los metric filters FCM/scheduler en I-110; false por defecto."
+  type        = bool
+  default     = false
+}
+
+variable "observabilidad_fcm_habilitar_alarmas" {
+  description = "Crea las alarmas FCM/scheduler en I-110; false por defecto. Exige métricas habilitadas."
+  type        = bool
+  default     = false
+}
+
+variable "observabilidad_version_esperada" {
+  description = "Versión efectiva esperada (vX.Y.Z+sha12) para el filtro de versión inesperada; vacío = no se crea."
+  type        = string
+  default     = ""
+
+  validation {
+    # 11 o 12 hex: la política de releases fija `<sha12>` para releases nuevos,
+    # pero el release desplegado `v0.20.0+4bf6758d372` se publicó con 11
+    # caracteres. Aceptar ambos evita que el filtro de versión sea inutilizable
+    # contra la versión real sin relajar la forma SemVer+sha.
+    condition     = var.observabilidad_version_esperada == "" || can(regex("^v[0-9]+\\.[0-9]+\\.[0-9]+\\+[0-9a-f]{11,12}$", var.observabilidad_version_esperada))
+    error_message = "observabilidad_version_esperada debe estar vacío o tener la forma vX.Y.Z+<sha12>."
+  }
+}
+
+# --- Egreso FCM/OAuth: NAT Gateway 1 AZ (deshabilitado por defecto) ---------
+
+variable "habilitar_egreso_fcm" {
+  description = <<-EOT
+    false por defecto: no se crea NAT, EIP, subred pública, ruta ni regla de
+    egreso. Al pasar a true, `module.egreso_fcm` sale de count=0 y aplica la
+    topología NAT 1 AZ con el IGW existente de I-010. Exige Gate FinOps y
+    Seguridad; no es una autorización de gasto por sí misma.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "egreso_fcm_az" {
+  description = "AZ única del NAT Gateway y de su subred pública dedicada."
+  type        = string
+  default     = "us-east-2a"
+
+  validation {
+    condition     = can(regex("^[a-z]{2}-[a-z]+-[0-9][a-z]$", var.egreso_fcm_az))
+    error_message = "egreso_fcm_az debe tener forma de zona de disponibilidad, p. ej. us-east-2a."
+  }
+}
+
+variable "egreso_fcm_cidr_publica" {
+  description = <<-EOT
+    CIDR de la subred pública nueva del NAT. Por defecto 10.42.16.0/24, fuera
+    de las subredes privadas 10.42.0.0/24 y 10.42.1.0/24 de I-010. Debe ser
+    /27 o mayor y no solaparse con las subredes existentes.
+  EOT
+  type        = string
+  default     = "10.42.16.0/24"
+
+  validation {
+    condition     = can(cidrhost(var.egreso_fcm_cidr_publica, 0))
+    error_message = "egreso_fcm_cidr_publica debe ser un bloque IPv4 válido."
+  }
+}
+
+variable "egreso_fcm_cidr_https" {
+  description = <<-EOT
+    Destino IPv4 del egreso TCP 443 cuando no se aporta una prefix list real de
+    Google. No existe prefix list administrada por AWS para FCM/OAuth; el
+    valor por defecto 0.0.0.0/0 es el único honesto si no hay lista propia.
+  EOT
+  type        = string
+  default     = "0.0.0.0/0"
+
+  validation {
+    condition     = can(cidrhost(var.egreso_fcm_cidr_https, 0))
+    error_message = "egreso_fcm_cidr_https debe ser un bloque IPv4 válido."
+  }
+}
+
+variable "egreso_fcm_prefix_list_id" {
+  description = "Opcional: ID de una prefix list REAL de rangos de Google; vacío = se usa el CIDR."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.egreso_fcm_prefix_list_id == "" || can(regex("^pl-[0-9a-f]+$", var.egreso_fcm_prefix_list_id))
+    error_message = "egreso_fcm_prefix_list_id debe estar vacío o ser un ID pl-* existente."
+  }
+}
+
 # --- I-020: cómputo ---------------------------------------------------------
 
 variable "root_volume_gb" {
@@ -155,10 +249,49 @@ variable "redis_password_aplicacion" {
 
 # --- I-060: IAM / OIDC ------------------------------------------------------
 
+# La lista efectiva se inyecta desde el tfvars de custodia (fuera del repositorio).
+# `ARTEFACTOS_RELEASE.md` documenta los ARN exactos que deben conservarse para el
+# release vigente y para el rollback. En particular, `v0.19.2+3098f379d7ab` estuvo
+# desplegado y debe seguir autorizado aunque ya no sea el release activo; omitirlo
+# rompe el rollback a LT v17.
 variable "iam_artifact_object_arns" {
-  description = "ARN exactos de los dos objetos S3 de I-020; vacío mientras I-080 no defina bucket y keys"
+  description = <<-EOT
+    ARN exactos de objetos S3 de releases (binario y unidad systemd). La lista
+    efectiva vive en el tfvars de custodia; `ARTEFACTOS_RELEASE.md` documenta los
+    ARN de v0.19.2 y v0.20.0. Sin comodines de bucket o prefijo: el módulo IAM
+    exige un objeto exacto por ARN.
+  EOT
   type        = list(string)
   default     = []
+
+  validation {
+    condition = alltrue([
+      for arn in var.iam_artifact_object_arns :
+      can(regex("^arn:aws:s3:::[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]/.+$", arn)) && !strcontains(arn, "*") && !endswith(arn, "/")
+    ])
+    error_message = "Cada ARN debe ser un objeto S3 exacto (sin '*', sin terminar en '/') para no ampliar el permiso al bucket o prefijo."
+  }
+}
+
+variable "release_objetivo" {
+  description = <<-EOT
+    Release que se va a desplegar, con la forma `vX.Y.Z+<sha12>` (por ejemplo
+    `v0.21.0+abcdef123456`). Vacío = no se exige un release nuevo en la lista.
+    Si no está vacío, la precondition bloqueante exige al menos un ARN exacto
+    de ese release en `iam_artifact_object_arns`; en la práctica el custodio
+    debe añadir los dos (binario y unidad) para que el rollout funcione.
+  EOT
+  type        = string
+  default     = ""
+
+  validation {
+    # 11 o 12 hex: la política de releases fija `<sha12>` para releases nuevos,
+    # pero el release desplegado `v0.20.0+4bf6758d372` se publicó con 11
+    # caracteres. Aceptar ambos permite fijar el release objetivo real sin
+    # relajar la forma SemVer+sha.
+    condition     = var.release_objetivo == "" || can(regex("^v[0-9]+\\.[0-9]+\\.[0-9]+\\+[0-9a-f]{11,12}$", var.release_objetivo))
+    error_message = "release_objetivo debe estar vacío o tener la forma vX.Y.Z+<sha12>."
+  }
 }
 
 variable "iam_cloudwatch_log_group_arns" {

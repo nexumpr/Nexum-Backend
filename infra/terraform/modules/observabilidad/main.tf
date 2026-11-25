@@ -38,6 +38,10 @@ resource "terraform_data" "precondiciones" {
       condition     = var.retencion_dias <= 30
       error_message = "La retención local no debe superar 30 días sin revisión FinOps."
     }
+    precondition {
+      condition     = !var.habilitar_alarmas_fcm || var.habilitar_metricas_fcm
+      error_message = "Las alarmas FCM exigen habilitar_metricas_fcm=true; de lo contrario apuntarían a métricas inexistentes."
+    }
   }
 }
 
@@ -223,6 +227,234 @@ resource "aws_cloudwatch_metric_alarm" "logs_sin_eventos" {
   threshold           = 1
   comparison_operator = "LessThanThreshold"
   treat_missing_data  = "breaching"
+  tags                = local.etiquetas
+}
+
+# --- Observabilidad FCM/scheduler (count=0 por defecto) ---------------------
+#
+# Contrato de eventos (sin PII ni tokens) documentado en
+# `sdd/_control/H08/OBSERVABILIDAD_FCM_I110.md`:
+#   event=startup          build_version
+#   event=worker_heartbeat worker=fcm_outbox|scheduler, lease_held, processed, failed
+#   event=fcm_send         status=ok|error
+#   event=aws_error        error_code=AccessDenied
+#   event=scheduler_tick   schedule_lag_seconds
+#
+# No se crea ninguna métrica ni alarma mientras las variables estén en false.
+
+resource "aws_cloudwatch_log_metric_filter" "arranques_proceso" {
+  count = var.habilitar_metricas_fcm ? 1 : 0
+
+  name           = "${var.proyecto}-${var.entorno}-arranques-proceso"
+  log_group_name = aws_cloudwatch_log_group.backend.name
+  pattern        = "{ $.event = \"startup\" }"
+
+  metric_transformation {
+    name          = "ArranquesProceso"
+    namespace     = local.namespace
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "arranque_version_esperada" {
+  count = var.habilitar_metricas_fcm && var.version_esperada != "" ? 1 : 0
+
+  name           = "${var.proyecto}-${var.entorno}-arranque-version-esperada"
+  log_group_name = aws_cloudwatch_log_group.backend.name
+  pattern        = "{ $.event = \"startup\" && $.build_version = \"${var.version_esperada}\" }"
+
+  metric_transformation {
+    name          = "ArranqueVersionEsperada"
+    namespace     = local.namespace
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "arranque_version_inesperada" {
+  count = var.habilitar_metricas_fcm && var.version_esperada != "" ? 1 : 0
+
+  name           = "${var.proyecto}-${var.entorno}-arranque-version-inesperada"
+  log_group_name = aws_cloudwatch_log_group.backend.name
+  pattern        = "{ $.event = \"startup\" && $.build_version != \"${var.version_esperada}\" }"
+
+  metric_transformation {
+    name          = "ArranqueVersionInesperada"
+    namespace     = local.namespace
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "fcm_worker_heartbeat" {
+  count = var.habilitar_metricas_fcm ? 1 : 0
+
+  name           = "${var.proyecto}-${var.entorno}-fcm-worker-heartbeat"
+  log_group_name = aws_cloudwatch_log_group.backend.name
+  pattern        = "{ $.event = \"worker_heartbeat\" && $.worker = \"${var.worker_fcm}\" }"
+
+  metric_transformation {
+    name          = "FcmWorkerHeartbeat"
+    namespace     = local.namespace
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "scheduler_heartbeat" {
+  count = var.habilitar_metricas_fcm ? 1 : 0
+
+  name           = "${var.proyecto}-${var.entorno}-scheduler-heartbeat"
+  log_group_name = aws_cloudwatch_log_group.backend.name
+  pattern        = "{ $.event = \"worker_heartbeat\" && $.worker = \"${var.worker_scheduler}\" }"
+
+  metric_transformation {
+    name          = "SchedulerHeartbeat"
+    namespace     = local.namespace
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "fcm_errores_envio" {
+  count = var.habilitar_metricas_fcm ? 1 : 0
+
+  name           = "${var.proyecto}-${var.entorno}-fcm-errores-envio"
+  log_group_name = aws_cloudwatch_log_group.backend.name
+  pattern        = "{ $.event = \"fcm_send\" && $.status = \"error\" }"
+
+  metric_transformation {
+    name          = "FcmErroresEnvio"
+    namespace     = local.namespace
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "access_denied" {
+  count = var.habilitar_metricas_fcm ? 1 : 0
+
+  name           = "${var.proyecto}-${var.entorno}-access-denied"
+  log_group_name = aws_cloudwatch_log_group.backend.name
+  pattern        = "{ $.event = \"aws_error\" && $.error_code = \"AccessDenied\" }"
+
+  metric_transformation {
+    name          = "AccessDenied"
+    namespace     = local.namespace
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "scheduler_lag" {
+  count = var.habilitar_metricas_fcm ? 1 : 0
+
+  name           = "${var.proyecto}-${var.entorno}-scheduler-lag"
+  log_group_name = aws_cloudwatch_log_group.backend.name
+  pattern        = "{ $.event = \"scheduler_tick\" }"
+
+  metric_transformation {
+    name          = "SchedulerLagSegundos"
+    namespace     = local.namespace
+    value         = "$.schedule_lag_seconds"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "fcm_worker_sin_latido" {
+  count = var.habilitar_alarmas_fcm ? 1 : 0
+
+  alarm_name          = "${var.proyecto}-${var.entorno}-fcm-worker-sin-latido"
+  alarm_description   = "Sin heartbeat del worker FCM en el periodo. Runbook: OBSERVABILIDAD_FCM_I110.md#A-FCM-1"
+  namespace           = local.namespace
+  metric_name         = "FcmWorkerHeartbeat"
+  statistic           = "Sum"
+  period              = var.minutos_sin_heartbeat * 60
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
+  tags                = local.etiquetas
+}
+
+resource "aws_cloudwatch_metric_alarm" "scheduler_sin_latido" {
+  count = var.habilitar_alarmas_fcm ? 1 : 0
+
+  alarm_name          = "${var.proyecto}-${var.entorno}-scheduler-sin-latido"
+  alarm_description   = "Sin heartbeat del scheduler de recordatorios en el periodo. Runbook: OBSERVABILIDAD_FCM_I110.md#A-FCM-2"
+  namespace           = local.namespace
+  metric_name         = "SchedulerHeartbeat"
+  statistic           = "Sum"
+  period              = var.minutos_sin_heartbeat * 60
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
+  tags                = local.etiquetas
+}
+
+resource "aws_cloudwatch_metric_alarm" "fcm_errores_envio" {
+  count = var.habilitar_alarmas_fcm ? 1 : 0
+
+  alarm_name          = "${var.proyecto}-${var.entorno}-fcm-errores-envio"
+  alarm_description   = "Errores de envío FCM por encima del umbral. Runbook: OBSERVABILIDAD_FCM_I110.md#A-FCM-3"
+  namespace           = local.namespace
+  metric_name         = "FcmErroresEnvio"
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = var.umbral_fcm_errores
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  tags                = local.etiquetas
+}
+
+resource "aws_cloudwatch_metric_alarm" "access_denied" {
+  count = var.habilitar_alarmas_fcm ? 1 : 0
+
+  alarm_name          = "${var.proyecto}-${var.entorno}-access-denied"
+  alarm_description   = "AccessDenied de AWS detectado en logs. Runbook: OBSERVABILIDAD_FCM_I110.md#A-FCM-4"
+  namespace           = local.namespace
+  metric_name         = "AccessDenied"
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = var.umbral_access_denied
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+  tags                = local.etiquetas
+}
+
+resource "aws_cloudwatch_metric_alarm" "scheduler_lag" {
+  count = var.habilitar_alarmas_fcm ? 1 : 0
+
+  alarm_name          = "${var.proyecto}-${var.entorno}-scheduler-lag"
+  alarm_description   = "Lag del scheduler por encima del umbral durante 3 periodos. Runbook: OBSERVABILIDAD_FCM_I110.md#A-FCM-5"
+  namespace           = local.namespace
+  metric_name         = "SchedulerLagSegundos"
+  statistic           = "Maximum"
+  period              = 300
+  evaluation_periods  = 3
+  threshold           = var.umbral_lag_scheduler_segundos
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  tags                = local.etiquetas
+}
+
+resource "aws_cloudwatch_metric_alarm" "arranque_version_inesperada" {
+  count = var.habilitar_alarmas_fcm && var.version_esperada != "" ? 1 : 0
+
+  alarm_name          = "${var.proyecto}-${var.entorno}-arranque-version-inesperada"
+  alarm_description   = "El proceso arrancó con una versión distinta de la esperada. Runbook: OBSERVABILIDAD_FCM_I110.md#A-FCM-6"
+  namespace           = local.namespace
+  metric_name         = "ArranqueVersionInesperada"
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
   tags                = local.etiquetas
 }
 
