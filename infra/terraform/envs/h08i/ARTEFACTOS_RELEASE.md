@@ -21,6 +21,22 @@ iam_artifact_object_arns = [
 ]
 ```
 
+## Cambio exacto que debe hacer el custodio en el tfvars privado
+
+El tfvars de custodia **no se edita desde el repositorio** (no hay valores
+versionados). Para habilitar un rollout nuevo:
+
+1. Conservar los cuatro ARN anteriores; no sustituirlos.
+2. Añadir los **dos** objetos del release nuevo, con el mismo patrón:
+   `arn:aws:s3:::<bucket-artefactos>/releases/<release>/nexum-backend-linux-arm64`
+   y `.../nexum-backend.service`. No usar `*`, no terminar en `/`, no usar el
+   ARN del bucket.
+3. Fijar `release_objetivo = "<release>"` (forma `vX.Y.Z+<sha12>`) en el tfvars
+   privado. La precondition bloqueante de `checks.tf` exige al menos un ARN de
+   ese release, y el contrato funcional exige los dos.
+4. Si no se va a desplegar un release nuevo, dejar `release_objetivo = ""`; la
+   precondition de rollback sigue exigiendo los cuatro ARN de v0.19.2/v0.20.0.
+
 ## Regla de mantenimiento
 
 - Nunca usar `arn:aws:s3:::bucket/*` ni el ARN del bucket: el módulo IAM exige
@@ -28,4 +44,7 @@ iam_artifact_object_arns = [
 - Al publicar un release nuevo se **añaden** sus dos objetos; no se retiran los del
   release anterior mientras siga siendo el destino de rollback.
 - La comprobación automatizada está en
-  `tests/infra/terraform/test_iam_artefactos_release.py`.
+  `tests/infra/terraform/test_iam_outbox_schedule_artefactos.py`.
+- La precondition bloqueante está en
+  `terraform_data.invariantes_release_rollback` (`checks.tf`); el `check`
+  `artefactos_release_rollback` solo advierte y no detiene el apply.

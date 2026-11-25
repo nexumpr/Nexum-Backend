@@ -1,17 +1,29 @@
-# Egreso HTTPS para FCM/OAuth (propuesta, DESHABILITADO por defecto).
+# Egreso HTTPS para FCM/OAuth — NAT Gateway administrado en 1 AZ.
 #
-# Este módulo existe para que un Gate FinOps/Seguridad pueda revisar el cambio
-# exacto sin que el `terraform plan` actual cree recursos. `habilitar = false`
-# deja todos los `count` en 0: no hay NAT Gateway, EIP, subred pública, ruta ni
-# regla de security group. NO se instancia desde `envs/h08i` todavía.
+# DESHABILITADO por defecto (`habilitar = false`): todos los recursos tienen
+# `count = 0` y no se crea NAT, EIP, subred pública, ruta ni regla de SG.
 #
-# Topología cuando se habilite:
-#   backend privado -> route table privada -> NAT Gateway -> IGW -> HTTPS 443
-#   -> oauth2.googleapis.com / fcm.googleapis.com
+# Topología cuando se habilita:
+#   EC2 privadas (I-010, sin IPv4 pública)
+#     -> route table privada (0.0.0.0/0)
+#     -> NAT Gateway en subred pública NUEVA y dedicada (1 AZ)
+#     -> IGW existente (adjunto por VPC Origins, sin rutas públicas previas)
+#     -> HTTPS 443 -> oauth2.googleapis.com / fcm.googleapis.com
 #
-# Limitación declarada: el NAT Gateway no filtra por dominio. La regla opcional
-# de egreso 443 a 0.0.0.0/0 sólo se crea con `habilitar_regla_egreso_backend`;
-# para allowlist por host hace falta un proxy de egreso (ver propuesta).
+# La subred pública dedicada NO aloja EC2: `map_public_ip_on_launch = false`.
+# El único EIP es el del NAT. No se abre SSH ni se asigna IPv4 pública a las
+# instancias. El ALB sigue siendo interno.
+#
+# Límites declarados:
+#  - Un solo NAT en una sola AZ es punto único de fallo de egreso.
+#  - NAT no filtra por dominio. Sin una prefix list real de Google, el egreso
+#    TCP 443 se abre a `cidr_egreso_https` (0.0.0.0/0 por defecto). Los rangos
+#    de FCM/OAuth cambian y no existe una prefix list administrada por AWS para
+#    ellos; este módulo NO inventa una.
+#  - La VPC de I-010 ya tiene `enable_dns_support` y `enable_dns_hostnames`;
+#    sin ellos el endpoint público de Google no resolvería. Se documenta y se
+#    prueba en `tests/infra/terraform/test_egreso_fcm_contrato.py`; no se muta
+#    la VPC desde este módulo.
 
 terraform {
   required_version = ">= 1.4.0, < 2.0.0"
@@ -31,65 +43,92 @@ locals {
     Name       = "${local.nombre}-egreso-fcm"
     Componente = "egreso-fcm"
     Spec       = "H08-E-FCM"
+    Rol        = "nat-gateway-1az"
   }, var.etiquetas)
 }
 
 resource "terraform_data" "preconditions" {
+  count = local.activo ? 1 : 0
+
   input = {
     habilitar        = var.habilitar
-    nat_gateways     = var.numero_nat_gateways
-    public_cidrs     = length(var.public_subnet_cidrs)
-    private_tables   = length(var.private_route_table_ids)
-    regla_backend    = var.habilitar_regla_egreso_backend
-    backend_sg       = var.backend_security_group_id
+    vpc              = var.vpc_id
     internet_gateway = var.internet_gateway_id
+    zona             = var.zona
+    subred_publica   = var.subred_publica_cidr
+    private_tables   = length(var.private_route_table_ids)
+    backend_sg       = var.backend_security_group_id
+    prefix_list      = var.prefix_list_egreso_https_id
+    cidr_https       = var.cidr_egreso_https
   }
 
   lifecycle {
     precondition {
+      condition     = !var.habilitar || var.vpc_id != ""
+      error_message = "Para habilitar el egreso FCM hace falta la VPC existente de I-010."
+    }
+
+    precondition {
       condition     = !var.habilitar || var.internet_gateway_id != ""
-      error_message = "Para habilitar el egreso FCM hace falta el IGW existente de la VPC."
+      error_message = "Para habilitar el egreso FCM hace falta el IGW existente de I-010 (ya adjunto por VPC Origins)."
     }
 
     precondition {
-      condition     = !var.habilitar || length(var.public_subnet_cidrs) >= var.numero_nat_gateways
-      error_message = "Cada NAT Gateway exige su propia subred pública y CIDR; faltan CIDR."
-    }
-
-    precondition {
-      condition     = !var.habilitar || length(var.availability_zones) >= var.numero_nat_gateways
-      error_message = "Cada NAT Gateway exige una AZ; faltan zonas de disponibilidad."
+      condition     = !var.habilitar || var.backend_security_group_id != ""
+      error_message = "Sin el SG real del backend no se puede añadir el egreso TCP 443."
     }
 
     precondition {
       condition     = !var.habilitar || length(var.private_route_table_ids) >= 1
-      error_message = "Sin al menos una route table privada no se puede enrutar el egreso."
+      error_message = "Sin al menos una route table privada no se puede enrutar el egreso del backend."
     }
 
     precondition {
-      condition     = !var.habilitar || var.numero_nat_gateways == 1 || length(var.private_route_table_ids) >= var.numero_nat_gateways
-      error_message = "Con 2 NAT Gateway se necesita una route table privada por AZ; con una sola tabla el segundo NAT quedaría sin uso."
+      condition     = !var.habilitar || startswith(var.zona, "${var.region}")
+      error_message = "La AZ del NAT debe pertenecer a var.region."
     }
 
     precondition {
-      condition     = !var.habilitar_regla_egreso_backend || (var.habilitar && var.backend_security_group_id != "")
-      error_message = "La regla de egreso 443 exige habilitar=true y el SG real del backend."
+      condition     = !var.habilitar || tonumber(split("/", var.subred_publica_cidr)[1]) <= 27
+      error_message = "La subred pública del NAT debe ser /27 o mayor (AWS reserva 5 direcciones)."
+    }
+
+    precondition {
+      condition     = !var.habilitar || var.prefix_list_egreso_https_id != "" || can(cidrhost(var.cidr_egreso_https, 0))
+      error_message = "Debe indicarse una prefix list real o un CIDR IPv4 válido para el egreso 443."
+    }
+
+    precondition {
+      condition     = !var.habilitar || var.prefix_list_egreso_https_id == "" || var.cidr_egreso_https == "0.0.0.0/0"
+      error_message = "Si se aporta una prefix list, deje cidr_egreso_https en 0.0.0.0/0 para no simular dos allowlists simultáneas."
+    }
+
+    precondition {
+      condition     = !var.habilitar || (var.prefix_list_egreso_https_id == "" || can(regex("^pl-[0-9a-f]+$", var.prefix_list_egreso_https_id)))
+      error_message = "La prefix list debe ser un ID pl-* existente; el módulo no la crea."
     }
   }
 }
 
-# Subred pública dedicada al NAT. No aloja EC2 ni asigna IP pública al lanzar
-# instancias: `map_public_ip_on_launch = false`; el EIP es exclusivo del NAT.
+# Subred pública NUEVA y dedicada al NAT. No aloja EC2 ni asigna IP pública al
+# lanzar instancias: el EIP es exclusivo del NAT.
+#
+# Desviación declarada: esta subred no recibe una NACL propia y queda asociada a
+# la NACL por defecto de la VPC (allow all). No es un problema de exposición
+# porque el único recurso es la ENI del NAT, que no acepta conexiones entrantes
+# iniciadas desde Internet; el tráfico de retorno lo gestiona el propio NAT. Si
+# en el futuro se aloja algo más aquí, hay que crear una NACL restrictiva.
 resource "aws_subnet" "publica_nat" {
-  count = local.activo ? var.numero_nat_gateways : 0
+  count = local.activo ? 1 : 0
 
   vpc_id                  = var.vpc_id
-  cidr_block              = var.public_subnet_cidrs[count.index]
-  availability_zone       = var.availability_zones[count.index]
+  cidr_block              = var.subred_publica_cidr
+  availability_zone       = var.zona
   map_public_ip_on_launch = false
 
   tags = merge(local.tags, {
-    Name = "${local.nombre}-publica-nat-${count.index + 1}"
+    Name = "${local.nombre}-publica-nat-${var.zona}"
+    Tipo = "publica-solo-nat"
   })
 }
 
@@ -112,27 +151,28 @@ resource "aws_route" "publica_internet" {
 }
 
 resource "aws_route_table_association" "publica_nat" {
-  count = local.activo ? var.numero_nat_gateways : 0
+  count = local.activo ? 1 : 0
 
-  subnet_id      = aws_subnet.publica_nat[count.index].id
+  subnet_id      = aws_subnet.publica_nat[0].id
   route_table_id = aws_route_table.publica_nat[0].id
 }
 
 resource "aws_eip" "nat" {
-  count = local.activo ? var.numero_nat_gateways : 0
+  count = local.activo ? 1 : 0
 
   domain = "vpc"
 
   tags = merge(local.tags, {
-    Name = "${local.nombre}-eip-nat-${count.index + 1}"
+    Name = "${local.nombre}-eip-nat"
   })
 }
 
 resource "aws_nat_gateway" "nat" {
-  count = local.activo ? var.numero_nat_gateways : 0
+  count = local.activo ? 1 : 0
 
-  allocation_id = aws_eip.nat[count.index].id
-  subnet_id     = aws_subnet.publica_nat[count.index].id
+  allocation_id     = aws_eip.nat[0].id
+  subnet_id         = aws_subnet.publica_nat[0].id
+  connectivity_type = "public"
 
   depends_on = [
     aws_route.publica_internet,
@@ -140,31 +180,44 @@ resource "aws_nat_gateway" "nat" {
   ]
 
   tags = merge(local.tags, {
-    Name = "${local.nombre}-nat-${count.index + 1}"
+    Name = "${local.nombre}-nat-1az"
   })
 }
 
-# Ruta por defecto de las tablas privadas al NAT. Con 2 NAT y una tabla por AZ,
-# la tabla i usa el NAT i; el precondition impide el caso ambiguo.
+# Ruta por defecto de las tablas privadas del backend al NAT único. Los
+# gateway endpoints S3/DynamoDB de I-010 siguen teniendo prioridad por prefijo
+# más específico; esta ruta sólo se usa para destinos fuera de la VPC que no
+# tengan un endpoint.
 resource "aws_route" "privada_nat" {
   count = local.activo ? length(var.private_route_table_ids) : 0
 
   route_table_id         = var.private_route_table_ids[count.index]
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.nat[count.index % var.numero_nat_gateways].id
+  nat_gateway_id         = aws_nat_gateway.nat[0].id
 }
 
-# Regla opcional y explícitamente peligrosa: NAT no filtra por dominio. Sin ella,
-# el backend seguirá sin poder salir a Internet aunque exista la ruta. Se deja
-# desactivada por defecto; un Gate de Seguridad debe aceptar el 0.0.0.0/0:443 o
-# sustituirla por un proxy con allowlist de hosts.
-resource "aws_vpc_security_group_egress_rule" "backend_https_internet" {
-  count = local.activo && var.habilitar_regla_egreso_backend && var.backend_security_group_id != "" ? 1 : 0
+# Egreso TCP 443. Si existe una prefix list real de Google (no la crea este
+# módulo), se usa; si no, se abre a Internet porque no hay una lista
+# administrada por AWS para FCM/OAuth. El NAT no filtra por dominio: el riesgo
+# residual se documenta en `PROPUESTA_EGRESO_FCM.md`.
+resource "aws_vpc_security_group_egress_rule" "backend_https_cidr" {
+  count = local.activo && var.prefix_list_egreso_https_id == "" ? 1 : 0
 
   security_group_id = var.backend_security_group_id
-  description       = "HTTPS de salida a Internet para FCM/OAuth (riesgo residual; Sin allowlist de dominio)"
+  description       = "HTTPS 443 a Internet para FCM/OAuth (sin allowlist de dominio; rangos de Google cambian)"
   ip_protocol       = "tcp"
   from_port         = 443
   to_port           = 443
-  cidr_ipv4         = "0.0.0.0/0"
+  cidr_ipv4         = var.cidr_egreso_https
+}
+
+resource "aws_vpc_security_group_egress_rule" "backend_https_prefix_list" {
+  count = local.activo && var.prefix_list_egreso_https_id != "" ? 1 : 0
+
+  security_group_id = var.backend_security_group_id
+  description       = "HTTPS 443 a la prefix list real aportada para FCM/OAuth"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  prefix_list_id    = var.prefix_list_egreso_https_id
 }

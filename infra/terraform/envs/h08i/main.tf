@@ -102,6 +102,51 @@ output "interface_endpoint_permanente" {
   value = module.red.interface_endpoint_permanente
 }
 
+# --- Egreso FCM/OAuth: NAT Gateway 1 AZ (count=0 por defecto) ---------------
+#
+# El bloque existe siempre, pero `count = 0` mientras
+# `habilitar_egreso_fcm = false`: no crea recursos y no cambia el plan actual.
+# Al activarlo, usa la VPC, el IGW y la route table privada reales de I-010.
+# La subred pública es nueva y dedicada al NAT; el entorno no tenía ninguna.
+module "egreso_fcm" {
+  count = var.habilitar_egreso_fcm ? 1 : 0
+
+  source = "../../modules/egreso_fcm"
+
+  habilitar = var.habilitar_egreso_fcm
+
+  proyecto = "nexum"
+  entorno  = var.entorno
+  region   = var.region
+
+  vpc_id              = module.red.vpc_id
+  internet_gateway_id = module.red.internet_gateway_id
+  zona                = var.egreso_fcm_az
+  subred_publica_cidr = var.egreso_fcm_cidr_publica
+
+  private_route_table_ids = [module.red.route_table_privada]
+
+  backend_security_group_id   = module.red.security_groups["backend"]
+  cidr_egreso_https           = var.egreso_fcm_cidr_https
+  prefix_list_egreso_https_id = var.egreso_fcm_prefix_list_id
+
+  etiquetas = var.etiquetas
+}
+
+output "egreso_fcm" {
+  description = "NAT Gateway 1 AZ, EIP, ruta privada y regla 443; null si está deshabilitado"
+  value = var.habilitar_egreso_fcm ? {
+    nat_gateway_id          = module.egreso_fcm[0].nat_gateway_id
+    eip                     = module.egreso_fcm[0].eip
+    private_route_table_ids = module.egreso_fcm[0].private_route_table_ids
+    public_subnet_id        = module.egreso_fcm[0].public_subnet_id
+    regla_egreso_id         = module.egreso_fcm[0].regla_egreso_id
+    cidr_egreso_https       = module.egreso_fcm[0].cidr_egreso_https
+    punto_unico_de_fallo    = module.egreso_fcm[0].punto_unico_de_fallo
+    estado                  = module.egreso_fcm[0].estado
+  } : null
+}
+
 # Etapa inicial: no instanciar EC2 hasta publicar artefactos y verificar SHA.
 # El módulo I-020 conserva capacidad fija de DOS instancias cuando se habilita.
 module "computo" {
@@ -384,6 +429,12 @@ module "observabilidad" {
   umbral_auth_401     = 20
   presupuesto_usd     = 1
   habilitar_dashboard = true
+
+  # FCM/scheduler: deshabilitado por defecto. Activar solo tras el Gate y con
+  # el pipeline de logs verificado; los filtros no crean por sí solos métricas.
+  habilitar_metricas_fcm = var.observabilidad_fcm_habilitar_metricas
+  habilitar_alarmas_fcm  = var.observabilidad_fcm_habilitar_alarmas
+  version_esperada       = var.observabilidad_version_esperada
 }
 
 output "observabilidad" {
@@ -396,6 +447,7 @@ output "observabilidad" {
     alarmas           = module.observabilidad[0].alarmas
     presupuesto       = module.observabilidad[0].presupuesto
     dashboard         = module.observabilidad[0].dashboard
+    fcm               = module.observabilidad[0].observabilidad_fcm
     estado_despliegue = module.observabilidad[0].estado_despliegue
   } : null
 }

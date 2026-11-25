@@ -20,6 +20,9 @@ RAIZ = Path(__file__).resolve().parents[3]
 IAM = RAIZ / "infra" / "terraform" / "modules" / "iam" / "main.tf"
 VARIABLES = RAIZ / "infra" / "terraform" / "envs" / "h08i" / "variables.tf"
 ARTEFACTOS = RAIZ / "infra" / "terraform" / "envs" / "h08i" / "ARTEFACTOS_RELEASE.md"
+CHECKS = RAIZ / "infra" / "terraform" / "envs" / "h08i" / "checks.tf"
+ENV_MAIN = RAIZ / "infra" / "terraform" / "envs" / "h08i" / "main.tf"
+MAIN_TF = IAM.read_text(encoding="utf-8")
 
 BUCKET = "nexum-h08i-artefactos-713797602090"
 RELEASE_ROLLBACK = "v0.19.2+3098f379d7ab"
@@ -35,6 +38,50 @@ ARN_EXACTOS = [
 
 def _leer(p: Path) -> str:
     return p.read_text(encoding="utf-8")
+
+
+def _bloque_hcl(texto: str, cabecera: str) -> str:
+    """Devuelve el contenido del bloque que empieza en `cabecera`."""
+
+    inicio = texto.find(cabecera)
+    if inicio < 0:
+        raise AssertionError(f"no se encontró {cabecera!r}")
+    apertura = texto.index("{", inicio)
+    nivel = 0
+    for pos in range(apertura, len(texto)):
+        if texto[pos] == "{":
+            nivel += 1
+        elif texto[pos] == "}":
+            nivel -= 1
+            if nivel == 0:
+                return texto[apertura + 1 : pos]
+    raise AssertionError(f"{cabecera!r} sin cierre")
+
+
+def _lista_requeridos(env_main: str) -> list[str]:
+    """Extrae los ARN requeridos resolviendo el nombre del bucket derivado."""
+
+    bloque = env_main.split("artefactos_release_requeridos = [", 1)[1].split("]", 1)[0]
+    literales = re.findall(r'"(arn:aws:s3:::[^"]+)"', bloque)
+    return [
+        literal.replace("${local.bucket_artefactos_nombre}", BUCKET)
+        for literal in literales
+    ]
+
+
+def _rollback_ok(requeridos: list[str], efectivos: list[str]) -> bool:
+    """Evalúa `alltrue([for arn in requeridos : contains(efectivos, arn)])`."""
+
+    return all(arn in efectivos for arn in requeridos)
+
+
+def _release_objetivo_ok(efectivos: list[str], release: str) -> bool:
+    """Evalúa `release == "" || anytrue(startswith(arn, ".../releases/<release>/"))`."""
+
+    if release == "":
+        return True
+    prefijo = f"arn:aws:s3:::{BUCKET}/releases/{release}/"
+    return any(arn.startswith(prefijo) for arn in efectivos)
 
 
 def _sin_comentarios(texto: str) -> str:
@@ -193,6 +240,134 @@ class ArtefactosDeRelease(unittest.TestCase):
         self.assertIn("!strcontains(arn, \"*\")", self.checks)
         self.assertIn("v0.19.2", ARTEFACTOS.read_text(encoding="utf-8"))
         self.assertIn("v0.20.0", ARTEFACTOS.read_text(encoding="utf-8"))
+
+    def test_precondition_bloqueante_de_rollback(self) -> None:
+        self.assertIn('resource "terraform_data" "invariantes_release_rollback"', self.checks)
+        bloque = self.checks.split('resource "terraform_data" "invariantes_release_rollback"', 1)[1]
+        self.assertIn("for arn in local.artefactos_release_requeridos", bloque)
+        self.assertIn("contains(var.iam_artifact_object_arns, arn)", bloque)
+        self.assertIn("!strcontains(arn, \"*\")", bloque)
+        self.assertIn("!endswith(arn, \"/\")", bloque)
+        # La precondition debe ser bloqueante: `check` no detiene el apply.
+        self.assertIn("lifecycle", bloque)
+        self.assertNotIn("check \"", bloque)
+
+    def test_release_objetivo_exige_un_arn_del_release(self) -> None:
+        self.assertIn('variable "release_objetivo"', self.variables)
+        self.assertIn("release_objetivo", self.checks)
+        self.assertIn("startswith(arn, \"arn:aws:s3:::${local.bucket_artefactos_nombre}/releases/${var.release_objetivo}/\")", self.checks)
+
+    def test_documenta_el_cambio_exacto_del_custodio(self) -> None:
+        texto = ARTEFACTOS.read_text(encoding="utf-8")
+        self.assertIn("release_objetivo", texto)
+        self.assertIn("Conservar los cuatro ARN anteriores", texto)
+        self.assertIn("Añadir los **dos** objetos del release nuevo", texto)
+        self.assertIn("No usar `*`", texto)
+
+
+class PunterosBajoUser(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.iam = _leer(IAM)
+        cls.patrones = _patrones_leading_keys(cls.iam)
+
+    def test_punteros_no_crean_particiones_globales(self) -> None:
+        for puntero in ("OUTBOXPTR#", "SCHEDULEPTR#", "REMINDERPTR#"):
+            self.assertNotIn(f'"{puntero}*"', self.patrones, puntero)
+        self.assertIn("USER#*", self.patrones)
+
+    def test_documenta_que_los_punteros_viven_bajo_user(self) -> None:
+        self.assertIn("OUTBOXPTR#<id>", self.iam)
+        self.assertIn("SCHEDULEPTR#<id>", self.iam)
+        self.assertIn("REMINDERPTR#<id>", self.iam)
+        self.assertIn("quedan cubiertos por `USER#*`", self.iam)
+
+    def test_idem_de_outbox_bajo_user_y_idem_global_conservado(self) -> None:
+        self.assertIn("Los IDEM# de outbox/recordatorio", self.iam)
+        self.assertIn("bajo USER#", self.iam)
+        self.assertIn("IDEM#*", self.patrones)
+
+
+class RollbackFailClosed(unittest.TestCase):
+    """La precondition de rollback debe FALLAR, no avisar, si falta un ARN.
+
+    No se ejecuta `terraform plan` (exigiría backend y credenciales). La prueba
+    evalúa la condición HCL real sobre los datos reales del entorno: extrae los
+    cuatro ARN de `main.tf`, comprueba que la precondition bloqueante los recorre
+    con `contains` y simula la evaluación con listas incompletas. Si la
+    condición dejara de ser `alltrue([... contains ...])` o se moviera a un
+    `check`, la prueba falla.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checks = _leer(CHECKS)
+        cls.requeridos = _lista_requeridos(_leer(ENV_MAIN))
+        cls.bloque = _bloque_hcl(
+            cls.checks, 'resource "terraform_data" "invariantes_release_rollback"'
+        )
+
+    def test_la_lista_requerida_son_los_cuatro_arn_documentados(self) -> None:
+        self.assertEqual(sorted(self.requeridos), sorted(ARN_EXACTOS))
+        for release in (RELEASE_ROLLBACK, RELEASE_ACTIVO):
+            self.assertEqual(
+                sum(1 for arn in self.requeridos if f"/releases/{release}/" in arn),
+                2,
+                release,
+            )
+
+    def test_condicion_es_alltrue_contains_y_es_bloqueante(self) -> None:
+        self.assertIn("for arn in local.artefactos_release_requeridos", self.bloque)
+        self.assertIn("contains(var.iam_artifact_object_arns, arn)", self.bloque)
+        self.assertIn("condition = alltrue([", self.bloque)
+        # `lifecycle.precondition` sí detiene el plan/apply; `check` solo avisa.
+        self.assertIn("lifecycle {", self.bloque)
+        self.assertIn("precondition {", self.bloque)
+        self.assertNotIn('check "', self.bloque)
+
+    def test_falla_si_falta_cualquiera_de_los_cuatro_arn(self) -> None:
+        self.assertTrue(_rollback_ok(self.requeridos, ARN_EXACTOS))
+        for arn in ARN_EXACTOS:
+            efectivos = [a for a in ARN_EXACTOS if a != arn]
+            self.assertFalse(_rollback_ok(self.requeridos, efectivos), arn)
+
+    def test_falla_si_falta_un_release_completo(self) -> None:
+        solo_rollback = [a for a in ARN_EXACTOS if RELEASE_ROLLBACK in a]
+        solo_activo = [a for a in ARN_EXACTOS if RELEASE_ACTIVO in a]
+        self.assertFalse(_rollback_ok(self.requeridos, solo_rollback))
+        self.assertFalse(_rollback_ok(self.requeridos, solo_activo))
+
+    def test_release_objetivo_no_vacio_exige_un_arn_de_ese_release(self) -> None:
+        self.assertTrue(_release_objetivo_ok(ARN_EXACTOS, ""))
+        self.assertTrue(_release_objetivo_ok(ARN_EXACTOS, RELEASE_ACTIVO))
+        self.assertFalse(_release_objetivo_ok(ARN_EXACTOS, "v0.21.0+abcdef123456"))
+        self.assertFalse(_release_objetivo_ok([], "v0.21.0+abcdef123456"))
+
+    def test_precondition_no_usa_self(self) -> None:
+        # Terraform no expone `self` dentro de `precondition`; usarlo rompería
+        # `terraform validate`. La prueba lo deja escrito para no reintroducirlo.
+        self.assertNotIn("self.", self.bloque)
+
+
+class ReadAllQueueE063(unittest.TestCase):
+    """E063 introduce QUEUE#READALL/REQ#<fecha>#<requestId> y READALLPTR# en el titular.
+
+    `QUEUE#*` ya estaba en la política desde I-060; esta prueba impide que una
+    edición futura la retire al tocar OUTBOX#*/SCHEDULE#* y deje el worker sin IAM.
+    """
+
+    def test_queue_cubre_la_cola_readall(self) -> None:
+        self.assertIn('"QUEUE#*"', MAIN_TF)
+
+    def test_worker_y_purga_declaran_readall(self) -> None:
+        # El comentario de la política debe nombrar la cola y el puntero para que
+        # el revisor no confunda `QUEUE#*` con una familia ajena.
+        self.assertIn("QUEUE#READALL", MAIN_TF)
+        self.assertIn("READALLPTR#", MAIN_TF)
+
+    def test_punteros_bajo_user(self) -> None:
+        for puntero in ("OUTBOXPTR#", "SCHEDULEPTR#", "REMINDERPTR#", "READALLPTR#"):
+            self.assertIn(puntero, MAIN_TF)
 
 
 if __name__ == "__main__":
