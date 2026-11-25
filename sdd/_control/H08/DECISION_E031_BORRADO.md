@@ -3,18 +3,19 @@
 | Campo | Valor |
 |---|---|
 | Documento | `sdd/_control/H08/DECISION_E031_BORRADO.md` |
-| Versión | 1.0.0 |
+| Versión | 1.1.0 |
 | Fecha | 2026-11-24 |
-| Estado | **PROPUESTA — NO APROBADA** |
-| Frase propuesta | `APRUEBO_DECISION_E031_BORRADO_LOGICO_TOMBSTONE` |
-| Alcance | Decisión de diseño y contrato interno de persistencia. **No** implementa código, no cambia OpenAPI, no toca AWS |
-| Base verificada | `main` `f3bccca8b2437dc154bedbef257a3cabc7620844`; runtime leído en esta rama (`fix/h08e-deuda-historica`) |
+| Estado | **APROBADA — implementada en local** |
+| Autorizaciones humanas | `APRUEBO_DECISION_E031_BORRADO_LOGICO_TOMBSTONE` · `APRUEBO_E031_IDEMPOTENTE_204_CON_PUNTERO` · `APRUEBO_CIERRE_IMPLEMENTACION_E031_TOMBSTONE` |
+| Alcance | Decisión de diseño y contrato interno de persistencia. **No** cambia OpenAPI (`204`/`404`/`409` ya existen), no toca AWS |
+| Base verificada | `main` `f3bccca8b2437dc154bedbef257a3cabc7620844`; implementación en la rama `fix/h08e-deuda-historica` |
 | Instrumentos relacionados | `sdd/03-endpoints/E031-movements-movementId/spec.md`; `sdd/01-arquitectura-general/A-060-modelo-dynamodb/spec.md`; RFC-022 §7.3; `MATRIZ_AUDITORIA_54_ENDPOINTS.md` (E031) |
 
-> **Aviso.** Este documento **no aprueba** nada. El Gate de regularización de Oleadas 4/5 excluye
-> expresamente «la decisión financiera de E031» (`GATE_H08E_REGULARIZACION_OLEADAS_4_5.md` §5).
-> Mientras la frase no se conceda, E031 permanece `DISCREPANCIA_DOCUMENTAL_REGISTRADA` y su
-> runtime actual (borrado físico) **no** se declara conforme.
+> **Aviso.** La decisión está concedida. `APRUEBO_E031_IDEMPOTENTE_204_CON_PUNTERO` fija la
+> variante vigente: el **segundo `DELETE` responde `204` idempotente** y el localizador
+> `MOVEMENTPTR#<id>` **se conserva** marcado con `deleted=true`. Las secciones §3.2, §3.3, §4 y §6
+> de la versión 1.0.0 que decían «puntero eliminado» y «segundo intento `404`» quedan **sustituidas**
+> por este texto. La implementación local está cerrada; el despliegue AWS exige su Gate propio.
 
 ---
 
@@ -26,9 +27,9 @@
 | `E031/spec.md` §4 | «Invariante: Soft delete o reverso auditable; …» | :42 |
 | `A-060/spec.md` §modelo | «Registro de movimiento guarda amountCents int64, type …, createdAt, version, **tombstone/reversal**.» | :55 |
 | `A-060/spec.md` §TTL | «TTL epoch seconds solo limpieza eventual de tokens/ítems no críticos…» | :73 |
-| Runtime `internal/application/movements/service.go` | `Delete` lee, valida y delega; **no** escribe tombstone | :485 |
-| Runtime `internal/adapters/dynamo/movements_store.go` | `DeleteMovement` ejecuta **`Delete` físico** del ítem principal y de su localizador en una transacción | :745-771 |
-| Runtime `internal/adapters/dynamo/movements_store.go` | El `Delete` principal usa `ConditionExpression: attribute_exists(PK)` | :759-763 |
+| Runtime `internal/application/movements/service.go` | `Delete` lee, valida y delega; **ya escribe tombstone** (v1.1.0) | :494-564 |
+| Runtime `internal/adapters/dynamo/movements_store.go` | `DeleteMovement` ejecutaba **`Delete` físico** del ítem principal y de su localizador en una transacción (estado que motivó esta decisión) | v1.0.0, sustituido |
+| Runtime `internal/adapters/dynamo/movements_store.go` | La escritura actual es un `Update` de tombstone con CAS de versión y filtro de borrado | §3.2 |
 | Contrato | `DELETE /api/v1/movements/{movementId}` → `204` sin cuerpo; códigos `204, 400, 401, 403, 404, 409, 422, 429, 500, 503` | OpenAPI `nexum_e031` |
 
 Conclusión de hecho: **la especificación y la arquitectura exigen soft delete/tombstone; el
@@ -110,43 +111,54 @@ Campos que **se eliminan** en la misma escritura:
 No se escribe `deleted=false` al crear: **la ausencia del atributo significa «no borrado»**
 (compatibilidad con todos los movimientos existentes y con E001/E028 ya publicados).
 
-### 3.2 Escritura atómica
+### 3.2 Escritura atómica (variante vigente: `204` idempotente con puntero conservado)
 
 Una sola `TransactWriteItems` con dos acciones:
 
 1. `Update` sobre `PK=USER#<id>`, `SK=MOVEMENT#<occurredAt>#<id>`:
-   - `UpdateExpression`: `SET #deleted = :true, #deletedAt = :now, #deletedBy = :actor, #updatedAt = :now REMOVE #description, #gsi1pk, #gsi1sk ADD #version :one` (orden obligatorio de DynamoDB: `SET`, `REMOVE`, `ADD`)
+   - `UpdateExpression`: `SET #deleted = :true, #deletedAt = :now, #deletedBy = :actor, #updatedAt = :now ADD #version :one REMOVE #description, #gsi1pk, #gsi1sk` (DynamoDB exige `SET` → `REMOVE` → `ADD`)
    - `ConditionExpression`: `attribute_exists(PK) AND #version = :expected AND (attribute_not_exists(#deleted) OR #deleted = :false)`
-2. `Delete` sobre `PK=USER#<id>`, `SK=MOVEMENTPTR#<id>` con `ConditionExpression: attribute_exists(PK)`.
+   - Todos los `ExpressionAttributeValues` declarados se usan y ninguno sobra: DynamoDB rechaza con
+     `ValidationException` cualquier valor no referenciado (defecto que ya rompió E003/E042).
+2. `Update` sobre `PK=USER#<id>`, `SK=MOVEMENTPTR#<id>` con
+   `SET #deleted = :true, #updatedAt = :now` y `ConditionExpression: attribute_exists(PK)`.
+   **El puntero NO se elimina** y conserva `targetSK` (autorización
+   `APRUEBO_E031_IDEMPOTENTE_204_CON_PUNTERO`).
 
 Reglas:
 
 - `:expected` es la versión leída con `ConsistentRead` inmediatamente antes. Si la condición
   falla, se relee (máximo 3 intentos) y se distingue: ítem ausente → `404`; versión distinta →
-  reintento; ya borrado → `404`.
+  reintento; **ya borrado → `204` idempotente** (sin escritura y sin subir la versión).
+- Si sólo falla la acción del puntero (cancelación en el índice 1: ausente o incoherente), se
+  reintenta **únicamente** el tombstone del principal. La autoridad es el ítem principal; nunca se
+  revierte un tombstone ya aplicado.
 - **No** se toca el ítem de aportación (`CONTRIBUTION#`) ni la meta. Un movimiento con
   `contributionId` no vacío responde **409** antes de escribir (comportamiento actual, correcto).
-- El `DELETE` sigue siendo **no idempotente en el código de respuesta**: el segundo intento
-  devuelve `404` (el contrato lo permite). No se inventa un `204` repetido.
+- El `DELETE` es **idempotente**: repetirlo sobre un movimiento ya borrado devuelve `204` sin
+  cuerpo, sin escritura y con la versión intacta.
 - La transacción es la única escritura: no hay ventana en la que el puntero exista sin ítem ni
   viceversa.
 
-### 3.3 Por qué el puntero se elimina y no se conserva
+### 3.3 Por qué el puntero se CONSERVA
 
-- E029 resuelve por `MOVEMENTPTR#` (`movements_store.go:562-570`). Al eliminar el puntero, E029
-  devuelve `404` sin revelar el tombstone, igual que hoy.
-- Conservar el puntero obligaría a añadir una comprobación `deleted` en E029 y permitiría que un
-  cliente distinguiera «borrado» de «inexistente» por tiempos o por errores, sin beneficio.
-- El tombstone se conserva en la partición por `SK`, no por puntero; E020 no lo exporta (§4.7).
+- La autorización `APRUEBO_E031_IDEMPOTENTE_204_CON_PUNTERO` exige que la repetición del `DELETE`
+  pueda resolver el mismo recurso y confirmar el tombstone sin una consulta de partición.
+- `LoadMovement` ya lee el puntero y devuelve el principal; el servicio excluye los tombstones
+  (`Deleted`) traduciéndolos a `404`/`204`, de modo que E029 y E030 siguen sin revelar recursos
+  borrados.
+- La alternativa de la v1.0.0 (eliminar el puntero) obligaba a distinguir «nunca existió» de «ya
+  se borró» por tiempos y hacía imposible un `204` idempotente sin `Query`.
+- El tombstone no aparece en `GSI1` (se retiran `GSI1PK`/`GSI1SK`) y E020 no lo exporta (§4.7).
 
 ## 4. Impacto por endpoint
 
 | Endpoint | Operación afectada | Cambio exigido | Riesgo si se omite |
 |---|---|---|---|
-| **E031** `DELETE /movements/{id}` | `Service.Delete` + `MovementsStore.DeleteMovement` | Tombstone (§3) en lugar de `Delete` físico; `204` se mantiene | Sigue incumpliendo E031 §1/§4 |
-| **E027** `GET /movements` | `MovementsStore.ListMovements` (`:320-380`) | `FilterExpression`: `(attribute_not_exists(#deleted) OR #deleted = :false)`; el bucle de páginas ya existe para filtros (`:357-359`) | El listado mostraría movimientos borrados |
-| **E029** `GET /movements/{id}` | `LoadMovement` (`:570`) | Sin cambio funcional (puntero eliminado ⇒ `404`). Añadir comprobación defensiva de `deleted` por si un tombstone heredara puntero | Devolvería un recurso borrado |
-| **E030** `PATCH /movements/{id}` | `Service.Patch` (`:367`) + `UpdateMovement` | `ConditionExpression` con `(attribute_not_exists(#deleted) OR #deleted = :false)`; si el ítem está borrado → `404` | Permitiría editar un tombstone o devolvería 409/503 confusos |
+| **E031** `DELETE /movements/{id}` | `Service.Delete` + `MovementsStore.DeleteMovement` | Tombstone (§3) en lugar de `Delete` físico; `204` idempotente con puntero conservado | Sigue incumpliendo E031 §1/§4 |
+| **E027** `GET /movements` | `MovementsStore.ListMovements` | `FilterExpression`: `(attribute_not_exists(#deleted) OR #deleted = :false)`; el bucle de páginas ya existe para filtros | El listado mostraría movimientos borrados |
+| **E029** `GET /movements/{id}` | `LoadMovement` + `Service.Get` | El puntero se conserva: el servicio convierte un tombstone en `404` homogéneo | Devolvería un recurso borrado |
+| **E030** `PATCH /movements/{id}` | `Service.Patch` + `ReplaceMovement` | Condición con `(attribute_not_exists(#deleted) OR #deleted = :false)` en ambas rutas; si el ítem está borrado → `404` | Permitiría editar un tombstone o devolvería 409/503 confusos |
 | **E026** `GET /financial-summary` | `FinancialSummaryStore.AggregateMovements` (`:66-111`) | Saltar ítems con `deleted=true` antes de sumar | `income`/`expenses`/`savings`/`net` inflados |
 | **E050** `GET /budgets/usage` | `BudgetUsageStore.AggregateExpenses` (`:78-130`) | Saltar `deleted=true` en el recorrido | `usedAmount` mayor que el real |
 | **E051** `GET /dashboard` | `DashboardStore.ListLatestMovements` (`:98-126`) + resumen de E026 | `FilterExpression` de borrado y acumulación hasta 10 elementos (el `Limit` se aplica antes del filtro) | `latestMovements` podría mostrar borrados o quedarse corto |
@@ -173,8 +185,8 @@ Reglas:
 
 1. `Delete` sobre un movimiento propio responde `204` sin cuerpo y deja el ítem con `deleted=true`, `deletedAt` RFC3339, `deletedBy=USER` y `version` incrementada.
 2. El ítem conserva `amountCents`, `type`, `categoryId`, `occurredAt` y **no** conserva `description`, `GSI1PK` ni `GSI1SK`.
-3. El localizador `MOVEMENTPTR#` ya no existe tras el borrado.
-4. Segundo `DELETE` del mismo movimiento → `404` (sin excepción ni 500).
+3. El localizador `MOVEMENTPTR#` **se conserva** con `deleted=true` y el mismo `targetSK`; no reaparece si estaba ausente.
+4. Segundo `DELETE` del mismo movimiento → `204` idempotente, sin escritura ni versión nueva.
 5. `DELETE` de un movimiento ajeno → `404` homogéneo (no 403).
 6. `DELETE` de un movimiento con `contributionId` → `409` y **ninguna** escritura (verificar versión intacta).
 7. `E027` no lista el tombstone, ni con filtros `type`/`from`/`to`, ni en la última página.
@@ -182,11 +194,11 @@ Reglas:
 9. `E030` devuelve `404` tras el borrado y no incrementa la versión del tombstone.
 10. `E026` calcula `expenses`/`savings`/`net` sin el movimiento borrado (comparación exacta en centavos).
 11. `E050` no cuenta el gasto borrado en `usedAmount`.
-12. `E051` no incluye el tombstone en `latestMovements` y su `summary` coincide con E026.
-13. `E020` no exporta el tombstone.
+12. `E051` no incluye el tombstone en `latestMovements` y pagina hasta llenar el límite.
+13. `E020` no exporta el tombstone (hereda el filtro de E027).
 14. Carrera `PATCH` ∥ `DELETE` en 25 iteraciones: o gana el PATCH y el DELETE reintenta, o gana el DELETE y el PATCH responde `404`; **nunca** un ítem sin `deleted` con versión retrocedida ni un `500`.
 15. Dos instancias lógicas sobre la misma tabla: el borrado en A es visible en B (lectura consistente).
-16. Cero `Scan` en todas las rutas; el tombstone no aparece en `GSI1`.
+16. Cero `Scan` en todas las rutas; el tombstone no aparece en `GSI1` (`GSI1PK`/`GSI1SK` retirados).
 17. Purga de cuenta (E014) elimina también los tombstones y termina en `PURGED`.
 
 ## 7. Riesgos
@@ -200,28 +212,30 @@ Reglas:
 | R-31-05 | Cambio de comportamiento en endpoints publicados | E027/E026/E050/E051/E020 cambian lecturas; exige Gate de runtime y regresión HTTPS |
 | R-31-06 | El `FilterExpression` altera la paginación | E027 ya itera para llenar página; E051 debe acumular hasta 10. Pruebas con tombstones intercalados |
 
-## 8. Frase propuesta (no concedida)
+## 8. Autorizaciones concedidas
 
 ```
 APRUEBO_DECISION_E031_BORRADO_LOGICO_TOMBSTONE
+APRUEBO_E031_IDEMPOTENTE_204_CON_PUNTERO
+APRUEBO_CIERRE_IMPLEMENTACION_E031_TOMBSTONE
 ```
 
-Alcance que autorizaría, si se concede:
+Alcance concedido:
 
 1. Implementar la opción B en `internal/application/movements` y `internal/adapters/dynamo`
-   (tombstone y filtros de lectura).
-2. Añadir los filtros de exclusión en E026, E050, E051, E020 y en los lectores de analítica
-   cuando se integren.
+   (tombstone y filtros de lectura), con **`204` idempotente y puntero conservado**.
+2. Añadir los filtros de exclusión en E026, E050, E051 y E020; los lectores de analítica/ML se
+   filtran cuando se integren.
 3. Ejecutar las pruebas del §6 y la regresión de los endpoints afectados.
 4. **No** autoriza por sí sola release, despliegue, cambio de OpenAPI ni modificación de
-   `spec.md`/`plan.md`. El contrato HTTP no cambia (`204`, `404`, `409` ya existen).
+   `spec.md`/`plan.md`. El contrato HTTP no cambia (`204`, `404`, `409` ya existen) y el
+   despliegue AWS exige su propio Gate.
 
 ## 9. Qué no hace este documento
 
-- No escribe código ni modifica `internal/**`, `cmd/**`, OpenAPI ni Terraform.
+- No cambia el contrato HTTP ni Terraform; la implementación vive en `internal/**` y `tests/**`.
 - No cambia `spec.md`/`plan.md` de E031 ni de A-060 (política de edición).
-- No declara E031 conforme: mientras la frase no se conceda, el estado sigue siendo
-  `DISCREPANCIA_DOCUMENTAL_REGISTRADA`.
+- No declara E031 desplegado ni verificado en AWS: el estado local es `IMPLEMENTED_LOCAL`.
 - No fija retención ni TTL de tombstones; si se desea, será una decisión posterior con Gate.
 
 ## 10. Trazabilidad

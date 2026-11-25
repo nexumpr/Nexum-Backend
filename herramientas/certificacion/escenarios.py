@@ -1023,8 +1023,12 @@ def e031(ctx: n.Contexto) -> None:
     if _exigir(ctx, "E029", lectura, r, (404,)):
         r.ok("lectura posterior 404")
     replay = ctx.pedir("E031", ruta=f"/api/v1/movements/{mid}", token=ctx.a.access)
-    if _exigir(ctx, "E031", replay, r, (204, 404)):
-        r.ok("replay idempotente")
+    if _exigir(ctx, "E031", replay, r, (204,)):
+        r.ok("replay idempotente 204")
+        if not (replay.texto or "").strip():
+            r.ok("replay sin cuerpo")
+        else:
+            r.fallo("replay sin cuerpo", f"len={len(replay.texto)}", n.CONTENT_MISMATCH)
 
 
 # --------------------------------------------------------------------------- #

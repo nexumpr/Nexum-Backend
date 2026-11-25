@@ -157,13 +157,18 @@ func (s *FinancialSummaryStore) queryRange(ctx context.Context, userID, desde, h
 		entrada := &dynamodb.QueryInput{
 			TableName:              aws.String(s.table),
 			KeyConditionExpression: aws.String("PK = :pk AND #sk BETWEEN :from AND :to"),
+			// E031: los tombstones (`deleted=true`) no suman en E026. Un ítem sin el atributo
+			// (todo el histórico anterior a E031 y las aportaciones, que no lo tienen) cuenta.
+			FilterExpression: aws.String("(attribute_not_exists(#deleted) OR #deleted = :false)"),
 			ExpressionAttributeNames: map[string]string{
-				"#sk": "SK",
+				"#sk":      "SK",
+				"#deleted": "deleted",
 			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":pk":   stringAttr(pk),
-				":from": stringAttr(desde),
-				":to":   stringAttr(hasta),
+				":pk":    stringAttr(pk),
+				":from":  stringAttr(desde),
+				":to":    stringAttr(hasta),
+				":false": &types.AttributeValueMemberBOOL{Value: false},
 			},
 			ConsistentRead: aws.Bool(true),
 		}

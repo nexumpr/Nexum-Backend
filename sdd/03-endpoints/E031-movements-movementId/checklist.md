@@ -1,4 +1,9 @@
-# Checklist de calidad — E031
+# Checklist de calidad - E031
+
+> **Nota de vigencia (2026-11-24).** Implementación local cerrada como **tombstone lógico con `204`
+> idempotente y puntero conservado** (`DECISION_E031_BORRADO.md` v1.1.0). Este checklist es el
+> instrumento histórico de H06 y no se reescribe; `NOT_RUN` deja de aplicar al código local pero
+> **sigue vigente para AWS, HTTP real y aceptación del usuario**, que requieren su Gate.
 
 **Diseño H06:** review. **Implementación y evidencia:** NOT_RUN. **Respuesta prevista:** 204.
 

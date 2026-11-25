@@ -18,6 +18,12 @@ import (
 
 const itemDynID = "018f90ef-08e5-7a68-b09f-0000000000aa"
 
+// movBool lee un atributo BOOL del doble (false si no existe o es de otro tipo).
+func movBool(item map[string]types.AttributeValue, nombre string) bool {
+	valor, ok := item[nombre].(*types.AttributeValueMemberBOOL)
+	return ok && valor.Value
+}
+
 // eliminar borra una clave del doble sin pasar por una transacción (para simular estados
 // parciales que no puede producir el adaptador).
 func (m *movDynamo) eliminar(pk, sk string) {
@@ -193,8 +199,9 @@ func TestE030StoreMueveFecha(t *testing.T) {
 	}
 }
 
-// TestE031StoreBorraPrincipalYPuntero comprueba el 204 real: ambos ítems desaparecen.
-func TestE031StoreBorraPrincipalYPuntero(t *testing.T) {
+// TestE031StoreTombstonePrincipalYPuntero comprueba el 204 real: el ítem principal NO
+// desaparece, se convierte en tombstone y el localizador se CONSERVA marcado.
+func TestE031StoreTombstonePrincipalYPuntero(t *testing.T) {
 	doble := newMovDynamo()
 	store := dynamoAdapter.NewMovementsStore(doble, movDynTabla)
 	creado := itemDynSembrar(t, doble, store, movDynAhora.Add(-time.Hour))
@@ -203,33 +210,91 @@ func TestE031StoreBorraPrincipalYPuntero(t *testing.T) {
 	if err != nil || actual == nil {
 		t.Fatalf("lectura de preparacion inesperada: %v", err)
 	}
+	pk, sk, _, _ := domainDynamo.MovementKeys(movDynUsuario, creado.ID, actual.Type, actual.OccurredAt)
 	if err := store.DeleteMovement(context.Background(), appMovements.DeleteWrite{
-		UserID: movDynUsuario, MovementID: creado.ID, Previous: *actual, Now: movDynAhora,
+		UserID: movDynUsuario, MovementID: creado.ID, ExpectedVersion: actual.Version,
+		Previous: *actual, Now: movDynAhora,
 	}); err != nil {
-		t.Fatalf("borrado inesperado: %v", err)
+		t.Fatalf("tombstone inesperado: %v", err)
 	}
 
-	if total := doble.contar(domainDynamo.PrefixUser+movDynUsuario, domainDynamo.PrefixMovement); total != 0 {
-		t.Fatalf("el item principal debe desaparecer: %d", total)
+	// El movimiento NO desaparece de DynamoDB: sigue exactamente en la misma clave.
+	if total := doble.contar(domainDynamo.PrefixUser+movDynUsuario, domainDynamo.PrefixMovement); total != 1 {
+		t.Fatalf("el item principal debe conservarse como tombstone: %d", total)
 	}
+	principal := doble.leer(pk, sk)
+	if principal == nil {
+		t.Fatal("el item principal debe existir")
+	}
+	if !movBool(principal, "deleted") {
+		t.Fatalf("deleted debe ser true: %+v", principal)
+	}
+	if mapaString(principal, "deletedBy") != "USER" || mapaString(principal, "deletedAt") == "" {
+		t.Fatalf("metadatos de borrado inesperados: %+v", principal)
+	}
+	if movValorTexto(principal["version"]) != "2" {
+		t.Fatalf("la version debe subir a 2: %q", movValorTexto(principal["version"]))
+	}
+	if _, existe := principal["description"]; existe {
+		t.Fatal("description debe retirarse del tombstone")
+	}
+	if _, existe := principal["GSI1PK"]; existe {
+		t.Fatal("GSI1PK debe retirarse para que el borrado salga del indice")
+	}
+	if _, existe := principal["GSI1SK"]; existe {
+		t.Fatal("GSI1SK debe retirarse para que el borrado salga del indice")
+	}
+	// El importe se conserva: el tombstone mantiene los hechos financieros minimos.
+	if movValorTexto(principal["amountCents"]) != "100000" {
+		t.Fatalf("el importe debe conservarse: %q", movValorTexto(principal["amountCents"]))
+	}
+
+	// El puntero se CONSERVA (autorizacion APRUEBO_E031_IDEMPOTENTE_204_CON_PUNTERO), marcado.
 	ptrPK, ptrSK := dynamoAdapter.MovementPointerKeys(movDynUsuario, creado.ID)
-	if doble.leer(ptrPK, ptrSK) != nil {
-		t.Fatal("el localizador debe desaparecer")
+	puntero := doble.leer(ptrPK, ptrSK)
+	if puntero == nil {
+		t.Fatal("el localizador NO debe eliminarse")
 	}
-	if restante, err := store.LoadMovement(context.Background(), movDynUsuario, creado.ID); err != nil || restante != nil {
-		t.Fatalf("tras borrar no debe resolverse: %v / %+v", err, restante)
+	if !movBool(puntero, "deleted") {
+		t.Fatal("el localizador debe quedar marcado como borrado")
+	}
+	if mapaString(puntero, "targetSK") != sk {
+		t.Fatalf("el localizador debe conservar targetSK: %q", mapaString(puntero, "targetSK"))
+	}
+	// Sigue resolviendose por id, pero como tombstone (el servicio lo traduce a 404/204).
+	restante, err := store.LoadMovement(context.Background(), movDynUsuario, creado.ID)
+	if err != nil || restante == nil || !restante.Deleted {
+		t.Fatalf("tras borrar debe resolverse como tombstone: %v / %+v", err, restante)
 	}
 
-	// Repetir el borrado con la posicion antigua ya no puede confirmar nada.
+	// Repetir el borrado con la version ya consumida no vuelve a escribir: es un conflicto que
+	// el servicio convierte en 204 idempotente sin subir la version.
 	if err := store.DeleteMovement(context.Background(), appMovements.DeleteWrite{
-		UserID: movDynUsuario, MovementID: creado.ID, Previous: *actual, Now: movDynAhora,
+		UserID: movDynUsuario, MovementID: creado.ID, ExpectedVersion: actual.Version,
+		Previous: *actual, Now: movDynAhora,
 	}); !errors.Is(err, appMovements.ErrConflict) {
-		t.Fatalf("un segundo borrado debe ser conflicto, se obtuvo %v", err)
+		t.Fatalf("un segundo tombstone debe ser conflicto, se obtuvo %v", err)
+	}
+	if tras := doble.leer(pk, sk); movValorTexto(tras["version"]) != "2" {
+		t.Fatalf("el segundo borrado no puede subir la version: %q", movValorTexto(tras["version"]))
+	}
+
+	// Un movimiento borrado no puede reemplazarse (E030): la condicion incluye `deleted=false`.
+	siguiente := *restante
+	siguiente.Version = restante.Version + 1
+	if _, err := store.ReplaceMovement(context.Background(), appMovements.ReplaceWrite{
+		UserID: movDynUsuario, MovementID: creado.ID, ExpectedVersion: restante.Version,
+		Previous: *restante, Next: siguiente, Now: movDynAhora,
+	}); !errors.Is(err, appMovements.ErrConflict) {
+		t.Fatalf("editar un tombstone debe ser conflicto, se obtuvo %v", err)
+	}
+	if tras := doble.leer(pk, sk); movValorTexto(tras["version"]) != "2" {
+		t.Fatalf("la edicion rechazada no puede subir la version: %q", movValorTexto(tras["version"]))
 	}
 }
 
-// TestE031StorePunteroAusente comprueba que un localizador ya desaparecido no impide borrar el
-// ítem principal (autoridad).
+// TestE031StorePunteroAusente comprueba que un localizador ya desaparecido no impide escribir el
+// tombstone del ítem principal (autoridad).
 func TestE031StorePunteroAusente(t *testing.T) {
 	doble := newMovDynamo()
 	store := dynamoAdapter.NewMovementsStore(doble, movDynTabla)
@@ -243,12 +308,18 @@ func TestE031StorePunteroAusente(t *testing.T) {
 	doble.eliminar(ptrPK, ptrSK)
 
 	if err := store.DeleteMovement(context.Background(), appMovements.DeleteWrite{
-		UserID: movDynUsuario, MovementID: creado.ID, Previous: *actual, Now: movDynAhora,
+		UserID: movDynUsuario, MovementID: creado.ID, ExpectedVersion: actual.Version,
+		Previous: *actual, Now: movDynAhora,
 	}); err != nil {
-		t.Fatalf("sin localizador el borrado del principal debe completarse: %v", err)
+		t.Fatalf("sin localizador el tombstone del principal debe completarse: %v", err)
 	}
-	if total := doble.contar(domainDynamo.PrefixUser+movDynUsuario, domainDynamo.PrefixMovement); total != 0 {
-		t.Fatalf("el item principal debe desaparecer: %d", total)
+	pk, sk, _, _ := domainDynamo.MovementKeys(movDynUsuario, creado.ID, actual.Type, actual.OccurredAt)
+	principal := doble.leer(pk, sk)
+	if principal == nil || !movBool(principal, "deleted") {
+		t.Fatalf("el item principal debe quedar como tombstone: %+v", principal)
+	}
+	if doble.leer(ptrPK, ptrSK) != nil {
+		t.Fatal("el puntero ausente no debe reaparecer")
 	}
 }
 

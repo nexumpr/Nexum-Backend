@@ -98,7 +98,19 @@ func (m *movItemStore) DeleteMovement(_ context.Context, write appMovements.Dele
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	delete(m.movimientos, itemClave(write.UserID, write.MovementID))
+	// Tombstone lógico de E031: el ítem NO se elimina; se marca `deleted` y sube la versión.
+	clave := itemClave(write.UserID, write.MovementID)
+	actual, ok := m.movimientos[clave]
+	if !ok {
+		return appMovements.ErrConflict
+	}
+	if actual.Version != write.ExpectedVersion {
+		return appMovements.ErrConflict
+	}
+	actual.Deleted = true
+	actual.Version++
+	actual.Description = ""
+	m.movimientos[clave] = actual
 	return nil
 }
 
@@ -370,6 +382,83 @@ func TestE031Delete(t *testing.T) {
 	// Id mal formado -> 400.
 	if err := servicio.Delete(context.Background(), movUsuario, "x"); !errors.Is(err, appMovements.ErrInvalidRequest) {
 		t.Fatalf("id mal formado debe ser 400, se obtuvo %v", err)
+	}
+}
+
+// TestE031DeleteIdempotenteYLectores cubre la autorización
+// APRUEBO_E031_IDEMPOTENTE_204_CON_PUNTERO: el segundo DELETE devuelve 204 sin escribir, un
+// tombstone no se lee (404) ni se edita (404) y su versión no retrocede.
+func TestE031DeleteIdempotenteYLectores(t *testing.T) {
+	store := newMovItemStore()
+	store.sembrar(movUsuario, itemMovimiento(itemMovID, movAhora.Add(-time.Hour)))
+	servicio := movServicio(store)
+
+	if err := servicio.Delete(context.Background(), movUsuario, itemMovID); err != nil {
+		t.Fatalf("primer borrado inesperado: %v", err)
+	}
+	// Segundo DELETE: mismo efecto, 204, sin una segunda escritura ni versión nueva.
+	if err := servicio.Delete(context.Background(), movUsuario, itemMovID); err != nil {
+		t.Fatalf("segundo borrado debe ser idempotente: %v", err)
+	}
+	store.mu.Lock()
+	if len(store.borrados) != 1 {
+		store.mu.Unlock()
+		t.Fatalf("el segundo DELETE no puede escribir: %d", len(store.borrados))
+	}
+	tombstone := store.movimientos[itemClave(movUsuario, itemMovID)]
+	store.mu.Unlock()
+	if !tombstone.Deleted || tombstone.Version != 2 {
+		t.Fatalf("el tombstone debe conservarse con version 2: %+v", tombstone)
+	}
+
+	// Un movimiento borrado no es legible ni editable: 404 homogéneo, sin revelar su existencia.
+	if _, err := servicio.Get(context.Background(), movUsuario, itemMovID); !errors.Is(err, appMovements.ErrNotFound) {
+		t.Fatalf("leer un tombstone debe ser 404, se obtuvo %v", err)
+	}
+	descripcion := "otra"
+	if _, err := servicio.Patch(context.Background(), movUsuario, itemMovID, 2, appMovements.Patch{Description: &descripcion}); !errors.Is(err, appMovements.ErrNotFound) {
+		t.Fatalf("editar un tombstone debe ser 404, se obtuvo %v", err)
+	}
+	store.mu.Lock()
+	escrituras := len(store.reemplazos)
+	store.mu.Unlock()
+	if escrituras != 0 {
+		t.Fatal("un PATCH rechazado no puede escribir")
+	}
+
+	// Aislamiento: el borrado de A no afecta a un movimiento B con el mismo identificador.
+	store.sembrar(movUsuarioB, itemMovimiento(itemMovID, movAhora.Add(-time.Hour)))
+	if _, err := servicio.Get(context.Background(), movUsuarioB, itemMovID); err != nil {
+		t.Fatalf("el movimiento de B debe seguir visible: %v", err)
+	}
+}
+
+// TestE031DeleteTombstonePresenteEnAlmacen comprueba que el borrado es lógico: el ítem sigue en
+// el almacén y solo cambia de estado.
+func TestE031DeleteTombstonePresenteEnAlmacen(t *testing.T) {
+	store := newMovItemStore()
+	original := itemMovimiento(itemMovID, movAhora.Add(-time.Hour))
+	store.sembrar(movUsuario, original)
+
+	if err := movServicio(store).Delete(context.Background(), movUsuario, itemMovID); err != nil {
+		t.Fatalf("borrado inesperado: %v", err)
+	}
+	store.mu.Lock()
+	guardado, existe := store.movimientos[itemClave(movUsuario, itemMovID)]
+	escritura := appMovements.DeleteWrite{}
+	if len(store.borrados) > 0 {
+		escritura = store.borrados[0]
+	}
+	totalBorrados := len(store.borrados)
+	store.mu.Unlock()
+	if !existe {
+		t.Fatal("el movimiento no puede desaparecer del almacen: es un tombstone")
+	}
+	if !guardado.Deleted || guardado.Version != original.Version+1 || guardado.AmountCents != original.AmountCents {
+		t.Fatalf("tombstone inesperado: %+v", guardado)
+	}
+	if totalBorrados != 1 || escritura.ExpectedVersion != original.Version {
+		t.Fatalf("la escritura debe declarar la version leida: %+v", escritura)
 	}
 }
 

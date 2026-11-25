@@ -95,6 +95,10 @@ func (s *DashboardStore) ListActiveGoals(ctx context.Context, userID string, lim
 }
 
 // ListLatestMovements consulta los movimientos más recientes en orden descendente.
+//
+// E031: los tombstones (`deleted=true`) no se sirven en el tablero. Como el filtro descarta
+// elementos DESPUÉS de que DynamoDB aplique `Limit`, se pagina hasta reunir `limit` movimientos
+// vivos (o agotar la partición): nunca se devuelve una página corta por culpa de un borrado.
 func (s *DashboardStore) ListLatestMovements(ctx context.Context, userID string, limit int) ([]appMovements.Movement, error) {
 	if s == nil || s.client == nil || s.table == "" {
 		return nil, appDashboard.ErrUnavailable
@@ -102,26 +106,50 @@ func (s *DashboardStore) ListLatestMovements(ctx context.Context, userID string,
 	if limit < 1 {
 		limit = appDashboard.LatestMovements
 	}
-	out, err := s.client.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String(s.table),
-		KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :prefix)"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":     stringAttr(domainDynamo.PrefixUser + strings.TrimSpace(userID)),
-			":prefix": stringAttr(domainDynamo.PrefixMovement),
-		},
-		ScanIndexForward: aws.Bool(false),
-		Limit:            aws.Int32(int32(limit)),
-	})
-	if err != nil {
-		return nil, appDashboard.ErrUnavailable
-	}
-	salida := make([]appMovements.Movement, 0, len(out.Items))
-	for _, item := range out.Items {
-		m, ok := movimientoDesdeItem(item, strings.TrimSpace(userID))
-		if !ok {
-			return nil, appDashboard.ErrInvalid
+	titular := strings.TrimSpace(userID)
+	salida := make([]appMovements.Movement, 0, limit)
+	var start map[string]types.AttributeValue
+	for {
+		entrada := &dynamodb.QueryInput{
+			TableName:              aws.String(s.table),
+			KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :prefix)"),
+			FilterExpression:       aws.String("(attribute_not_exists(#deleted) OR #deleted = :false)"),
+			ExpressionAttributeNames: map[string]string{
+				"#deleted": "deleted",
+			},
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk":     stringAttr(domainDynamo.PrefixUser + titular),
+				":prefix": stringAttr(domainDynamo.PrefixMovement),
+				":false":  &types.AttributeValueMemberBOOL{Value: false},
+			},
+			ScanIndexForward: aws.Bool(false),
+			Limit:            aws.Int32(int32(limit)),
 		}
-		salida = append(salida, m)
+		if len(start) > 0 {
+			entrada.ExclusiveStartKey = start
+		}
+		out, err := s.client.Query(ctx, entrada)
+		if err != nil {
+			return nil, appDashboard.ErrUnavailable
+		}
+		for _, item := range out.Items {
+			m, ok := movimientoDesdeItem(item, titular)
+			if !ok {
+				return nil, appDashboard.ErrInvalid
+			}
+			if m.Deleted {
+				// Defensa en profundidad: el filtro ya lo excluye; si el ítem llegara como
+				// tombstone no se sirve ni se cuenta para el límite.
+				continue
+			}
+			salida = append(salida, m)
+			if len(salida) >= limit {
+				return salida, nil
+			}
+		}
+		if len(out.LastEvaluatedKey) == 0 {
+			return salida, nil
+		}
+		start = out.LastEvaluatedKey
 	}
-	return salida, nil
 }
