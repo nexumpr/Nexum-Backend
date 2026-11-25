@@ -267,6 +267,17 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 		}
 	}
 
+	// Scheduler durable de recordatorios (Oleada 5): recupera ocurrencias vencidas,
+	// las encola en el outbox push y avanza la siguiente. Sin DynamoDB/tabla no se
+	// inicia; el resto del servidor sigue disponible.
+	cerrarScheduler, errScheduler := iniciarSchedulerOleada5(ctx, depsOleada5)
+	if errScheduler != nil {
+		logger.WarnContext(ctx, "scheduler Oleada 5: no iniciado",
+			slog.String("clase", "SCHEDULER_NO_INICIADO"))
+	} else {
+		defer cerrarScheduler()
+	}
+
 	srv := nexumhttp.NewHTTPServer(cfg, router, logger)
 
 	// Start bloquea hasta que el listener falla o se cierra; el canal transporta
