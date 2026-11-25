@@ -96,6 +96,9 @@ class DisparadoresYPermisos(unittest.TestCase):
         bloque = self.texto.split("pull_request:", 1)[1].split("push:", 1)[0]
         self.assertIn("main", bloque)
         self.assertIn("release/**", bloque)
+        # RFC-023: los PR apilados de la regularización deben ejecutar CI.
+        self.assertIn("fix/**", bloque)
+        self.assertIn("feat/**", bloque)
 
     def test_push_solo_a_main(self) -> None:
         bloque = self.texto.split("push:", 1)[1].split("permissions:", 1)[0]

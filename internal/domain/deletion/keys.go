@@ -35,6 +35,31 @@ const (
 	EntityControl = "DELETION_CONTROL"
 	EntityQueue   = "DELETION_QUEUE"
 
+	// PrefixOutboxPointer y PrefixSchedulePointer son los punteros que viven en la
+	// partición del titular y referencian un ítem de una partición global del servicio.
+	//
+	//	USER#<sub> / OUTBOXPTR#<notificationID>    -> skGlobal en OUTBOX#GLOBAL
+	//	USER#<sub> / SCHEDULEPTR#<reminderID>      -> skGlobal en SCHEDULE#GLOBAL
+	//
+	// Existen porque la purga no puede usar `Scan`: sin el puntero, un ítem global
+	// (cuya PK es del servicio, no del titular) sería inalcanzable desde la partición
+	// del usuario. El puntero NO contiene datos personales: sólo la clave del ítem
+	// global, su titular y la marca de creación.
+	PrefixOutboxPointer   = "OUTBOXPTR#"
+	PrefixSchedulePointer = "SCHEDULEPTR#"
+
+	// PartitionOutboxGlobal es la partición del outbox push (worker FCM, Oleada 4) y
+	// PartitionScheduleGlobal la reservada al scheduler durable de recordatorios. Las
+	// dos son particiones del SERVICIO: la purga sólo borra los ítems referenciados
+	// por un puntero del titular y cuyo atributo `userID` coincide.
+	PartitionOutboxGlobal   = "OUTBOX#GLOBAL"
+	PartitionScheduleGlobal = "SCHEDULE#GLOBAL"
+
+	// EntityOutboxPointer y EntitySchedulePointer identifican los punteros, de modo que
+	// un barrido pueda distinguirlos de otras entidades de la partición.
+	EntityOutboxPointer   = "PUSH_OUTBOX_POINTER"
+	EntitySchedulePointer = "REMINDER_SCHEDULE_POINTER"
+
 	// CatalogVersion es la versión del catálogo de purga. Permite que las oleadas
 	// posteriores añadan entidades sin reescribir el worker: el control persistido guarda
 	// la versión con la que se creó el trabajo.
@@ -93,6 +118,63 @@ func RefreshLocatorKeys(digest string) (pk, sk string) {
 // la excluye siempre: nunca se puede borrar el registro que acredita el avance.
 func IsControlSK(sk string) bool {
 	return strings.HasPrefix(strings.TrimSpace(sk), PrefixDeletion)
+}
+
+// OutboxPointerKeys devuelve PK y SK del puntero que referencia un trabajo del outbox push.
+// El puntero se escribe en la MISMA transacción que el ítem global (contrato de
+// `CONTRATO_PUNTEROS.md`); un ítem global sin puntero sólo puede ser anterior a ese contrato.
+func OutboxPointerKeys(userID, notificationID string) (pk, sk string) {
+	return UserPartition(userID), PrefixOutboxPointer + strings.TrimSpace(notificationID)
+}
+
+// SchedulePointerKeys devuelve PK y SK del puntero que referencia la ocurrencia programada
+// de un recordatorio. Se reserva para el scheduler durable; mientras no exista, la purga
+// tolera su ausencia.
+func SchedulePointerKeys(userID, reminderID string) (pk, sk string) {
+	return UserPartition(userID), PrefixSchedulePointer + strings.TrimSpace(reminderID)
+}
+
+// IsOutboxPointerSK indica si una SK es un puntero al outbox push.
+func IsOutboxPointerSK(sk string) bool {
+	return strings.HasPrefix(strings.TrimSpace(sk), PrefixOutboxPointer)
+}
+
+// IsSchedulePointerSK indica si una SK es un puntero al scheduler de recordatorios.
+func IsSchedulePointerSK(sk string) bool {
+	return strings.HasPrefix(strings.TrimSpace(sk), PrefixSchedulePointer)
+}
+
+// IsGlobalPointerSK indica si una SK es un puntero a una partición global del servicio.
+// El barrido de PARTITION trata estos ítems en dos pasos: primero borra el ítem global
+// referenciado (con condición) y sólo después el puntero.
+func IsGlobalPointerSK(sk string) bool {
+	return IsOutboxPointerSK(sk) || IsSchedulePointerSK(sk)
+}
+
+// GlobalPartitionForPointer devuelve la partición global a la que apunta un puntero. El
+// segundo valor es falso si la SK no es un puntero conocido: la purga nunca borra fuera de
+// las dos particiones del servicio declaradas aquí.
+func GlobalPartitionForPointer(sk string) (string, bool) {
+	switch {
+	case IsOutboxPointerSK(sk):
+		return PartitionOutboxGlobal, true
+	case IsSchedulePointerSK(sk):
+		return PartitionScheduleGlobal, true
+	default:
+		return "", false
+	}
+}
+
+// IsGlobalPartition indica si una PK pertenece a una partición global del servicio que la
+// purga puede tocar (y sólo mediante un puntero del titular). Es defensa en profundidad
+// frente a un puntero corrupto.
+func IsGlobalPartition(pk string) bool {
+	switch strings.TrimSpace(pk) {
+	case PartitionOutboxGlobal, PartitionScheduleGlobal:
+		return true
+	default:
+		return false
+	}
 }
 
 // IsDeletionQueueSK indica si una SK es un requestId utilizable en la cola.

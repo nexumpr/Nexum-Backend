@@ -2,8 +2,10 @@ package application_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,12 +55,35 @@ type e020Fuente struct {
 	perfil          *appProfile.Profile
 	consentimientos []appPrivacy.ConsentRecord
 
-	errMovimientos     error
-	errMetas           error
-	errPerfil          error
-	errConsentimientos error
+	notificaciones []e020NotifFila
+	recordatorios  []e020RemFila
+	dispositivos   []e020DevFila
+	prefsNotif     *appExport.NotificationPreferencesRow
+
+	errMovimientos       error
+	errMetas             error
+	errPerfil            error
+	errConsentimientos   error
+	errNotificaciones    error
+	errPreferenciasNotif error
 
 	consultas []string
+}
+
+// Filas con SK física para que el cursor use posiciones reales también en las familias nuevas.
+type e020NotifFila struct {
+	sk   string
+	fila appExport.NotificationRow
+}
+
+type e020RemFila struct {
+	sk   string
+	fila appExport.ReminderRow
+}
+
+type e020DevFila struct {
+	sk   string
+	fila appExport.PushDeviceRow
 }
 
 func (f *e020Fuente) Movimientos(_ context.Context, userID, after string, limit int) ([]appMovements.Movement, string, error) {
@@ -118,6 +143,57 @@ func e020PaginarMetas(filas []e020MetaFila, after string, limit int) ([]appGoals
 		}
 	}
 	salida := make([]appGoals.GoalRow, 0, limit)
+	for i := 0; i < len(restantes) && i < limit; i++ {
+		salida = append(salida, restantes[i].fila)
+	}
+	if len(restantes) > limit {
+		return salida, restantes[limit-1].sk, nil
+	}
+	return salida, "", nil
+}
+
+func e020PaginarNotificaciones(filas []e020NotifFila, after string, limit int) ([]appExport.NotificationRow, string, error) {
+	restantes := make([]e020NotifFila, 0, len(filas))
+	for _, fila := range filas {
+		if fila.sk > after {
+			restantes = append(restantes, fila)
+		}
+	}
+	salida := make([]appExport.NotificationRow, 0, limit)
+	for i := 0; i < len(restantes) && i < limit; i++ {
+		salida = append(salida, restantes[i].fila)
+	}
+	if len(restantes) > limit {
+		return salida, restantes[limit-1].sk, nil
+	}
+	return salida, "", nil
+}
+
+func e020PaginarRecordatorios(filas []e020RemFila, after string, limit int) ([]appExport.ReminderRow, string, error) {
+	restantes := make([]e020RemFila, 0, len(filas))
+	for _, fila := range filas {
+		if fila.sk > after {
+			restantes = append(restantes, fila)
+		}
+	}
+	salida := make([]appExport.ReminderRow, 0, limit)
+	for i := 0; i < len(restantes) && i < limit; i++ {
+		salida = append(salida, restantes[i].fila)
+	}
+	if len(restantes) > limit {
+		return salida, restantes[limit-1].sk, nil
+	}
+	return salida, "", nil
+}
+
+func e020PaginarDispositivos(filas []e020DevFila, after string, limit int) ([]appExport.PushDeviceRow, string, error) {
+	restantes := make([]e020DevFila, 0, len(filas))
+	for _, fila := range filas {
+		if fila.sk > after {
+			restantes = append(restantes, fila)
+		}
+	}
+	salida := make([]appExport.PushDeviceRow, 0, limit)
 	for i := 0; i < len(restantes) && i < limit; i++ {
 		salida = append(salida, restantes[i].fila)
 	}
@@ -537,6 +613,125 @@ func TestE020ExportedAtViajaEnElCursor(t *testing.T) {
 	}
 }
 
+// TestE020TransversalExportaFamiliasYNoFiltraSecretos comprueba que las cuatro familias
+// transversales viajan en la página y que el JSON resultante no contiene tokens, huellas,
+// hashes, claves de idempotencia ni leases.
+func TestE020TransversalExportaFamiliasYNoFiltraSecretos(t *testing.T) {
+	fuente := e020Coleccion()
+	fuente.notificaciones = []e020NotifFila{{
+		sk: appExport.PrefijoNotificacion + "2026-11-20T10:00:00.000000001Z#n1",
+		fila: appExport.NotificationRow{
+			ID: "n1", Title: "Aviso", Message: "Mensaje", IsRead: true,
+			CreatedAt: e020Ahora.Add(-2 * time.Hour),
+		},
+	}}
+	fuente.recordatorios = []e020RemFila{{
+		sk: appExport.PrefijoRecordatorio + "2026-11-25T09:00:00.000Z#r1",
+		fila: appExport.ReminderRow{
+			ID: "r1", Title: "Pagar renta", DueAt: e020Ahora.Add(24 * time.Hour),
+			Timezone: "America/Mexico_City", Active: true,
+			CreatedAt: e020Ahora.Add(-72 * time.Hour), UpdatedAt: e020Ahora.Add(-48 * time.Hour),
+		},
+	}}
+	fuente.dispositivos = []e020DevFila{{
+		sk: appExport.PrefijoDispositivo + "d1",
+		fila: appExport.PushDeviceRow{
+			ID: "d1", Provider: "fcm", DeviceLabel: "Pixel", RegisteredAt: e020Ahora.Add(-96 * time.Hour),
+			Active: true,
+		},
+	}}
+	fuente.prefsNotif = &appExport.NotificationPreferencesRow{
+		PushEnabled: true, ReminderEnabled: true, BudgetAlerts: true, RecurringReminders: true,
+		Version: 4, TimeZone: "America/Mexico_City",
+		QuietHours: &appExport.QuietHoursRow{Enabled: true, Start: "22:00", End: "07:00"},
+	}
+
+	pagina, err := e020Servicio(fuente).Export(context.Background(), appExport.Query{
+		UserID: e020Usuario, Limit: 100,
+	})
+	if err != nil {
+		t.Fatalf("exportacion: %v", err)
+	}
+	if len(pagina.Notifications) != 1 || len(pagina.Reminders) != 1 || len(pagina.PushDevices) != 1 {
+		t.Fatalf("familias transversales incompletas: %d/%d/%d",
+			len(pagina.Notifications), len(pagina.Reminders), len(pagina.PushDevices))
+	}
+	if pagina.Notifications[0].ID != "n1" || !pagina.Notifications[0].IsRead {
+		t.Fatalf("notificacion mal proyectada: %+v", pagina.Notifications[0])
+	}
+	if pagina.Reminders[0].Frequency != nil || pagina.Reminders[0].CreatedAt == "" || pagina.Reminders[0].UpdatedAt == "" {
+		t.Fatalf("recordatorio mal proyectado: %+v", pagina.Reminders[0])
+	}
+	prefs := pagina.NotificationPreferences
+	if prefs == nil || !prefs.PushEnabled || prefs.Version != 4 {
+		t.Fatalf("preferencias de notificacion mal proyectadas: %+v", prefs)
+	}
+	if prefs.QuietHours == nil || prefs.QuietHours.Start != "22:00" {
+		t.Fatalf("quietHours mal proyectado: %+v", prefs.QuietHours)
+	}
+
+	crudo, errJSON := json.Marshal(pagina)
+	if errJSON != nil {
+		t.Fatalf("serializacion: %v", errJSON)
+	}
+	texto := strings.ToLower(string(crudo))
+	for _, prohibido := range []string{
+		"token", "cipher", "fingerprint", "idem#", "passwordhash", "refreshhash",
+		"leaseuntil", "skglobal", "schedulesptr", "outboxptr",
+	} {
+		if strings.Contains(texto, prohibido) {
+			t.Fatalf("la exportacion no puede contener %q: %s", prohibido, texto)
+		}
+	}
+	for _, presente := range []string{"notifications", "reminders", "pushdevices", "notificationpreferences"} {
+		if !strings.Contains(texto, presente) {
+			t.Fatalf("falta %q en la exportacion: %s", presente, texto)
+		}
+	}
+}
+
+// TestE020TransversalPaginacionHastaAgotar comprueba que las familias nuevas usan el mismo
+// cursor firmado y que la última página no emite continuación.
+func TestE020TransversalPaginacionHastaAgotar(t *testing.T) {
+	fuente := &e020Fuente{perfil: e020Perfil()}
+	fuente.notificaciones = []e020NotifFila{
+		{sk: appExport.PrefijoNotificacion + "2026-11-20T10:00:00.000000001Z#n1", fila: appExport.NotificationRow{ID: "n1", CreatedAt: e020Ahora}},
+		{sk: appExport.PrefijoNotificacion + "2026-11-20T10:00:00.000000002Z#n2", fila: appExport.NotificationRow{ID: "n2", CreatedAt: e020Ahora}},
+	}
+	servicio := e020Servicio(fuente)
+
+	primera, err := servicio.Export(context.Background(), appExport.Query{UserID: e020Usuario, Limit: 1})
+	if err != nil || len(primera.Notifications) != 1 || primera.NextCursor == "" {
+		t.Fatalf("primera pagina: %+v err=%v", primera, err)
+	}
+	segunda, err := servicio.Export(context.Background(), appExport.Query{
+		UserID: e020Usuario, Limit: 1, Cursor: primera.NextCursor,
+	})
+	if err != nil || len(segunda.Notifications) != 1 || segunda.Notifications[0].ID != "n2" {
+		t.Fatalf("segunda pagina: %+v err=%v", segunda, err)
+	}
+	// La página se llenó exactamente en la última notificación: la continuación apunta a la
+	// colección siguiente con posición vacía, no declara agotada la exportación.
+	if segunda.NextCursor == "" {
+		t.Fatal("quedan colecciones por recorrer: debe haber continuación")
+	}
+	tercera, err := servicio.Export(context.Background(), appExport.Query{
+		UserID: e020Usuario, Limit: 1, Cursor: segunda.NextCursor,
+	})
+	if err != nil {
+		t.Fatalf("tercera pagina: %v", err)
+	}
+	if len(tercera.Notifications) != 0 || tercera.NextCursor != "" {
+		t.Fatalf("agotadas todas las colecciones no debe haber cursor: %+v", tercera)
+	}
+	// Un cursor de otro titular se sigue rechazando.
+	if _, err := servicio.Export(context.Background(), appExport.Query{
+		UserID: e020Otro, Limit: 1, Cursor: primera.NextCursor,
+	}); !errors.Is(err, appExport.ErrInvalidRequest) {
+		t.Fatalf("el cursor debe estar ligado al titular: %v", err)
+	}
+}
+
 func (f *e020Fuente) Aportaciones(context.Context, string, string, int) ([]appExport.ContributionRow, string, error) {
 	return nil, "", nil
 }
@@ -554,4 +749,29 @@ func (f *e020Fuente) Onboarding(context.Context, string) (*appOnboarding.State, 
 }
 func (f *e020Fuente) Preferencias(context.Context, string) (*appPreferences.Preferences, error) {
 	return nil, nil
+}
+
+// Familias transversales: los dobles devuelven colecciones vacías salvo que la prueba las
+// siembre (ver `notifications`, `reminders`, `devices` y `notificationPrefs` más abajo).
+func (f *e020Fuente) Notificaciones(_ context.Context, userID, after string, limit int) ([]appExport.NotificationRow, string, error) {
+	f.consultas = append(f.consultas, "notifications:"+userID+":"+after)
+	if f.errNotificaciones != nil {
+		return nil, "", f.errNotificaciones
+	}
+	return e020PaginarNotificaciones(f.notificaciones, after, limit)
+}
+func (f *e020Fuente) Recordatorios(_ context.Context, userID, after string, limit int) ([]appExport.ReminderRow, string, error) {
+	f.consultas = append(f.consultas, "reminders:"+userID+":"+after)
+	return e020PaginarRecordatorios(f.recordatorios, after, limit)
+}
+func (f *e020Fuente) Dispositivos(_ context.Context, userID, after string, limit int) ([]appExport.PushDeviceRow, string, error) {
+	f.consultas = append(f.consultas, "devices:"+userID+":"+after)
+	return e020PaginarDispositivos(f.dispositivos, after, limit)
+}
+func (f *e020Fuente) PreferenciasNotificacion(_ context.Context, userID string) (*appExport.NotificationPreferencesRow, error) {
+	f.consultas = append(f.consultas, "notificationPrefs:"+userID)
+	if f.errPreferenciasNotif != nil {
+		return nil, f.errPreferenciasNotif
+	}
+	return f.prefsNotif, nil
 }

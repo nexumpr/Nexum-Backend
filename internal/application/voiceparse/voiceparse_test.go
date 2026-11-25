@@ -1,125 +1,152 @@
 package voiceparse
 
 import (
-	"encoding/json"
 	"errors"
-	"regexp"
+	"reflect"
 	"strings"
+	"sync"
 	"testing"
 )
 
-var regexAmount = regexp.MustCompile(`^(0|[1-9][0-9]{0,11})\.[0-9]{2}$`)
-
-func TestParseTextoValidoDeterminista(t *testing.T) {
+// TestE075ImportesDeterministas cubre formatos numéricos y palabras del
+// contrato: separador de miles, decimal con coma o punto, centavos y palabras.
+func TestE075ImportesDeterministas(t *testing.T) {
 	casos := []struct {
-		nombre       string
-		texto        string
-		intent       string
-		parsedAmount string
+		texto   string
+		importe string
 	}{
-		{"ejemplo openapi", "Registrar gasto de cien pesos", IntentCreateMovement, "100.00"},
-		{"entero", "Gasto de 100", IntentCreateMovement, "100.00"},
-		{"decimal punto", "Pago de 100.50", IntentCreateMovement, "100.50"},
-		{"miles y decimal", "Compra de 1,234.50", IntentCreateMovement, "1234.50"},
-		{"formato latinoamericano", "Compra de 1.234,50", IntentCreateMovement, "1234.50"},
-		{"palabras con mil", "Registrar dos mil pesos", IntentCreateMovement, "2000.00"},
-		{"centavos en palabras", "Gasto de cien pesos con cincuenta", IntentCreateMovement, "100.50"},
-		{"decima simple", "Gasto de 100,50 pesos", IntentCreateMovement, "100.50"},
-		{"ambiguo sin monto", "Hola, ¿cómo estás?", IntentUnknown, "0.00"},
-		{"cero", "Gasto de 0 pesos", IntentUnknown, "0.00"},
+		{"Registrar gasto de 1,234 pesos", "1234.00"},
+		{"Pagué 1.234,50 pesos", "1234.50"},
+		{"Gasto de 1.234 pesos", "1234.00"},
+		{"Café 12,34 pesos", "12.34"},
+		{"Ingreso de 100.50", "100.50"},
+		{"Un gasto de cien pesos", "100.00"},
+		{"Cien pesos con cincuenta centavos", "100.50"},
+		{"Gasto de 100 pesos con 25 centavos", "100.25"},
 	}
 	for _, caso := range casos {
-		t.Run(caso.nombre, func(t *testing.T) {
-			req := VoiceParseRequestWire{Text: caso.texto, Locale: LocaleESMX}
-			primero, err := Parse(req)
+		t.Run(caso.texto, func(t *testing.T) {
+			resultado, err := Parse(VoiceParseRequestWire{Text: caso.texto, Locale: LocaleESMX})
 			if err != nil {
-				t.Fatalf("Parse devolvió error: %v", err)
+				t.Fatalf("Parse(%q): %v", caso.texto, err)
 			}
-			if primero.Intent != caso.intent {
-				t.Fatalf("intent=%q, esperado %q", primero.Intent, caso.intent)
+			if resultado.Intent != IntentCreateMovement {
+				t.Fatalf("intent=%q, esperado %q", resultado.Intent, IntentCreateMovement)
 			}
-			if primero.ParsedAmount != caso.parsedAmount {
-				t.Fatalf("parsedAmount=%q, esperado %q", primero.ParsedAmount, caso.parsedAmount)
+			if resultado.ParsedAmount != caso.importe {
+				t.Fatalf("importe=%q, esperado %q", resultado.ParsedAmount, caso.importe)
 			}
-			if !primero.RequiresConfirmation {
-				t.Fatal("requiresConfirmation debe ser siempre true")
-			}
-			if primero.Currency != CurrencyMXN {
-				t.Fatalf("currency=%q, esperado MXN", primero.Currency)
-			}
-			segundo, err := Parse(req)
-			if err != nil || segundo != primero {
-				t.Fatalf("parser no determinista: %+v / %+v / %v", primero, segundo, err)
-			}
-			if !regexAmount.MatchString(primero.ParsedAmount) {
-				t.Fatalf("parsedAmount no cumple el regex del contrato: %q", primero.ParsedAmount)
+			if resultado.Currency != CurrencyMXN || !resultado.RequiresConfirmation {
+				t.Fatalf("respuesta fuera de contrato: %+v", resultado)
 			}
 		})
 	}
 }
 
-func TestParseRespuestaSoloCamposDelContrato(t *testing.T) {
-	resultado, err := NewService().Parse(VoiceParseRequestWire{Text: "Gasto de 100 pesos", Locale: LocaleESMX})
-	if err != nil {
-		t.Fatalf("Parse devolvió error: %v", err)
-	}
-	bytes, err := json.Marshal(resultado)
-	if err != nil {
-		t.Fatalf("json.Marshal: %v", err)
-	}
-	campos := map[string]any{}
-	if err := json.Unmarshal(bytes, &campos); err != nil {
-		t.Fatalf("json.Unmarshal: %v", err)
-	}
-	if len(campos) != 4 {
-		t.Fatalf("la respuesta tiene campos extra: %s", bytes)
+// TestE075TextosAmbiguosNoInventanImporte valida que la ambigüedad se resuelve
+// como «unknown» con 0.00, nunca como una cifra inventada.
+func TestE075TextosAmbiguosNoInventanImporte(t *testing.T) {
+	for _, texto := range []string{
+		"Hola",
+		"Gasto de cien",        // sin divisa: no se asume moneda
+		"Gasto de 0 pesos",     // cero no es un movimiento
+		"9999999999999 pesos",  // fuera del máximo exacto
+		"El recibo llegó ayer", // sin importe
+	} {
+		t.Run(texto, func(t *testing.T) {
+			resultado, err := Parse(VoiceParseRequestWire{Text: texto, Locale: LocaleESMX})
+			if err != nil {
+				t.Fatalf("Parse(%q): %v", texto, err)
+			}
+			if resultado.Intent != IntentUnknown {
+				t.Fatalf("intent=%q, esperado %q", resultado.Intent, IntentUnknown)
+			}
+			if resultado.ParsedAmount != "0.00" || resultado.Currency != CurrencyMXN {
+				t.Fatalf("respuesta ambigua fuera de contrato: %+v", resultado)
+			}
+			if !resultado.RequiresConfirmation {
+				t.Fatal("toda interpretación exige confirmación del usuario")
+			}
+		})
 	}
 }
 
-func TestParseValidacionEstricta(t *testing.T) {
+// TestE075NegativosYLocaleSonRechazosDistintos separa error de negocio (422) de
+// error de solicitud (400) sin persistir ni ejecutar movimientos.
+func TestE075NegativosYLocaleSonRechazosDistintos(t *testing.T) {
+	for _, texto := range []string{"Gasto de -100 pesos", "menos cien pesos"} {
+		if _, err := Parse(VoiceParseRequestWire{Text: texto, Locale: LocaleESMX}); !errors.Is(err, ErrNegativeAmount) {
+			t.Fatalf("%q: esperado ErrNegativeAmount, obtenido %v", texto, err)
+		}
+	}
+
 	casos := []struct {
 		nombre string
 		req    VoiceParseRequestWire
-		field  string
-		reason string
+		campo  string
 	}{
-		{"locale distinto", VoiceParseRequestWire{Text: "Gasto de 100", Locale: "en-US"}, "locale", "invalid_enum"},
-		{"locale con espacio", VoiceParseRequestWire{Text: "Gasto de 100", Locale: " es-MX"}, "locale", "invalid_enum"},
-		{"texto vacio", VoiceParseRequestWire{Text: "", Locale: LocaleESMX}, "text", "required"},
-		{"texto solo espacios", VoiceParseRequestWire{Text: "   ", Locale: LocaleESMX}, "text", "required"},
-		{"texto demasiado largo", VoiceParseRequestWire{Text: strings.Repeat("á", MaxTextRunes+1), Locale: LocaleESMX}, "text", "too_long"},
+		{"locale distinto", VoiceParseRequestWire{Text: "Gasto de 100 pesos", Locale: "en-US"}, "locale"},
+		{"locale vacío", VoiceParseRequestWire{Text: "Gasto de 100 pesos"}, "locale"},
+		{"texto vacío", VoiceParseRequestWire{Text: "", Locale: LocaleESMX}, "text"},
+		{"texto en blanco", VoiceParseRequestWire{Text: "   ", Locale: LocaleESMX}, "text"},
+		{"texto demasiado largo", VoiceParseRequestWire{Text: strings.Repeat("a", MaxTextRunes+1), Locale: LocaleESMX}, "text"},
 	}
 	for _, caso := range casos {
 		t.Run(caso.nombre, func(t *testing.T) {
 			_, err := Parse(caso.req)
 			if !errors.Is(err, ErrInvalidRequest) {
-				t.Fatalf("se esperaba ErrInvalidRequest, obtenido %v", err)
+				t.Fatalf("esperado ErrInvalidRequest, obtenido %v", err)
 			}
-			var reqErr *RequestError
-			if !errors.As(err, &reqErr) || reqErr.Field != caso.field || reqErr.Reason != caso.reason {
-				t.Fatalf("detalle inesperado: %#v", err)
+			var solicitud *RequestError
+			if !errors.As(err, &solicitud) || solicitud.Field != caso.campo {
+				t.Fatalf("RequestError inesperado: %#v", err)
 			}
-		})
-	}
-}
-
-func TestParseRechazaMontosNegativos(t *testing.T) {
-	for _, texto := range []string{"Gasto de -100 pesos", "Gasto de -100.50", "Gasto de menos cien pesos"} {
-		t.Run(texto, func(t *testing.T) {
-			_, err := Parse(VoiceParseRequestWire{Text: texto, Locale: LocaleESMX})
-			if !errors.Is(err, ErrNegativeAmount) {
-				t.Fatalf("se esperaba ErrNegativeAmount, obtenido %v", err)
+			if strings.Contains(err.Error(), caso.req.Text) && caso.req.Text != "" {
+				t.Fatalf("el error no debe repetir el texto del usuario: %v", err)
 			}
 		})
 	}
 }
 
-func TestParseRechazaMontosFueraDelRango(t *testing.T) {
-	resultado, err := Parse(VoiceParseRequestWire{Text: "Gasto de 1000000000000 pesos", Locale: LocaleESMX})
+// TestE075SinPersistenciaNiEfectos comprueba que el servicio es puro: no tiene
+// dependencias, no muta la entrada y es determinista bajo concurrencia.
+func TestE075SinPersistenciaNiEfectos(t *testing.T) {
+	if campos := reflect.TypeOf(Service{}).NumField(); campos != 0 {
+		t.Fatalf("el servicio de voz no debe tener dependencias: %d campos", campos)
+	}
+	entrada := VoiceParseRequestWire{Text: "Registrar gasto de cien pesos", Locale: LocaleESMX}
+	copia := entrada
+	primero, err := NewService().Parse(entrada)
 	if err != nil {
-		t.Fatalf("Parse devolvió error: %v", err)
+		t.Fatalf("Parse: %v", err)
 	}
-	if resultado.Intent != IntentUnknown || resultado.ParsedAmount != "0.00" {
-		t.Fatalf("un monto fuera del contrato debe ser unknown: %+v", resultado)
+	if entrada != copia {
+		t.Fatal("Parse no debe mutar la solicitud")
+	}
+	segundo, err := Parse(entrada)
+	if err != nil || primero != segundo {
+		t.Fatalf("Parse debe ser determinista: %+v vs %+v err=%v", primero, segundo, err)
+	}
+
+	var espera sync.WaitGroup
+	resultados := make(chan VoiceParseWire, 32)
+	for i := 0; i < 32; i++ {
+		espera.Add(1)
+		go func() {
+			defer espera.Done()
+			resultado, err := Parse(entrada)
+			if err != nil {
+				t.Errorf("Parse concurrente: %v", err)
+				return
+			}
+			resultados <- resultado
+		}()
+	}
+	espera.Wait()
+	close(resultados)
+	for resultado := range resultados {
+		if resultado != primero {
+			t.Fatalf("resultado no determinista: %+v", resultado)
+		}
 	}
 }

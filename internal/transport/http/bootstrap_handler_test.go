@@ -42,6 +42,15 @@ func o5bHandler(profiles *o5bProfiles, summaries *o5bSummaries) http.Handler {
 	return NewBootstrapHandler(svc, o5rTokens{}, o5rAuthorizer{}, nil, nil)
 }
 
+type o5bResumenVacio struct{}
+
+func (o5bResumenVacio) Summary(_ context.Context, userID, _ string) (*appSummary.Summary, error) {
+	return &appSummary.Summary{
+		Period: "2026-11", Currency: "MXN",
+		AsOf: time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC),
+	}, nil
+}
+
 func TestE021RespuestaExactaYCabecera(t *testing.T) {
 	h := o5bHandler(&o5bProfiles{}, &o5bSummaries{})
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/bootstrap", nil)
@@ -117,5 +126,58 @@ func TestE021AislamientoYFallosControlados(t *testing.T) {
 	}())
 	if rec.Code != http.StatusServiceUnavailable || o5rCodigo(t, rec) != "DEPENDENCY_UNAVAILABLE" {
 		t.Fatalf("fallo de persistencia: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestE021SinDatosPerfilAusenteYResumenVacio valida los dos estados «sin datos»:
+// perfil inexistente -> 404 NOT_FOUND; perfil sin movimientos -> 200 con ceros
+// exactos y el mismo conjunto de campos del contrato.
+func TestE021SinDatosPerfilAusenteYResumenVacio(t *testing.T) {
+	svcSinPerfil := appBootstrap.NewService(&o5bProfiles{err: appProfile.ErrProfileNotFound}, &o5bSummaries{}, "2026-11")
+	h := NewBootstrapHandler(svcSinPerfil, o5rTokens{}, o5rAuthorizer{}, nil, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/bootstrap", nil)
+	req.Header.Set("Authorization", "Bearer o5r-token-a")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound || o5rCodigo(t, rec) != "NOT_FOUND" {
+		t.Fatalf("perfil ausente: %d %s", rec.Code, rec.Body.String())
+	}
+
+	svcVacio := appBootstrap.NewService(&o5bProfiles{}, o5bResumenVacio{}, "2026-11")
+	h = NewBootstrapHandler(svcVacio, o5rTokens{}, o5rAuthorizer{}, nil, nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/bootstrap", nil))
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("sin bearer: %d %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/bootstrap", nil)
+	req.Header.Set("Authorization", "Bearer o5r-token-a")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("resumen vacío: %d %s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("JSON invalido: %v", err)
+	}
+	if len(body) != 3 {
+		t.Fatalf("campos extra en Bootstrap: %s", rec.Body.String())
+	}
+	resumen, ok := body["financialSummary"].(map[string]any)
+	if !ok || len(resumen) != 7 {
+		t.Fatalf("financialSummary fuera de contrato: %s", rec.Body.String())
+	}
+	for _, campo := range []string{"income", "expenses", "savings", "net"} {
+		if resumen[campo] != "0.00" {
+			t.Fatalf("%s=%v, esperado 0.00", campo, resumen[campo])
+		}
+	}
+	if resumen["period"] != "2026-11" || resumen["currency"] != "MXN" {
+		t.Fatalf("periodo/moneda inesperados: %s", rec.Body.String())
+	}
+	if body["profile"].(map[string]any)["id"] != "user-a" {
+		t.Fatalf("el perfil debe ser el titular: %s", rec.Body.String())
 	}
 }

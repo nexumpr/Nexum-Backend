@@ -862,6 +862,7 @@ func (s *DeletionStore) ListPartition(ctx context.Context, userID, startSK strin
 			SK:          stringAttribute(item["SK"]),
 			EntityType:  stringAttribute(item["entityType"]),
 			RefreshHash: stringAttribute(item["refreshHash"]),
+			GlobalSK:    stringAttribute(item["skGlobal"]),
 		})
 	}
 	return items, nil
@@ -890,6 +891,88 @@ func (s *DeletionStore) DeletePartitionItem(ctx context.Context, userID, sk stri
 		return appAccount.ErrDeletionUnavailable
 	}
 	return nil
+}
+
+// DeleteGlobalItem borra el ítem global al que apunta un puntero del titular, sin `Scan`:
+// la clave llega del puntero (`skGlobal`) y la partición del prefijo del puntero.
+//
+// Controles:
+//   - Sólo se aceptan las dos particiones del servicio declaradas en `domain/deletion`.
+//   - Se lee el ítem antes de borrar para comprobar el titular: un puntero corrupto no
+//     puede borrar datos de otra cuenta (`GlobalItemForeign`).
+//   - Un envío en curso (atributo `owner` con `leaseUntil` vigente) bloquea el borrado
+//     (`GlobalItemBusy`) y el trabajo se reintenta cuando el lease vence. Cancelar un
+//     trabajo pendiente es, en esta fase, retirarlo del outbox con esa misma condición de
+//     lease: DynamoDB no admite dos acciones sobre el mismo ítem en una transacción, así
+//     que no se puede "marcar revocado" y borrar de forma atómica.
+func (s *DeletionStore) DeleteGlobalItem(ctx context.Context, partition, sk, userID string, now time.Time) (appAccount.GlobalDeleteResult, error) {
+	if !s.disponible() {
+		return appAccount.GlobalItemBusy, appAccount.ErrDeletionUnavailable
+	}
+	partition = strings.TrimSpace(partition)
+	sk = strings.TrimSpace(sk)
+	userID = strings.TrimSpace(userID)
+	if !domainDeletion.IsGlobalPartition(partition) || sk == "" || userID == "" {
+		return appAccount.GlobalItemBusy, appAccount.ErrDeletionUnavailable
+	}
+
+	actual, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(partition),
+			"SK": stringAttr(sk),
+		},
+		ConsistentRead: aws.Bool(true),
+	})
+	if err != nil {
+		return appAccount.GlobalItemBusy, appAccount.ErrDeletionUnavailable
+	}
+	if actual == nil || len(actual.Item) == 0 {
+		return appAccount.GlobalItemDeleted, nil
+	}
+	if titular := strings.TrimSpace(stringAttribute(actual.Item["userID"])); titular != "" && titular != userID {
+		return appAccount.GlobalItemForeign, nil
+	}
+	if enEnvio(actual.Item, now) {
+		return appAccount.GlobalItemBusy, nil
+	}
+
+	_, err = s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(partition),
+			"SK": stringAttr(sk),
+		},
+		ConditionExpression: aws.String("attribute_exists(PK) AND (attribute_not_exists(#owner) OR #lease < :ahora)"),
+		ExpressionAttributeNames: map[string]string{
+			"#owner": "owner",
+			"#lease": "leaseUntil",
+		},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":ahora": stringAttr(now.UTC().Format(time.RFC3339Nano)),
+		},
+	})
+	if err == nil {
+		return appAccount.GlobalItemDeleted, nil
+	}
+	var condicional *types.ConditionalCheckFailedException
+	if errors.As(err, &condicional) {
+		// Otro worker reclamó el ítem entre la lectura y el borrado, o ya no existe.
+		return appAccount.GlobalItemBusy, nil
+	}
+	return appAccount.GlobalItemBusy, appAccount.ErrDeletionUnavailable
+}
+
+// enEnvio indica si el ítem global tiene un lease de envío vigente.
+func enEnvio(item map[string]types.AttributeValue, now time.Time) bool {
+	if strings.TrimSpace(stringAttribute(item["owner"])) == "" {
+		return false
+	}
+	lease, errLease := time.Parse(time.RFC3339Nano, strings.TrimSpace(stringAttribute(item["leaseUntil"])))
+	if errLease != nil {
+		return false
+	}
+	return lease.After(now.UTC())
 }
 
 // ListPasswordResetQueue consulta `QUEUE#PWRESET` filtrando por `userId`. El `Limit` se

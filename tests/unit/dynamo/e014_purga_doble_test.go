@@ -111,7 +111,7 @@ func (m *purgaDynamo) PutItem(_ context.Context, in *dynamodb.PutItemInput, _ ..
 	sk := mapaString(in.Item, "SK")
 	existente := m.items[clavePurga(pk, sk)]
 	if in.ConditionExpression != nil {
-		ok, err := evaluarExpresion(aws.ToString(in.ConditionExpression), existente, nil, in.ExpressionAttributeValues)
+		ok, err := evaluarExpresion(aws.ToString(in.ConditionExpression), existente, in.ExpressionAttributeNames, in.ExpressionAttributeValues)
 		if err != nil {
 			return nil, err
 		}
@@ -130,7 +130,7 @@ func (m *purgaDynamo) DeleteItem(_ context.Context, in *dynamodb.DeleteItemInput
 	sk := mapaString(in.Key, "SK")
 	existente := m.items[clavePurga(pk, sk)]
 	if in.ConditionExpression != nil {
-		ok, err := evaluarExpresion(aws.ToString(in.ConditionExpression), existente, nil, in.ExpressionAttributeValues)
+		ok, err := evaluarExpresion(aws.ToString(in.ConditionExpression), existente, in.ExpressionAttributeNames, in.ExpressionAttributeValues)
 		if err != nil {
 			return nil, err
 		}

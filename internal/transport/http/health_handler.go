@@ -2,10 +2,12 @@ package http
 
 import (
 	"context"
-	"encoding/json"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/nexumpr/Nexum-Backend/pkg/httputil"
 )
 
 // HealthCheckFunc evalúa el estado de una dependencia con timeout acotado.
@@ -47,26 +49,46 @@ func (hr *HealthRegistry) BeginShutdown() {
 	hr.shuttingDown = true
 }
 
-// LiveHandler responde 200 si el proceso HTTP está en ejecución.
-// No consulta DynamoDB, Redis ni ninguna dependencia (A-090).
-func (hr *HealthRegistry) LiveHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"status": "UP",
-		})
+// HealthServiceName identifica el servicio en la respuesta contractual.
+const HealthServiceName = "nexum-backend"
+
+// HealthResponse es el esquema `Health` del contrato (E072/E073). Tiene
+// `additionalProperties: false`: no admite detalles operativos ni estados de
+// dependencias. El detalle vive únicamente en los logs del proceso.
+type HealthResponse struct {
+	Status    string `json:"status"`
+	Service   string `json:"service"`
+	Timestamp string `json:"timestamp"`
+}
+
+func healthResponse() HealthResponse {
+	return HealthResponse{
+		Status:    "ok",
+		Service:   HealthServiceName,
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
 	}
 }
 
-// ReadyResponse estructura la respuesta de readiness sin exponer detalles
-// internos ni mensajes de error de las dependencias.
-type ReadyResponse struct {
-	Status       string            `json:"status"`
-	Dependencies map[string]string `json:"dependencies"`
+func writeHealthResponse(w http.ResponseWriter, status int) {
+	w.Header().Set("Cache-Control", "no-store")
+	_ = httputil.WriteJSON(w, status, healthResponse())
 }
 
-// ReadyHandler verifica cada dependencia registrada con timeout acotado.
+// LiveHandler responde 200 con el esquema `Health` mientras el proceso HTTP
+// está en ejecución. No consulta DynamoDB, Redis ni ninguna dependencia
+// (A-090) y no expone su estado.
+func (hr *HealthRegistry) LiveHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeHealthResponse(w, http.StatusOK)
+	}
+}
+
+// ReadyHandler verifica cada dependencia registrada con timeout acotado y
+// responde con el esquema contractual:
+//
+//   - 200 `{"status":"ok","service":"nexum-backend","timestamp":...}`.
+//   - 503 `ErrorEnvelope` con `code=DEPENDENCY_UNAVAILABLE` y `traceId` cuando
+//     el nodo no puede atender.
 //
 // Reglas (AC-A-090-02):
 //   - 503 durante el apagado.
@@ -85,25 +107,18 @@ func (hr *HealthRegistry) ReadyHandler() http.HandlerFunc {
 		timeout := hr.timeout
 		hr.mu.RUnlock()
 
-		responder := func(code int, resp ReadyResponse) {
-			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			w.WriteHeader(code)
-			_ = json.NewEncoder(w).Encode(resp)
+		noDisponible := func() {
+			w.Header().Set("Cache-Control", "no-store")
+			_ = httputil.WriteErrorEnvelope(w, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "solicitud no completada", traceID(r), nil)
 		}
 
 		if apagando {
-			responder(http.StatusServiceUnavailable, ReadyResponse{
-				Status:       "DOWN",
-				Dependencies: map[string]string{},
-			})
+			noDisponible()
 			return
 		}
 
 		if len(deps) == 0 {
-			responder(http.StatusServiceUnavailable, ReadyResponse{
-				Status:       "DOWN",
-				Dependencies: map[string]string{},
-			})
+			noDisponible()
 			return
 		}
 
@@ -126,20 +141,14 @@ func (hr *HealthRegistry) ReadyHandler() http.HandlerFunc {
 			}(nombre, check)
 		}
 
-		estados := make(map[string]string, len(deps))
-		for nombre := range deps {
-			estados[nombre] = "UNKNOWN"
-		}
-
 		pendientes := len(deps)
 		expirado := false
+		fallidas := make([]string, 0, len(deps))
 		for pendientes > 0 {
 			select {
 			case res := <-resultados:
-				if res.ok {
-					estados[res.nombre] = "UP"
-				} else {
-					estados[res.nombre] = "DOWN"
+				if !res.ok {
+					fallidas = append(fallidas, res.nombre)
 				}
 				pendientes--
 			case <-ctx.Done():
@@ -149,17 +158,21 @@ func (hr *HealthRegistry) ReadyHandler() http.HandlerFunc {
 			}
 		}
 
-		todoOK := !expirado
-		for _, estado := range estados {
-			if estado != "UP" {
-				todoOK = false
-			}
-		}
-
-		if todoOK {
-			responder(http.StatusOK, ReadyResponse{Status: "UP", Dependencies: estados})
+		if expirado {
+			slog.Default().WarnContext(r.Context(), "readiness agotó el tiempo de comprobación",
+				slog.String("trace_id", traceID(r)))
+			noDisponible()
 			return
 		}
-		responder(http.StatusServiceUnavailable, ReadyResponse{Status: "DOWN", Dependencies: estados})
+		if len(fallidas) > 0 {
+			// Sólo el nombre lógico de la dependencia: nunca el error del
+			// proveedor, que puede contener endpoints o credenciales.
+			slog.Default().WarnContext(r.Context(), "readiness con dependencias degradadas",
+				slog.Any("dependencias", fallidas),
+				slog.String("trace_id", traceID(r)))
+			noDisponible()
+			return
+		}
+		writeHealthResponse(w, http.StatusOK)
 	}
 }

@@ -74,6 +74,14 @@ type e020Dynamo struct {
 	sinProgreso bool
 
 	consultas []e020Consulta
+	lecturas  []e020Lectura
+}
+
+// e020Lectura registra un GetItem para poder afirmar consistencia fuerte y clave exacta.
+type e020Lectura struct {
+	PK          string
+	SK          string
+	Consistente bool
 }
 
 func newE020Dynamo() *e020Dynamo {
@@ -98,6 +106,38 @@ func (m *e020Dynamo) consultasRealizadas() []e020Consulta {
 	copia := make([]e020Consulta, len(m.consultas))
 	copy(copia, m.consultas)
 	return copia
+}
+
+func (m *e020Dynamo) lecturasRealizadas() []e020Lectura {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	copia := make([]e020Lectura, len(m.lecturas))
+	copy(copia, m.lecturas)
+	return copia
+}
+
+// GetItem resuelve el singleton `NOTIFICATION_PREFERENCES` con consistencia fuerte.
+func (m *e020Dynamo) GetItem(_ context.Context, in *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	lectura := e020Lectura{
+		PK:          mapaString(in.Key, "PK"),
+		SK:          mapaString(in.Key, "SK"),
+		Consistente: aws.ToBool(in.ConsistentRead),
+	}
+	m.lecturas = append(m.lecturas, lectura)
+	if m.err != nil {
+		return nil, m.err
+	}
+	item, ok := m.items[e020ClaveItem(lectura.PK, lectura.SK)]
+	if !ok {
+		return &dynamodb.GetItemOutput{}, nil
+	}
+	copia := make(map[string]types.AttributeValue, len(item))
+	for k, v := range item {
+		copia[k] = v
+	}
+	return &dynamodb.GetItemOutput{Item: copia}, nil
 }
 
 // Query reproduce la semántica de DynamoDB usada por el adaptador.
@@ -738,8 +778,14 @@ func TestE020ExportNingunaInterfazExponeScan(t *testing.T) {
 		}
 	}
 	api := reflect.TypeOf((*dynamoAdapter.ExportDynamoAPI)(nil)).Elem()
-	if api.NumMethod() != 1 || api.Method(0).Name != "Query" {
-		t.Fatalf("el subconjunto de DynamoDB debe ser exactamente Query: %v", api)
+	if api.NumMethod() != 2 {
+		t.Fatalf("el subconjunto de DynamoDB debe declarar exactamente Query y GetItem: %v", api)
+	}
+	permitidos := map[string]bool{"Query": true, "GetItem": true}
+	for i := 0; i < api.NumMethod(); i++ {
+		if !permitidos[api.Method(i).Name] {
+			t.Fatalf("metodo no autorizado en el subconjunto de DynamoDB: %s", api.Method(i).Name)
+		}
 	}
 }
 
