@@ -937,19 +937,14 @@ func (s *DeletionStore) DeleteGlobalItem(ctx context.Context, partition, sk, use
 		return appAccount.GlobalItemBusy, nil
 	}
 
+	// Tras el tombstone ninguna reclamación es legítima: se borra el ítem aunque otro
+	// worker lo haya reclamado entre la lectura y el borrado (su envío no debe continuar).
+	// El borrado por clave es idempotente.
 	_, err = s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(s.table),
 		Key: map[string]types.AttributeValue{
 			"PK": stringAttr(partition),
 			"SK": stringAttr(sk),
-		},
-		ConditionExpression: aws.String("attribute_exists(PK) AND (attribute_not_exists(#owner) OR #lease < :ahora)"),
-		ExpressionAttributeNames: map[string]string{
-			"#owner": "owner",
-			"#lease": "leaseUntil",
-		},
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":ahora": stringAttr(now.UTC().Format(time.RFC3339Nano)),
 		},
 	})
 	if err == nil {
@@ -963,10 +958,18 @@ func (s *DeletionStore) DeleteGlobalItem(ctx context.Context, partition, sk, use
 	return appAccount.GlobalItemBusy, appAccount.ErrDeletionUnavailable
 }
 
-// enEnvio indica si el ítem global tiene un lease de envío vigente.
+// enEnvio indica si el ítem global tiene un lease de envío vigente. Cubre el outbox
+// (`owner` + `leaseUntil` RFC3339) y la cola READALL (`leaseOwner` + `leaseUntil` epoch).
 func enEnvio(item map[string]types.AttributeValue, now time.Time) bool {
-	if strings.TrimSpace(stringAttribute(item["owner"])) == "" {
+	propietario := strings.TrimSpace(stringAttribute(item["owner"]))
+	if propietario == "" {
+		propietario = strings.TrimSpace(stringAttribute(item["leaseOwner"]))
+	}
+	if propietario == "" {
 		return false
+	}
+	if epoch, ok := attributeInt(item["leaseUntil"]); ok {
+		return time.Unix(epoch, 0).After(now.UTC())
 	}
 	lease, errLease := time.Parse(time.RFC3339Nano, strings.TrimSpace(stringAttribute(item["leaseUntil"])))
 	if errLease != nil {

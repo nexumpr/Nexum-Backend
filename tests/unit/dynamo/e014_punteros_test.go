@@ -221,3 +221,60 @@ func TestE014PunteroSinReferenciaNoBloquea(t *testing.T) {
 		}
 	}
 }
+
+// TestE014PurgaPunteroReadAll elimina el trabajo global de E063 (QUEUE#READALL)
+// mediante su puntero READALLPTR# del titular, sin Scan y sin tocar la cola de B.
+func TestE014PurgaPunteroReadAll(t *testing.T) {
+	m := newPurgaDynamo()
+	e014SembrarCuenta(m, e014Usuario)
+
+	global := "REQ#2026-11-20T10:00:00.000000000Z#req-a"
+	m.sembrar(domainDeletion.PartitionQueueReadAll, global, map[string]types.AttributeValue{
+		"entityType": strAttr("READALL"),
+		"userID":     strAttr(e014Usuario),
+		"requestId":  strAttr("req-a"),
+		"leaseOwner": strAttr(""),
+		"leaseUntil": &types.AttributeValueMemberN{Value: "0"},
+		"createdAt":  &types.AttributeValueMemberN{Value: "1763632800"},
+	})
+	ptrPK, ptrSK := domainDeletion.ReadAllPointerKeys(e014Usuario, "req-a")
+	m.sembrar(ptrPK, ptrSK, map[string]types.AttributeValue{
+		"entityType": strAttr("READALL_POINTER"),
+		"userID":     strAttr(e014Usuario),
+		"requestId":  strAttr("req-a"),
+		"skGlobal":   strAttr(global),
+	})
+
+	// Cola de otro titular: no debe tocarse.
+	globalB := "REQ#2026-11-20T11:00:00.000000000Z#req-b"
+	m.sembrar(domainDeletion.PartitionQueueReadAll, globalB, map[string]types.AttributeValue{
+		"entityType": strAttr("READALL"),
+		"userID":     strAttr(e014OtroUser),
+		"requestId":  strAttr("req-b"),
+	})
+	ptrBPK, ptrBSK := domainDeletion.ReadAllPointerKeys(e014OtroUser, "req-b")
+	m.sembrar(ptrBPK, ptrBSK, map[string]types.AttributeValue{
+		"entityType": strAttr("READALL_POINTER"),
+		"userID":     strAttr(e014OtroUser),
+		"skGlobal":   strAttr(globalB),
+	})
+
+	store := dynamoAdapter.NewDeletionStore(m, e014Tabla)
+	reloj := nuevoRelojPurga(e014T0)
+	e014Programar(t, store, e014Usuario, e014RequestID, e014T0)
+	worker := e014Worker(store, &e014Cache{}, reloj)
+	e014CorrerHastaPurga(t, worker, reloj, m, 20)
+
+	if _, existe := m.items[domainDeletion.PartitionQueueReadAll+"\x00"+global]; existe {
+		t.Fatal("el trabajo READALL del titular no se eliminó")
+	}
+	if _, existe := m.items[ptrPK+"\x00"+ptrSK]; existe {
+		t.Fatal("el puntero READALLPTR# del titular no se eliminó")
+	}
+	if _, existe := m.items[domainDeletion.PartitionQueueReadAll+"\x00"+globalB]; !existe {
+		t.Fatal("la cola READALL de B se eliminó")
+	}
+	if _, existe := m.items[ptrBPK+"\x00"+ptrBSK]; !existe {
+		t.Fatal("el puntero READALLPTR# de B se eliminó")
+	}
+}

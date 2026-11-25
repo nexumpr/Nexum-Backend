@@ -47,6 +47,9 @@ const (
 	// global, su titular y la marca de creación.
 	PrefixOutboxPointer   = "OUTBOXPTR#"
 	PrefixSchedulePointer = "SCHEDULEPTR#"
+	// PrefixReadAllPointer referencia el trabajo global de E063 (QUEUE#READALL) para
+	// que la purga lo encuentre sin Scan. El ítem apunta a una partición de servicio.
+	PrefixReadAllPointer = "READALLPTR#"
 
 	// PartitionOutboxGlobal es la partición del outbox push (worker FCM, Oleada 4) y
 	// PartitionScheduleGlobal la reservada al scheduler durable de recordatorios. Las
@@ -54,6 +57,8 @@ const (
 	// por un puntero del titular y cuyo atributo `userID` coincide.
 	PartitionOutboxGlobal   = "OUTBOX#GLOBAL"
 	PartitionScheduleGlobal = "SCHEDULE#GLOBAL"
+	// PartitionQueueReadAll es la cola global del worker durable de E063.
+	PartitionQueueReadAll = "QUEUE#READALL"
 
 	// EntityOutboxPointer y EntitySchedulePointer identifican los punteros, de modo que
 	// un barrido pueda distinguirlos de otras entidades de la partición.
@@ -144,11 +149,21 @@ func IsSchedulePointerSK(sk string) bool {
 	return strings.HasPrefix(strings.TrimSpace(sk), PrefixSchedulePointer)
 }
 
+// IsReadAllPointerSK indica si una SK referencia un trabajo de QUEUE#READALL.
+func IsReadAllPointerSK(sk string) bool {
+	return strings.HasPrefix(strings.TrimSpace(sk), PrefixReadAllPointer)
+}
+
+// ReadAllPointerKeys devuelve PK y SK del puntero de un trabajo READALL.
+func ReadAllPointerKeys(userID, requestID string) (pk, sk string) {
+	return UserPartition(userID), PrefixReadAllPointer + strings.TrimSpace(requestID)
+}
+
 // IsGlobalPointerSK indica si una SK es un puntero a una partición global del servicio.
 // El barrido de PARTITION trata estos ítems en dos pasos: primero borra el ítem global
 // referenciado (con condición) y sólo después el puntero.
 func IsGlobalPointerSK(sk string) bool {
-	return IsOutboxPointerSK(sk) || IsSchedulePointerSK(sk)
+	return IsOutboxPointerSK(sk) || IsSchedulePointerSK(sk) || IsReadAllPointerSK(sk)
 }
 
 // GlobalPartitionForPointer devuelve la partición global a la que apunta un puntero. El
@@ -160,6 +175,8 @@ func GlobalPartitionForPointer(sk string) (string, bool) {
 		return PartitionOutboxGlobal, true
 	case IsSchedulePointerSK(sk):
 		return PartitionScheduleGlobal, true
+	case IsReadAllPointerSK(sk):
+		return PartitionQueueReadAll, true
 	default:
 		return "", false
 	}
@@ -170,7 +187,7 @@ func GlobalPartitionForPointer(sk string) (string, bool) {
 // frente a un puntero corrupto.
 func IsGlobalPartition(pk string) bool {
 	switch strings.TrimSpace(pk) {
-	case PartitionOutboxGlobal, PartitionScheduleGlobal:
+	case PartitionOutboxGlobal, PartitionScheduleGlobal, PartitionQueueReadAll:
 		return true
 	default:
 		return false
