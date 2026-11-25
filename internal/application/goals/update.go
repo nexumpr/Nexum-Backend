@@ -84,6 +84,16 @@ func (s *Service) Update(ctx context.Context, cmd UpdateCommand) (*domainGoal.Go
 		return nil, ErrNotFound
 	}
 
+	// Un patch vacio es valido para el contrato (`GoalPatch.required = []`): no escribe
+	// nada, no incrementa la version y devuelve el recurso actual con su ETag. La
+	// precondicion se sigue evaluando: un If-Match obsoleto es 412 aunque no haya cambios.
+	if patch.Empty() {
+		if current.Version != cmd.ExpectedVersion {
+			return nil, ErrVersionConflict
+		}
+		return current, nil
+	}
+
 	// Prevalidación con la versión leída: da el error preciso (422) sin depender del orden en
 	// que DynamoDB evalúe la condición. La autoridad final sigue siendo la condición atómica.
 	if patch.TargetCents != nil && *patch.TargetCents < current.SavedAmount.Amount() {
@@ -152,9 +162,8 @@ func buildPatch(cmd UpdateCommand) (domainGoal.Patch, error) {
 		}
 		patch.Status = &estado
 	}
-	if patch.Empty() {
-		return domainGoal.Patch{}, fmt.Errorf("%w: la modificacion no contiene cambios", ErrInvalidRequest)
-	}
+	// Un patch sin campos no es un error: el contrato GoalPatch no exige ninguno y el caso
+	// de uso lo resuelve como no-op sin escritura (ver Update).
 	return patch, nil
 }
 

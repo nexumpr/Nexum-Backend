@@ -2,7 +2,7 @@
   "url_publica": "https://api.nexum.example/",
   "artefacto_openapi": {
     "ruta": "sdd/03-endpoints/openapi/nexum-api-v1.json",
-    "sha256": "550a24296af485b4f4aed5e8d942f5f069eef5b74070c9aff4bd5769dcba39e1"
+    "sha256": "b0985b9064c78669eddde226984d78e4590e5a7758975d7c258da711758f47b0"
   },
   "openapi_version": "3.1.0",
   "cors": {
