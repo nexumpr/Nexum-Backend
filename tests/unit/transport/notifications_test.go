@@ -170,15 +170,16 @@ func (f *e061HTTPStore) AdvanceReadAll(_ context.Context, userID, expectedOwner 
 	return nil
 }
 
-func (f *e061HTTPStore) CompleteReadAll(_ context.Context, userID, requestID, owner string, processed int64, now time.Time) error {
+func (f *e061HTTPStore) CompleteReadAll(_ context.Context, userID, requestID, owner string, fence, processed int64, now time.Time) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	actual := f.readall[userID+"\x00"+requestID]
-	if actual == nil || (owner != "" && actual.LeaseOwner != owner) {
+	if actual == nil || (owner != "" && actual.LeaseOwner != owner) || actual.Fence > fence {
 		return appNotifications.ErrConflict
 	}
 	actual.Status = appNotifications.StatusCompleted
 	actual.ProcessedCount = processed
+	actual.Fence = fence
 	final := now.UTC()
 	actual.CompletedAt = &final
 	return nil
@@ -428,19 +429,27 @@ func TestE063HTTPAceptadoConTrabajoReal(t *testing.T) {
 	if len(general) != 2 || general["status"] == nil || general["requestId"] == nil {
 		t.Fatalf("campos no contractuales en 202: %v", general)
 	}
-	if total, err := store.CountUnread(context.Background(), e004HTTPUsuario); err != nil || total != 0 {
-		t.Fatalf("el trabajo real no se ejecutó: unreadCount=%d %v", total, err)
+	if total, err := store.CountUnread(context.Background(), e004HTTPUsuario); err != nil || total != 17 {
+		t.Fatalf("el 202 no debe procesar en la petición: unreadCount=%d %v", total, err)
 	}
 	if total, err := store.CountUnread(context.Background(), e004HTTPOtroUser); err != nil || total != 4 {
 		t.Fatalf("usuario B intacto: unreadCount=%d %v", total, err)
 	}
+	// Admisión durable: registro READALL y trabajo en la cola, ambos pendientes.
+	estado := store.readall[e004HTTPUsuario+"\x00"+accepted.RequestID]
+	if estado == nil || estado.Status != appNotifications.StatusPending || estado.InitialUnread != 17 {
+		t.Fatalf("registro READALL ausente o incorrecto: %+v", estado)
+	}
 
-	// El 202 posterior con el mismo store es seguro: no resurrect notificaciones.
+	// Un segundo 202 es idempotente y tampoco procesa en la petición.
 	rec2 := httptest.NewRecorder()
 	e061HTTPHandler(store, e053Limitador{permitido: true}, e061HTTPClave).ServeHTTP(
 		rec2, e061HTTPPeticion(http.MethodPost, "/api/v1/notifications/read-all", "jwt-valido"))
 	if rec2.Code != http.StatusAccepted {
 		t.Fatalf("segundo read-all: %d %s", rec2.Code, rec2.Body.String())
+	}
+	if total, err := store.CountUnread(context.Background(), e004HTTPUsuario); err != nil || total != 17 {
+		t.Fatalf("el segundo 202 no debe procesar: unreadCount=%d %v", total, err)
 	}
 }
 

@@ -21,22 +21,47 @@ type fakeItem struct {
 }
 
 type fakeStore struct {
-	mu            sync.Mutex
-	porUsuario    map[string][]fakeItem
-	readall       map[string]*ReadAllState
-	beginCalls    int
-	advanceCalls  int
-	failAdvanceAt int
+	mu         sync.Mutex
+	porUsuario map[string][]fakeItem
+	readall    map[string]*ReadAllState
+	jobs       map[string]*ReadAllJob
+	punteros   map[string]map[string]bool
+
+	beginCalls int
+	listCalls  int
+	markCalls  []string
+
+	// contadorSemilla produce IDs únicos entre usuarios (la bandeja real usa UUID).
+	contadorSemilla int
+
+	// fallos inyectables: se comportan como DynamoDB caído, nunca como éxito.
+	listErr  error
+	markErr  error
+	beginErr error
+
+	now func() time.Time
 }
 
 func nuevoFakeStore() *fakeStore {
-	return &fakeStore{porUsuario: map[string][]fakeItem{}, readall: map[string]*ReadAllState{}}
+	return &fakeStore{
+		porUsuario: map[string][]fakeItem{},
+		readall:    map[string]*ReadAllState{},
+		jobs:       map[string]*ReadAllJob{},
+		punteros:   map[string]map[string]bool{},
+		now:        func() time.Time { return time.Date(2026, 11, 24, 12, 0, 0, 0, time.UTC) },
+	}
 }
+
+func claveReadAll(userID, requestID string) string { return userID + "\x00" + requestID }
 
 func (f *fakeStore) sembrar(userID string, cantidad int, noLeidas int, tipo Type) {
 	base := time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC)
 	for i := 0; i < cantidad; i++ {
-		id := fmt.Sprintf("018f90ef-08e5-7a68-b09f-%012d", i+1)
+		// ID único por tirada: la bandeja real usa UUID y dos usuarios nunca
+		// comparten identificador. Un contador por usuario produciría colisiones
+		// entre A y B y ocultaría un fallo de aislamiento.
+		f.contadorSemilla++
+		id := fmt.Sprintf("018f90ef-08e5-7a68-b09f-%012d", f.contadorSemilla)
 		creado := base.Add(time.Duration(i) * time.Minute)
 		leida := i >= noLeidas
 		f.porUsuario[userID] = append(f.porUsuario[userID], fakeItem{
@@ -61,6 +86,13 @@ func (f *fakeStore) productos(userID string) []fakeItem {
 }
 
 func (f *fakeStore) List(_ context.Context, q ListQuery) (*ListResult, error) {
+	f.mu.Lock()
+	f.listCalls++
+	err := f.listErr
+	f.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
 	items := f.productos(q.UserID)
 	filtrados := make([]fakeItem, 0, len(items))
 	for _, item := range items {
@@ -106,6 +138,9 @@ func (f *fakeStore) CountUnread(_ context.Context, userID string) (int64, error)
 func (f *fakeStore) MarkRead(_ context.Context, userID, notificationID string, now time.Time) (*Notification, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.markErr != nil {
+		return nil, f.markErr
+	}
 	for i := range f.porUsuario[userID] {
 		if f.porUsuario[userID][i].notification.ID != notificationID {
 			continue
@@ -115,12 +150,15 @@ func (f *fakeStore) MarkRead(_ context.Context, userID, notificationID string, n
 			lectura := now.UTC()
 			f.porUsuario[userID][i].notification.ReadAt = &lectura
 		}
+		f.markCalls = append(f.markCalls, notificationID)
 		copia := f.porUsuario[userID][i].notification
 		return &copia, nil
 	}
 	return nil, ErrNotFound
 }
 
+// BeginReadAll modela la transacción de admisión: registro + ítem de cola +
+// puntero en una sola operación idempotente por requestId.
 func (f *fakeStore) BeginReadAll(ctx context.Context, userID, requestID string, now time.Time) (*ReadAllState, error) {
 	inicial, err := f.CountUnread(ctx, userID)
 	if err != nil {
@@ -128,13 +166,27 @@ func (f *fakeStore) BeginReadAll(ctx context.Context, userID, requestID string, 
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.beginErr != nil {
+		return nil, f.beginErr
+	}
 	f.beginCalls++
-	if actual := f.readall[userID+"\x00"+requestID]; actual != nil {
+	clave := claveReadAll(userID, requestID)
+	if actual := f.readall[clave]; actual != nil {
 		copia := *actual
 		return &copia, nil
 	}
-	estado := &ReadAllState{RequestID: requestID, Status: StatusPending, CreatedAt: now.UTC(), InitialUnread: inicial}
-	f.readall[userID+"\x00"+requestID] = estado
+	estado := &ReadAllState{
+		RequestID: requestID, Status: StatusPending, CreatedAt: now.UTC(),
+		InitialUnread: inicial, Fence: 0,
+	}
+	f.readall[clave] = estado
+	f.jobs[clave] = &ReadAllJob{
+		UserID: userID, RequestID: requestID, CreatedAt: now.UTC(), Fence: 0,
+	}
+	if f.punteros[userID] == nil {
+		f.punteros[userID] = map[string]bool{}
+	}
+	f.punteros[userID][requestID] = true
 	copia := *estado
 	return &copia, nil
 }
@@ -142,7 +194,7 @@ func (f *fakeStore) BeginReadAll(ctx context.Context, userID, requestID string, 
 func (f *fakeStore) LoadReadAll(_ context.Context, userID, requestID string) (*ReadAllState, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	actual := f.readall[userID+"\x00"+requestID]
+	actual := f.readall[claveReadAll(userID, requestID)]
 	if actual == nil {
 		return nil, ErrNotFound
 	}
@@ -153,48 +205,170 @@ func (f *fakeStore) LoadReadAll(_ context.Context, userID, requestID string) (*R
 func (f *fakeStore) AdvanceReadAll(_ context.Context, userID, expectedLeaseOwner string, next ReadAllState) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	actual := f.readall[userID+"\x00"+next.RequestID]
+	clave := claveReadAll(userID, next.RequestID)
+	actual := f.readall[clave]
 	if actual == nil {
 		return ErrNotFound
 	}
-	if expectedLeaseOwner != "" && actual.LeaseOwner != expectedLeaseOwner {
+	job := f.jobs[clave]
+	if job == nil {
 		return ErrConflict
 	}
-	f.advanceCalls++
-	if f.failAdvanceAt > 0 && f.advanceCalls == f.failAdvanceAt {
-		return errors.New("fallo transitorio antes de persistir el avance")
+	if expectedLeaseOwner != "" && next.LeaseOwner != expectedLeaseOwner {
+		return ErrInvalidRequest
+	}
+	if job.Fence != next.Fence || job.LeaseOwner != next.LeaseOwner {
+		return ErrConflict
+	}
+	if job.LeaseUntil.IsZero() || !job.LeaseUntil.After(f.now().UTC()) {
+		return ErrConflict
+	}
+	if next.Fence < actual.Fence {
+		return ErrConflict
 	}
 	copia := next
-	f.readall[userID+"\x00"+next.RequestID] = &copia
+	f.readall[clave] = &copia
+	job.LeaseUntil = next.LeaseUntil
 	return nil
 }
 
-func (f *fakeStore) CompleteReadAll(_ context.Context, userID, requestID, expectedLeaseOwner string, processed int64, now time.Time) error {
+func (f *fakeStore) CompleteReadAll(_ context.Context, userID, requestID, expectedLeaseOwner string, fence, processed int64, now time.Time) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	actual := f.readall[userID+"\x00"+requestID]
+	clave := claveReadAll(userID, requestID)
+	actual := f.readall[clave]
 	if actual == nil {
 		return ErrNotFound
 	}
-	if expectedLeaseOwner != "" && actual.LeaseOwner != expectedLeaseOwner {
+	if actual.Status == StatusCompleted {
+		return nil
+	}
+	job := f.jobs[clave]
+	if job == nil || job.Fence != fence || job.LeaseOwner != expectedLeaseOwner {
 		return ErrConflict
 	}
 	actual.Status = StatusCompleted
 	actual.ProcessedCount = processed
+	actual.Fence = fence
 	final := now.UTC()
 	actual.CompletedAt = &final
+	delete(f.jobs, clave)
+	if f.punteros[userID] != nil {
+		delete(f.punteros[userID], requestID)
+	}
+	return nil
+}
+
+func (f *fakeStore) DueReadAll(_ context.Context, now time.Time, limit int) ([]ReadAllJob, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	claves := make([]string, 0, len(f.jobs))
+	for clave := range f.jobs {
+		claves = append(claves, clave)
+	}
+	sort.Strings(claves)
+	salida := make([]ReadAllJob, 0)
+	for _, clave := range claves {
+		job := f.jobs[clave]
+		// Due por lease: un backoff de Release deja leaseUntil futuro aunque el
+		// dueño se haya limpiado; sólo vence al llegar la hora.
+		if !job.LeaseUntil.IsZero() && job.LeaseUntil.After(now.UTC()) {
+			continue
+		}
+		salida = append(salida, *job)
+		if len(salida) == limit {
+			break
+		}
+	}
+	return salida, nil
+}
+
+func (f *fakeStore) ClaimReadAll(_ context.Context, job ReadAllJob, owner string, now time.Time, lease time.Duration) (ReadAllJob, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	actual := f.jobs[claveReadAll(job.UserID, job.RequestID)]
+	if actual == nil {
+		return ReadAllJob{}, false, nil
+	}
+	if actual.LeaseOwner != "" && actual.LeaseUntil.After(now.UTC()) {
+		return ReadAllJob{}, false, nil
+	}
+	if !actual.LeaseUntil.IsZero() && actual.LeaseUntil.After(now.UTC()) {
+		return ReadAllJob{}, false, nil
+	}
+	actual.Fence++
+	actual.Attempts++
+	actual.LeaseOwner = owner
+	actual.LeaseUntil = now.UTC().Add(lease)
+	copia := *actual
+	return copia, true, nil
+}
+
+func (f *fakeStore) ReleaseReadAll(_ context.Context, job ReadAllJob, now, retryAt time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	actual := f.jobs[claveReadAll(job.UserID, job.RequestID)]
+	if actual == nil || actual.Fence != job.Fence || actual.LeaseOwner != job.LeaseOwner {
+		return ErrConflict
+	}
+	actual.LeaseOwner = ""
+	actual.LeaseUntil = retryAt.UTC()
+	_ = now
+	return nil
+}
+
+func (f *fakeStore) FinishReadAll(_ context.Context, job ReadAllJob, _ time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	clave := claveReadAll(job.UserID, job.RequestID)
+	actual := f.jobs[clave]
+	if actual == nil || actual.Fence != job.Fence || actual.LeaseOwner != job.LeaseOwner {
+		return ErrConflict
+	}
+	delete(f.jobs, clave)
+	if f.punteros[job.UserID] != nil {
+		delete(f.punteros[job.UserID], job.RequestID)
+	}
 	return nil
 }
 
 func (f *fakeStore) estado(userID, requestID string) *ReadAllState {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	actual := f.readall[userID+"\x00"+requestID]
+	actual := f.readall[claveReadAll(userID, requestID)]
 	if actual == nil {
 		return nil
 	}
 	copia := *actual
 	return &copia
+}
+
+func (f *fakeStore) trabajo(userID, requestID string) *ReadAllJob {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	actual := f.jobs[claveReadAll(userID, requestID)]
+	if actual == nil {
+		return nil
+	}
+	copia := *actual
+	return &copia
+}
+
+func (f *fakeStore) trabajoCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.jobs)
+}
+
+func (f *fakeStore) tienePuntero(userID, requestID string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.punteros[userID] != nil && f.punteros[userID][requestID]
+}
+
+func (f *fakeStore) noLeidas(userID string) int64 {
+	total, _ := f.CountUnread(context.Background(), userID)
+	return total
 }
 
 func servicioDePrueba(store Store) *Service {
@@ -354,66 +528,58 @@ func TestE062IdempotenteYAjeno(t *testing.T) {
 	}
 }
 
-func TestE063CeroUnYCientosConReanudacion(t *testing.T) {
-	for _, caso := range []struct {
-		nombre   string
-		pending  int
-		fallaEn  int
-		reintent bool
-	}{
-		{nombre: "cero_pendientes", pending: 0},
-		{nombre: "una_pendiente", pending: 1},
-		{nombre: "cientos_con_reanudacion", pending: 137, fallaEn: 2, reintent: true},
-	} {
-		t.Run(caso.nombre, func(t *testing.T) {
-			store := nuevoFakeStore()
-			store.sembrar("user-a", caso.pending, caso.pending, TypeSystem)
-			store.sembrar("user-b", 5, 5, TypeSystem)
-			store.failAdvanceAt = caso.fallaEn
+func TestE063Admision202SinProcesarNotificaciones(t *testing.T) {
+	store := nuevoFakeStore()
+	store.sembrar("user-a", 30, 17, TypeSystem)
+	servicio := servicioDePrueba(store).WithIDGenerator(func() (string, error) {
+		return "018f90ef-08e5-7a68-b09f-000000009001", nil
+	})
 
-			secuencia := 0
-			generador := func() (string, error) {
-				secuencia++
-				return fmt.Sprintf("018f90ef-08e5-7a68-b09f-%012d", 9000+secuencia), nil
-			}
-			servicio := servicioDePrueba(store).WithIDGenerator(generador)
-			requestID := "018f90ef-08e5-7a68-b09f-000000009001"
+	antes := store.noLeidas("user-a")
+	aceptado, err := servicio.StartReadAll(context.Background(), "user-a")
+	if err != nil || aceptado == nil || aceptado.Status != "accepted" ||
+		aceptado.RequestID != "018f90ef-08e5-7a68-b09f-000000009001" {
+		t.Fatalf("E063 admisión: %+v %v", aceptado, err)
+	}
+	// La petición NO procesa: ni marca, ni lista páginas de la bandeja.
+	if store.listCalls != 0 || len(store.markCalls) != 0 {
+		t.Fatalf("la petición procesó trabajo: list=%d mark=%d", store.listCalls, len(store.markCalls))
+	}
+	if despues := store.noLeidas("user-a"); despues != antes {
+		t.Fatalf("la petición marcó notificaciones: %d -> %d", antes, despues)
+	}
 
-			aceptado, err := servicio.StartReadAll(context.Background(), "user-a")
-			if caso.fallaEn > 0 {
-				if err == nil {
-					t.Fatal("el fallo a mitad no se propagó: no se debe responder 202 falso")
-				}
-				if store.beginCalls == 0 {
-					t.Fatal("el registro READALL debe persistirse antes de trabajar")
-				}
-				parcial := store.estado("user-a", requestID)
-				if parcial == nil || parcial.Status != StatusPending || parcial.Cursor == nil {
-					t.Fatalf("el avance persistido no permite reanudar: %+v", parcial)
-				}
-				if !caso.reintent {
-					t.Fatal("caso de reanudación mal configurado")
-				}
-				store.failAdvanceAt = 0
-				aceptado, err = servicio.ResumeReadAll(context.Background(), "user-a", requestID)
-			}
-			if err != nil || aceptado == nil || aceptado.Status != "accepted" || aceptado.RequestID != requestID {
-				t.Fatalf("E063: %+v %v", aceptado, err)
-			}
-			final := store.estado("user-a", requestID)
-			if final == nil || final.Status != StatusCompleted || final.CompletedAt == nil {
-				t.Fatalf("READALL no quedó completado: %+v", final)
-			}
-			if final.ProcessedCount != int64(caso.pending) {
-				t.Fatalf("processedCount=%d, esperado %d", final.ProcessedCount, caso.pending)
-			}
-			if noLeidas, err := servicio.UnreadCount(context.Background(), "user-a"); err != nil || noLeidas != 0 {
-				t.Fatalf("unreadCount de A: %d %v", noLeidas, err)
-			}
-			if noLeidas, err := servicio.UnreadCount(context.Background(), "user-b"); err != nil || noLeidas != 5 {
-				t.Fatalf("usuario B fue modificado: %d %v", noLeidas, err)
-			}
-		})
+	estado := store.estado("user-a", aceptado.RequestID)
+	if estado == nil || estado.Status != StatusPending || estado.Cursor != nil || estado.InitialUnread != 17 {
+		t.Fatalf("registro READALL pendiente incorrecto: %+v", estado)
+	}
+	trabajo := store.trabajo("user-a", aceptado.RequestID)
+	if trabajo == nil || trabajo.Fence != 0 || trabajo.LeaseOwner != "" {
+		t.Fatalf("ítem de cola durable incorrecto: %+v", trabajo)
+	}
+	if !store.tienePuntero("user-a", aceptado.RequestID) {
+		t.Fatal("falta el puntero READALLPTR del titular")
+	}
+
+	// Reenviar el mismo requestId no duplica el trabajo.
+	if _, err := servicio.ResumeReadAll(context.Background(), "user-a", aceptado.RequestID); err != nil {
+		t.Fatalf("reanudación idempotente: %v", err)
+	}
+	if store.trabajoCount() != 1 {
+		t.Fatalf("la cola duplicó el trabajo: %d", store.trabajoCount())
+	}
+}
+
+func TestE063AdmisionFallaCerradaSinRegistro(t *testing.T) {
+	store := nuevoFakeStore()
+	store.sembrar("user-a", 3, 3, TypeSystem)
+	store.beginErr = errors.New("dynamodb caido")
+	servicio := servicioDePrueba(store)
+	if _, err := servicio.StartReadAll(context.Background(), "user-a"); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("sin persistencia no se debe aceptar: %v", err)
+	}
+	if store.trabajoCount() != 0 {
+		t.Fatal("no debe quedar trabajo durable sin admisión confirmada")
 	}
 }
 

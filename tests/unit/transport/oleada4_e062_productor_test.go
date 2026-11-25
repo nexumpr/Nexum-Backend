@@ -164,6 +164,13 @@ func TestE062ProductorUUIDAceptadoPorE061YE062(t *testing.T) {
 	if !e062UUIDPattern.MatchString(id) {
 		t.Fatalf("el ID generado no cumple el patrón de E062: %q", id)
 	}
+	// D-E062-01: UUID v8 RFC 9562 (SHA-256), no v5 (SHA-1).
+	if len(id) != 36 || id[14] != '8' {
+		t.Fatalf("el ID debe ser UUID v8 (version 8): %q", id)
+	}
+	if id[19] != '8' && id[19] != '9' && id[19] != 'a' && id[19] != 'b' {
+		t.Fatalf("variante RFC 4122 invalida en el ID: %q", id)
+	}
 	if productor.Ciclo(ctx) != 1 {
 		t.Fatal("el worker no aceptó el envío sintético")
 	}

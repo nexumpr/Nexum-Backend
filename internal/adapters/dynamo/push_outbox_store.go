@@ -19,12 +19,36 @@ import (
 	domainDynamo "github.com/nexumpr/Nexum-Backend/internal/domain/dynamo"
 )
 
-// Patrón físico nuevo y autocontenido para el worker FCM (sin GSI2, sin Scan):
+// Patrón físico autocontenido para el worker FCM (sin GSI2, sin Scan):
 //
 //	PK = OUTBOX#GLOBAL
-//	SK = DUE#<RFC3339Nano UTC>#<notificationID>
+//	SK = DUE#<nextAttemptAt UTC, ancho fijo>#<notificationID>
 //
-// La SK fija el vencimiento inicial y permite una Query acotada por prefijo.
+// La SK ordena por PRÓXIMO INTENTO, no por instante de creación: un trabajo
+// reprogramado al futuro se mueve de posición y deja de ocupar la página de los
+// que ya vencieron. El instante se serializa con fracción de 9 dígitos fijos
+// (`2006-01-02T15:04:05.000000000Z`), de modo que el orden lexicográfico de la
+// SK coincide con el cronológico y la Query puede acotarse con
+// `SK BETWEEN "DUE#" AND DUE#<ahora>#~` sin `FilterExpression` sobre el lease
+// (el lease se descarta en memoria, de forma acotada por la paginación).
+//
+// Cambiar la SK exige mover el ítem: DynamoDB no permite modificar la clave con
+// `UpdateItem`. `Reprogramar` usa una transacción `Put` (clave nueva) +
+// `Delete` (clave vieja, condicionada al `owner` y a `attempts`) para que el
+// movimiento sea atómico. Los cierres terminales (`sent`/`revoked`) no mueven la
+// clave porque dejan de ser elegibles.
+//
+// Compatibilidad con ítems históricos: los escritos antes de este cambio tienen
+// `SK = DUE#<RFC3339Nano sin relleno>#<id>`. `Pendientes` los sigue leyendo
+// porque el relleno de la fracción sólo altera el orden dentro del mismo
+// segundo; al reprogramarse migran al formato nuevo. Una SK antigua programada
+// exactamente en el mismo segundo que `ahora` se entrega en el ciclo siguiente
+// (retraso < intervalo del worker): se retrasa, nunca se pierde.
+//
+// La idempotencia por eventId+userID vive en la MISMA partición con
+// SK IDEM#<sha256>. La bandeja E061 se escribe aparte en
+// USER#<sub>/NOTIFICATION#<UTC>#<id>.
+//
 // Los reprocesos no reescriben la clave: `nextAttemptAt` es el atributo
 // autoritativo y se filtra en la consulta. La idempotencia por
 // eventId+userID vive en la MISMA partición con SK IDEM#<sha256>.
@@ -46,6 +70,17 @@ const (
 	pushOutboxEntityType       = "PUSH_OUTBOX"
 	pushOutboxIdemEntityType   = "PUSH_OUTBOX_DELIVERY"
 	pushNotificationEntityType = "USER_NOTIFICATION"
+
+	// pushOutboxLayoutInstante fija 9 decimales: ancho constante y orden
+	// lexicográfico igual al cronológico.
+	pushOutboxLayoutInstante = "2006-01-02T15:04:05.000000000"
+	// pushOutboxSufijoCola es mayor que cualquier carácter usado en un
+	// notificationID (hex y guiones), de modo que la cota superior alcanza a
+	// todos los identificadores del mismo instante.
+	pushOutboxSufijoCola = "~"
+	// pushOutboxPaginasMax acota el barrido por ciclo. Sin este tope, un
+	// backlog patológico de ítems no elegibles retendría al worker.
+	pushOutboxPaginasMax = 5
 
 	// Puntero de purga dentro de la partición del titular.
 	pushOutboxPointerPrefix = "OUTBOXPTR#"
@@ -71,7 +106,8 @@ var (
 )
 
 // PushOutboxAPI es el subconjunto de DynamoDB que usa el outbox. No incluye
-// Scan: el compilador impide un barrido global.
+// Scan: el compilador impide un barrido global. `TransactWriteItems` es
+// necesario para mover la clave al reprogramar sin dejar duplicados ni huecos.
 type PushOutboxAPI interface {
 	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
@@ -131,8 +167,32 @@ func (s *PushOutboxStore) Owner() string {
 	return s.owner
 }
 
+func pushOutboxInstante(t time.Time) string {
+	return t.UTC().Format(pushOutboxLayoutInstante) + "Z"
+}
+
 func pushOutboxSK(due time.Time, notificationID string) string {
-	return fmt.Sprintf("%s%s#%s", pushOutboxDuePrefix, due.UTC().Format(time.RFC3339Nano), notificationID)
+	return pushOutboxDuePrefix + pushOutboxInstante(due) + "#" + notificationID
+}
+
+// pushOutboxSKLimite es la cota superior inclusiva de la Query de vencimientos:
+// cualquier SK con instante <= ahora queda por debajo.
+func pushOutboxSKLimite(ahora time.Time) string {
+	return pushOutboxSK(ahora, pushOutboxSufijoCola)
+}
+
+// pushOutboxNotificationID recupera el sufijo de una SK DUE#<instante>#<id>. Es
+// la vía de compatibilidad para ítems que no guardan el atributo notificationID.
+func pushOutboxNotificationID(sk string) string {
+	resto, ok := strings.CutPrefix(sk, pushOutboxDuePrefix)
+	if !ok {
+		return ""
+	}
+	partes := strings.SplitN(resto, "#", 2)
+	if len(partes) != 2 {
+		return ""
+	}
+	return partes[1]
 }
 
 func pushOutboxIdemSK(userID, eventID string) string {
@@ -190,9 +250,9 @@ func (s *PushOutboxStore) Crear(ctx context.Context, registro pushoutbox.Registr
 		"status":         stringAttr(string(pushoutbox.EstadoPendiente)),
 		"attempts":       numberAttr(0),
 		"leaseUntil":     stringAttr(""),
-		"nextAttemptAt":  stringAttr(due.UTC().Format(time.RFC3339Nano)),
-		"createdAt":      stringAttr(registro.CreatedAt.UTC().Format(time.RFC3339Nano)),
-		"updatedAt":      stringAttr(ahora.UTC().Format(time.RFC3339Nano)),
+		"nextAttemptAt":  stringAttr(pushOutboxInstante(due)),
+		"createdAt":      stringAttr(pushOutboxInstante(registro.CreatedAt)),
+		"updatedAt":      stringAttr(pushOutboxInstante(ahora)),
 	}
 
 	pointerPK, pointerSK := pushOutboxPointerKeys(registro.UserID, registro.NotificationID)
@@ -244,8 +304,15 @@ func (s *PushOutboxStore) Crear(ctx context.Context, registro pushoutbox.Registr
 	return false, ErrOutboxNoDisponible
 }
 
-// Pendientes hace una Query por PK con begins_with(SK,"DUE#"). El filtro
-// acota estado y vencimiento; la paginación la controla el límite del lote.
+// Pendientes (equivalente al `Due` del worker) devuelve los trabajos cuyo
+// próximo intento ya venció, en orden de SK (es decir, de vencimiento).
+//
+// La Query se acota por clave, sin `FilterExpression`: `SK BETWEEN "DUE#" AND
+// DUE#<ahora>#~`. Los trabajos reprogramados al futuro quedan fuera del rango y
+// no consumen la página. El lease se descarta en memoria y la lectura pagina con
+// `ExclusiveStartKey` hasta `pushOutboxPaginasMax` páginas, de modo que una
+// página corta (límite de 1 MB de DynamoDB o ítems no elegibles) no oculta
+// pendientes y no se pierde ningún vencido.
 func (s *PushOutboxStore) Pendientes(ctx context.Context, ahora time.Time, limite int) ([]pushoutbox.Registro, error) {
 	if !s.disponible() {
 		return nil, ErrOutboxNoDisponible
@@ -253,40 +320,64 @@ func (s *PushOutboxStore) Pendientes(ctx context.Context, ahora time.Time, limit
 	if limite < 1 {
 		limite = 25
 	}
-	out, err := s.client.Query(ctx, &dynamodb.QueryInput{
+	ahora = ahora.UTC()
+	entrada := &dynamodb.QueryInput{
 		TableName:              aws.String(s.table),
 		ConsistentRead:         aws.Bool(true),
 		Limit:                  aws.Int32(int32(limite)),
-		KeyConditionExpression: aws.String("#pk = :pk AND begins_with(#sk, :prefijo)"),
-		FilterExpression: aws.String("((#estado = :pendiente OR #estado = :fallido) OR " +
-			"(#estado = :enviando AND (attribute_not_exists(#lease) OR #lease <= :ahora))) AND #siguiente <= :ahora"),
+		KeyConditionExpression: aws.String("#pk = :pk AND #sk BETWEEN :desde AND :hasta"),
 		ExpressionAttributeNames: map[string]string{
-			"#pk":        "PK",
-			"#sk":        "SK",
-			"#estado":    "status",
-			"#siguiente": "nextAttemptAt",
-			"#lease":     "leaseUntil",
+			"#pk": "PK",
+			"#sk": "SK",
 		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":        stringAttr(pushOutboxPartition),
-			":prefijo":   stringAttr(pushOutboxDuePrefix),
-			":pendiente": stringAttr(string(pushoutbox.EstadoPendiente)),
-			":fallido":   stringAttr(string(pushoutbox.EstadoFallido)),
-			":enviando":  stringAttr(string(pushoutbox.EstadoEnviando)),
-			":ahora":     stringAttr(ahora.UTC().Format(time.RFC3339Nano)),
+			":pk":    stringAttr(pushOutboxPartition),
+			":desde": stringAttr(pushOutboxDuePrefix),
+			":hasta": stringAttr(pushOutboxSKLimite(ahora)),
 		},
-	})
-	if err != nil {
-		return nil, ErrOutboxNoDisponible
 	}
-	registros := make([]pushoutbox.Registro, 0, len(out.Items))
-	for _, item := range out.Items {
-		if stringAttribute(item["entityType"]) != pushOutboxEntityType {
-			continue
+	registros := make([]pushoutbox.Registro, 0, limite)
+	for pagina := 0; pagina < pushOutboxPaginasMax; pagina++ {
+		out, err := s.client.Query(ctx, entrada)
+		if err != nil {
+			return nil, ErrOutboxNoDisponible
 		}
-		registros = append(registros, pushOutboxDesdeItem(item))
+		for _, item := range out.Items {
+			if stringAttribute(item["entityType"]) != pushOutboxEntityType {
+				continue
+			}
+			registro := pushOutboxDesdeItem(item)
+			if !pushOutboxElegible(registro, ahora) {
+				continue
+			}
+			registros = append(registros, registro)
+			if len(registros) >= limite {
+				return registros, nil
+			}
+		}
+		if len(out.LastEvaluatedKey) == 0 {
+			break
+		}
+		entrada.ExclusiveStartKey = out.LastEvaluatedKey
 	}
 	return registros, nil
+}
+
+// pushOutboxElegible aplica en memoria las condiciones que antes vivían en el
+// FilterExpression: vencimiento, estado reclamable y lease no vigente.
+func pushOutboxElegible(registro pushoutbox.Registro, ahora time.Time) bool {
+	if !registro.NextAttemptAt.IsZero() && registro.NextAttemptAt.After(ahora) {
+		return false
+	}
+	switch registro.Status {
+	case pushoutbox.EstadoPendiente, pushoutbox.EstadoFallido:
+		return true
+	case pushoutbox.EstadoEnviando:
+		// Un trabajo quedó en vuelo: sólo se recupera si su lease venció.
+		return registro.LeaseUntil.IsZero() || !registro.LeaseUntil.After(ahora)
+	default:
+		return false
+	}
 }
 
 // Reclamar toma el lease bajo condición: sólo si está pendiente/fallido, ya
@@ -348,10 +439,10 @@ func (s *PushOutboxStore) Reclamar(ctx context.Context, id string, ahora time.Ti
 			":enviando":  stringAttr(string(pushoutbox.EstadoEnviando)),
 			":pendiente": stringAttr(string(pushoutbox.EstadoPendiente)),
 			":fallido":   stringAttr(string(pushoutbox.EstadoFallido)),
-			":lease":     stringAttr(ahora.Add(lease).UTC().Format(time.RFC3339Nano)),
+			":lease":     stringAttr(pushOutboxInstante(ahora.Add(lease))),
 			":owner":     stringAttr(s.owner),
 			":uno":       numberAttr(1),
-			":ahora":     stringAttr(ahora.Format(time.RFC3339Nano)),
+			":ahora":     stringAttr(pushOutboxInstante(ahora)),
 		},
 		ReturnValues: types.ReturnValueAllNew,
 	})
@@ -487,11 +578,169 @@ func (s *PushOutboxStore) MarcarRevocado(ctx context.Context, id string, clase s
 }
 
 // Reprogramar guarda un fallo recuperable con backoff y libera el lease.
+//
+// Como la SK ordena por `nextAttemptAt`, reprogramar mueve el ítem: se recrea en
+// `DUE#<siguiente>#<id>` y se borra la clave anterior en una sola transacción,
+// condicionada al `owner` del lease y al número de intentos leído. Si el nuevo
+// instante cae en el mismo segundo que la clave vigente, la clave no cambia y se
+// actualiza en sitio. Un ítem histórico con SK sin relleno migra al formato nuevo
+// en su primera reprogramación.
 func (s *PushOutboxStore) Reprogramar(ctx context.Context, id string, attempts int, clase string, siguiente time.Time, ahora time.Time) error {
-	return s.actualizarCierre(ctx, id, pushoutbox.EstadoFallido, clase, &struct {
-		intentos  int
-		siguiente time.Time
-	}{intentos: attempts, siguiente: siguiente}, ahora)
+	if !s.disponible() {
+		return ErrOutboxNoDisponible
+	}
+	ahora = ahora.UTC()
+	siguiente = siguiente.UTC()
+	if siguiente.IsZero() {
+		return ErrOutboxNoDisponible
+	}
+	item, err := s.leerItem(ctx, id)
+	if err != nil {
+		return err
+	}
+	idNotificacion := pushOutboxNotificationID(id)
+	if item == nil {
+		// Replay de una reprogramación ya aplicada: si el destino existe, el
+		// trabajo se movió y esta llamada no debe reintentar nada.
+		if destino, errDestino := s.leerItem(ctx, pushOutboxSK(siguiente, idNotificacion)); errDestino == nil && destino != nil {
+			return nil
+		}
+		return ErrConflictoLease
+	}
+	if propietario := stringAttribute(item["notificationID"]); propietario != "" {
+		idNotificacion = propietario
+	}
+	nuevaSK := pushOutboxSK(siguiente, idNotificacion)
+	if nuevaSK == id {
+		return s.actualizarCierre(ctx, id, pushoutbox.EstadoFallido, clase, &struct {
+			intentos  int
+			siguiente time.Time
+		}{intentos: attempts, siguiente: siguiente}, ahora)
+	}
+	nuevo := make(map[string]types.AttributeValue, len(item)+4)
+	for clave, valor := range item {
+		nuevo[clave] = valor
+	}
+	nuevo["SK"] = stringAttr(nuevaSK)
+	nuevo["status"] = stringAttr(string(pushoutbox.EstadoFallido))
+	nuevo["attempts"] = numberAttr(int64(attempts))
+	nuevo["nextAttemptAt"] = stringAttr(pushOutboxInstante(siguiente))
+	nuevo["updatedAt"] = stringAttr(pushOutboxInstante(ahora))
+	if clase != "" {
+		nuevo["lastErrorClass"] = stringAttr(clase)
+	}
+	delete(nuevo, "leaseUntil")
+	delete(nuevo, "owner")
+
+	acciones := []types.TransactWriteItem{
+		{Put: &types.Put{
+			TableName:           aws.String(s.table),
+			Item:                nuevo,
+			ConditionExpression: aws.String("attribute_not_exists(PK)"),
+		}},
+		{Delete: &types.Delete{
+			TableName:           aws.String(s.table),
+			Key:                 map[string]types.AttributeValue{"PK": stringAttr(pushOutboxPartition), "SK": stringAttr(id)},
+			ConditionExpression: aws.String("#owner = :owner AND #intentos = :intentos"),
+			ExpressionAttributeNames: map[string]string{
+				"#owner":    "owner",
+				"#intentos": "attempts",
+			},
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":owner":    stringAttr(s.owner),
+				":intentos": numberAttr(pushOutboxIntentos(item)),
+			},
+		}},
+	}
+
+	// El puntero de purga guarda la SK global: si el trabajo se mueve, el puntero
+	// debe moverse con él en la MISMA transacción; de lo contrario E014 buscaría
+	// una SK ya borrada y dejaría el global huérfano. Los ítems históricos sin
+	// puntero (creados antes del contrato) no lo crean aquí: se migran al
+	// reprogramarse sólo si ya existía.
+	userIDItem := strings.TrimSpace(stringAttribute(item["userID"]))
+	if userIDItem != "" && idNotificacion != "" {
+		punteroPK, punteroSK := pushOutboxPointerKeys(userIDItem, idNotificacion)
+		puntero, errPuntero := s.leerItemPorClave(ctx, punteroPK, punteroSK)
+		if errPuntero != nil {
+			return errPuntero
+		}
+		if puntero != nil {
+			acciones = append(acciones, types.TransactWriteItem{Update: &types.Update{
+				TableName:           aws.String(s.table),
+				Key:                 map[string]types.AttributeValue{"PK": stringAttr(punteroPK), "SK": stringAttr(punteroSK)},
+				UpdateExpression:    aws.String("SET #skGlobal = :nueva, #dueAt = :siguiente"),
+				ConditionExpression: aws.String("#skGlobal = :vieja"),
+				ExpressionAttributeNames: map[string]string{
+					"#skGlobal": "skGlobal", "#dueAt": "dueAt",
+				},
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":nueva":     stringAttr(nuevaSK),
+					":vieja":     stringAttr(id),
+					":siguiente": stringAttr(pushOutboxInstante(siguiente)),
+				},
+			}})
+		}
+	}
+
+	_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: acciones,
+	})
+	if err == nil {
+		return nil
+	}
+	var cancelada *types.TransactionCanceledException
+	if errors.As(err, &cancelada) {
+		if destino, errDestino := s.leerItem(ctx, nuevaSK); errDestino == nil && destino != nil {
+			return nil
+		}
+		return ErrConflictoLease
+	}
+	return ErrOutboxNoDisponible
+}
+
+// leerItemPorClave devuelve un ítem por PK/SK con lectura consistente.
+func (s *PushOutboxStore) leerItemPorClave(ctx context.Context, pk, sk string) (map[string]types.AttributeValue, error) {
+	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName:      aws.String(s.table),
+		ConsistentRead: aws.Bool(true),
+		Key:            map[string]types.AttributeValue{"PK": stringAttr(pk), "SK": stringAttr(sk)},
+	})
+	if err != nil {
+		return nil, ErrOutboxNoDisponible
+	}
+	if out == nil || len(out.Item) == 0 {
+		return nil, nil
+	}
+	return out.Item, nil
+}
+
+// leerItem devuelve el ítem completo con lectura consistente. Un ítem ausente se
+// representa como (nil, nil): no se degrada a un error de dependencia.
+func (s *PushOutboxStore) leerItem(ctx context.Context, sk string) (map[string]types.AttributeValue, error) {
+	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName:      aws.String(s.table),
+		ConsistentRead: aws.Bool(true),
+		Key: map[string]types.AttributeValue{
+			"PK": stringAttr(pushOutboxPartition),
+			"SK": stringAttr(sk),
+		},
+	})
+	if err != nil {
+		return nil, ErrOutboxNoDisponible
+	}
+	if out == nil || len(out.Item) == 0 {
+		return nil, nil
+	}
+	return out.Item, nil
+}
+
+func pushOutboxIntentos(item map[string]types.AttributeValue) int64 {
+	intentos, err := strconv.ParseInt(stringAttribute(item["attempts"]), 10, 64)
+	if err != nil || intentos < 0 {
+		return 0
+	}
+	return intentos
 }
 
 func (s *PushOutboxStore) actualizarCierre(ctx context.Context, id string, estado pushoutbox.Estado, clase string, reprogramacion *struct {
@@ -511,7 +760,7 @@ func (s *PushOutboxStore) actualizarCierre(ctx context.Context, id string, estad
 	}
 	valores := map[string]types.AttributeValue{
 		":estado": stringAttr(string(estado)),
-		":ahora":  stringAttr(ahora.Format(time.RFC3339Nano)),
+		":ahora":  stringAttr(pushOutboxInstante(ahora)),
 		":owner":  stringAttr(s.owner),
 	}
 	if clase != "" {
@@ -524,7 +773,7 @@ func (s *PushOutboxStore) actualizarCierre(ctx context.Context, id string, estad
 		nombres["#intentos"] = "attempts"
 		nombres["#siguiente"] = "nextAttemptAt"
 		valores[":intentos"] = numberAttr(int64(reprogramacion.intentos))
-		valores[":siguiente"] = stringAttr(reprogramacion.siguiente.UTC().Format(time.RFC3339Nano))
+		valores[":siguiente"] = stringAttr(pushOutboxInstante(reprogramacion.siguiente))
 	}
 	salida, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(s.table),

@@ -11,7 +11,6 @@ package pushoutbox
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -21,6 +20,7 @@ import (
 
 	appPrefs "github.com/nexumpr/Nexum-Backend/internal/application/notificationprefs"
 	"github.com/nexumpr/Nexum-Backend/internal/infrastructure/push"
+	"github.com/nexumpr/Nexum-Backend/pkg/uuidv8"
 )
 
 // Estado del trabajo en el outbox.
@@ -256,19 +256,18 @@ func (s *Service) Encolar(ctx context.Context, solicitud Solicitud) (string, boo
 	return notificationID, creado, err
 }
 
-// notificationUUID deriva un UUID determinista (v5-like) de (userID, eventID).
+// notificationUUID deriva un UUID v8 (RFC 9562) determinista de (userID, eventID).
 //
-// E062 exige el patrón `^[0-9a-fA-F]{8}-...$`; un hex de 32 caracteres sin guiones
-// (la forma anterior) era rechazado por 400 invalid_uuid. Se toman 16 bytes de
-// SHA-256 sobre la misma clave que usa la deduplicación, se fija versión 5 y la
-// variante RFC 4122 y se formatea 8-4-4-4-12. El valor no contiene el identificador
-// del titular y es estable entre reintentos del mismo evento.
+// E062 exige el formato UUID; el contrato no impone versión. Un hex de 32
+// caracteres sin guiones (la forma anterior) era rechazado por 400 invalid_uuid.
+// Nexum usa UUID v8 con SHA-256 sobre la misma clave que la deduplicación y el
+// namespace propio de pkg/uuidv8: el valor no contiene el identificador del
+// titular, es estable entre reintentos del mismo evento y no introduce SHA-1
+// (UUID v5) en el árbol. La deduplicación sigue siendo (userID, eventID) con
+// IDEM#; este UUID solo identifica el recurso de la bandeja.
 func notificationUUID(userID, eventID string) string {
-	suma := sha256.Sum256([]byte(strings.TrimSpace(userID) + "|" + strings.TrimSpace(eventID)))
-	b := suma[:16]
-	b[6] = (b[6] & 0x0f) | 0x50 // versión 5
-	b[8] = (b[8] & 0x3f) | 0x80 // variante RFC 4122
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+	nombre := strings.TrimSpace(userID) + "|" + strings.TrimSpace(eventID)
+	return uuidv8.New(uuidv8.NamespaceNexum, nombre).String()
 }
 
 // Ciclo hace una pasada y devuelve cuántos mensajes fueron aceptados por FCM.
@@ -497,9 +496,10 @@ func enVentanaSilencio(ahora time.Time, q *appPrefs.QuietHours, zona *time.Locat
 		return false, time.Time{}, nil
 	}
 	// Formato estricto HH:MM: `time.Parse("15:04", "9:00")` acepta una hora de un
-	// dígito, pero el contrato exige dos y el handler ya lo rechaza con 422.
+	// dígito, pero el contrato exige dos y el handler ya lo rechaza con 422. El
+	// cálculo no debe aceptar una forma que la API no admite.
 	if len(q.Start) != 5 || len(q.End) != 5 || q.Start[2] != ':' || q.End[2] != ':' {
-		return false, time.Time{}, fmt.Errorf("horario con formato invalido")
+		return false, time.Time{}, fmt.Errorf("horario de quietHours con formato inválido")
 	}
 	inicio, err := time.Parse("15:04", q.Start)
 	if err != nil {
@@ -521,14 +521,16 @@ func enVentanaSilencio(ahora time.Time, q *appPrefs.QuietHours, zona *time.Locat
 		enFranja = minActual >= minInicio || minActual < minFin
 	}
 
-	// Fin de pared local de hoy; si no queda por delante, el de mañana.
+	// Fin de la ventana como hora de PARED local. Sumar minutos a la medianoche
+	// absoluta falla en los días de cambio de horario (23 o 25 horas): en marzo el
+	// fin quedaba una hora tarde y en noviembre una hora temprano, dentro de la
+	// propia ventana, lo que reprogramaba el envío a un instante aún bloqueado.
 	finVentana := time.Date(local.Year(), local.Month(), local.Day(), fin.Hour(), fin.Minute(), 0, 0, zona)
 	if !finVentana.After(ahora) {
 		finVentana = time.Date(local.Year(), local.Month(), local.Day()+1, fin.Hour(), fin.Minute(), 0, 0, zona)
 	}
 	return enFranja, finVentana, nil
 }
-
 func backoff(intentos int) time.Duration {
 	if intentos < 1 {
 		intentos = 1

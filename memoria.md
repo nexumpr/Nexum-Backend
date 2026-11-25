@@ -2482,7 +2482,16 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 
 ### Integración de main y autorizaciones 2026-11-25
 
-- **PR #146 MERGED:** HEAD autorizado `a1cc9406a2bf038641b2b436275eebe8a32a07e4`; merge commit `f3bccca8b2437dc154bedbef257a3cabc7620844`; `origin/main` actualizado.
-- **Autorizaciones de esta sesión:** continuación de regularización e integración; merge de #146 por SHA exacto; cierre de defectos residuales; Gate ML-155; enmienda ML de ventana de 90 días sin caché; FinOps de egreso FCM (solo diseño/IaC); revisión del ZIP; reconciliación contractual E002/E008/E009/E051; preparación de certificación funcional 75/75.
-- **Sigue no autorizado:** `terraform apply`, creación de recursos, publicación de artefactos, despliegue, instance refresh, rollback, rotación de credenciales, borrado del ZIP, E015 legal, cambios de semántica E031 y merge de PR sin Gate por su HEAD.
-- **Sincronización:** #145 integró `origin/main` (RFC-023/025 + históricos) conservando E020; OpenAPI fusionado con 401 E002, 413 E005, 104 esquemas y checksum de publicación recalculado.
+- **PR #146 MERGED:** HEAD autorizado `a1cc9406a2bf038641b2b436275eebe8a32a07e4`; merge commit `f3bccca8b2437dc154bedbef257a3cabc7620844`; `origin/main` actualizado. CI de `main` en ejecución al registrar esta línea.
+- **Autorizaciones de esta sesión:** `APRUEBO_CONTINUACION_REGULARIZACION_E_INTEGRACION_OLEADAS_4_5`, `APRUEBO_MERGE_PR_146_SHA_a1cc9406…`, `APRUEBO_CIERRE_DEFECTOS_RESIDUALES_OLEADAS_4_5`, `APRUEBO_GATE_ML_155`, `APRUEBO_ENMIENDA_ML_VENTANA_90_DIAS_SIN_CACHE_RESPUESTA`, `APRUEBO_FCM_EGRESO_FINOPS`, `APRUEBO_REVISION_ZIP_SECRETOS`, `APRUEBO_RECONCILIACION_CONTRACTUAL_E002_E008_E009_E051`, `APRUEBO_PREPARACION_CERTIFICACION_FUNCIONAL_AWS_75_ENDPOINTS`.
+- **Sigue no autorizado:** `terraform apply`, creación de recursos, publicación de artefactos, despliegue, instance refresh, rollback, rotación de credenciales, borrado del ZIP, E015 legal, E031 sin decisión y merge de PR cuyo HEAD no coincida con su Gate.
+- **Bases actualizadas:** #144 fusionó `origin/main` sin conflictos; #143 resolvió `memoria.md` conservando checkpoints de Liz + secciones nuevas y regenerará `BASELINE_SHA256.json`. #145 se sincronizará tras el cierre de #143.
+
+### Cierre de integración 2026-11-25 (segunda sesión)
+
+- **PR #146 MERGED y CI verde:** `main` `f3bccca8b2437dc154bedbef257a3cabc7620844`; Go Backend CI `45534568903` SUCCESS y SDD `45534568852` SUCCESS.
+- **PR #143:** HEAD `3b2f5e04d708ae9595be0bed580dea56f4ea39db`. UUID v8 RFC 9562 con SHA-256 (D-E062-01 aprobada), E063 con admisión durable + `ReadAllWorker` y 202 solo tras persistir, outbox ordenado por próximo intento con paginación y sin inanición, quiet hours con hora de pared y HH:MM estricto, E075 corregido, ML-155 ratificado. Suite completa PASS, staticcheck/gosec 0.
+- **PR #145:** integración de #143 en curso; se combinaron orden por próximo intento, punteros `OUTBOXPTR#`, guarda `PROFILE ACTIVE`, TTL del dedupe y actualización atómica del puntero al mover la SK. Scheduler con `SCHEDULEPTR` condicional y doble del SDK que aplica condiciones. Sin commit del merge al cierre de esta línea.
+- **PR #144:** validado localmente (`fmt`/`validate` en módulos y entorno, 540 pruebas Terraform y 274 FinOps); pendiente de commit.
+- **Deuda histórica:** commit `d54cf6d` con D-429 (RATE_LIMITED, cuota real en E008/E009 y orden del limitador corregido en 11 handlers), `Retry-After` inline y `409/422` de E002 reservados. Documentos RFC-026, E031, matriz y aviso E015 v3 pendientes de commit y de corregir el hash.
+- **Sin AWS:** producción sigue en `v0.20.0+4bf6758d372`; sin release, apply, despliegue ni rollback.

@@ -18,18 +18,20 @@ import (
 )
 
 // fake cliente DynamoDB para E061–E063. Emula Query por PK/prefijo con
-// ExclusiveStartKey, Select COUNT, UpdateItem con condiciones y PutItem
-// condicional. No hay Scan en la interfaz del adaptador.
+// ExclusiveStartKey, Select COUNT, UpdateItem/PutItem/DeleteItem condicionales
+// y TransactWriteItems atómico. No hay Scan en la interfaz del adaptador.
 type e061FakeClient struct {
 	mu                sync.Mutex
 	items             map[string]map[string]types.AttributeValue
 	queries           []*dynamodb.QueryInput
 	updates           []*dynamodb.UpdateItemInput
 	puts              []*dynamodb.PutItemInput
+	transacts         []*dynamodb.TransactWriteItemsInput
 	queryErr          error
 	getErr            error
 	putErr            error
 	updateErr         error
+	transactErr       error
 	fuerzaCondicional bool
 	maxEvaluados      int
 }
@@ -137,6 +139,16 @@ func (f *e061FakeClient) Query(_ context.Context, params *dynamodb.QueryInput, _
 }
 
 func cumpleFiltroFalso(item map[string]types.AttributeValue, params *dynamodb.QueryInput) bool {
+	// Si el adaptador emitió una FilterExpression real, se evalúa con el mismo
+	// intérprete estricto que las condiciones (incluye el filtro de lease
+	// `attribute_not_exists(leaseUntil) OR leaseUntil <= :now`).
+	if expresion := strings.TrimSpace(aws.ToString(params.FilterExpression)); expresion != "" {
+		cumple, err := evaluarCondicionE063(item, expresion, params.ExpressionAttributeNames, params.ExpressionAttributeValues)
+		if err != nil {
+			return false
+		}
+		return cumple
+	}
 	valores := params.ExpressionAttributeValues
 	if valor, ok := valores[":notificacion"]; ok && stringAttribute(item["entityType"]) != stringAttribute(valor) {
 		return false
@@ -178,10 +190,13 @@ func (f *e061FakeClient) PutItem(_ context.Context, params *dynamodb.PutItemInpu
 		return nil, f.putErr
 	}
 	clave := claveItem(stringAttribute(params.Item["PK"]), stringAttribute(params.Item["SK"]))
-	if params.ConditionExpression != nil && strings.Contains(*params.ConditionExpression, "attribute_not_exists(PK)") {
-		if _, existe := f.items[clave]; existe {
-			return nil, &types.ConditionalCheckFailedException{}
-		}
+	cumple, err := evaluarCondicionE063(f.items[clave], aws.ToString(params.ConditionExpression),
+		params.ExpressionAttributeNames, params.ExpressionAttributeValues)
+	if err != nil {
+		return nil, err
+	}
+	if !cumple {
+		return nil, &types.ConditionalCheckFailedException{}
 	}
 	f.items[clave] = params.Item
 	return &dynamodb.PutItemOutput{}, nil
@@ -199,65 +214,294 @@ func (f *e061FakeClient) UpdateItem(_ context.Context, params *dynamodb.UpdateIt
 	if item == nil {
 		return nil, &types.ConditionalCheckFailedException{}
 	}
-	expresion := aws.ToString(params.ConditionExpression)
-	switch {
-	case f.fuerzaCondicional:
+	if f.fuerzaCondicional {
 		return nil, &types.ConditionalCheckFailedException{}
-	case strings.Contains(expresion, "#isRead = :falso"):
-		actual, ok := item["isRead"].(*types.AttributeValueMemberBOOL)
-		if !ok || actual.Value {
-			return nil, &types.ConditionalCheckFailedException{}
-		}
-	case strings.Contains(expresion, "#status = :pending"):
-		if stringAttribute(item["status"]) != stringAttribute(params.ExpressionAttributeValues[":pending"]) {
-			return nil, &types.ConditionalCheckFailedException{}
-		}
-		if !leaseValido(item, params) {
-			return nil, &types.ConditionalCheckFailedException{}
-		}
-	case strings.Contains(expresion, "attribute_not_exists(#leaseOwner)"):
-		if !leaseValido(item, params) {
-			return nil, &types.ConditionalCheckFailedException{}
-		}
 	}
+	cumple, err := evaluarCondicionE063(item, aws.ToString(params.ConditionExpression),
+		params.ExpressionAttributeNames, params.ExpressionAttributeValues)
+	if err != nil {
+		return nil, err // condición no soportada por el doble: fallo visible
+	}
+	if !cumple {
+		return nil, &types.ConditionalCheckFailedException{}
+	}
+	actualizado, err := aplicarUpdateE063(item, aws.ToString(params.UpdateExpression),
+		params.ExpressionAttributeNames, params.ExpressionAttributeValues)
+	if err != nil {
+		return nil, err
+	}
+	f.items[clave] = actualizado
+	copia := copiarMapa(actualizado)
+	return &dynamodb.UpdateItemOutput{Attributes: copia}, nil
+}
 
-	actualizado := make(map[string]types.AttributeValue, len(item))
-	for k, v := range item {
-		actualizado[k] = v
+// TransactWriteItems evalúa todas las condiciones antes de aplicar nada y
+// cancela el conjunto si una falla, como el servicio real.
+func (f *e061FakeClient) TransactWriteItems(_ context.Context, params *dynamodb.TransactWriteItemsInput, _ ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.transacts = append(f.transacts, params)
+	if f.transactErr != nil {
+		return nil, f.transactErr
 	}
-	exp := aws.ToString(params.UpdateExpression)
-	parteSet, parteRemove := exp, ""
-	if i := strings.Index(exp, " REMOVE "); i >= 0 {
-		parteSet, parteRemove = exp[:i], exp[i+len(" REMOVE "):]
+	razones := make([]types.CancellationReason, 0, len(params.TransactItems))
+	fallo := false
+	for _, accion := range params.TransactItems {
+		cumple, err := f.condicionDeAccion(accion)
+		if err != nil {
+			return nil, err
+		}
+		if cumple {
+			razones = append(razones, types.CancellationReason{Code: aws.String("None")})
+			continue
+		}
+		razones = append(razones, types.CancellationReason{Code: aws.String("ConditionalCheckFailed")})
+		fallo = true
+	}
+	if fallo {
+		return nil, &types.TransactionCanceledException{
+			Message:             aws.String("Transaction cancelled"),
+			CancellationReasons: razones,
+		}
+	}
+	for _, accion := range params.TransactItems {
+		switch {
+		case accion.Put != nil:
+			item := copiarMapa(accion.Put.Item)
+			f.items[claveItem(stringAttribute(item["PK"]), stringAttribute(item["SK"]))] = item
+		case accion.Update != nil:
+			clave := claveItem(stringAttribute(accion.Update.Key["PK"]), stringAttribute(accion.Update.Key["SK"]))
+			actualizado, err := aplicarUpdateE063(f.items[clave], aws.ToString(accion.Update.UpdateExpression),
+				accion.Update.ExpressionAttributeNames, accion.Update.ExpressionAttributeValues)
+			if err != nil {
+				return nil, err
+			}
+			f.items[clave] = actualizado
+		case accion.Delete != nil:
+			delete(f.items, claveItem(stringAttribute(accion.Delete.Key["PK"]), stringAttribute(accion.Delete.Key["SK"])))
+		case accion.ConditionCheck != nil:
+			// No escribe: sólo valida.
+		default:
+			return nil, fmt.Errorf("accion no soportada por el doble de E063")
+		}
+	}
+	return &dynamodb.TransactWriteItemsOutput{}, nil
+}
+
+func (f *e061FakeClient) condicionDeAccion(accion types.TransactWriteItem) (bool, error) {
+	switch {
+	case accion.Put != nil:
+		clave := claveItem(stringAttribute(accion.Put.Item["PK"]), stringAttribute(accion.Put.Item["SK"]))
+		return evaluarCondicionE063(f.items[clave], aws.ToString(accion.Put.ConditionExpression),
+			accion.Put.ExpressionAttributeNames, accion.Put.ExpressionAttributeValues)
+	case accion.Update != nil:
+		clave := claveItem(stringAttribute(accion.Update.Key["PK"]), stringAttribute(accion.Update.Key["SK"]))
+		return evaluarCondicionE063(f.items[clave], aws.ToString(accion.Update.ConditionExpression),
+			accion.Update.ExpressionAttributeNames, accion.Update.ExpressionAttributeValues)
+	case accion.Delete != nil:
+		clave := claveItem(stringAttribute(accion.Delete.Key["PK"]), stringAttribute(accion.Delete.Key["SK"]))
+		return evaluarCondicionE063(f.items[clave], aws.ToString(accion.Delete.ConditionExpression),
+			accion.Delete.ExpressionAttributeNames, accion.Delete.ExpressionAttributeValues)
+	case accion.ConditionCheck != nil:
+		clave := claveItem(stringAttribute(accion.ConditionCheck.Key["PK"]), stringAttribute(accion.ConditionCheck.Key["SK"]))
+		return evaluarCondicionE063(f.items[clave], aws.ToString(accion.ConditionCheck.ConditionExpression),
+			accion.ConditionCheck.ExpressionAttributeNames, accion.ConditionCheck.ExpressionAttributeValues)
+	default:
+		return false, fmt.Errorf("accion no soportada por el doble de E063")
+	}
+}
+
+// evaluarCondicionE063 interpreta las condiciones que emite el adaptador.
+// Cualquier forma desconocida es un error explícito: el doble nunca aprueba
+// una condición que no entiende.
+func evaluarCondicionE063(item map[string]types.AttributeValue, expresion string, nombres map[string]string, valores map[string]types.AttributeValue) (bool, error) {
+	expresion = strings.TrimSpace(expresion)
+	if expresion == "" {
+		return true, nil
+	}
+	for _, parte := range strings.Split(expresion, " AND ") {
+		cumple, err := evaluarAtomoE063(item, strings.TrimSpace(parte), nombres, valores)
+		if err != nil {
+			return false, err
+		}
+		if !cumple {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func evaluarAtomoE063(item map[string]types.AttributeValue, atomo string, nombres map[string]string, valores map[string]types.AttributeValue) (bool, error) {
+	atomo = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(atomo), "("), ")"))
+	if partes := strings.Split(atomo, " OR "); len(partes) > 1 {
+		for _, parte := range partes {
+			cumple, err := evaluarAtomoE063(item, strings.TrimSpace(parte), nombres, valores)
+			if err != nil {
+				return false, err
+			}
+			if cumple {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+	if strings.HasPrefix(atomo, "attribute_not_exists(") || strings.HasPrefix(atomo, "attribute_exists(") {
+		niega := strings.HasPrefix(atomo, "attribute_not_exists(")
+		nombre := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(atomo, "attribute_not_exists("), "attribute_exists("), ")")
+		_, existe := item[resolverNombreE063(nombre, nombres)]
+		if niega {
+			return !existe, nil
+		}
+		return existe, nil
+	}
+	for _, operador := range []string{" <= ", " >= ", " = ", " > ", " < "} {
+		partes := strings.Split(atomo, operador)
+		if len(partes) != 2 {
+			continue
+		}
+		nombre := resolverNombreE063(strings.TrimSpace(partes[0]), nombres)
+		valorEsperado, ok := valores[strings.TrimSpace(partes[1])]
+		if !ok {
+			return false, fmt.Errorf("valor de condicion ausente: %q", partes[1])
+		}
+		actual, existe := item[nombre]
+		if !existe {
+			return false, nil
+		}
+		return compararAtributosE063(actual, valorEsperado, operador), nil
+	}
+	return false, fmt.Errorf("condicion no soportada por el doble de E063: %q", atomo)
+}
+
+func resolverNombreE063(nombre string, nombres map[string]string) string {
+	if strings.HasPrefix(nombre, "#") {
+		return nombres[nombre]
+	}
+	return nombre
+}
+
+func compararAtributosE063(actual, esperado types.AttributeValue, operador string) bool {
+	numeroActual, okActual := attributeInt(actual)
+	numeroEsperado, okEsperado := attributeInt(esperado)
+	if okActual && okEsperado {
+		switch operador {
+		case " = ":
+			return numeroActual == numeroEsperado
+		case " <= ":
+			return numeroActual <= numeroEsperado
+		case " >= ":
+			return numeroActual >= numeroEsperado
+		case " > ":
+			return numeroActual > numeroEsperado
+		case " < ":
+			return numeroActual < numeroEsperado
+		}
+	}
+	if operador != " = " {
+		return false
+	}
+	switch esperado.(type) {
+	case *types.AttributeValueMemberBOOL:
+		valorActual, ok := actual.(*types.AttributeValueMemberBOOL)
+		valorEsperado, okEsperado := esperado.(*types.AttributeValueMemberBOOL)
+		return ok && okEsperado && valorActual.Value == valorEsperado.Value
+	default:
+		return stringAttribute(actual) == stringAttribute(esperado)
+	}
+}
+
+// aplicarUpdateE063 soporta SET (con incremento if_not_exists) y REMOVE.
+func aplicarUpdateE063(item map[string]types.AttributeValue, expresion string, nombres map[string]string, valores map[string]types.AttributeValue) (map[string]types.AttributeValue, error) {
+	actualizado := copiarMapa(item)
+	if actualizado == nil {
+		actualizado = map[string]types.AttributeValue{}
+	}
+	expresion = strings.TrimSpace(expresion)
+	parteSet, parteRemove := expresion, ""
+	if i := strings.Index(expresion, " REMOVE "); i >= 0 {
+		parteSet, parteRemove = expresion[:i], expresion[i+len(" REMOVE "):]
 	}
 	parteSet = strings.TrimPrefix(parteSet, "SET ")
-	for _, clausula := range strings.Split(parteSet, ",") {
+	// Las cláusulas se separan por comas de PRIMER nivel: `if_not_exists(#x, :cero)`
+	// contiene una coma interna y dividir a ciegas la partiría.
+	for _, clausula := range dividirClausulasE063(parteSet) {
 		pares := strings.Split(strings.TrimSpace(clausula), " = ")
 		if len(pares) != 2 {
 			continue
 		}
-		nombre := params.ExpressionAttributeNames[pares[0]]
-		valor := params.ExpressionAttributeValues[pares[1]]
-		if nombre != "" && valor != nil {
-			actualizado[nombre] = valor
+		nombre := resolverNombreE063(strings.TrimSpace(pares[0]), nombres)
+		if nombre == "" {
+			return nil, fmt.Errorf("SET sin nombre resoluble: %q", clausula)
 		}
+		derecha := strings.TrimSpace(pares[1])
+		if indice := strings.Index(derecha, " + "); indice >= 0 {
+			incremento, ok := valores[strings.TrimSpace(derecha[indice+len(" + "):])]
+			if !ok {
+				return nil, fmt.Errorf("incremento sin valor: %q", derecha)
+			}
+			base, okBase := attributeInt(actualizado[nombre])
+			if !okBase {
+				base = 0
+			}
+			suma, okSuma := attributeInt(incremento)
+			if !okSuma {
+				return nil, fmt.Errorf("incremento no numerico: %q", derecha)
+			}
+			actualizado[nombre] = numberAttr(base + suma)
+			continue
+		}
+		valor, ok := valores[derecha]
+		if !ok {
+			// `if_not_exists(#x, :valor)` sin suma conserva el valor actual.
+			if strings.HasPrefix(derecha, "if_not_exists(") {
+				continue
+			}
+			return nil, fmt.Errorf("SET sin valor: %q", derecha)
+		}
+		actualizado[nombre] = valor
 	}
 	for _, nombre := range strings.Split(parteRemove, ",") {
-		nombre = params.ExpressionAttributeNames[strings.TrimSpace(nombre)]
+		nombre = resolverNombreE063(strings.TrimSpace(nombre), nombres)
 		if nombre != "" {
 			delete(actualizado, nombre)
 		}
 	}
-	f.items[clave] = actualizado
-	return &dynamodb.UpdateItemOutput{Attributes: actualizado}, nil
+	return actualizado, nil
 }
 
-func leaseValido(item map[string]types.AttributeValue, params *dynamodb.UpdateItemInput) bool {
-	dueñoActual := stringAttribute(item["leaseOwner"])
-	if dueñoActual == "" {
-		return true
+// dividirClausulasE063 separa por comas de primer nivel, respetando paréntesis.
+func dividirClausulasE063(texto string) []string {
+	var salida []string
+	profundidad := 0
+	inicio := 0
+	for i, r := range texto {
+		switch r {
+		case '(':
+			profundidad++
+		case ')':
+			if profundidad > 0 {
+				profundidad--
+			}
+		case ',':
+			if profundidad == 0 {
+				salida = append(salida, texto[inicio:i])
+				inicio = i + 1
+			}
+		}
 	}
-	return dueñoActual == stringAttribute(params.ExpressionAttributeValues[":expected"])
+	salida = append(salida, texto[inicio:])
+	return salida
+}
+
+func copiarMapa(item map[string]types.AttributeValue) map[string]types.AttributeValue {
+	if len(item) == 0 {
+		return nil
+	}
+	copia := make(map[string]types.AttributeValue, len(item))
+	for k, v := range item {
+		copia[k] = v
+	}
+	return copia
 }
 
 func TestE061AdaptadorQueryExclusiveStartKeyYFiltros(t *testing.T) {
@@ -378,60 +622,164 @@ func boolValue(v types.AttributeValue) bool {
 	return ok && b.Value
 }
 
-func TestE063AdaptadorRegistroReadAllPersistidoYCerrado(t *testing.T) {
+func TestE063AdaptadorAdmisionColaClaimAvanceYCierre(t *testing.T) {
 	cliente := nuevoE061Fake()
 	cliente.sembrar("user-a", 31, 12, appNotifications.TypeSystem)
 	store := NewNotificationsStore(cliente, "nexum-table")
+	creado := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
 
-	estado, err := store.BeginReadAll(context.Background(), "user-a", "req-1", time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC))
+	estado, err := store.BeginReadAll(context.Background(), "user-a", "req-1", creado)
 	if err != nil || estado == nil || estado.Status != appNotifications.StatusPending || estado.InitialUnread != 12 {
 		t.Fatalf("BeginReadAll: %+v %v", estado, err)
 	}
-	put := cliente.puts[len(cliente.puts)-1]
-	if put.ConditionExpression == nil || !strings.Contains(*put.ConditionExpression, "attribute_not_exists(PK)") {
-		t.Fatalf("el registro no se creó de forma condicional: %v", put.ConditionExpression)
+	if len(cliente.transacts) != 1 || len(cliente.transacts[0].TransactItems) != 3 {
+		t.Fatalf("la admisión no fue una transacción de tres ítems: %+v", cliente.transacts)
 	}
-	if stringAttribute(put.Item["entityType"]) != ReadAllEntityType || stringAttribute(put.Item["SK"]) != "READALL#req-1" {
-		t.Fatalf("clave/entidad READALL incorrecta: %v", put.Item)
+	acciones := cliente.transacts[0].TransactItems
+	if acciones[0].Put == nil || stringAttribute(acciones[0].Put.Item["SK"]) != "READALL#req-1" {
+		t.Fatalf("registro READALL ausente de la transacción: %+v", acciones[0])
 	}
-	if stringAttribute(put.Item["createdAt"]) == "" || attributeIntMust(put.Item["processedCount"]) != 0 {
-		t.Fatal("createdAt/processedCount ausentes en el registro persistido")
+	if acciones[1].Put == nil || stringAttribute(acciones[1].Put.Item["PK"]) != ReadAllQueuePK ||
+		!strings.HasPrefix(stringAttribute(acciones[1].Put.Item["SK"]), ReadAllQueueSKPrefix) {
+		t.Fatalf("ítem de cola ausente de la transacción: %+v", acciones[1])
+	}
+	if acciones[2].Put == nil || stringAttribute(acciones[2].Put.Item["SK"]) != "READALLPTR#req-1" {
+		t.Fatalf("puntero del titular ausente: %+v", acciones[2])
+	}
+	for _, accion := range acciones {
+		if accion.Put.ConditionExpression == nil || !strings.Contains(*accion.Put.ConditionExpression, "attribute_not_exists(PK)") {
+			t.Fatalf("la admisión no es idempotente: %v", accion.Put.ConditionExpression)
+		}
+	}
+
+	// Repetir la admisión no duplica el trabajo y devuelve el registro vigente.
+	antes := len(cliente.transacts)
+	if repetido, err := store.BeginReadAll(context.Background(), "user-a", "req-1", creado.Add(time.Minute)); err != nil ||
+		repetido == nil || repetido.CreatedAt != estado.CreatedAt {
+		t.Fatalf("admisión repetida: %+v %v", repetido, err)
+	}
+	if len(cliente.transacts) == antes {
+		t.Fatal("la admisión repetida debió intentar la transacción y cancelarse por condición")
+	}
+	reintento := cliente.transacts[antes]
+	if reintento.TransactItems[0].Put == nil || stringAttribute(reintento.TransactItems[0].Put.Item["SK"]) != "READALL#req-1" {
+		t.Fatalf("la admisión repetida no fue condicional sobre el registro: %+v", reintento.TransactItems)
+	}
+	cola, err := store.DueReadAll(context.Background(), creado.Add(time.Minute), 10)
+	if err != nil || len(cola) != 1 || cola[0].Fence != 0 {
+		t.Fatalf("la cola se duplicó o cambió: %+v %v", cola, err)
+	}
+
+	trabajos, err := store.DueReadAll(context.Background(), creado, 10)
+	if err != nil || len(trabajos) != 1 {
+		t.Fatalf("DueReadAll: %+v %v", trabajos, err)
+	}
+	if trabajos[0].RequestID != "req-1" || trabajos[0].Fence != 0 || trabajos[0].LeaseOwner != "" {
+		t.Fatalf("trabajo due incorrecto: %+v", trabajos[0])
+	}
+
+	reclamado, ok, err := store.ClaimReadAll(context.Background(), trabajos[0], "worker-1", creado.Add(time.Second), time.Minute)
+	if err != nil || !ok || reclamado.Fence != 1 || reclamado.Attempts != 1 || reclamado.LeaseOwner != "worker-1" {
+		t.Fatalf("ClaimReadAll: %+v %v", reclamado, err)
+	}
+	if _, ok, _ := store.ClaimReadAll(context.Background(), trabajos[0], "worker-2", creado.Add(2*time.Second), time.Minute); ok {
+		t.Fatal("dos workers reclamaron el mismo trabajo")
+	}
+	if trabajosDue, _ := store.DueReadAll(context.Background(), creado.Add(2*time.Second), 10); len(trabajosDue) != 0 {
+		t.Fatalf("un trabajo con lease vigente aparece como due: %+v", trabajosDue)
 	}
 
 	avance := appNotifications.ReadAllState{
-		RequestID: "req-1", Status: appNotifications.StatusPending,
-		ProcessedCount: 25, Cursor: &appNotifications.NotificationKey{PK: notificationUserPK("user-a"), SK: "NOTIFICATION#cierre"},
-		LeaseOwner: "worker-1", LeaseUntil: time.Now().UTC().Add(time.Minute),
+		RequestID: "req-1", Status: appNotifications.StatusPending, CreatedAt: estado.CreatedAt,
+		ProcessedCount: 12,
+		Cursor:         &appNotifications.NotificationKey{PK: notificationUserPK("user-a"), SK: "NOTIFICATION#cierre"},
+		LeaseOwner:     "worker-1", LeaseUntil: creado.Add(3 * time.Minute), Fence: reclamado.Fence,
 	}
-	if err := store.AdvanceReadAll(context.Background(), "user-a", "", avance); err != nil {
-		t.Fatalf("AdvanceReadAll: %v", err)
+	errAvance := store.AdvanceReadAll(context.Background(), "user-a", "worker-1", avance)
+	if errAvance != nil {
+		t.Fatalf("AdvanceReadAll: %v", errAvance)
 	}
-	avanceUpdate := cliente.updates[len(cliente.updates)-1]
-	if avanceUpdate.ConditionExpression == nil || !strings.Contains(*avanceUpdate.ConditionExpression, "#leaseOwner") {
-		t.Fatalf("avance sin lease: %v", avanceUpdate.ConditionExpression)
-	}
-	if stringAttribute(avanceUpdate.ExpressionAttributeValues[":cursor"]) != "NOTIFICATION#cierre" {
-		t.Fatal("el cursor no se persistió en el registro READALL")
-	}
-
-	if err := store.CompleteReadAll(context.Background(), "user-a", "req-1", "worker-1", 12, time.Now().UTC()); err != nil {
-		t.Fatalf("CompleteReadAll: %v", err)
-	}
-	cierre := cliente.updates[len(cliente.updates)-1]
-	if cierre.ConditionExpression == nil || !strings.Contains(*cierre.ConditionExpression, "#status = :pending") {
-		t.Fatalf("cierre no condicionado al estado pendiente: %v", cierre.ConditionExpression)
-	}
-	if !strings.Contains(aws.ToString(cierre.UpdateExpression), "REMOVE #cursor") {
-		t.Fatalf("el cierre no libera el lease/cursor: %s", aws.ToString(cierre.UpdateExpression))
+	ultima := cliente.transacts[len(cliente.transacts)-1]
+	if len(ultima.TransactItems) != 2 || ultima.TransactItems[0].Update == nil || ultima.TransactItems[1].Update == nil {
+		t.Fatalf("el avance no renovó cola y registro en una transacción: %+v", ultima.TransactItems)
 	}
 	final, err := store.LoadReadAll(context.Background(), "user-a", "req-1")
-	if err != nil || final.Status != appNotifications.StatusCompleted || final.CompletedAt == nil {
-		t.Fatalf("estado final: %+v %v", final, err)
+	if err != nil || final.Cursor == nil || final.Cursor.SK != "NOTIFICATION#cierre" || final.Fence != 1 {
+		t.Fatalf("cursor/fence no persistidos: %+v %v", final, err)
+	}
+
+	if err := store.CompleteReadAll(context.Background(), "user-a", "req-1", "worker-1", reclamado.Fence, 12, creado.Add(4*time.Minute)); err != nil {
+		t.Fatalf("CompleteReadAll: %v", err)
+	}
+	cierre := cliente.transacts[len(cliente.transacts)-1]
+	if len(cierre.TransactItems) != 3 || cierre.TransactItems[1].Delete == nil || cierre.TransactItems[2].Delete == nil {
+		t.Fatalf("el cierre no borra cola y puntero: %+v", cierre.TransactItems)
+	}
+	if stringAttribute(cierre.TransactItems[1].Delete.Key["PK"]) != ReadAllQueuePK {
+		t.Fatal("el cierre no borra el ítem de cola correcto")
+	}
+	completado, err := store.LoadReadAll(context.Background(), "user-a", "req-1")
+	if err != nil || completado.Status != appNotifications.StatusCompleted || completado.CompletedAt == nil {
+		t.Fatalf("estado final: %+v %v", completado, err)
+	}
+	if _, existe := cliente.items[claveItem(ReadAllQueuePK, readAllQueueSortKey(estado.CreatedAt, "req-1"))]; existe {
+		t.Fatal("el ítem de cola sobrevivió al cierre")
+	}
+	if _, existe := cliente.items[claveItem(notificationUserPK("user-a"), "READALLPTR#req-1")]; existe {
+		t.Fatal("el puntero sobrevivió al cierre")
 	}
 
 	// Un dueño distinto no puede avanzar ni cerrar el mismo request.
 	if err := store.AdvanceReadAll(context.Background(), "user-a", "otro-worker", avance); !errors.Is(err, appNotifications.ErrConflict) {
 		t.Fatalf("carrera de leases: %v", err)
+	}
+	if err := store.CompleteReadAll(context.Background(), "user-a", "req-1", "otro-worker", 9, 12, time.Now().UTC()); err != nil {
+		t.Fatalf("completar un registro ya cerrado debe ser idempotente: %v", err)
+	}
+}
+
+func TestE063AdaptadorReleaseYPunteroDeCuentaEliminada(t *testing.T) {
+	cliente := nuevoE061Fake()
+	cliente.sembrar("user-a", 3, 3, appNotifications.TypeSystem)
+	store := NewNotificationsStore(cliente, "nexum-table")
+	creado := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
+	if _, err := store.BeginReadAll(context.Background(), "user-a", "req-2", creado); err != nil {
+		t.Fatal(err)
+	}
+	trabajos, _ := store.DueReadAll(context.Background(), creado, 10)
+	if len(trabajos) != 1 {
+		t.Fatal("sin trabajo para liberar")
+	}
+	reclamado, ok, err := store.ClaimReadAll(context.Background(), trabajos[0], "worker-1", creado.Add(time.Second), time.Minute)
+	if err != nil || !ok {
+		t.Fatalf("claim: %v", err)
+	}
+	retryAt := creado.Add(30 * time.Second)
+	if err := store.ReleaseReadAll(context.Background(), reclamado, creado.Add(2*time.Second), retryAt); err != nil {
+		t.Fatalf("release: %v", err)
+	}
+	if due, _ := store.DueReadAll(context.Background(), creado.Add(3*time.Second), 10); len(due) != 0 {
+		t.Fatal("el trabajo liberado no debe estar due antes del reintento")
+	}
+	due, err := store.DueReadAll(context.Background(), retryAt.Add(time.Second), 10)
+	if err != nil || len(due) != 1 {
+		t.Fatalf("el trabajo no volvió tras el backoff: %+v %v", due, err)
+	}
+	if err := store.ReleaseReadAll(context.Background(), reclamado, creado.Add(40*time.Second), retryAt.Add(time.Minute)); !errors.Is(err, appNotifications.ErrConflict) {
+		t.Fatalf("un dueño obsoleto liberó el trabajo: %v", err)
+	}
+
+	// La partición del titular se borra (E014): el trabajo pendiente se
+	// descarta sin recrear el registro ni resucitar notificaciones.
+	delete(cliente.items, claveItem(notificationUserPK("user-a"), readAllSortKey("req-2")))
+	if _, err := store.LoadReadAll(context.Background(), "user-a", "req-2"); !errors.Is(err, appNotifications.ErrNotFound) {
+		t.Fatalf("registro ausente: %v", err)
+	}
+	if err := store.FinishReadAll(context.Background(), reclamado, creado.Add(time.Minute)); err != nil {
+		t.Fatalf("FinishReadAll: %v", err)
+	}
+	if _, existe := cliente.items[claveItem(ReadAllQueuePK, readAllQueueSortKey(creado, "req-2"))]; existe {
+		t.Fatal("el trabajo obsoleto quedó en la cola")
 	}
 }
 
@@ -459,7 +807,7 @@ func TestE061AdaptadorFallosCerrados(t *testing.T) {
 	if err := NewNotificationsStore(cliente, "nexum-table").AdvanceReadAll(context.Background(), "", "x", appNotifications.ReadAllState{RequestID: "req"}); !errors.Is(err, appNotifications.ErrInvalidRequest) {
 		t.Fatalf("usuario vacío: %v", err)
 	}
-	if err := NewNotificationsStore(nil, "nexum-table").CompleteReadAll(context.Background(), "user-a", "req", "", 0, time.Now()); !errors.Is(err, appNotifications.ErrUnavailable) {
+	if err := NewNotificationsStore(nil, "nexum-table").CompleteReadAll(context.Background(), "user-a", "req", "", 0, 0, time.Now()); !errors.Is(err, appNotifications.ErrUnavailable) {
 		t.Fatalf("Complete sin cliente: %v", err)
 	}
 }

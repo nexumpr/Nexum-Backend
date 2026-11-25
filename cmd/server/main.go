@@ -251,6 +251,16 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 	}
 	montarOleada5(depsOleada5)
 
+	// E063: el worker durable procesa la cola READALL fuera de la petición. Sin
+	// persistencia no se arranca; el endpoint seguiría aceptando trabajo que nadie
+	// ejecutaría, por lo que el fallo se registra y no se simula.
+	if cerrarReadAll, errReadAll := iniciarReadAllWorkerOleada4(ctx, depsOleada4); errReadAll != nil {
+		logger.WarnContext(ctx, "E063: worker durable no iniciado",
+			slog.String("clase", "READALL_WORKER_NO_INICIADO"))
+	} else {
+		defer cerrarReadAll()
+	}
+
 	// Emisor FCM real: se arranca sólo si existe credencial de servidor válida en
 	// el secret store/entorno. Sin ella el worker queda inerte y no se afirma E2E.
 	cfgFCM, errFCM := configuracionFCMOleada4DesdeEntorno()

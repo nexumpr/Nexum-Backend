@@ -648,7 +648,7 @@ func TestPUSHAssertionFirmadoConClavePublica(t *testing.T) {
 // 400 invalid_uuid. No existen datos productivos con la forma antigua porque no
 // hay productor en producción; el patrón se prueba sobre el valor generado.
 func TestPUSHNotificationIDCumplePatronE062(t *testing.T) {
-	patron := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+	patron := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 	store := nuevoStoreFalso()
 	servicio := nuevoServicio(t, store, &emisorFalso{}, &prefsFalsas{valor: preferencias(true, "", nil)},
@@ -660,10 +660,16 @@ func TestPUSHNotificationIDCumplePatronE062(t *testing.T) {
 		t.Fatalf("encolar: id=%q creado=%v err=%v", id, creado, err)
 	}
 	if !patron.MatchString(id) {
-		t.Fatalf("notificationID no es UUID v5 valido para E062: %q", id)
+		t.Fatalf("notificationID no es UUID v8 valido para E062: %q", id)
 	}
 	if len(id) != 36 {
 		t.Fatalf("longitud inesperada del UUID: %d", len(id))
+	}
+	if id[14] != '8' {
+		t.Fatalf("la version debe ser 8 (RFC 9562), obtenido %q en %q", id[14], id)
+	}
+	if !strings.ContainsRune("89ab", rune(id[19])) {
+		t.Fatalf("la variante debe ser RFC 4122 (8|9|a|b), obtenido %q en %q", id[19], id)
 	}
 	if strings.Contains(id, "u1") {
 		t.Fatalf("el ID no debe exponer el userID: %q", id)
@@ -682,5 +688,28 @@ func TestPUSHNotificationIDCumplePatronE062(t *testing.T) {
 	}
 	if recortado := notificationUUID(" u1 ", " evt-uuid "); recortado != id {
 		t.Fatalf("los espacios no deben cambiar el UUID: %q", recortado)
+	}
+}
+
+// TestPUSHNotificationIDNoEsSHA1 demuestra de forma estructural que el ID no es
+// un UUID v5 (SHA-1): la version es 8 y la variante es RFC 4122. Un v5 llevaria
+// 5 en el nibble de version y habria requerido SHA-1, que gosec marca G401/G505.
+func TestPUSHNotificationIDNoEsSHA1(t *testing.T) {
+	id := notificationUUID("u1", "evt-sha1")
+	if len(id) != 36 {
+		t.Fatalf("longitud inesperada: %q", id)
+	}
+	if id[14] == '5' {
+		t.Fatalf("el ID no puede ser UUID v5 (SHA-1): %q", id)
+	}
+	if id[14] != '8' {
+		t.Fatalf("el ID debe ser UUID v8: %q", id)
+	}
+	if !strings.ContainsRune("89ab", rune(id[19])) {
+		t.Fatalf("variante RFC 4122 invalida: %q", id)
+	}
+	v5 := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+	if v5.MatchString(id) {
+		t.Fatalf("el ID coincide con el patron de UUID v5: %q", id)
 	}
 }

@@ -11,9 +11,10 @@
 //     nunca se deriva del tamaño de la página ni se mantiene como contador local.
 //   - E062 es idempotente: la escritura condicional la hace el adaptador y el
 //     servicio sólo informa del estado resultante.
-//   - E063 persiste el registro READALL antes de devolver 202 y procesa páginas
-//     con cursor/lease. Si falla a mitad, el mismo requestId reanuda desde el
-//     último LastEvaluatedKey persistido.
+//   - E063 acepta y responde 202 SIN procesar la bandeja en la petición. El
+//     registro READALL y el ítem de la cola global `QUEUE#READALL` se escriben
+//     en la misma transacción; el trabajo lo ejecuta ReadAllWorker por lotes
+//     acotados con lease/fence, nunca un barrido completo dentro de la petición.
 package notifications
 
 import (
@@ -45,8 +46,6 @@ const (
 	StatusPending   = "pending"
 	StatusCompleted = "completed"
 
-	readAllLeaseTTL    = 2 * time.Minute
-	readAllMaxBatches  = 10000
 	cursorDomainMarker = "nexum:e061:cursor:v1:"
 )
 
@@ -199,10 +198,14 @@ type ReadAllState struct {
 	Cursor        *NotificationKey
 	LeaseOwner    string
 	LeaseUntil    time.Time
+	// Fence es el contador monótono de reclamaciones del trabajo. Un worker
+	// con un fence menor no puede avanzar ni cerrar el registro.
+	Fence int64
 }
 
-// Store es el puerto de persistencia. La implementación productiva es
-// *dynamo.NotificationsStore; nunca se sustituye por memoria en producción.
+// Store es el puerto de persistencia de E061/E062 y de la admisión de E063.
+// La implementación productiva es *dynamo.NotificationsStore; nunca se
+// sustituye por memoria en producción.
 type Store interface {
 	List(ctx context.Context, query ListQuery) (*ListResult, error)
 	CountUnread(ctx context.Context, userID string) (int64, error)
@@ -210,7 +213,7 @@ type Store interface {
 	BeginReadAll(ctx context.Context, userID, requestID string, now time.Time) (*ReadAllState, error)
 	LoadReadAll(ctx context.Context, userID, requestID string) (*ReadAllState, error)
 	AdvanceReadAll(ctx context.Context, userID, expectedLeaseOwner string, next ReadAllState) error
-	CompleteReadAll(ctx context.Context, userID, requestID, expectedLeaseOwner string, processed int64, now time.Time) error
+	CompleteReadAll(ctx context.Context, userID, requestID, expectedLeaseOwner string, fence, processed int64, now time.Time) error
 }
 
 // ListParams son los parámetros validados por el transporte para E061.
@@ -245,7 +248,6 @@ type Service struct {
 	cursorKey []byte
 	now       func() time.Time
 	newID     func() (string, error)
-	maxPages  int
 }
 
 // NewService construye el servicio con la clave HMAC estable inyectada por el
@@ -256,7 +258,6 @@ func NewService(store Store, cursorKey []byte) *Service {
 		cursorKey: deriveCursorKey(cursorKey),
 		now:       func() time.Time { return time.Now().UTC() },
 		newID:     identity.NewID,
-		maxPages:  readAllMaxBatches,
 	}
 }
 
@@ -463,23 +464,26 @@ func (s *Service) UnreadCount(ctx context.Context, userID string) (int64, error)
 	return n, nil
 }
 
-// StartReadAll ejecuta E063: persiste el registro READALL y realiza el trabajo
-// completo por páginas antes de devolver 202. Nunca confirma una escritura que
-// no ha ocurrido.
+// StartReadAll ejecuta la admisión de E063: persiste el registro READALL, el
+// ítem durable de la cola global y el puntero del titular en una sola
+// transacción, y devuelve 202 de inmediato. La petición NO procesa
+// notificaciones: como máximo hace un conteo y una escritura transaccional, de
+// modo que el tiempo de respuesta no depende del tamaño de la bandeja.
 func (s *Service) StartReadAll(ctx context.Context, userID string) (*Accepted, error) {
-	return s.beginAndRun(ctx, userID, "")
+	return s.beginReadAll(ctx, userID, "")
 }
 
-// ResumeReadAll reanuda un requestId existente. Es la operación que se usa
-// tras un fallo a mitad: el cursor y el lease viven en DynamoDB, no en memoria.
+// ResumeReadAll reanuda un requestId existente. Es idempotente: si el registro
+// ya existe no se duplica el trabajo; si está pendiente y perdió su ítem de
+// cola, el adaptador lo repara. El cursor y el lease viven en DynamoDB.
 func (s *Service) ResumeReadAll(ctx context.Context, userID, requestID string) (*Accepted, error) {
 	if strings.TrimSpace(requestID) == "" {
 		return nil, ErrInvalidRequest
 	}
-	return s.beginAndRun(ctx, userID, strings.TrimSpace(requestID))
+	return s.beginReadAll(ctx, userID, strings.TrimSpace(requestID))
 }
 
-func (s *Service) beginAndRun(ctx context.Context, userID, requestID string) (*Accepted, error) {
+func (s *Service) beginReadAll(ctx context.Context, userID, requestID string) (*Accepted, error) {
 	if !s.Disponible() {
 		return nil, ErrUnavailable
 	}
@@ -501,84 +505,8 @@ func (s *Service) beginAndRun(ctx context.Context, userID, requestID string) (*A
 	if estado == nil {
 		return nil, ErrUnavailable
 	}
-	if estado.Status == StatusCompleted {
-		return &Accepted{Status: "accepted", RequestID: requestID}, nil
-	}
-	if err := s.runReadAll(ctx, userID, requestID); err != nil {
-		return nil, err
-	}
 	return &Accepted{Status: "accepted", RequestID: requestID}, nil
 }
-
-func (s *Service) runReadAll(ctx context.Context, userID, requestID string) error {
-	paginas := 0
-	for {
-		paginas++
-		if paginas > s.maxPages {
-			return ErrConflict
-		}
-		estado, err := s.store.LoadReadAll(ctx, userID, requestID)
-		if err != nil {
-			return normalizeError(err)
-		}
-		if estado == nil {
-			return ErrUnavailable
-		}
-		if estado.Status == StatusCompleted {
-			return nil
-		}
-
-		dueño, err := s.newID()
-		if err != nil || strings.TrimSpace(dueño) == "" {
-			return ErrUnavailable
-		}
-		actual := s.now().UTC()
-		pagina, err := s.store.List(ctx, ListQuery{
-			UserID: userID,
-			Limit:  ReadAllBatchSize,
-			IsRead: boolPtr(false),
-			After:  estado.Cursor,
-		})
-		if err != nil {
-			return normalizeError(err)
-		}
-		if pagina == nil {
-			return ErrUnavailable
-		}
-		for _, n := range pagina.Items {
-			if _, err := s.store.MarkRead(ctx, userID, n.ID, actual); err != nil {
-				return normalizeError(err)
-			}
-		}
-
-		// El total procesado se deriva del diferencial de no leídas: si un
-		// lote anterior falló después de marcar algunos items, ésos ya no
-		// aparecen en el próximo Query y no deben contarse dos veces ni
-		// perderse del informe del registro READALL.
-		restantes, errConteo := s.store.CountUnread(ctx, userID)
-		if errConteo != nil {
-			return normalizeError(errConteo)
-		}
-		procesados := estado.InitialUnread - restantes
-		if procesados < 0 {
-			procesados = 0
-		}
-
-		siguiente := *estado
-		siguiente.ProcessedCount = procesados
-		siguiente.Cursor = pagina.NextKey
-		siguiente.LeaseOwner = dueño
-		siguiente.LeaseUntil = actual.Add(readAllLeaseTTL)
-		if err := s.store.AdvanceReadAll(ctx, userID, estado.LeaseOwner, siguiente); err != nil {
-			return normalizeError(err)
-		}
-		if pagina.NextKey == nil {
-			return s.store.CompleteReadAll(ctx, userID, requestID, dueño, procesados, s.now().UTC())
-		}
-	}
-}
-
-func boolPtr(v bool) *bool { return &v }
 
 func normalizeError(err error) error {
 	switch {
