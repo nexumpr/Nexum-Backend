@@ -825,15 +825,30 @@ class Cliente:
             url += "?" + consulta[1]
 
         inicio = time.monotonic()
-        try:
-            codigo, cabeceras_respuesta, crudo = self.transporte(
-                metodo, url, datos, hdrs, timeout or self.timeout
-            )
-        except ConnectionError as exc:
-            latencia = int((time.monotonic() - inicio) * 1000)
-            respuesta = Respuesta(0, None, {}, latencia, "", f"error de red: {exc}")
-            self._registrar_llamada(escenario, respuesta)
-            return respuesta
+        intentos = 0
+        while True:
+            try:
+                codigo, cabeceras_respuesta, crudo = self.transporte(
+                    metodo, url, datos, hdrs, timeout or self.timeout
+                )
+            except ConnectionError as exc:
+                latencia = int((time.monotonic() - inicio) * 1000)
+                respuesta = Respuesta(0, None, {}, latencia, "", f"error de red: {exc}")
+                self._registrar_llamada(escenario, respuesta)
+                return respuesta
+            if codigo == 429 and intentos < 6:
+                # DEF-H10: respetar Retry-After en lugar de fallar por cuota. El limitador
+                # rechaza antes de procesar, por lo que el reintento no duplica efectos.
+                cabeceras_429 = {str(k).lower(): str(v) for k, v in (cabeceras_respuesta or {}).items()}
+                espera = 5.0 * (2 ** intentos)
+                try:
+                    espera = max(1.0, min(90.0, float(cabeceras_429.get("retry-after", espera))))
+                except ValueError:
+                    pass
+                intentos += 1
+                time.sleep(espera)
+                continue
+            break
         latencia = int((time.monotonic() - inicio) * 1000)
         texto = crudo.decode("utf-8", errors="replace") if crudo else ""
         try:
@@ -1001,12 +1016,58 @@ class Contexto:
         self.secretos.registrar("token-acceso", sesion.access)
         self.secretos.registrar("token-refresh", sesion.refresh)
 
+    def _ruta_cache_sesiones(self) -> str:
+        return os.environ.get("NEXUM_SESSION_CACHE", "").strip()
+
+    def _restaurar_sesion(self, sesion: Sesion) -> bool:
+        """Reutiliza un access token vigente de una corrida anterior (misma cuenta)."""
+        ruta = self._ruta_cache_sesiones()
+        if not ruta or not os.path.exists(ruta):
+            return False
+        try:
+            datos = json.loads(io.open(ruta, encoding="utf-8").read())
+        except Exception:  # noqa: BLE001
+            return False
+        entrada = datos.get(sesion.email) or {}
+        if not entrada.get("access") or float(entrada.get("expira_en", 0)) <= time.time():
+            return False
+        sesion.access = entrada["access"]
+        sesion.refresh = entrada.get("refresh", "")
+        sesion.session_id = entrada.get("session_id", "")
+        sesion.user_id = entrada.get("user_id", "")
+        return True
+
+    def _guardar_sesion(self, sesion: Sesion, respuesta: Respuesta) -> None:
+        ruta = self._ruta_cache_sesiones()
+        if not ruta:
+            return
+        try:
+            datos = json.loads(io.open(ruta, encoding="utf-8").read()) if os.path.exists(ruta) else {}
+        except Exception:  # noqa: BLE001
+            datos = {}
+        expires = respuesta.campo("expiresIn")
+        segundos = int(expires) if isinstance(expires, (int, float)) else 840
+        datos[sesion.email] = {
+            "access": sesion.access,
+            "refresh": sesion.refresh,
+            "session_id": sesion.session_id,
+            "user_id": sesion.user_id,
+            "expira_en": time.time() + max(60, segundos - 60),
+        }
+        try:
+            os.makedirs(os.path.dirname(ruta), exist_ok=True)
+            io.open(ruta, "w", encoding="utf-8").write(json.dumps(datos, ensure_ascii=False))
+        except Exception:  # noqa: BLE001
+            pass
+
     def login_auxiliar(self, sesion: Sesion, resultado: Resultado) -> bool:
         """Login fuera del escenario E002 (para reanudar fases sin repetir la suite).
 
         No certifica E002: si falla, el estado es BLOCKED_EXTERNAL, no FAIL.
         """
         if sesion.access:
+            return True
+        if self._restaurar_sesion(sesion):
             return True
         if not self.autorizacion.permite(self.escenarios["E002"]):
             resultado.bloqueo(
@@ -1034,6 +1095,7 @@ class Contexto:
             )
             return False
         self.cargar_sesion(sesion, respuesta)
+        self._guardar_sesion(sesion, respuesta)
         return True
 
     # -- datos de dependencia ------------------------------------------------ #

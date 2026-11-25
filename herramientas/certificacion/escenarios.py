@@ -299,6 +299,14 @@ def e001(ctx: n.Contexto) -> None:
         r.bloqueo("versión del aviso disponible", "E015 no respondió y NEXUM_NOTICE_VERSION está vacío", n.BLOCKED_EXTERNAL)
         return
     for sesion, etiqueta in ((ctx.a, "A"), (ctx.b, "B")):
+        # DEF-H11: si la cuenta ya existe y la contraseña de certificación autentica, no se
+        # registra de nuevo (evita consumir la cuota de registro y no interpreta la
+        # preexistencia como defecto de E001).
+        if ctx.login_auxiliar(sesion, r):
+            r.ok(f"cuenta {etiqueta} preexistente autenticada")
+            if sesion.user_id:
+                r.ok(f"userId presente {etiqueta}")
+            continue
         cuerpo = {
             "name": f"Cuenta sintética {etiqueta}",
             "email": sesion.email,
@@ -313,11 +321,24 @@ def e001(ctx: n.Contexto) -> None:
         if _error_de_red(ctx, "E001", p, r):
             return
         if p.codigo == 409:
-            r.bloqueo(
-                "registro 201",
-                f"cuenta {etiqueta} ya existente; no se recrea ni se adivina su contraseña",
-                n.BLOCKED_EXTERNAL,
+            # Una cuenta preexistente no es un defecto de E001 (DEF-H11): si la contraseña de
+            # certificación autentica, la cuenta queda disponible para el resto de escenarios.
+            ingreso = ctx.pedir(
+                "E002",
+                cuerpo={"email": sesion.email, "password": sesion.password, "deviceId": sesion.device_id},
             )
+            if ingreso.codigo == 200:
+                r.ok(f"cuenta {etiqueta} preexistente autenticada")
+                user_id = ingreso.campo("user", "id")
+                if isinstance(user_id, str) and user_id:
+                    sesion.user_id = user_id
+                    r.ok(f"userId presente {etiqueta}")
+            else:
+                r.bloqueo(
+                    "registro 201",
+                    f"cuenta {etiqueta} preexistente y login {ingreso.codigo}; se requiere recuperación",
+                    n.BLOCKED_EXTERNAL,
+                )
         elif _exigir(ctx, "E001", p, r, (201,)):
             r.ok(f"registro 201 cuenta {etiqueta}")
             user_id = p.campo("user", "id")
@@ -2578,7 +2599,7 @@ _ESCENARIOS_LISTA: tuple[Escenario, ...] = (
     _esc("E072", "Health liveness", "GET", "/api/v1/health/live", (FASE_PUBLICO,), e072),
     _esc("E073", "Health readiness", "GET", "/api/v1/health/ready", (FASE_PUBLICO,), e073),
     _esc("E001", "Registro", "POST", "/api/v1/auth/register", (FASE_AUTH,), e001, muta=True, idempotencia=True),
-    _esc("E002", "Login", "POST", "/api/v1/auth/login", (FASE_AUTH,), e002, muta=True, depende_de=("E001",)),
+    _esc("E002", "Login", "POST", "/api/v1/auth/login", (FASE_AUTH,), e002, muta=True),
     _esc("E003", "Rotación de refresh", "POST", "/api/v1/auth/refresh", (FASE_AUTH,), e003, muta=True, depende_de=("E002",)),
     _esc("E004", "Logout", "POST", "/api/v1/auth/logout", (FASE_AUTH,), e004, muta=True, depende_de=("E002",)),
     _esc("E007", "Cambio de contraseña", "POST", "/api/v1/auth/password/change", (FASE_AUTH,), e007, muta=True, depende_de=("E002",)),
