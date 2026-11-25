@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	appReminders "github.com/nexumpr/Nexum-Backend/internal/application/reminders"
+	domainDeletion "github.com/nexumpr/Nexum-Backend/internal/domain/deletion"
 	"github.com/nexumpr/Nexum-Backend/internal/ports"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 )
@@ -43,16 +44,24 @@ type remFakeDynamo struct {
 	tamanoPagina        int
 	gets                int
 	queries             int
+	updates             int
 	transacciones       int
 	transaccionesVistas []*dynamodb.TransactWriteItemsInput
+	actualizaciones     []*dynamodb.UpdateItemInput
+	consultas           []*dynamodb.QueryInput
 	errGet              error
 	errQuery            error
 	errTransact         error
+	errUpdate           error
 	clavesInvalidas     []string
+	// prohibirUpdateItem mantiene la invariante de E064–E067: sus mutaciones son
+	// transaccionales, nunca un UpdateItem suelto. El scheduler sí usa UpdateItem
+	// condicional, así que su prueba desactiva esta guarda de forma explícita.
+	prohibirUpdateItem bool
 }
 
 func nuevoRemFakeDynamo() *remFakeDynamo {
-	return &remFakeDynamo{items: map[string]map[string]types.AttributeValue{}}
+	return &remFakeDynamo{items: map[string]map[string]types.AttributeValue{}, prohibirUpdateItem: true}
 }
 
 func remClave(pk, sk string) string { return pk + "\x00" + sk }
@@ -78,6 +87,13 @@ func (f *remFakeDynamo) item(pk, sk string) map[string]types.AttributeValue {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return remCopiar(f.items[remClave(pk, sk)])
+}
+
+// eliminar retira un ítem del doble (simula una purga o un borrado externo).
+func (f *remFakeDynamo) eliminar(pk, sk string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.items, remClave(pk, sk))
 }
 
 func (f *remFakeDynamo) claveExacta(llave map[string]types.AttributeValue) (string, error) {
@@ -119,21 +135,70 @@ func (f *remFakeDynamo) PutItem(_ context.Context, params *dynamodb.PutItemInput
 }
 
 func (f *remFakeDynamo) UpdateItem(_ context.Context, params *dynamodb.UpdateItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
-	return nil, errors.New("E064–E067 no deben usar UpdateItem suelto: toda mutación es transaccional")
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.updates++
+	f.actualizaciones = append(f.actualizaciones, params)
+	if f.prohibirUpdateItem {
+		return nil, errors.New("E064–E067 no deben usar UpdateItem suelto: toda mutación es transaccional")
+	}
+	if f.errUpdate != nil {
+		return nil, f.errUpdate
+	}
+	clave, err := f.claveExacta(params.Key)
+	if err != nil {
+		f.clavesInvalidas = append(f.clavesInvalidas, err.Error())
+		return nil, err
+	}
+	cumple, err := remEvaluaCondicion(f.items[clave], aws.ToString(params.ConditionExpression), params.ExpressionAttributeNames, params.ExpressionAttributeValues)
+	if err != nil {
+		return nil, err
+	}
+	if !cumple {
+		return nil, &types.ConditionalCheckFailedException{Message: aws.String("condición no cumplida")}
+	}
+	item := remCopiar(f.items[clave])
+	if item == nil {
+		item = map[string]types.AttributeValue{"PK": params.Key["PK"], "SK": params.Key["SK"]}
+	}
+	if err := remAplicaSet(item, aws.ToString(params.UpdateExpression), params.ExpressionAttributeNames, params.ExpressionAttributeValues); err != nil {
+		return nil, err
+	}
+	f.items[clave] = item
+	salida := &dynamodb.UpdateItemOutput{}
+	if params.ReturnValues == types.ReturnValueAllNew {
+		salida.Attributes = remCopiar(item)
+	}
+	return salida, nil
 }
 
+// filtroLease reconoce el filtro exacto de vencimiento del scheduler. Cualquier
+// otro filtro cae en el evaluador booleano previo.
+const filtroLease = "attribute_not_exists(#lease) OR #lease = :vacio OR #lease <= :ahora"
+
+// filtroBooleano es el filtro de E064 (`deleted = false` y, opcional, `active = X`).
 func (f *remFakeDynamo) Query(_ context.Context, params *dynamodb.QueryInput, _ ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.queries++
+	f.consultas = append(f.consultas, params)
 	if f.errQuery != nil {
 		return nil, f.errQuery
 	}
-	if aws.ToString(params.KeyConditionExpression) != "#pk = :pk AND begins_with(#sk, :prefijo)" {
-		return nil, fmt.Errorf("condición de Query no soportada por el doble: %q", aws.ToString(params.KeyConditionExpression))
-	}
+	condicion := aws.ToString(params.KeyConditionExpression)
 	pk := stringAttribute(params.ExpressionAttributeValues[":pk"])
-	prefijo := stringAttribute(params.ExpressionAttributeValues[":prefijo"])
+	var coincide func(sk string) bool
+	switch condicion {
+	case "#pk = :pk AND begins_with(#sk, :prefijo)":
+		prefijo := stringAttribute(params.ExpressionAttributeValues[":prefijo"])
+		coincide = func(sk string) bool { return strings.HasPrefix(sk, prefijo) }
+	case "#pk = :pk AND #sk <= :limite":
+		limite := stringAttribute(params.ExpressionAttributeValues[":limite"])
+		coincide = func(sk string) bool { return sk <= limite }
+	default:
+		return nil, fmt.Errorf("condición de Query no soportada por el doble: %q", condicion)
+	}
+
 	desde := ""
 	if len(params.ExclusiveStartKey) > 0 {
 		clave, err := f.claveExacta(params.ExclusiveStartKey)
@@ -154,7 +219,7 @@ func (f *remFakeDynamo) Query(_ context.Context, params *dynamodb.QueryInput, _ 
 	salida := &dynamodb.QueryOutput{}
 	for _, clave := range claves {
 		item := f.items[clave]
-		if stringAttribute(item["PK"]) != pk || !strings.HasPrefix(stringAttribute(item["SK"]), prefijo) {
+		if stringAttribute(item["PK"]) != pk || !coincide(stringAttribute(item["SK"])) {
 			continue
 		}
 		if stringAttribute(item["SK"]) <= desde {
@@ -175,7 +240,7 @@ func (f *remFakeDynamo) Query(_ context.Context, params *dynamodb.QueryInput, _ 
 	}
 	for _, clave := range claves {
 		item := f.items[clave]
-		if stringAttribute(item["PK"]) == pk && strings.HasPrefix(stringAttribute(item["SK"]), prefijo) &&
+		if stringAttribute(item["PK"]) == pk && coincide(stringAttribute(item["SK"])) &&
 			stringAttribute(item["SK"]) > ultima && ultima != "" {
 			salida.LastEvaluatedKey = map[string]types.AttributeValue{
 				"PK": stringAttr(pk), "SK": stringAttr(ultima),
@@ -189,10 +254,23 @@ func (f *remFakeDynamo) Query(_ context.Context, params *dynamodb.QueryInput, _ 
 }
 
 func remCumpleFiltro(item map[string]types.AttributeValue, params *dynamodb.QueryInput) (bool, error) {
-	if aws.ToString(params.FilterExpression) == "" {
+	expresion := aws.ToString(params.FilterExpression)
+	if expresion == "" {
 		return true, nil
 	}
-	for _, parte := range strings.Split(aws.ToString(params.FilterExpression), " AND ") {
+	if expresion == filtroLease {
+		lease, existe := item[params.ExpressionAttributeNames["#lease"]].(*types.AttributeValueMemberS)
+		if !existe || lease.Value == stringAttribute(params.ExpressionAttributeValues[":vacio"]) {
+			return true, nil
+		}
+		actual, errActual := time.Parse(time.RFC3339Nano, lease.Value)
+		ahora, errAhora := time.Parse(time.RFC3339Nano, stringAttribute(params.ExpressionAttributeValues[":ahora"]))
+		if errActual != nil || errAhora != nil {
+			return false, fmt.Errorf("lease no parseable: %q / %q", lease.Value, stringAttribute(params.ExpressionAttributeValues[":ahora"]))
+		}
+		return !actual.After(ahora), nil
+	}
+	for _, parte := range strings.Split(expresion, " AND ") {
 		parte = strings.TrimSpace(parte)
 		campos := strings.Split(parte, " = ")
 		if len(campos) != 2 {
@@ -321,42 +399,101 @@ func remClaveExactaDe(llave map[string]types.AttributeValue) (string, error) {
 
 func remEvaluaCondicion(item map[string]types.AttributeValue, expresion string, nombres map[string]string, valores map[string]types.AttributeValue) (bool, error) {
 	switch expresion {
+	case "":
+		// Sin ConditionExpression: la escritura incondicional del doble.
+		return true, nil
 	case "attribute_not_exists(PK)":
 		_, existe := item["PK"]
 		return !existe, nil
-	case "attribute_exists(PK) AND #version = :expected AND (attribute_not_exists(#deleted) OR #deleted = :falso)":
-		if _, existe := item["PK"]; !existe {
+	case condicionReminderVigente:
+		if !remExiste(item) || !remVersionEsperada(item, nombres["#version"], valores[":expected"]) {
 			return false, nil
 		}
-		if !remVersionEsperada(item, nombres["#version"], valores[":expected"]) {
+		return remBooleanoEsperado(item, nombres["#deleted"], valores[":falso"], true), nil
+	case condicionPunteroVigente:
+		if !remExiste(item) || !remVersionEsperada(item, nombres["#version"], valores[":expected"]) {
 			return false, nil
 		}
-		if !remBooleanoEsperado(item, nombres["#deleted"], valores[":falso"], true) {
+		return remTextoEsperado(item, nombres["#reminderSK"], valores[":sk"]), nil
+	case condicionAgendaReclamable:
+		if !remExiste(item) || !remVersionEsperada(item, nombres["#version"], valores[":expected"]) {
 			return false, nil
 		}
-		return true, nil
-	case "attribute_exists(PK) AND #version = :expected AND #reminderSK = :sk":
-		if _, existe := item["PK"]; !existe {
+		return remLeaseVencido(item, nombres["#lease"], valores)
+	case condicionAgendaArrendada:
+		if !remExiste(item) || !remTextoEsperado(item, nombres["#owner"], valores[":owner"]) {
 			return false, nil
 		}
-		if !remVersionEsperada(item, nombres["#version"], valores[":expected"]) {
+		if !remNumeroEsperado(item, nombres["#fence"], valores[":fence"]) {
 			return false, nil
 		}
-		actual, ok := item[nombres["#reminderSK"]].(*types.AttributeValueMemberS)
-		esperado, okEsperado := valores[":sk"].(*types.AttributeValueMemberS)
-		return ok && okEsperado && actual.Value == esperado.Value, nil
+		return remNumeroEsperado(item, nombres["#version"], valores[":agendaVersion"]), nil
+	case condicionRecordatorioMovible:
+		if !remExiste(item) || !remVersionEsperada(item, nombres["#version"], valores[":expected"]) {
+			return false, nil
+		}
+		activo, okActivo := item[nombres["#activo"]].(*types.AttributeValueMemberBOOL)
+		if !okActivo || !activo.Value {
+			return false, nil
+		}
+		return remBooleanoEsperado(item, nombres["#borrado"], valores[":falso"], true), nil
+	case condicionRecordatorioDesactivable:
+		if !remExiste(item) || !remVersionEsperada(item, nombres["#version"], valores[":expected"]) {
+			return false, nil
+		}
+		return remBooleanoEsperado(item, nombres["#borrado"], valores[":falso"], true), nil
+	case condicionPunteroRecordatorio:
+		if !remExiste(item) || !remTextoEsperado(item, nombres["#reminderSK"], valores[":recordatorioSK"]) {
+			return false, nil
+		}
+		return remVersionEsperada(item, nombres["#version"], valores[":expected"]), nil
+	case condicionPunteroAgendaSK:
+		if !remExiste(item) {
+			return false, nil
+		}
+		return remTextoEsperado(item, nombres["#skGlobal"], valores[":viejaSK"]), nil
 	default:
 		return false, fmt.Errorf("condición no soportada por el doble de recordatorios: %q", expresion)
 	}
 }
 
-func remVersionEsperada(item map[string]types.AttributeValue, nombre string, esperado types.AttributeValue) bool {
+func remExiste(item map[string]types.AttributeValue) bool {
+	_, existe := item["PK"]
+	return existe
+}
+
+// remLeaseVencido evalúa la condición de agenda reclamable: sin lease, vacío o
+// vencido. Compara instantes, no cadenas.
+func remLeaseVencido(item map[string]types.AttributeValue, nombreLease string, valores map[string]types.AttributeValue) (bool, error) {
+	lease, existe := item[nombreLease].(*types.AttributeValueMemberS)
+	if !existe {
+		return true, nil
+	}
+	if lease.Value == "" || lease.Value == stringAttribute(valores[":vacio"]) {
+		return true, nil
+	}
+	actual, errActual := time.Parse(time.RFC3339Nano, lease.Value)
+	ahora, errAhora := time.Parse(time.RFC3339Nano, stringAttribute(valores[":ahora"]))
+	if errActual != nil || errAhora != nil {
+		return false, fmt.Errorf("lease no parseable: %q", lease.Value)
+	}
+	return !actual.After(ahora), nil
+}
+
+func remTextoEsperado(item map[string]types.AttributeValue, nombre string, esperado types.AttributeValue) bool {
+	actual, ok := item[nombre].(*types.AttributeValueMemberS)
+	objetivo, okObjetivo := esperado.(*types.AttributeValueMemberS)
+	return ok && okObjetivo && actual.Value == objetivo.Value
+}
+
+func remNumeroEsperado(item map[string]types.AttributeValue, nombre string, esperado types.AttributeValue) bool {
 	actual, ok := item[nombre].(*types.AttributeValueMemberN)
 	objetivo, okObjetivo := esperado.(*types.AttributeValueMemberN)
-	if !ok || !okObjetivo {
-		return false
-	}
-	return actual.Value == objetivo.Value
+	return ok && okObjetivo && actual.Value == objetivo.Value
+}
+
+func remVersionEsperada(item map[string]types.AttributeValue, nombre string, esperado types.AttributeValue) bool {
+	return remNumeroEsperado(item, nombre, esperado)
 }
 
 func remBooleanoEsperado(item map[string]types.AttributeValue, nombre string, esperado types.AttributeValue, ausenteVale bool) bool {
@@ -369,7 +506,12 @@ func remBooleanoEsperado(item map[string]types.AttributeValue, nombre string, es
 }
 
 func remAplicaUpdate(item map[string]types.AttributeValue, in *types.Update) error {
-	expresion := aws.ToString(in.UpdateExpression)
+	return remAplicaSet(item, aws.ToString(in.UpdateExpression), in.ExpressionAttributeNames, in.ExpressionAttributeValues)
+}
+
+// remAplicaSet aplica `SET a = :x, b = :y`. El doble no admite aritmética: el
+// adaptador escribe valores absolutos calculados bajo condición de versión.
+func remAplicaSet(item map[string]types.AttributeValue, expresion string, nombres map[string]string, valores map[string]types.AttributeValue) error {
 	if !strings.HasPrefix(expresion, "SET ") {
 		return fmt.Errorf("expresión de update no soportada por el doble: %q", expresion)
 	}
@@ -379,10 +521,10 @@ func remAplicaUpdate(item map[string]types.AttributeValue, in *types.Update) err
 			return fmt.Errorf("asignación no soportada: %q", asignacion)
 		}
 		nombre := partes[0]
-		if alias, ok := in.ExpressionAttributeNames[nombre]; ok {
+		if alias, ok := nombres[nombre]; ok {
 			nombre = alias
 		}
-		valor, ok := in.ExpressionAttributeValues[partes[1]]
+		valor, ok := valores[partes[1]]
 		if !ok {
 			return fmt.Errorf("valor de expresión ausente: %q", partes[1])
 		}
@@ -455,8 +597,8 @@ func TestE065CreateEscribeRecordatorioPunteroEIdempotencia(t *testing.T) {
 	if doble.transacciones != 1 {
 		t.Fatalf("Create debe ser una única transacción, hubo %d", doble.transacciones)
 	}
-	if len(doble.transaccionesVistas[0].TransactItems) != 3 {
-		t.Fatalf("Create debe escribir recordatorio, puntero e idempotencia: %d acciones", len(doble.transaccionesVistas[0].TransactItems))
+	if len(doble.transaccionesVistas[0].TransactItems) != 5 {
+		t.Fatalf("Create debe escribir recordatorio, puntero, idempotencia, agenda y puntero de agenda: %d acciones", len(doble.transaccionesVistas[0].TransactItems))
 	}
 
 	pk := reminderPartition(remUsuarioA)
@@ -483,6 +625,33 @@ func TestE065CreateEscribeRecordatorioPunteroEIdempotencia(t *testing.T) {
 	idem := doble.item(pk, reminderIdempotencySortKey("clave-idem-1"))
 	if idem == nil || stringAttribute(idem["reminderID"]) != remID || stringAttribute(idem["payloadHash"]) != "carga-1" {
 		t.Fatalf("registro de idempotencia inesperado: %v", idem)
+	}
+
+	// Disparo programado: ítem global y puntero SCHEDULEPTR en la misma transacción.
+	skAgenda := scheduleSortKey(remAhoraDe(t, dueAt), remID)
+	agenda := doble.item(domainDeletion.PartitionScheduleGlobal, skAgenda)
+	if agenda == nil || stringAttribute(agenda["entityType"]) != scheduleEntityType {
+		t.Fatalf("falta la ocurrencia global: %v", agenda)
+	}
+	if stringAttribute(agenda["userID"]) != remUsuarioA || stringAttribute(agenda["reminderID"]) != remID {
+		t.Fatalf("la ocurrencia debe identificar al titular y al recordatorio: %v", agenda)
+	}
+	if stringAttribute(agenda["title"]) != "Pagar luz" || stringAttribute(agenda["timezone"]) != "America/Mexico_City" {
+		t.Fatalf("la ocurrencia debe llevar título y zona: %v", agenda)
+	}
+	if remAtributoNumber(t, agenda, "reminderVersion") != 1 || remAtributoNumber(t, agenda, "version") != 1 {
+		t.Fatalf("versiones iniciales de la agenda: %v", agenda)
+	}
+	if stringAttribute(agenda["owner"]) != "" || stringAttribute(agenda["leaseUntil"]) != "" {
+		t.Fatalf("la ocurrencia nace libre de lease: %v", agenda)
+	}
+	pkPuntero, skPuntero := domainDeletion.SchedulePointerKeys(remUsuarioA, remID)
+	punteroAgenda := doble.item(pkPuntero, skPuntero)
+	if punteroAgenda == nil || stringAttribute(punteroAgenda["entityType"]) != domainDeletion.EntitySchedulePointer {
+		t.Fatalf("falta el puntero SCHEDULEPTR: %v", punteroAgenda)
+	}
+	if stringAttribute(punteroAgenda["skGlobal"]) != skAgenda {
+		t.Fatalf("skGlobal=%q, esperado %q", stringAttribute(punteroAgenda["skGlobal"]), skAgenda)
 	}
 
 	// Lectura tras escritura: el puntero resuelve la SK completa.
@@ -603,10 +772,29 @@ func TestE066UpdateConCambioDeFechaMueveSKYSinPunteroObsoleto(t *testing.T) {
 		t.Fatalf("List tras mover SK: %+v err=%v", pagina, err)
 	}
 
-	// El movimiento es transaccional: la acción de borrado y el puntero van juntos.
+	// El movimiento es transaccional: el borrado de la SK antigua, la agenda y los
+	// punteros van juntos. 6 acciones = recordatorio nuevo, recordatorio viejo,
+	// puntero, agenda vieja, agenda nueva, puntero de agenda.
 	ultima := doble.transaccionesVistas[len(doble.transaccionesVistas)-1]
-	if len(ultima.TransactItems) != 3 || ultima.TransactItems[1].Delete == nil {
-		t.Fatalf("se esperaban Put+Delete+Update; acciones=%d", len(ultima.TransactItems))
+	if len(ultima.TransactItems) != 6 || ultima.TransactItems[1].Delete == nil {
+		t.Fatalf("se esperaban Put+Delete+Update+Delete+Put+Put; acciones=%d", len(ultima.TransactItems))
+	}
+	skAgendaVieja := scheduleSortKey(remAhoraDe(t, dueAtViejo), remID)
+	skAgendaNueva := scheduleSortKey(remAhoraDe(t, dueAtNuevo), remID)
+	if doble.item(domainDeletion.PartitionScheduleGlobal, skAgendaVieja) != nil {
+		t.Fatal("la ocurrencia con el vencimiento anterior debe eliminarse en la misma transacción")
+	}
+	agenda := doble.item(domainDeletion.PartitionScheduleGlobal, skAgendaNueva)
+	if agenda == nil || remAtributoNumber(t, agenda, "reminderVersion") != 2 {
+		t.Fatalf("la ocurrencia debe moverse y seguir la versión del recordatorio: %v", agenda)
+	}
+	if !strings.HasPrefix(stringAttribute(agenda["dueAt"]), "2026-11-25T09:30:00") {
+		t.Fatalf("dueAt de la agenda: %q", stringAttribute(agenda["dueAt"]))
+	}
+	pkPuntero, skPuntero := domainDeletion.SchedulePointerKeys(remUsuarioA, remID)
+	punteroAgenda := doble.item(pkPuntero, skPuntero)
+	if punteroAgenda == nil || stringAttribute(punteroAgenda["skGlobal"]) != skAgendaNueva {
+		t.Fatalf("el puntero de agenda debe apuntar a la SK nueva: %v", punteroAgenda)
 	}
 }
 
@@ -617,6 +805,90 @@ func remAhoraDe(t *testing.T, valor string) time.Time {
 		t.Fatalf("fecha inválida %q: %v", valor, err)
 	}
 	return parsed
+}
+
+func TestE066UpdateInactivoRetiraAgendaYReactivarLaRecrea(t *testing.T) {
+	store, doble, _ := remEntorno(t)
+	dueAt := "2026-11-24T10:00:00Z"
+	if err := store.Create(context.Background(), remAlta(remUsuarioA, remID, "clave-idem-7", "carga-7", "Reactivar", dueAt)); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	skAgenda := scheduleSortKey(remAhoraDe(t, dueAt), remID)
+	// Simula un lease en curso: la desactivación del titular debe poder retirarlo.
+	item := doble.item(domainDeletion.PartitionScheduleGlobal, skAgenda)
+	item["owner"] = stringAttr("nodo-a")
+	item["leaseUntil"] = stringAttr(remAhora.Add(time.Minute).Format(time.RFC3339Nano))
+	doble.poner(item)
+
+	inactivo := false
+	if _, err := store.Update(context.Background(), appReminders.UpdateInput{
+		UserID: remUsuarioA, ID: remID, ExpectedVersion: 1, Active: &inactivo, Now: remAhora,
+	}); err != nil {
+		t.Fatalf("desactivar: %v", err)
+	}
+	if doble.item(domainDeletion.PartitionScheduleGlobal, skAgenda) != nil {
+		t.Fatal("desactivar debe retirar la ocurrencia")
+	}
+	pkPuntero, skPuntero := domainDeletion.SchedulePointerKeys(remUsuarioA, remID)
+	if doble.item(pkPuntero, skPuntero) != nil {
+		t.Fatal("desactivar debe retirar el puntero de agenda")
+	}
+
+	activo := true
+	if _, err := store.Update(context.Background(), appReminders.UpdateInput{
+		UserID: remUsuarioA, ID: remID, ExpectedVersion: 2, Active: &activo, Now: remAhora,
+	}); err != nil {
+		t.Fatalf("reactivar: %v", err)
+	}
+	recreada := doble.item(domainDeletion.PartitionScheduleGlobal, skAgenda)
+	if recreada == nil {
+		t.Fatal("reactivar debe recrear la ocurrencia")
+	}
+	if remAtributoNumber(t, recreada, "version") != 1 || stringAttribute(recreada["owner"]) != "" {
+		t.Fatalf("la ocurrencia recreada debe empezar libre: %v", recreada)
+	}
+	if remAtributoNumber(t, recreada, "reminderVersion") != 3 {
+		t.Fatalf("reminderVersion debe seguir al recordatorio: %v", recreada)
+	}
+}
+
+func TestE066UpdateConservaContadoresDeAgendaSiNoCambiaElVencimiento(t *testing.T) {
+	store, doble, _ := remEntorno(t)
+	dueAt := "2026-11-24T10:00:00Z"
+	if err := store.Create(context.Background(), remAlta(remUsuarioA, remID, "clave-idem-8", "carga-8", "Contadores", dueAt)); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	skAgenda := scheduleSortKey(remAhoraDe(t, dueAt), remID)
+	item := doble.item(domainDeletion.PartitionScheduleGlobal, skAgenda)
+	item["version"] = numberAttr(3)
+	item["fence"] = numberAttr(2)
+	item["attempts"] = numberAttr(4)
+	item["owner"] = stringAttr("nodo-a")
+	item["leaseUntil"] = stringAttr(remAhora.Add(time.Minute).Format(time.RFC3339Nano))
+	doble.poner(item)
+
+	titulo := "Contadores actualizados"
+	if _, err := store.Update(context.Background(), appReminders.UpdateInput{
+		UserID: remUsuarioA, ID: remID, ExpectedVersion: 1, Title: &titulo, Now: remAhora,
+	}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	agenda := doble.item(domainDeletion.PartitionScheduleGlobal, skAgenda)
+	if agenda == nil {
+		t.Fatal("la ocurrencia debe conservarse con el mismo vencimiento")
+	}
+	if remAtributoNumber(t, agenda, "version") != 4 {
+		t.Fatalf("la versión de agenda debe avanzar: %v", agenda["version"])
+	}
+	if remAtributoNumber(t, agenda, "fence") != 2 || remAtributoNumber(t, agenda, "attempts") != 4 {
+		t.Fatalf("fence/attempts deben conservarse: %v", agenda)
+	}
+	if stringAttribute(agenda["owner"]) != "" || stringAttribute(agenda["leaseUntil"]) != "" {
+		t.Fatalf("el lease debe limpiarse para que el scheduler vuelva a reclamar: %v", agenda)
+	}
+	if stringAttribute(agenda["title"]) != titulo {
+		t.Fatalf("el título de la agenda debe seguir al recordatorio: %q", stringAttribute(agenda["title"]))
+	}
 }
 
 func TestE066FrequencyNilEliminaAtributoYPreservaSinCambio(t *testing.T) {
@@ -682,6 +954,14 @@ func TestE067DeleteMarcaRecordatorioYPuntero(t *testing.T) {
 	leido, err := store.Get(context.Background(), remUsuarioA, remID)
 	if err != nil || leido == nil || !leido.Deleted {
 		t.Fatalf("Get de un borrado debe devolver el registro con Deleted=true: %+v err=%v", leido, err)
+	}
+	// El borrado retira la ocurrencia global y su puntero en la misma transacción.
+	if doble.item(domainDeletion.PartitionScheduleGlobal, scheduleSortKey(remAhoraDe(t, dueAt), remID)) != nil {
+		t.Fatal("la ocurrencia debe retirarse al borrar el recordatorio")
+	}
+	pkPuntero, skPuntero := domainDeletion.SchedulePointerKeys(remUsuarioA, remID)
+	if doble.item(pkPuntero, skPuntero) != nil {
+		t.Fatal("el puntero SCHEDULEPTR debe retirarse al borrar el recordatorio")
 	}
 	if err := store.Delete(context.Background(), remUsuarioA, remID, 2); !errors.Is(err, appReminders.ErrNotFound) {
 		t.Fatalf("segundo Delete debe ser ErrNotFound: %v", err)

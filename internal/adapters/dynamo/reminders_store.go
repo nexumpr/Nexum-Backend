@@ -21,11 +21,17 @@ import (
 //	PK = USER#<sub>
 //	SK = REMINDER#<RFC3339 UTC ordenable>#<reminderId>
 //	SK = REMINDERPTR#<reminderId>   -> puntero con la SK completa y la versión
+//	SK = SCHEDULEPTR#<reminderId>   -> puntero al disparo en SCHEDULE#GLOBAL
 //
 // La SK del recordatorio ordena por vencimiento y sirve de cursor opaco firmado.
 // Como el identificador no forma parte de la clave de consulta, el puntero es
 // obligatorio para resolver `Get`/`Update`/`Delete` con un `GetItem` exacto:
 // así se evita un `Scan` y se mantiene el aislamiento por `USER#<sub>`.
+//
+// El disparo programado vive en la partición del servicio `SCHEDULE#GLOBAL`
+// (scheduler durable de Oleada 5). Se escribe, se mueve y se retira en la MISMA
+// transacción que el recordatorio y su puntero: no existe estado parcial, y E014
+// puede purgar el ítem global sin `Scan` a través de `SCHEDULEPTR#`.
 //
 // La idempotencia de E065 vive en la MISMA partición para no ampliar la
 // política IAM:
@@ -347,12 +353,18 @@ func (s *RemindersStore) Create(ctx context.Context, input reminders.CreateInput
 		"payloadHash": stringAttr(input.PayloadHash),
 		"createdAt":   stringAttr(ahora.Format(time.RFC3339Nano)),
 	}
+	accionesAgenda, errAgenda := s.accionesAgenda(ctx, userID, id, input.Title, dueAt, input.Timezone, input.Frequency, true, 1, true, ahora)
+	if errAgenda != nil {
+		return errAgenda
+	}
+	acciones := []types.TransactWriteItem{
+		{Put: &types.Put{TableName: aws.String(s.table), Item: item, ConditionExpression: aws.String(condicionAltaNueva)}},
+		{Put: &types.Put{TableName: aws.String(s.table), Item: puntero, ConditionExpression: aws.String(condicionAltaNueva)}},
+		{Put: &types.Put{TableName: aws.String(s.table), Item: idem, ConditionExpression: aws.String(condicionAltaNueva)}},
+	}
+	acciones = append(acciones, accionesAgenda...)
 	_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-		TransactItems: []types.TransactWriteItem{
-			{Put: &types.Put{TableName: aws.String(s.table), Item: item, ConditionExpression: aws.String(condicionAltaNueva)}},
-			{Put: &types.Put{TableName: aws.String(s.table), Item: puntero, ConditionExpression: aws.String(condicionAltaNueva)}},
-			{Put: &types.Put{TableName: aws.String(s.table), Item: idem, ConditionExpression: aws.String(condicionAltaNueva)}},
-		},
+		TransactItems: acciones,
 	})
 	if err == nil {
 		return nil
@@ -470,6 +482,31 @@ func (s *RemindersStore) Update(ctx context.Context, input reminders.UpdateInput
 		ExpressionAttributeValues: map[string]types.AttributeValue{":expected": numberAttr(input.ExpectedVersion), ":next": numberAttr(versionSiguiente), ":updatedAt": stringAttr(updatedAt), ":sk": stringAttr(pointer.SortKey), ":nuevaSK": stringAttr(nuevaSK)},
 	}})
 
+	activoFinal := actual.Active
+	if input.Active != nil {
+		activoFinal = *input.Active
+	}
+	tituloFinal := actual.Title
+	if input.Title != nil {
+		tituloFinal = *input.Title
+	}
+	dueAtFinal := actual.DueAt
+	if input.DueAt != nil {
+		dueAtFinal, err = time.Parse(time.RFC3339, strings.TrimSpace(*input.DueAt))
+		if err != nil {
+			return nil, reminders.ErrInvalidRequest
+		}
+	}
+	frecuenciaFinal := actual.Frequency
+	if input.Frequency.Set {
+		frecuenciaFinal = input.Frequency.Value
+	}
+	accionesAgenda, errAgenda := s.accionesAgenda(ctx, userID, id, tituloFinal, dueAtFinal, actual.Timezone, frecuenciaFinal, activoFinal, versionSiguiente, false, ahora)
+	if errAgenda != nil {
+		return nil, errAgenda
+	}
+	acciones = append(acciones, accionesAgenda...)
+
 	if _, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: acciones}); err != nil {
 		if esCancelacionPorCondicion(err) {
 			return nil, reminders.ErrConflict
@@ -529,6 +566,11 @@ func (s *RemindersStore) Delete(ctx context.Context, userID, id string, expected
 			ExpressionAttributeValues: map[string]types.AttributeValue{":verdadero": boolAttr(true), ":expected": numberAttr(expectedVersion), ":next": numberAttr(versionSiguiente), ":updatedAt": stringAttr(updatedAt), ":sk": stringAttr(pointer.SortKey)},
 		}},
 	}
+	accionesAgenda, errAgenda := s.accionesAgenda(ctx, userID, id, actual.Title, actual.DueAt, actual.Timezone, actual.Frequency, false, versionSiguiente, false, ahora)
+	if errAgenda != nil {
+		return errAgenda
+	}
+	acciones = append(acciones, accionesAgenda...)
 	if _, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: acciones}); err != nil {
 		if !esCancelacionPorCondicion(err) {
 			return reminders.ErrUnavailable

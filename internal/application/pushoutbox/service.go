@@ -26,6 +26,14 @@ import (
 // Estado del trabajo en el outbox.
 type Estado string
 
+// ErrCuentaNoActiva es el contrato del puerto `Store`: una implementación lo
+// devuelve cuando el titular ya no está ACTIVE (eliminado o en purga) y el
+// trabajo NO debe crearse. Es una señal permanente, no un fallo transitorio: un
+// productor (por ejemplo el scheduler de recordatorios) la usa para retirar el
+// origen sin reintentar y sin que la capa de aplicación tenga que importar el
+// adaptador de persistencia.
+var ErrCuentaNoActiva = errors.New("pushoutbox: la cuenta del titular no esta activa")
+
 const (
 	EstadoPendiente Estado = "pending"
 	EstadoEnviando  Estado = "sending"

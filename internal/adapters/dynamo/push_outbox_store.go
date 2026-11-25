@@ -65,8 +65,9 @@ var (
 	ErrConflictoLease = errors.New("conflicto de lease del outbox push")
 	// ErrCuentaNoActiva indica que el titular no está ACTIVE (eliminado o en purga).
 	// El trabajo no se encola: se falla cerrado en lugar de crear datos de una cuenta
-	// dada de baja.
-	ErrCuentaNoActiva = errors.New("la cuenta no esta activa")
+	// dada de baja. Envuelve pushoutbox.ErrCuentaNoActiva para que la señal cruce el
+	// puerto de aplicación sin que ésta importe este paquete.
+	ErrCuentaNoActiva = fmt.Errorf("la cuenta no esta activa: %w", pushoutbox.ErrCuentaNoActiva)
 )
 
 // PushOutboxAPI es el subconjunto de DynamoDB que usa el outbox. No incluye
