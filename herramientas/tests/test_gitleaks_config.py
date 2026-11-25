@@ -1,4 +1,4 @@
-﻿"""Pruebas de la configuración de gitleaks (A-100 + excepción I-030).
+"""Pruebas de la configuración de gitleaks (A-100 + excepción I-030).
 
 La excepción del digest RFC-004 debe ser **mínima y no ocultar credenciales**:
 gitleaks v8.30.1 evalúa las allowlists globales en modo OR por defecto y, en ese
@@ -96,8 +96,8 @@ class ConfiguracionGitleaks(unittest.TestCase):
         rutas = re.findall(r"regexes\s*=\s*\[\s*'''(.*?)'''", self.sin_comentarios)
         self.assertEqual(
             len(rutas),
-            18,
-            "manifiesto + constante de estado de I-120 + passphrase sintetica E001 + clave de idempotencia E001 + convencion sintetica de la oleada E007-E011 + literal no-hex de la prueba E010 + excepciones de la Oleada 2 (movimientos, metas, recurrencia) + excepciones Oleadas 4/5 (7 falsos positivos)",
+            19,
+            "manifiesto + constante de estado de I-120 + passphrase sintetica E001 + clave de idempotencia E001 + convencion sintetica de la oleada E007-E011 + literal no-hex de la prueba E010 + excepciones de la Oleada 2 (movimientos, metas, recurrencia) + excepciones Oleadas 4/5 (7 falsos positivos) + Idempotency-Key sinteticas de recordatorios (Oleada 5)",
         )
         candidatos = [r for r in rutas if "[a-f0-9]{64}" in r]
         self.assertEqual(len(candidatos), 1)

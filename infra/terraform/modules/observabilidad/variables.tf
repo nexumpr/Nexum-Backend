@@ -121,3 +121,94 @@ variable "emails_presupuesto" {
     error_message = "emails_presupuesto debe contener direcciones con formato b?sico."
   }
 }
+
+# --- Observabilidad FCM/scheduler: deshabilitada por defecto ----------------
+#
+# Los filtros y alarmas existen en el módulo, pero nacen con count=0. No se
+# crea ninguna métrica ni alarma hasta que un Gate active estas variables y el
+# proceso Go emita los eventos canónicos documentados en
+# `sdd/_control/H08/OBSERVABILIDAD_FCM_I110.md`. El pipeline de logs a
+# CloudWatch sigue `LOG_PIPELINE_AWS_VERIFIED = NOT_RUN`.
+
+variable "habilitar_metricas_fcm" {
+  description = "Crea los log metric filters de FCM/scheduler; false por defecto."
+  type        = bool
+  default     = false
+}
+
+variable "habilitar_alarmas_fcm" {
+  description = "Crea las alarmas de FCM/scheduler; false por defecto. Exige habilitar_metricas_fcm=true."
+  type        = bool
+  default     = false
+}
+
+variable "version_esperada" {
+  description = "Versión efectiva esperada (vX.Y.Z+sha12). Vacío = no se crea el filtro de versión inesperada."
+  type        = string
+  default     = ""
+
+  validation {
+    # 11 o 12 hex: la política fija `<sha12>` para releases nuevos, pero el
+    # release desplegado `v0.20.0+4bf6758d372` se publicó con 11 caracteres.
+    # Aceptar ambos permite fijar la versión real del filtro sin relajar la
+    # forma SemVer+sha.
+    condition     = var.version_esperada == "" || can(regex("^v[0-9]+\\.[0-9]+\\.[0-9]+\\+[0-9a-f]{11,12}$", var.version_esperada))
+    error_message = "version_esperada debe estar vacío o tener la forma vX.Y.Z+<sha12>."
+  }
+}
+
+variable "worker_fcm" {
+  description = "Valor del campo worker para el heartbeat del outbox FCM."
+  type        = string
+  default     = "fcm_outbox"
+}
+
+variable "worker_scheduler" {
+  description = "Valor del campo worker para el heartbeat del scheduler de recordatorios."
+  type        = string
+  default     = "scheduler"
+}
+
+variable "umbral_fcm_errores" {
+  description = "Suma de errores de envío FCM en 5 minutos que dispara la alarma."
+  type        = number
+  default     = 5
+
+  validation {
+    condition     = var.umbral_fcm_errores >= 1
+    error_message = "umbral_fcm_errores debe ser >= 1."
+  }
+}
+
+variable "umbral_access_denied" {
+  description = "Suma de AccessDenied en 5 minutos que dispara la alarma."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.umbral_access_denied >= 1
+    error_message = "umbral_access_denied debe ser >= 1."
+  }
+}
+
+variable "umbral_lag_scheduler_segundos" {
+  description = "Lag máximo aceptable del scheduler; la alarma usa Maximum durante 3 periodos de 5 min."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = var.umbral_lag_scheduler_segundos >= 1
+    error_message = "umbral_lag_scheduler_segundos debe ser >= 1."
+  }
+}
+
+variable "minutos_sin_heartbeat" {
+  description = "Periodo sin heartbeat que dispara la alarma de worker/scheduler parado."
+  type        = number
+  default     = 15
+
+  validation {
+    condition     = contains([5, 10, 15, 30, 60], var.minutos_sin_heartbeat)
+    error_message = "minutos_sin_heartbeat debe ser 5, 10, 15, 30 o 60."
+  }
+}

@@ -33,6 +33,29 @@ check "identidades_publicacion_coherentes" {
   }
 }
 
+# Rollback de releases: v0.19.2 estuvo desplegado y v0.20.0 es el posterior.
+# La lista efectiva vive en el tfvars de custodia. El `check` siguiente solo
+# advierte; la precondition bloqueante está en
+# `terraform_data.invariantes_release_rollback`, más abajo, porque un `check`
+# no detiene el apply.
+check "artefactos_release_rollback" {
+  assert {
+    condition = alltrue([
+      for arn in local.artefactos_release_requeridos :
+      contains(var.iam_artifact_object_arns, arn)
+    ])
+    error_message = "Faltan ARN de v0.19.2 o v0.20.0 en iam_artifact_object_arns; el rollback de LT fallará con AccessDenied."
+  }
+
+  assert {
+    condition = alltrue([
+      for arn in local.artefactos_release_requeridos :
+      !strcontains(arn, "*") && !endswith(arn, "/")
+    ])
+    error_message = "Los ARN de rollback deben ser objetos exactos, sin wildcard ni prefijo."
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Invariantes BLOQUEANTES (RFC-011).
 #
@@ -82,6 +105,51 @@ resource "terraform_data" "invariantes_identidades" {
     precondition {
       condition     = length(var.entorno) > 0 && !strcontains(local.bucket_artefactos_nombre, "..")
       error_message = "El entorno debe estar definido y los nombres derivados no pueden contener '..'."
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Rollback fail-closed (bloqueante, no solo aviso).
+#
+# El `check` de arriba no detiene el apply. Esta precondition sí: si el tfvars
+# de custodia no contiene los cuatro ARN exactos de v0.19.2 y v0.20.0, el plan
+# falla antes de tocar IAM. Sin esos objetos, un `instance_refresh` hacia atrás
+# responde AccessDenied al descargar el binario o la unidad.
+#
+# Cuando `release_objetivo` no está vacío, exige además al menos un ARN de ese
+# release. El contrato funcional necesita los dos (binario y unidad); la
+# checklist del custodio en ARTEFACTOS_RELEASE.md exige ambos. La precondition
+# solo comprueba la presencia del release para fallar pronto y de forma clara.
+#
+# No crea recursos AWS: es un `terraform_data` local.
+# ---------------------------------------------------------------------------
+resource "terraform_data" "invariantes_release_rollback" {
+  input = join("|", var.iam_artifact_object_arns)
+
+  lifecycle {
+    precondition {
+      condition = alltrue([
+        for arn in local.artefactos_release_requeridos :
+        contains(var.iam_artifact_object_arns, arn)
+      ])
+      error_message = "Faltan ARN exactos de v0.19.2 o v0.20.0 en iam_artifact_object_arns; el rollback de LT fallaria con AccessDenied. Ver ARTEFACTOS_RELEASE.md."
+    }
+
+    precondition {
+      condition = alltrue([
+        for arn in local.artefactos_release_requeridos :
+        !strcontains(arn, "*") && !endswith(arn, "/")
+      ])
+      error_message = "Los ARN de rollback deben ser objetos exactos, sin wildcard ni prefijo."
+    }
+
+    precondition {
+      condition = var.release_objetivo == "" || anytrue([
+        for arn in var.iam_artifact_object_arns :
+        startswith(arn, "arn:aws:s3:::${local.bucket_artefactos_nombre}/releases/${var.release_objetivo}/")
+      ])
+      error_message = "release_objetivo no vacio pero iam_artifact_object_arns no contiene ningun ARN de ese release; el rollout fallaria. Ver ARTEFACTOS_RELEASE.md."
     }
   }
 }

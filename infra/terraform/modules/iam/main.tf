@@ -55,7 +55,24 @@ locals {
       "LOOKUP#SESSION#*",
       # E005 (RFC-016 17.2): token de recuperacion y cola durable del worker.
       "RESET#*",
+      # QUEUE#* cubre QUEUE#PWRESET (E005) y QUEUE#READALL (E063:
+      # PK=QUEUE#READALL, SK=REQ#<creado>#<requestId>) del worker durable de E063.
       "QUEUE#*",
+      # H08-E: outbox global de push (FCM) y programacion global de recordatorios.
+      # Ambas son particiones de sistema (no de usuario) y se usan con GetItem/
+      # PutItem/UpdateItem/DeleteItem/Query/ConditionCheckItem; NO conceden Scan.
+      # Origen: PK=OUTBOX#GLOBAL del outbox push y PK=SCHEDULE#GLOBAL con
+      # SK=DUE#<RFC3339Nano>#<id> para el scheduler de recordatorios.
+      #
+      # Punteros: OUTBOXPTR#<id>, SCHEDULEPTR#<id>, REMINDERPTR#<id> y
+      # READALLPTR#<requestId> viven
+      # dentro de la particion USER#<userID> (PK=USER#..., SK=OUTBOXPTR#...),
+      # por lo que ya quedan cubiertos por `USER#*`; no se añaden patrones
+      # globales para ellos. Los IDEM# de outbox/recordatorio tambien viven
+      # bajo USER# y los cubre `USER#*`; `IDEM#*` se conserva para la
+      # idempotencia de E001, que usa una particion de primer nivel.
+      "OUTBOX#*",
+      "SCHEDULE#*",
       "PUBLIC#CATALOG",
       "PUBLIC#CONTENT",
     ],
