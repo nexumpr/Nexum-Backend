@@ -173,10 +173,68 @@ systemctl daemon-reload || fail "daemon-reload fallo"
 systemctl enable "$SERVICIO" >/dev/null 2>&1 || fail "no se pudo habilitar $SERVICIO"
 systemctl restart "$SERVICIO" || fail "no se pudo arrancar $SERVICIO"
 
+set +e
 # Diagnostico FCM (solo metadatos y estados; nunca valores ni secretos).
 if [[ -f "$ENV_FILE" ]]; then
   log "diag fcm claves=$(sed -n 's/^\(NEXUM_FCM_[A-Z_]*\)=.*/\1/p' "$ENV_FILE" 2>/dev/null | sort | tr '\n' ',')"
-  systemctl show "$SERVICIO" -p Environment 2>/dev/null | tr ' ' '\n' | grep -E '^NEXUM_FCM_(CREDENTIALS_FILE|CREDENTIALS_JSON|PROJECT_ID)=' | sed 's/=.*$/=PRESENT/' | while IFS= read -r linea; do log "diag service_env: $linea"; done
+  pid=$(systemctl show -p MainPID --value "$SERVICIO" 2>/dev/null || true)
+  if [[ "$pid" =~ ^[0-9]+$ ]] && [[ "$pid" -gt 0 ]] && [[ -r "/proc/$pid/environ" ]]; then
+    python3 - "/proc/$pid/environ" <<'PY' 2>/dev/null || log "diag env_effective=UNREADABLE"
+import base64
+import json
+import sys
+
+try:
+    datos = open(sys.argv[1], "rb").read()
+except Exception:
+    print("[bootstrap] diag env_effective=UNREADABLE")
+    sys.exit(0)
+
+pares = {}
+for item in datos.split(b"\0"):
+    if b"=" not in item:
+        continue
+    clave, valor = item.split(b"=", 1)
+    pares[clave.decode("utf-8", "replace")] = valor.decode("utf-8", "replace")
+
+def estado(nombre):
+    if nombre not in pares:
+        return "AUSENTE"
+    return "PRESENTE" if pares[nombre] else "VACIO"
+
+print("[bootstrap] diag env_effective project_id=%s credentials_file=%s credentials_json=%s push_key=%s cursor_key=%s" % (
+    estado("NEXUM_FCM_PROJECT_ID"),
+    estado("NEXUM_FCM_CREDENTIALS_FILE"),
+    estado("NEXUM_FCM_CREDENTIALS_JSON"),
+    estado("NEXUM_PUSH_TOKEN_KEY_B64"),
+    estado("NEXUM_NOTIFICATION_CURSOR_KEY_B64"),
+))
+
+proyecto = pares.get("NEXUM_FCM_PROJECT_ID", "")
+ruta = pares.get("NEXUM_FCM_CREDENTIALS_FILE", "")
+try:
+    credencial = json.load(open(ruta, encoding="utf-8")) if ruta else {}
+except Exception:
+    credencial = {}
+proyecto_cred = credencial.get("project_id", "") if isinstance(credencial, dict) else ""
+
+def b64_32(valor):
+    try:
+        return len(base64.b64decode(valor, validate=True)) == 32
+    except Exception:
+        return False
+
+print("[bootstrap] diag env_checks project_match=%s file_abs=%s file_under_etc_nexum=%s push_key_b64_32=%s cursor_key_b64_32=%s" % (
+    "YES" if proyecto and proyecto == proyecto_cred else "NO",
+    "YES" if ruta.startswith("/") else "NO",
+    "YES" if ruta.startswith("/etc/nexum/") else "NO",
+    "YES" if b64_32(pares.get("NEXUM_PUSH_TOKEN_KEY_B64", "")) else "NO",
+    "YES" if b64_32(pares.get("NEXUM_NOTIFICATION_CURSOR_KEY_B64", "")) else "NO",
+))
+PY
+  else
+    log "diag env_effective=NO_MAINPID"
+  fi
 fi
 if [[ -f /etc/nexum/fcm-service-account.json ]]; then
   log "diag fcm_file=$(stat -c 'mode=%a owner=%U group=%G size=%s' /etc/nexum/fcm-service-account.json 2>/dev/null || echo stat_fail)"
@@ -194,8 +252,8 @@ else
   log "diag fcm_file=MISSING"
 fi
 if command -v getent >/dev/null 2>&1; then
-  getent hosts oauth2.googleapis.com >/dev/null 2>&1 && log "diag dns_oauth=OK" || log "diag dns_oauth=FAIL"
-  getent hosts fcm.googleapis.com >/dev/null 2>&1 && log "diag dns_fcm=OK" || log "diag dns_fcm=FAIL"
+  timeout 10 getent hosts oauth2.googleapis.com >/dev/null 2>&1 && log "diag dns_oauth=OK" || log "diag dns_oauth=FAIL"
+  timeout 10 getent hosts fcm.googleapis.com >/dev/null 2>&1 && log "diag dns_fcm=OK" || log "diag dns_fcm=FAIL"
 fi
 if command -v curl >/dev/null 2>&1; then
   codigo_https=$(curl -sS -o /dev/null -w '%%{http_code}' --max-time 10 https://oauth2.googleapis.com/token 2>/dev/null || echo 000)
@@ -264,6 +322,7 @@ try:
         proyecto = os.environ.get("NEXUM_FCM_PROJECT_ID") or credencial.get("project_id") or ""
         url_fcm = f"https://fcm.googleapis.com/v1/projects/{proyecto}/messages:send"
         cuerpo_fcm = json.dumps({
+            "validate_only": True,
             "message": {
                 "token": "nexum-diagnostico-token-invalido",
                 "notification": {"title": "diag", "body": "diag"},
@@ -273,18 +332,27 @@ try:
             url_fcm, data=cuerpo_fcm, method="POST",
             headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
         )
+        permitidos_status = {"PERMISSION_DENIED", "INVALID_ARGUMENT", "NOT_FOUND", "UNAUTHENTICATED", "RESOURCE_EXHAUSTED", "UNAVAILABLE", "INTERNAL", "FAILED_PRECONDITION"}
+        permitidos_code = {"UNREGISTERED", "INVALID_ARGUMENT", "SENDER_ID_MISMATCH", "THIRD_PARTY_AUTH_ERROR", "QUOTA_EXCEEDED", "UNAVAILABLE", "INTERNAL", "PERMISSION_DENIED"}
         try:
             with urllib.request.urlopen(peticion_fcm, timeout=10) as respuesta_fcm:
-                print(f"[bootstrap] diag fcm_http={respuesta_fcm.status} fcm_status=OK")
+                print(f"[bootstrap] diag fcm_http={respuesta_fcm.status} fcm_status=OK_VALIDATE_ONLY fcm_error_code=NONE")
         except urllib.error.HTTPError as exc:
             estado = ""
+            codigos = []
             try:
-                estado = (json.loads(exc.read().decode()).get("error") or {}).get("status", "")
+                err = json.loads(exc.read().decode()).get("error") or {}
+                estado = err.get("status") or ""
+                for detalle in err.get("details") or []:
+                    if isinstance(detalle, dict) and detalle.get("errorCode"):
+                        codigos.append(str(detalle["errorCode"]))
             except Exception:
                 estado = ""
-            print(f"[bootstrap] diag fcm_http={exc.code} fcm_status={estado}")
+            estado = estado if estado in permitidos_status else "OTHER"
+            codigos = [c for c in codigos if c in permitidos_code]
+            print(f"[bootstrap] diag fcm_http={exc.code} fcm_status={estado} fcm_error_code={','.join(sorted(set(codigos))) or 'NONE'}")
         except Exception:
-            print("[bootstrap] diag fcm_http=000 fcm_status=NETWORK")
+            print("[bootstrap] diag fcm_http=000 fcm_status=NETWORK fcm_error_code=NONE")
 except urllib.error.HTTPError as exc:
     print(f"[bootstrap] diag oauth_http={exc.code} token_present=False")
 except Exception:
@@ -293,9 +361,26 @@ PY
 else
   log "diag oauth=SKIP_NO_OPENSSL"
 fi
+set -e
 
 # Estado real del worker en el journal (solo lineas FCM, sin secretos).
-journalctl -u "$SERVICIO" --no-pager -n 100 2>/dev/null | grep -E 'FCM Oleada 4|worker iniciado|outbox push activo|credencial no inyectada|FCM_WORKER' | tail -20 | while IFS= read -r linea; do log "diag journal: $linea"; done
+journalctl -u "$SERVICIO" --no-pager -n 200 2>/dev/null | python3 - <<'PY' || log "diag journal=UNREADABLE"
+import sys
+
+estados = set()
+for linea in sys.stdin:
+    if "modo=sin-emisor" in linea:
+        estados.add("MODE_SIN_EMISOR")
+    if "modo=http-v1-oauth2-jwt-rs256" in linea:
+        estados.add("MODE_HTTP_V1")
+    if "FCM_WORKER_NO_INICIADO" in linea or "emisor no disponible" in linea:
+        estados.add("CONFIG_EMISOR_NO_DISPONIBLE")
+    if "FCM_CREDENCIAL_AUSENTE" in linea or "credencial no inyectada" in linea:
+        estados.add("CONFIG_CREDENCIAL_AUSENTE")
+    if "outbox push activo" in linea:
+        estados.add("OUTBOX_ACTIVO")
+print("[bootstrap] diag journal=" + (",".join(sorted(estados)) if estados else "SIN_ESTADOS_CONOCIDOS"))
+PY
 
 # Debe quedar activo y responder liveness en local.
 for intento in 1 2 3 4 5 6 7 8 9 10; do

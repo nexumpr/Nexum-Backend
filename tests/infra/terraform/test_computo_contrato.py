@@ -183,14 +183,15 @@ class Bootstrap(unittest.TestCase):
         """El diagnostico imprime estados y metadatos, nunca valores sensibles."""
         for fragmento in (
             "diag fcm claves=",
+            "diag env_effective",
+            "diag env_checks",
             "diag fcm_file=",
             "diag fcm_readable=",
             "diag fcm_json=OK",
             "diag https_oauth=",
             "diag oauth_http=",
             "diag fcm_http=",
-            "diag journal:",
-            "diag service_env:",
+            "diag journal=",
         ):
             self.assertIn(fragmento, self.userdata)
         self.assertNotIn("print(credencial", self.userdata)
