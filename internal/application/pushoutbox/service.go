@@ -182,8 +182,10 @@ type Service struct {
 	opciones     Opciones
 }
 
-// NewService construye el servicio. Sin store o sin emisor queda inerte; sin
-// preferencias, tokens o bandeja NO envía (fail-closed).
+// NewService construye el servicio. Sin store queda inerte. Sin emisor FCM no puede
+// enviar, pero SI procesa el outbox: cierra como revocados los trabajos sin dispositivos
+// y reprograma con CONFIG_FCM los que si tienen destinos. Asi un fallo de configuracion
+// de FCM no deja trabajos pendientes con cero intentos para siempre.
 func NewService(store Store, emisor push.Emisor, preferencias PreferenceReader, tokens TokenSource, bandeja NotificationSink, opciones Opciones) *Service {
 	return &Service{
 		store:        store,
@@ -196,8 +198,11 @@ func NewService(store Store, emisor push.Emisor, preferencias PreferenceReader, 
 }
 
 // Disponible indica si el worker puede ejecutar.
+//
+// Solo exige el almacen del outbox: el emisor FCM puede faltar por configuracion y el
+// worker debe seguir cerrando los trabajos que no requieren envio.
 func (s *Service) Disponible() bool {
-	return s != nil && s.store != nil && s.emisor != nil
+	return s != nil && s.store != nil
 }
 
 // Run procesa un lote inicial y continúa con un ticker hasta cancelar el contexto.
@@ -365,6 +370,13 @@ func (s *Service) procesar(ctx context.Context, registro Registro, ahora time.Ti
 	clasePermanente := ""
 	for _, token := range tokens {
 		if token.Valor == "" {
+			continue
+		}
+		if s.emisor == nil {
+			// Configuracion FCM ausente o invalida: no se intenta el envio, pero el
+			// trabajo se reprograma con una clase explicita en lugar de quedar pendiente
+			// con cero intentos o provocar un panic.
+			huboConfig = true
 			continue
 		}
 		_, errEnvio := s.emisor.Enviar(ctx, push.Mensaje{
