@@ -163,6 +163,19 @@ class Bootstrap(unittest.TestCase):
     def test_instalacion_atomica_e_idempotente(self) -> None:
         self.assertIn("mv -f", self.userdata)
         self.assertIn("useradd --system", self.userdata)
+
+    def test_credencial_fcm_en_archivo_no_en_environment_file(self) -> None:
+        """systemd interpreta \\n en EnvironmentFile y rompe el JSON de la credencial FCM.
+
+        La credencial debe escribirse como archivo 0640 root:nexum y exportarse por
+        NEXUM_FCM_CREDENTIALS_FILE; el JSON no debe ir en backend.env.
+        """
+        self.assertIn("NEXUM_FCM_CREDENTIALS_FILE", self.userdata)
+        self.assertIn("fcm-service-account.json", self.userdata)
+        self.assertIn("os.chown(temporal_fcm, 0, pwd.getpwnam(usuario).pw_gid)", self.userdata)
+        self.assertIn("json.loads(credencial_fcm)", self.userdata)
+        self.assertIn("if clave in claves_fcm:", self.userdata)
+        self.assertIn("continue", self.userdata)
         self.assertIn("set -euo pipefail", self.userdata)
 
     def test_verifica_herramientas_de_la_ami(self) -> None:

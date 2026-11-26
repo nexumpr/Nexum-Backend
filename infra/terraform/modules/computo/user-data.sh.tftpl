@@ -87,13 +87,14 @@ if [[ -n "$SECRETOS_URI" ]]; then
     || fail "no se pudo descargar el bundle de secretos desde $SECRETOS_URI"
   [[ -s "$TMP/secrets.json" ]] || fail "el bundle de secretos esta vacio"
 
-  python3 - "$TMP/secrets.json" "$ENV_FILE" <<'PY' || fail "bundle de secretos invalido"
+  python3 - "$TMP/secrets.json" "$ENV_FILE" "$USUARIO" <<'PY' || fail "bundle de secretos invalido"
 import json
 import os
+import pwd
 import re
 import sys
 
-origen, destino = sys.argv[1], sys.argv[2]
+origen, destino, usuario = sys.argv[1], sys.argv[2], sys.argv[3]
 
 try:
     with open(origen, encoding="utf-8") as manejador:
@@ -112,8 +113,22 @@ variables = datos.get("variables")
 if not isinstance(variables, dict) or not variables:
     sys.exit("bundle sin campo 'variables'")
 
+# La credencial FCM contiene secuencias \n en la clave privada. systemd interpreta
+# los escapes de EnvironmentFile y convertiria \n en un salto real, rompiendo el
+# JSON. Se escribe como archivo 0640 root:nexum y se exporta su ruta; el backend
+# ya soporta NEXUM_FCM_CREDENTIALS_FILE y no requiere el JSON en el entorno.
+claves_fcm = ("NEXUM_FCM_CREDENTIALS_JSON", "FCM_SERVICE_ACCOUNT_JSON")
+credencial_fcm = next((variables[c] for c in claves_fcm if c in variables), None)
+if credencial_fcm is not None:
+    try:
+        json.loads(credencial_fcm)
+    except ValueError:
+        sys.exit("credencial FCM invalida")
+
 lineas = []
 for clave, valor in variables.items():
+    if clave in claves_fcm:
+        continue
     if not isinstance(clave, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]{1,63}", clave):
         sys.exit(f"clave invalida: {clave!r}")
     if not isinstance(valor, str) or "\n" in valor or "\r" in valor or "\x00" in valor:
@@ -122,6 +137,16 @@ for clave, valor in variables.items():
 
 if not any(linea.startswith("APP_ENV=") for linea in lineas):
     sys.exit("bundle sin la variable obligatoria APP_ENV")
+
+if credencial_fcm is not None:
+    ruta_fcm = os.path.join(os.path.dirname(destino), "fcm-service-account.json")
+    temporal_fcm = ruta_fcm + ".nuevo"
+    with open(temporal_fcm, "w", encoding="utf-8") as manejador:
+        manejador.write(credencial_fcm)
+    os.chmod(temporal_fcm, 0o640)
+    os.chown(temporal_fcm, 0, pwd.getpwnam(usuario).pw_gid)
+    os.replace(temporal_fcm, ruta_fcm)
+    lineas.append("NEXUM_FCM_CREDENTIALS_FILE=" + ruta_fcm)
 
 temporal = destino + ".nuevo"
 with open(temporal, "w", encoding="utf-8") as manejador:
