@@ -476,3 +476,65 @@ class RegresionesDefectos(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class ReintentosDelCliente(unittest.TestCase):
+    """Reglas de repetición del cliente HTTP del harness.
+
+    Un error de red puede ocurrir después de que el servidor procesó la petición:
+    repetir una mutación duplicaría el efecto. El 429, en cambio, se emite antes de
+    procesar, así que repetirlo es seguro en cualquier método.
+    """
+
+    def _cliente(self, metodo: str, guion: list):
+        llamadas: list[str] = []
+
+        def transporte(m, url, datos, hdrs, timeout):
+            llamadas.append(m)
+            paso = guion[min(len(llamadas) - 1, len(guion) - 1)]
+            if isinstance(paso, Exception):
+                raise paso
+            return paso
+
+        escenario = escenarios.Escenario(
+            eid="E900", titulo="prueba", metodo=metodo, ruta="/x", fases=("publico",), funcion=lambda ctx: None
+        )
+        cliente = nucleo.Cliente(
+            "https://example.invalid",
+            nucleo.Autorizacion(True, True),
+            {"E900": escenario},
+            None,
+            transporte=transporte,
+            timeout=5,
+        )
+        return cliente, llamadas
+
+    def test_mutacion_no_se_reintenta_tras_error_de_red(self) -> None:
+        cliente, llamadas = self._cliente("POST", [ConnectionError("reset")])
+        with mock.patch.object(nucleo.time, "sleep", lambda *_: None):
+            respuesta = cliente.pedir("E900", cuerpo={}, validar_payload=False)
+        self.assertEqual(respuesta.codigo, 0)
+        self.assertEqual(len(llamadas), 1, "una mutación no puede repetirse a ciegas")
+
+    def test_lectura_se_reintenta_tras_error_de_red(self) -> None:
+        cliente, llamadas = self._cliente("GET", [ConnectionError("reset"), (200, {}, b"{}")])
+        with mock.patch.object(nucleo.time, "sleep", lambda *_: None):
+            respuesta = cliente.pedir("E900", validar_payload=False)
+        self.assertEqual((respuesta.codigo, len(llamadas)), (200, 2))
+
+    def test_retry_after_se_respeta(self) -> None:
+        cliente, llamadas = self._cliente(
+            "POST", [(429, {"Retry-After": "3"}, b"{}"), (202, {}, b"{}")]
+        )
+        esperas: list[float] = []
+        with mock.patch.object(nucleo.time, "sleep", lambda s: esperas.append(s)):
+            respuesta = cliente.pedir("E900", cuerpo={}, validar_payload=False)
+        self.assertEqual(respuesta.codigo, 202)
+        self.assertEqual(len(llamadas), 2)
+        self.assertEqual(esperas, [3.0], "debe esperar exactamente lo pedido por el servidor")
+
+    def test_retry_after_excesivo_no_se_recorta(self) -> None:
+        cliente, llamadas = self._cliente("POST", [(429, {"Retry-After": "600"}, b"{}")])
+        with mock.patch.object(nucleo.time, "sleep", lambda *_: None):
+            respuesta = cliente.pedir("E900", cuerpo={}, validar_payload=False)
+        self.assertEqual(respuesta.codigo, 429)
+        self.assertEqual(len(llamadas), 1, "no se reintenta antes del tiempo pedido")

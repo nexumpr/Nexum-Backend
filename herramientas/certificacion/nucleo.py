@@ -825,15 +825,48 @@ class Cliente:
             url += "?" + consulta[1]
 
         inicio = time.monotonic()
-        try:
-            codigo, cabeceras_respuesta, crudo = self.transporte(
-                metodo, url, datos, hdrs, timeout or self.timeout
-            )
-        except ConnectionError as exc:
-            latencia = int((time.monotonic() - inicio) * 1000)
-            respuesta = Respuesta(0, None, {}, latencia, "", f"error de red: {exc}")
-            self._registrar_llamada(escenario, respuesta)
-            return respuesta
+        intentos = 0
+        red_intentos = 0
+        # Un error de red puede ocurrir DESPUES de que el servidor proceso la peticion
+        # (respuesta perdida). Reintentar una mutacion duplicaria el efecto, asi que la
+        # repeticion automatica se limita a metodos seguros. En mutaciones, el fallo se
+        # reporta como resultado sin codigo y el escenario no se declara PASS.
+        red_segura = metodo in ("GET", "HEAD", "OPTIONS")
+        while True:
+            try:
+                codigo, cabeceras_respuesta, crudo = self.transporte(
+                    metodo, url, datos, hdrs, timeout or self.timeout
+                )
+            except ConnectionError as exc:
+                if red_segura and red_intentos < 2:
+                    red_intentos += 1
+                    time.sleep(2)
+                    continue
+                latencia = int((time.monotonic() - inicio) * 1000)
+                respuesta = Respuesta(0, None, {}, latencia, "", f"error de red: {exc}")
+                self._registrar_llamada(escenario, respuesta)
+                return respuesta
+            if codigo == 429 and intentos < 6:
+                # DEF-H10: respetar Retry-After. El limitador rechaza antes de procesar,
+                # por lo que repetir aqui no duplica efectos ni en mutaciones.
+                cabeceras_429 = {str(k).lower(): str(v) for k, v in (cabeceras_respuesta or {}).items()}
+                crudo_espera = cabeceras_429.get("retry-after")
+                espera = 5.0 * (2 ** intentos)
+                if crudo_espera is not None:
+                    try:
+                        espera = float(crudo_espera)
+                    except ValueError:
+                        espera = 5.0 * (2 ** intentos)
+                if espera < 1.0:
+                    espera = 1.0
+                if espera > 120.0:
+                    # No se recorta la espera pedida por el servidor: se deja de reintentar
+                    # y el 429 queda como fallo observable, en lugar de insistir antes de tiempo.
+                    break
+                intentos += 1
+                time.sleep(espera)
+                continue
+            break
         latencia = int((time.monotonic() - inicio) * 1000)
         texto = crudo.decode("utf-8", errors="replace") if crudo else ""
         try:
@@ -1001,12 +1034,84 @@ class Contexto:
         self.secretos.registrar("token-acceso", sesion.access)
         self.secretos.registrar("token-refresh", sesion.refresh)
 
+    def olvidar_sesion(self, sesion: Sesion) -> None:
+        """Invalida la sesión en memoria y en la caché tras un logout.
+
+        El login auxiliar de E004 puede compartir la sesión del titular; tras el
+        cierre, los escenarios siguientes deben autenticarse de nuevo en lugar de
+        reutilizar un token revocado.
+        """
+        sesion.access = ""
+        sesion.refresh = ""
+        sesion.session_id = ""
+        ruta = self._ruta_cache_sesiones()
+        if not ruta or not os.path.exists(ruta):
+            return
+        try:
+            datos = json.loads(io.open(ruta, encoding="utf-8").read())
+            datos.pop(sesion.email, None)
+            with io.open(ruta, "w", encoding="utf-8") as fh:
+                fh.write(json.dumps(datos, ensure_ascii=False))
+        except Exception:  # noqa: BLE001
+            return
+
+    def _ruta_cache_sesiones(self) -> str:
+        return os.environ.get("NEXUM_SESSION_CACHE", "").strip()
+
+    def _restaurar_sesion(self, sesion: Sesion) -> bool:
+        """Reutiliza un access token vigente de una corrida anterior (misma cuenta)."""
+        ruta = self._ruta_cache_sesiones()
+        if not ruta or not os.path.exists(ruta):
+            return False
+        try:
+            datos = json.loads(io.open(ruta, encoding="utf-8").read())
+        except Exception:  # noqa: BLE001
+            return False
+        entrada = datos.get(sesion.email) or {}
+        if not entrada.get("access") or float(entrada.get("expira_en", 0)) <= time.time():
+            return False
+        sesion.access = entrada["access"]
+        sesion.refresh = entrada.get("refresh", "")
+        sesion.session_id = entrada.get("session_id", "")
+        sesion.user_id = entrada.get("user_id", "")
+        return True
+
+    def _guardar_sesion(self, sesion: Sesion, respuesta: Respuesta) -> None:
+        ruta = self._ruta_cache_sesiones()
+        if not ruta:
+            return
+        try:
+            datos = json.loads(io.open(ruta, encoding="utf-8").read()) if os.path.exists(ruta) else {}
+        except Exception:  # noqa: BLE001
+            datos = {}
+        expires = respuesta.campo("expiresIn")
+        segundos = int(expires) if isinstance(expires, (int, float)) else 840
+        datos[sesion.email] = {
+            "access": sesion.access,
+            "refresh": sesion.refresh,
+            "session_id": sesion.session_id,
+            "user_id": sesion.user_id,
+            "expira_en": time.time() + max(60, segundos - 60),
+        }
+        try:
+            os.makedirs(os.path.dirname(ruta), exist_ok=True)
+            with io.open(ruta, "w", encoding="utf-8") as fh:
+                fh.write(json.dumps(datos, ensure_ascii=False))
+            # El archivo contiene access/refresh tokens vivos: se restringe a lectura y
+            # escritura del propietario. En Windows chmod es limitado, pero no rompe y la
+            # custodia ya limita la ACL de la carpeta.
+            os.chmod(ruta, 0o600)
+        except Exception:  # noqa: BLE001
+            pass
+
     def login_auxiliar(self, sesion: Sesion, resultado: Resultado) -> bool:
         """Login fuera del escenario E002 (para reanudar fases sin repetir la suite).
 
         No certifica E002: si falla, el estado es BLOCKED_EXTERNAL, no FAIL.
         """
         if sesion.access:
+            return True
+        if self._restaurar_sesion(sesion):
             return True
         if not self.autorizacion.permite(self.escenarios["E002"]):
             resultado.bloqueo(
@@ -1034,6 +1139,7 @@ class Contexto:
             )
             return False
         self.cargar_sesion(sesion, respuesta)
+        self._guardar_sesion(sesion, respuesta)
         return True
 
     # -- datos de dependencia ------------------------------------------------ #
@@ -1053,6 +1159,8 @@ class Contexto:
             return str(self.datos["category_id"])
         respuesta = self.pedir("E022")
         categorias = respuesta.campo("categories")
+        if not isinstance(categorias, list):
+            categorias = respuesta.campo("items")
         if isinstance(categorias, list):
             for item in categorias:
                 if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"]:
@@ -1225,11 +1333,12 @@ def fusionar_reanudacion(
     base_url: str,
     digest: str,
 ) -> InformeReanudacion:
-    """Recupera de una corrida previa solo PASS/BLOCKED de E-ID no seleccionados.
+    """Recupera de una corrida previa los resultados de E-ID no seleccionados.
 
-    Nunca hereda FAIL, CONTRACT_MISMATCH, CONTENT_MISMATCH ni NOT_RUN: esos deben
-    volver a ejecutarse. Un archivo de otro entorno, otro inventario o una versión
-    distinta se rechaza completo.
+    Se heredan PASS, FAIL, CONTRACT_MISMATCH, CONTENT_MISMATCH y BLOCKED_*: un fallo
+    ya demostrado no puede desaparecer al reanudar, y volver a ejecutarlo en cada
+    grupo ocultaría el progreso. NOT_RUN no se hereda: debe ejecutarse. Un archivo
+    de otro entorno, otro inventario o una versión distinta se rechaza completo.
     """
     informe = InformeReanudacion()
     if previo.get("version") != VERSION_RESULTADOS:
@@ -1256,7 +1365,9 @@ def fusionar_reanudacion(
             informe.problemas.append(f"{eid}: resultado malformado")
             continue
         estado = datos.get("estado")
-        if estado not in (PASS, BLOCKED_EXTERNAL, BLOCKED_DEPENDENCY):
+        heredables = (PASS, BLOCKED_EXTERNAL, BLOCKED_DEPENDENCY,
+                      FAIL, CONTRACT_MISMATCH, CONTENT_MISMATCH)
+        if estado not in heredables:
             continue
         resultado = _resultado_desde_dict(datos)
         if resultado.estado_final() != estado:
@@ -1277,7 +1388,8 @@ def leer_secreto(nombre_env: str, descripcion: str, permitir_prompt: bool = True
     valor = os.environ.get(nombre_env, "").strip()
     if valor:
         return valor
-    if permitir_prompt and sys.stdin.isatty():
+    sin_prompt = os.environ.get("NEXUM_CERT_NO_PROMPT", "").strip() == "1"
+    if permitir_prompt and not sin_prompt and sys.stdin.isatty():
         try:
             return getpass(f"{descripcion} ({nombre_env}, sin eco): ").strip()
         except (EOFError, KeyboardInterrupt):
