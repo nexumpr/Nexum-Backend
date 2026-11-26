@@ -174,7 +174,7 @@
   "infra/terraform/modules/balanceo/main.tf": "e9e7c482dd263303df1c5990fc8a03bb34c6edb2b6ca824363f77b4ab8f86536",
   "infra/terraform/modules/balanceo/outputs.tf": "e3ca677691abec433b160ea6a0babb82ebc4a961996ec50dee630c42b6cdbf6b",
   "infra/terraform/modules/balanceo/variables.tf": "f3431cc74308e28425a1a9ff9552bf0d44147e58b53ba0ba2d4e11426fbfb875",
-  "infra/terraform/modules/computo/main.tf": "9fa1afdb0f255b15b7e1fe93b440ff7d4461cb12e30ce4b675ab795a03ed85ec",
+  "infra/terraform/modules/computo/main.tf": "0eb09ec571ffa5c2b3a95a435537e2efc3544152ac459ff965d8be9db8304a1d",
   "infra/terraform/modules/computo/outputs.tf": "9b3b535c7efe9a62013d2da043e543df18d4059940889500dee997b5165c25b2",
   "infra/terraform/modules/computo/user-data.sh.tftpl": "f06a4d8010375ebd8106c402f083d34c8f342ac6aa32471fd2c17a81461526dc",
   "infra/terraform/modules/computo/variables.tf": "28fa8bd5b4c3143da3f4b97fb1e3facad6b9eb857a251eb0f9b868c6a1574359",

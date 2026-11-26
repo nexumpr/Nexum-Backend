@@ -43,7 +43,12 @@ const EmailVerificationTokenTTL = 30 * time.Minute
 // EmailVerificationSendTimeout acota la llamada sincrona a SES. Sin este limite, una
 // latencia excepcional del proveedor puede superar el idle timeout del balanceador y
 // devolver un 502 ajeno al contrato; con el, el fallo se traduce a 503.
-const EmailVerificationSendTimeout = 8 * time.Second
+//
+// 12 s mantiene la respuesta por debajo del WriteTimeout HTTP (15 s) y del timeout de
+// origen de CloudFront (30 s) sin cortar envios legitimos: en AWS se midieron envios de
+// verificacion que superaban 8 s y devolvian 503 aunque SES aceptaba el mensaje. El tope
+// sigue siendo finito para no exponer la peticion a una espera indefinida.
+const EmailVerificationSendTimeout = 12 * time.Second
 
 // EmailVerificationProfile es el perfil minimo necesario para E010 y E011.
 //
