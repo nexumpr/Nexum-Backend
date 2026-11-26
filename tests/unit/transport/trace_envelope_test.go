@@ -54,8 +54,11 @@ func TestErrorEnvelopeTraceIDDesdeTraceparent(t *testing.T) {
 		t.Fatalf("sin Authorization se esperaba 401, obtenido %d", rec.Code)
 	}
 	payload := traceEnvelopeError(t, rec)
-	if payload.TraceID != traceEnvelopeTraceID {
-		t.Fatalf("traceId debe ser el trace-id W3C del contexto: esperado %q, obtenido %q", traceEnvelopeTraceID, payload.TraceID)
+	if strings.ReplaceAll(payload.TraceID, "-", "") != traceEnvelopeTraceID {
+		t.Fatalf("traceId debe correlacionar con el trace-id W3C del contexto: esperado %q, obtenido %q", traceEnvelopeTraceID, payload.TraceID)
+	}
+	if len(payload.TraceID) != 36 {
+		t.Fatalf("el envelope debe presentar traceId con format uuid, obtenido %q", payload.TraceID)
 	}
 	if rec.Header().Get("X-Request-ID") == "" {
 		t.Fatal("la respuesta debe propagar X-Request-ID")
@@ -81,8 +84,11 @@ func TestErrorEnvelopeTraceIDDesdeRequestID(t *testing.T) {
 	// mismo valor para que el cliente correlacione con la cabecera `traceparent` de respuesta.
 	respuesta := rec.Header().Get("traceparent")
 	partes := strings.Split(respuesta, "-")
-	if len(partes) != 4 || partes[1] != payload.TraceID {
-		t.Fatalf("traceId %q no coincide con el traceparent de respuesta %q", payload.TraceID, respuesta)
+	if len(partes) != 4 || strings.ReplaceAll(payload.TraceID, "-", "") != partes[1] {
+		t.Fatalf("traceId %q no correlaciona con el traceparent de respuesta %q", payload.TraceID, respuesta)
+	}
+	if len(payload.TraceID) != 36 {
+		t.Fatalf("el envelope debe presentar traceId con format uuid (36 caracteres), obtenido %q", payload.TraceID)
 	}
 	if rec.Header().Get("X-Request-ID") != traceEnvelopeRequestID {
 		t.Fatalf("X-Request-ID debe conservarse: %q", rec.Header().Get("X-Request-ID"))
@@ -109,8 +115,8 @@ func TestErrorEnvelopeTraceIDEn503DeSesion(t *testing.T) {
 	if payload.Code != "DEPENDENCY_UNAVAILABLE" {
 		t.Fatalf("codigo inesperado: %q", payload.Code)
 	}
-	if payload.TraceID != traceEnvelopeTraceID {
-		t.Fatalf("el 503 tambien debe llevar traceId: esperado %q, obtenido %q", traceEnvelopeTraceID, payload.TraceID)
+	if strings.ReplaceAll(payload.TraceID, "-", "") != traceEnvelopeTraceID {
+		t.Fatalf("el 503 debe llevar el mismo traceId correlacionado: esperado %q, obtenido %q", traceEnvelopeTraceID, payload.TraceID)
 	}
 }
 

@@ -101,8 +101,14 @@ func (m *movDynamo) Query(_ context.Context, params *dynamodb.QueryInput, _ ...f
 	m.consultas++
 
 	expresion := aws.ToString(params.KeyConditionExpression)
-	if !strings.Contains(expresion, "PK = :pk") || !strings.Contains(expresion, "begins_with(SK, :prefijo)") {
+	esBegins := strings.Contains(expresion, "begins_with(SK, :prefijo)")
+	esBetween := strings.Contains(expresion, "BETWEEN :desde AND :hasta")
+	if !strings.Contains(expresion, "PK = :pk") || esBegins == esBetween {
 		return nil, errors.New("condicion de clave no soportada por el doble: " + expresion)
+	}
+	if esBegins && (strings.Contains(expresion, ">=") || strings.Contains(expresion, " < ")) {
+		// DynamoDB no permite combinar begins_with con un rango de sort key.
+		return nil, errors.New("condicion de clave invalida para DynamoDB: " + expresion)
 	}
 	valores := params.ExpressionAttributeValues
 	pk := movValorTexto(valores[":pk"])
@@ -117,13 +123,13 @@ func (m *movDynamo) Query(_ context.Context, params *dynamodb.QueryInput, _ ...f
 			continue
 		}
 		sk := mapaString(item, "SK")
-		if !strings.HasPrefix(sk, prefijo) {
+		if prefijo != "" && !strings.HasPrefix(sk, prefijo) {
 			continue
 		}
 		if desde != "" && sk < desde {
 			continue
 		}
-		if hasta != "" && sk >= hasta {
+		if hasta != "" && sk > hasta {
 			continue
 		}
 		claves = append(claves, sk)

@@ -2529,3 +2529,20 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **FCM (sin cambios de estado):** bundle v2 tiene 17 variables frente a 13 de v1 — evidencia indirecta, no verificación de nombres. La consola de arranque confirma `version v2, 17 variables`; el contenido no se puede leer (bucket deniega al operador y `logs filter-log-events` está denegado). El bloqueo funcional es la red: sin NAT no hay salida a `oauth2.googleapis.com` ni `fcm.googleapis.com`.
 - **FinOps:** créditos `130.491975 USD` y expiración `2027-05-04` (plan `FREE`/`ACTIVE`). NAT 1 AZ: `9.6044` USD/8 d y `54.0248` USD/45 d. El escenario de 8 días cabe; el de 45 días con NAT (~156.8 USD) supera los créditos restantes.
 - **Sin cambios en AWS:** producción sigue en `v0.20.0+4bf6758d372`, LT v19, bundle v2, ASG 2/2/2, dos AZ y SES fuera de sandbox.
+
+### Hotfix E007 — contraseña actual incorrecta devolvía 503 (2026-11-25)
+
+- Defecto reproducido en producción `v0.21.0+b527f981c1d7`: `POST /api/v1/auth/password/change` con `currentPassword` incorrecta devolvía **503 DEPENDENCY_UNAVAILABLE**.
+- Causa: `Argon2Hasher.VerifyPassword` devuelve `ports.ErrInvalidPassword` cuando la contraseña no coincide y `PasswordChangeService.Change` lo trataba como caída de dependencia.
+- Corrección: `errors.Is(err, ports.ErrInvalidPassword)` se traduce a `ErrPasswordChangeActualIncorrecta` (422); los errores reales de hasher, lectura o escritura siguen respondiendo 503.
+- Regresiones: prueba de aplicación con Argon2id real y prueba HTTP con `ports.ErrInvalidPassword`, ambas sin aplicar la transacción.
+- Sin despliegue en esta unidad: release pendiente de publicación y Gates.
+
+### Hotfix movimientos filtrados y analítica — 2026-11-25
+
+- Defecto reproducido en producción `v0.21.0+b527f981c1d7`: `GET /api/v1/movements` con `from` y/o `to` devolvía **503 DEPENDENCY_UNAVAILABLE**; E052–E055 (analítica) devolvían 503 por la misma consulta.
+- Causa: `MovementsStore.ListMovements` combinaba `begins_with(SK, :prefijo)` con `SK >= :desde`/`SK < :hasta`. DynamoDB admite una sola condición sobre la sort key; la expresión producía `ValidationException`, traducida a `ErrUnavailable`.
+- Corrección: con rango se usa un único `SK BETWEEN :desde AND :hasta` con límites prefijados `MOVEMENT#`; el extremo superior cierra el milisegundo `to` con `\uffff`. Sin rango se conserva `begins_with`.
+- Regresión: el doble de DynamoDB rechaza combinar `begins_with` con un rango (como el servicio real) y `TestE027StoreFiltrosYLimites` cubre `from`/`to`.
+- Sin cambios de contrato, claves ni índices; no se modificó DynamoDB ni IAM.
+
