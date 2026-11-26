@@ -257,7 +257,33 @@ peticion = urllib.request.Request("https://oauth2.googleapis.com/token", data=da
 try:
     with urllib.request.urlopen(peticion, timeout=10) as respuesta:
         cuerpo = json.loads(respuesta.read().decode())
-        print(f"[bootstrap] diag oauth_http={respuesta.status} token_present={bool(cuerpo.get('access_token'))}")
+        token = cuerpo.get("access_token") or ""
+        print(f"[bootstrap] diag oauth_http={respuesta.status} token_present={bool(token)}")
+    if token:
+        proyecto = os.environ.get("NEXUM_FCM_PROJECT_ID") or credencial.get("project_id") or ""
+        url_fcm = f"https://fcm.googleapis.com/v1/projects/{proyecto}/messages:send"
+        cuerpo_fcm = json.dumps({
+            "message": {
+                "token": "nexum-diagnostico-token-invalido",
+                "notification": {"title": "diag", "body": "diag"},
+            }
+        }).encode()
+        peticion_fcm = urllib.request.Request(
+            url_fcm, data=cuerpo_fcm, method="POST",
+            headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(peticion_fcm, timeout=10) as respuesta_fcm:
+                print(f"[bootstrap] diag fcm_http={respuesta_fcm.status} fcm_status=OK")
+        except urllib.error.HTTPError as exc:
+            estado = ""
+            try:
+                estado = (json.loads(exc.read().decode()).get("error") or {}).get("status", "")
+            except Exception:
+                estado = ""
+            print(f"[bootstrap] diag fcm_http={exc.code} fcm_status={estado}")
+        except Exception:
+            print("[bootstrap] diag fcm_http=000 fcm_status=NETWORK")
 except urllib.error.HTTPError as exc:
     print(f"[bootstrap] diag oauth_http={exc.code} token_present=False")
 except Exception:
@@ -266,6 +292,9 @@ PY
 else
   log "diag oauth=SKIP_NO_OPENSSL"
 fi
+
+# Estado real del worker en el journal (solo lineas FCM, sin secretos).
+journalctl -u "$SERVICIO" --no-pager -n 100 2>/dev/null | grep -E 'FCM Oleada 4|worker iniciado|outbox push activo|credencial no inyectada|FCM_WORKER' | tail -20 | while IFS= read -r linea; do log "diag journal: $linea"; done
 
 # Debe quedar activo y responder liveness en local.
 for intento in 1 2 3 4 5 6 7 8 9 10; do

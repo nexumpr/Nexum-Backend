@@ -188,6 +188,8 @@ class Bootstrap(unittest.TestCase):
             "diag fcm_json=OK",
             "diag https_oauth=",
             "diag oauth_http=",
+            "diag fcm_http=",
+            "diag journal:",
         ):
             self.assertIn(fragmento, self.userdata)
         self.assertNotIn("print(credencial", self.userdata)
