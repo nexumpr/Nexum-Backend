@@ -90,7 +90,6 @@ if [[ -n "$SECRETOS_URI" ]]; then
   python3 - "$TMP/secrets.json" "$ENV_FILE" "$USUARIO" <<'PY' || fail "bundle de secretos invalido"
 import json
 import os
-import pwd
 import re
 import sys
 
@@ -139,6 +138,8 @@ if not any(linea.startswith("APP_ENV=") for linea in lineas):
     sys.exit("bundle sin la variable obligatoria APP_ENV")
 
 if credencial_fcm is not None:
+    import pwd
+
     ruta_fcm = os.path.join(os.path.dirname(destino), "fcm-service-account.json")
     temporal_fcm = ruta_fcm + ".nuevo"
     with open(temporal_fcm, "w", encoding="utf-8") as manejador:

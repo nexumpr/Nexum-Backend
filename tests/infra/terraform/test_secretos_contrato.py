@@ -528,7 +528,7 @@ class ParserDelBundle(unittest.TestCase):
         if destino.exists():
             destino.unlink()
         proceso = subprocess.run(
-            [sys.executable, str(self.script), str(origen), str(destino)],
+            [sys.executable, str(self.script), str(origen), str(destino), "nexum"],
             capture_output=True,
             text=True,
         )
