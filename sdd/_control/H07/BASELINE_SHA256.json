@@ -218,7 +218,7 @@
   "infra/terraform/operacion/inventario.json": "a3facdc1b42795d47ab3fe82f0e533188f026af60d703c714e53745e4a02d11a",
   "infra/terraform/policies/terraform-state-access.json.tftpl": "e666d80aaadbd2c2f4af414e20ab22d09f27848f570ef7079cbab2bde01629aa",
   "infra/terraform/respaldo/inventario_backup.json": "e2b6a6f2306e2a4f9c65c2225c3cfbf480b637a7d64d2eb548477b5dd67327ee",
-  "memoria.md": "7c7d8256cf4d431e8c4f8d6c2e676f885010b3f280e5e6e659c0f0c0e95b995e",
+  "memoria.md": "178f6dd049a961bb1f5327723895290b0d81103190f76258869d4a910cf9004c",
   "ml/artifact.go": "601a5c585710155362fc90d0c3dff07ed3da5c05559153522035f0400307e9a4",
   "ml/datos_sinteticos_v1.json": "8d2bf29691a08eee6a1cd1230ad81b8454712424721e5e3e21bb9e9bd99918fd",
   "ml/entrenar_kmeans.py": "12f1ab3358c7029ccf05157d61b9a42512f5e1d834c28ebe28417e9040b1256d",
@@ -934,6 +934,7 @@
   "sdd/_control/H08/RUNBOOK_RESTAURACION.md": "2314617c2197f55f1c8ab842bb7b9c8654b39d8d91253d5cd956dc9f1942eb50",
   "sdd/_control/H08/RUNBOOK_START_STOP.md": "eb77398853d048d5c217580767e90ddd4cd126b61de08d108f1a90a6117d1348",
   "sdd/_control/H08/TRUST_OIDC_I060.md": "1eab957a5d23013d364a66a5552c7b6f1783c3efdd774f17757bfb5740834986",
-  "sdd/_control/H08/opencode.PROPUESTA_RFC017.json": "0a5259e58a17240323a6e6c0ba90aecc9669c97e074aa7396741c28ead561e4a"
+  "sdd/_control/H08/opencode.PROPUESTA_RFC017.json": "0a5259e58a17240323a6e6c0ba90aecc9669c97e074aa7396741c28ead561e4a",
+  "sdd/_control/H08/MATRIZ_CERTIFICACION_75_FINAL.md": "e50086af3dee03cb1ac901cd9d9ea58d3cf3b6c46736b014c6416b0e0800ff98"
  }
 }
