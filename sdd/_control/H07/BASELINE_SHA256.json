@@ -37,7 +37,7 @@
   "herramientas/certificacion/_explorar.py": "2ddb77eba279f55d720f6636c6d1d07e784e4d277f9408b0af0b594981d0a3af",
   "herramientas/certificacion/certificar_75.py": "497a2fcd90c80cddc0b0a7a9c67bf2d34609c188fec9c623ca08ef146d9afc65",
   "herramientas/certificacion/escenarios.py": "58dfd203431e460bdbd791228020fe79f1a70f64775784beeb6f3495757b793a",
-  "herramientas/certificacion/nucleo.py": "9dd0e88f171bb319a4538844077d057e3a500808fb6023e5620c35dac81432f8",
+  "herramientas/certificacion/nucleo.py": "e9ba288c6147b053ae1988c69804aeee928e11b81c1c2614044c1af0f3f72d97",
   "herramientas/clasificar_contratos_e005.py": "9efe1e9c96b26f618e73fa81440df64bcc72c7ed53d597fe236dc69ab8017b29",
   "herramientas/cobertura_dominio.py": "ec03ca39eab5a4a1a94b96e1929d3cfebe30d3279eb4fa8c5fedfff84ea29edc",
   "herramientas/comparar_contrato_api.py": "98927c538d1347167f586a2eaa2469d3507b6762f7a256b8be665119f4dca507",
@@ -934,6 +934,7 @@
   "sdd/_control/H08/RUNBOOK_RESTAURACION.md": "2314617c2197f55f1c8ab842bb7b9c8654b39d8d91253d5cd956dc9f1942eb50",
   "sdd/_control/H08/RUNBOOK_START_STOP.md": "eb77398853d048d5c217580767e90ddd4cd126b61de08d108f1a90a6117d1348",
   "sdd/_control/H08/TRUST_OIDC_I060.md": "1eab957a5d23013d364a66a5552c7b6f1783c3efdd774f17757bfb5740834986",
-  "sdd/_control/H08/opencode.PROPUESTA_RFC017.json": "0a5259e58a17240323a6e6c0ba90aecc9669c97e074aa7396741c28ead561e4a"
+  "sdd/_control/H08/opencode.PROPUESTA_RFC017.json": "0a5259e58a17240323a6e6c0ba90aecc9669c97e074aa7396741c28ead561e4a",
+  "tests/infra/certificacion/test_certificar_75.py": "10c55f32fc26a9028cc9e4fd2e56f01c8328065e21a7a3557fb218381229f785"
  }
 }

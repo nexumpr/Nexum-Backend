@@ -827,13 +827,18 @@ class Cliente:
         inicio = time.monotonic()
         intentos = 0
         red_intentos = 0
+        # Un error de red puede ocurrir DESPUES de que el servidor proceso la peticion
+        # (respuesta perdida). Reintentar una mutacion duplicaria el efecto, asi que la
+        # repeticion automatica se limita a metodos seguros. En mutaciones, el fallo se
+        # reporta como resultado sin codigo y el escenario no se declara PASS.
+        red_segura = metodo in ("GET", "HEAD", "OPTIONS")
         while True:
             try:
                 codigo, cabeceras_respuesta, crudo = self.transporte(
                     metodo, url, datos, hdrs, timeout or self.timeout
                 )
             except ConnectionError as exc:
-                if red_intentos < 2:
+                if red_segura and red_intentos < 2:
                     red_intentos += 1
                     time.sleep(2)
                     continue
@@ -842,14 +847,22 @@ class Cliente:
                 self._registrar_llamada(escenario, respuesta)
                 return respuesta
             if codigo == 429 and intentos < 6:
-                # DEF-H10: respetar Retry-After en lugar de fallar por cuota. El limitador
-                # rechaza antes de procesar, por lo que el reintento no duplica efectos.
+                # DEF-H10: respetar Retry-After. El limitador rechaza antes de procesar,
+                # por lo que repetir aqui no duplica efectos ni en mutaciones.
                 cabeceras_429 = {str(k).lower(): str(v) for k, v in (cabeceras_respuesta or {}).items()}
+                crudo_espera = cabeceras_429.get("retry-after")
                 espera = 5.0 * (2 ** intentos)
-                try:
-                    espera = max(1.0, min(90.0, float(cabeceras_429.get("retry-after", espera))))
-                except ValueError:
-                    pass
+                if crudo_espera is not None:
+                    try:
+                        espera = float(crudo_espera)
+                    except ValueError:
+                        espera = 5.0 * (2 ** intentos)
+                if espera < 1.0:
+                    espera = 1.0
+                if espera > 120.0:
+                    # No se recorta la espera pedida por el servidor: se deja de reintentar
+                    # y el 429 queda como fallo observable, en lugar de insistir antes de tiempo.
+                    break
                 intentos += 1
                 time.sleep(espera)
                 continue
@@ -1082,7 +1095,12 @@ class Contexto:
         }
         try:
             os.makedirs(os.path.dirname(ruta), exist_ok=True)
-            io.open(ruta, "w", encoding="utf-8").write(json.dumps(datos, ensure_ascii=False))
+            with io.open(ruta, "w", encoding="utf-8") as fh:
+                fh.write(json.dumps(datos, ensure_ascii=False))
+            # El archivo contiene access/refresh tokens vivos: se restringe a lectura y
+            # escritura del propietario. En Windows chmod es limitado, pero no rompe y la
+            # custodia ya limita la ACL de la carpeta.
+            os.chmod(ruta, 0o600)
         except Exception:  # noqa: BLE001
             pass
 
