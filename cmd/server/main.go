@@ -261,20 +261,18 @@ func run(ctx context.Context, cfg nexumhttp.ServerConfig, logger *slog.Logger) e
 		defer cerrarReadAll()
 	}
 
-	// Emisor FCM real: se arranca sólo si existe credencial de servidor válida en
-	// el secret store/entorno. Sin ella el worker queda inerte y no se afirma E2E.
-	cfgFCM, errFCM := configuracionFCMOleada4DesdeEntorno()
-	if errFCM != nil {
-		logger.WarnContext(ctx, "FCM Oleada 4: credencial no inyectada; worker no iniciado",
-			slog.String("clase", "FCM_CREDENCIAL_AUSENTE"))
+	// Outbox push: el worker se arranca siempre que exista persistencia. Con
+	// credencial FCM valida envia; sin ella procesa en modo degradado (cierra
+	// SIN_DISPOSITIVOS y reprograma CONFIG_FCM) para que ningun trabajo quede
+	// pendiente con cero intentos por un fallo de configuracion.
+	cerrarFCM, modoFCM, errWorker := iniciarOutboxPushOleada4(ctx, depsOleada4, logger)
+	if errWorker != nil {
+		logger.WarnContext(ctx, "FCM Oleada 4: worker no iniciado",
+			slog.String("clase", "FCM_WORKER_NO_INICIADO"))
 	} else {
-		cerrarFCM, errWorker := iniciarFCMWorkerOleada4(ctx, depsOleada4, cfgFCM)
-		if errWorker != nil {
-			logger.WarnContext(ctx, "FCM Oleada 4: worker no iniciado",
-				slog.String("clase", "FCM_WORKER_NO_INICIADO"))
-		} else {
-			defer cerrarFCM()
-		}
+		defer cerrarFCM()
+		logger.InfoContext(ctx, "FCM Oleada 4: outbox push activo",
+			slog.String("modo", modoFCM))
 	}
 
 	// Scheduler durable de recordatorios (Oleada 5): recupera ocurrencias vencidas,
