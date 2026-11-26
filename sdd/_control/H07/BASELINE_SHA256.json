@@ -934,7 +934,6 @@
   "sdd/_control/H08/RUNBOOK_RESTAURACION.md": "2314617c2197f55f1c8ab842bb7b9c8654b39d8d91253d5cd956dc9f1942eb50",
   "sdd/_control/H08/RUNBOOK_START_STOP.md": "eb77398853d048d5c217580767e90ddd4cd126b61de08d108f1a90a6117d1348",
   "sdd/_control/H08/TRUST_OIDC_I060.md": "1eab957a5d23013d364a66a5552c7b6f1783c3efdd774f17757bfb5740834986",
-  "sdd/_control/H08/opencode.PROPUESTA_RFC017.json": "0a5259e58a17240323a6e6c0ba90aecc9669c97e074aa7396741c28ead561e4a",
-  "tests/infra/certificacion/test_certificar_75.py": "10c55f32fc26a9028cc9e4fd2e56f01c8328065e21a7a3557fb218381229f785"
+  "sdd/_control/H08/opencode.PROPUESTA_RFC017.json": "0a5259e58a17240323a6e6c0ba90aecc9669c97e074aa7396741c28ead561e4a"
  }
 }
