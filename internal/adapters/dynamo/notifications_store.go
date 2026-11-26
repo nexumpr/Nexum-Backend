@@ -953,8 +953,21 @@ func readAllJobFromItem(item map[string]types.AttributeValue) (appNotifications.
 		RequestID:  requestID,
 		LeaseOwner: stringAttribute(item["leaseOwner"]),
 	}
-	if creado, ok := epochTimeAttribute(item["createdAt"]); ok {
-		trabajo.CreatedAt = creado
+	// El instante debe provenir de la SK, que es la clave real del trabajo. `createdAt`
+	// se persiste como epoch en segundos, así que reconstruir la SK desde él perdía los
+	// nanosegundos y `ClaimReadAll` apuntaba a una clave distinta: el trabajo se leía
+	// pero nunca se reclamaba (defecto real de E063). Se conserva el epoch solo como
+	// respaldo para items antiguos sin SK válida.
+	resto := strings.TrimPrefix(stringAttribute(item["SK"]), ReadAllQueueSKPrefix)
+	if corte := strings.LastIndex(resto, "#"); corte > 0 {
+		if creado, err := time.Parse(readAllQueueTimeLayout, resto[:corte]); err == nil {
+			trabajo.CreatedAt = creado.UTC()
+		}
+	}
+	if trabajo.CreatedAt.IsZero() {
+		if creado, ok := epochTimeAttribute(item["createdAt"]); ok {
+			trabajo.CreatedAt = creado
+		}
 	}
 	if hasta, ok := epochTimeAttribute(item["leaseUntil"]); ok {
 		trabajo.LeaseUntil = hasta
