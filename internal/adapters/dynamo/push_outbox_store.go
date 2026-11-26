@@ -65,12 +65,16 @@ import (
 // trabajo termina. Así E014 purga el outbox sin `Scan` y sin tocar datos de
 // otras cuentas.
 const (
-	pushOutboxPartition        = "OUTBOX#GLOBAL"
-	pushOutboxDuePrefix        = "DUE#"
-	pushOutboxIdemPrefix       = "IDEM#"
-	pushOutboxEntityType       = "PUSH_OUTBOX"
-	pushOutboxIdemEntityType   = "PUSH_OUTBOX_DELIVERY"
-	pushNotificationEntityType = "USER_NOTIFICATION"
+	pushOutboxPartition      = "OUTBOX#GLOBAL"
+	pushOutboxDuePrefix      = "DUE#"
+	pushOutboxIdemPrefix     = "IDEM#"
+	pushOutboxEntityType     = "PUSH_OUTBOX"
+	pushOutboxIdemEntityType = "PUSH_OUTBOX_DELIVERY"
+	// pushNotificationEntityType usa la MISMA constante que el lector de E061.
+	// Antes era el literal "USER_NOTIFICATION" y el lector filtraba por
+	// "NOTIFICATION": las notificaciones se escribian pero nunca se listaban.
+	// Al compartir la constante, el compilador impide que vuelvan a divergir.
+	pushNotificationEntityType = NotificationEntityType
 
 	// pushOutboxLayoutInstante fija 9 decimales: ancho constante y orden
 	// lexicográfico igual al cronológico.

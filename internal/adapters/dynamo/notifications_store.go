@@ -18,7 +18,11 @@ const (
 	// NotificationEntityType y ReadAllEntityType discriminan los dos items que
 	// este almacén escribe dentro de la partición del usuario.
 	NotificationEntityType = "NOTIFICATION"
-	ReadAllEntityType      = "READALL"
+	// legacyNotificationEntityType es el entityType con el que el worker del
+	// outbox escribio avisos antes de unificar la constante. Se sigue leyendo
+	// para no ocultar notificaciones ya entregadas; nunca se escribe.
+	legacyNotificationEntityType = "USER_NOTIFICATION"
+	ReadAllEntityType            = "READALL"
 
 	// ReadAllQueueEntityType y ReadAllPointerEntityType identifican el ítem
 	// global de la cola de E063 y el puntero dentro de la partición del
@@ -159,8 +163,12 @@ func (s *NotificationsStore) queryNotifications(
 		":pk":           stringAttr(pk),
 		":prefijo":      stringAttr(NotificationSKPrefix),
 		":notificacion": stringAttr(NotificationEntityType),
+		":legacy":       stringAttr(legacyNotificationEntityType),
 	}
-	filtros := []string{"#entityType = :notificacion"}
+	// Se aceptan ambos valores: el canonico y el que escribio el worker antes
+	// de unificar la constante. El parentesis externo mantiene la precedencia
+	// cuando se agregan filtros con AND.
+	filtros := []string{"(#entityType = :notificacion OR #entityType = :legacy)"}
 	if isRead != nil {
 		nombres["#isRead"] = "isRead"
 		valores[":isRead"] = boolAttr(*isRead)
@@ -855,7 +863,11 @@ func traducirTransaccion(err error) error {
 }
 
 func notificationFromItem(item map[string]types.AttributeValue) *appNotifications.Notification {
-	if len(item) == 0 || stringAttribute(item["entityType"]) != NotificationEntityType {
+	if len(item) == 0 {
+		return nil
+	}
+	if entidad := stringAttribute(item["entityType"]); entidad != NotificationEntityType &&
+		entidad != legacyNotificationEntityType {
 		return nil
 	}
 	creado, err := time.Parse(time.RFC3339Nano, stringAttribute(item["createdAt"]))

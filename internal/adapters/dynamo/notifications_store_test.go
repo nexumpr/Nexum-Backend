@@ -551,6 +551,44 @@ func TestE061AdaptadorQueryExclusiveStartKeyYFiltros(t *testing.T) {
 	}
 }
 
+// TestE061AdaptadorEntityTypeCanonicoYLegacy fija la regresión que ocultaba
+// todos los avisos escritos por el worker: el outbox usaba USER_NOTIFICATION y
+// E061 filtraba solo por NOTIFICATION. Ambos valores deben listarse, contarse
+// y poder marcarse como leídos.
+func TestE061AdaptadorEntityTypeCanonicoYLegacy(t *testing.T) {
+	cliente := nuevoE061Fake()
+	cliente.sembrar("user-a", 1, 1, appNotifications.TypeSystem)
+	base := time.Date(2026, 11, 26, 6, 0, 0, 0, time.UTC)
+	idLegacy := "018f90ef-08e5-7a68-b09f-000000000099"
+	pk := notificationUserPK("user-a")
+	sk := notificationSortKey(base, idLegacy)
+	cliente.items[claveItem(pk, sk)] = map[string]types.AttributeValue{
+		"PK":         stringAttr(pk),
+		"SK":         stringAttr(sk),
+		"entityType": stringAttr(legacyNotificationEntityType),
+		"id":         stringAttr(idLegacy),
+		"title":      stringAttr("Aviso legacy"),
+		"message":    stringAttr("Mensaje"),
+		"type":       stringAttr(string(appNotifications.TypeSystem)),
+		"isRead":     boolAttr(false),
+		"createdAt":  stringAttr(base.Format(time.RFC3339Nano)),
+	}
+	store := NewNotificationsStore(cliente, "nexum-table")
+
+	lista, err := store.List(context.Background(), appNotifications.ListQuery{UserID: "user-a", Limit: 10})
+	if err != nil || len(lista.Items) != 2 {
+		t.Fatalf("la bandeja debe incluir el entityType canónico y el legacy: %+v %v", lista, err)
+	}
+	total, err := store.CountUnread(context.Background(), "user-a")
+	if err != nil || total != 2 {
+		t.Fatalf("CountUnread debe contar ambos entityType: %d %v", total, err)
+	}
+	leida, err := store.MarkRead(context.Background(), "user-a", idLegacy, base.Add(time.Minute))
+	if err != nil || leida == nil || !leida.IsRead {
+		t.Fatalf("MarkRead sobre un aviso legacy: %+v %v", leida, err)
+	}
+}
+
 func TestE061AdaptadorSelectCountPagaTodaLaBandeja(t *testing.T) {
 	cliente := nuevoE061Fake()
 	cliente.sembrar("user-a", 30, 17, appNotifications.TypeSystem)

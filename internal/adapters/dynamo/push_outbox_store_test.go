@@ -756,6 +756,11 @@ func TestOUTBOXIdempotenciaYBandejaE061(t *testing.T) {
 	if got := stringAttribute(bandeja.Item["SK"]); got != esperadoSK {
 		t.Fatalf("SK bandeja=%q esperado %q", got, esperadoSK)
 	}
+	// El worker y E061 deben usar el MISMO entityType. Si diverge, el aviso se
+	// escribe pero la bandeja nunca lo lista (defecto real de v0.21.2).
+	if got := stringAttribute(bandeja.Item["entityType"]); got != NotificationEntityType {
+		t.Fatalf("entityType bandeja=%q, el lector de E061 espera %q", got, NotificationEntityType)
+	}
 	if boolAttribute(bandeja.Item["isRead"]) {
 		t.Fatal("la notificación nueva debe estar no leída")
 	}
