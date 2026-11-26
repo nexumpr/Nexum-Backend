@@ -2,12 +2,17 @@ package ses
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2/types"
+	"github.com/aws/smithy-go"
+
+	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
 )
 
 // Mailer implementa ports.Correo con Amazon SES v2 (API HTTPS, no SMTP).
@@ -94,7 +99,47 @@ func (m *Mailer) EnviarVerificacion(ctx context.Context, destino, token string, 
 		},
 	})
 	if err != nil {
-		return "", fmt.Errorf("ses send-email verificacion: %w", err)
+		return "", clasificarErrorVerificacion(ctx, err)
 	}
 	return aws.ToString(out.MessageId), nil
+}
+
+// clasificarErrorVerificacion traduce el error de SES a una clase estable para el
+// servicio de E010. El mensaje original no se registra: puede contener direcciones.
+//
+//   - ambiguo: timeout o corte. El proveedor pudo aceptar el mensaje; NO se reintenta.
+//   - transitorio: cuota/indisponibilidad. El SDK ya agoto sus reintentos internos.
+//   - definitivo: permiso, remitente, validacion o cuenta suspendida. Reintentar no ayuda.
+func clasificarErrorVerificacion(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+	clase := appIdentity.ErrEnvioDefinitivo
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		clase = appIdentity.ErrEnvioAmbiguo
+	} else {
+		var red net.Error
+		if errors.As(err, &red) && red.Timeout() {
+			clase = appIdentity.ErrEnvioAmbiguo
+		} else {
+			var apiErr smithy.APIError
+			if errors.As(err, &apiErr) {
+				switch apiErr.ErrorCode() {
+				case "TooManyRequestsException", "ThrottlingException", "Throttling",
+					"RequestLimitExceeded", "ServiceUnavailable", "InternalFailure":
+					clase = appIdentity.ErrEnvioTransitorio
+				case "AccessDeniedException", "AccessDenied", "NotAuthorized",
+					"MessageRejected", "ValidationException", "BadRequestException",
+					"AccountSuspendedException", "SendingPausedException",
+					"MailFromDomainNotVerifiedException":
+					clase = appIdentity.ErrEnvioDefinitivo
+				default:
+					// Codigo no catalogado: se trata como rechazo definitivo para no
+					// insinuar que un reintento lo resolveria.
+					clase = appIdentity.ErrEnvioDefinitivo
+				}
+			}
+		}
+	}
+	return fmt.Errorf("%w: %v", clase, err)
 }

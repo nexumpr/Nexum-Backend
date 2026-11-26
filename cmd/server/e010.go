@@ -62,6 +62,9 @@ func montarE010(
 			logger.Error("E010: no se pudo configurar SES; el endpoint respondera 503",
 				slog.String("error_class", "ses_config"))
 		} else {
+			// Cliente HTTP propio: sin reutilizar conexiones ociosas y con timeouts
+			// cortos, para que un socket muerto no consuma el deadline completo del envio.
+			cfgSES.HTTPClient = sesHTTPClient()
 			correo = sesAdapter.NewMailer(sesv2.NewFromConfig(cfgSES), remitente)
 		}
 	} else {
