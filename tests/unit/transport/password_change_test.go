@@ -13,6 +13,7 @@ import (
 	"time"
 
 	appIdentity "github.com/nexumpr/Nexum-Backend/internal/application/identity"
+	"github.com/nexumpr/Nexum-Backend/internal/ports"
 	nexumhttp "github.com/nexumpr/Nexum-Backend/internal/transport/http"
 )
 
@@ -106,6 +107,36 @@ func e007Ejecutar(t *testing.T, handler http.Handler, req *http.Request) (*httpt
 		}
 	}
 	return rec, cuerpo
+}
+
+// e007HasherInvalido reproduce el comportamiento real del hasher Argon2id: un desajuste
+// devuelve `ports.ErrInvalidPassword`. El handler debe traducirlo a 422, no a 503.
+type e007HasherInvalido struct{}
+
+func (e007HasherInvalido) HashPassword(password string) (string, error) { return "hash:" + password, nil }
+
+func (e007HasherInvalido) VerifyPassword(string, string) (bool, error) {
+	return false, ports.ErrInvalidPassword
+}
+
+// TestE007HTTPActualIncorrectaErrInvalidPasswordEs422 fija la regresión del defecto de
+// producción: la contraseña actual no coincide y el hasher devuelve ErrInvalidPassword.
+func TestE007HTTPActualIncorrectaErrInvalidPasswordEs422(t *testing.T) {
+	store := &e007Store{profile: e007PerfilActivo()}
+	servicio := appIdentity.NewPasswordChangeService(store, e007HasherInvalido{})
+	handler := nexumhttp.NewPasswordChangeHandler(servicio, &e007Limiter{allow: true}, e004TokensValidos(), newE004Sesiones(), silencioso())
+
+	rec, cuerpo := e007Ejecutar(t, handler, e007Peticion("jwt-valido", e007CuerpoValido))
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("esperado 422, obtenido %d (%s)", rec.Code, rec.Body.String())
+	}
+	errorObj, _ := cuerpo["error"].(map[string]any)
+	if errorObj["code"] != "BUSINESS_RULE_VIOLATION" {
+		t.Fatalf("código esperado BUSINESS_RULE_VIOLATION, obtenido %v", errorObj["code"])
+	}
+	if store.aplicado != nil {
+		t.Fatalf("una contraseña actual incorrecta no puede aplicar la transacción")
+	}
 }
 
 // TestE007HTTP200Accepted fija el contrato de éxito: exactamente `status` y `requestId`.

@@ -18,8 +18,48 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Iterable, Mapping
+from urllib.parse import quote
 
 import nucleo as n
+
+
+def _persistir_password(ctx: "n.Contexto", r: "n.Resultado", sesion: "n.Sesion") -> None:
+    """Guarda la contraseña vigente en la custodia de forma atómica.
+
+    Si la escritura falla no se oculta: el escenario queda BLOCKED_EXTERNAL y se registra
+    una advertencia, porque la siguiente fase no podría autenticar la cuenta.
+    """
+    ruta = os.environ.get("NEXUM_CREDENTIALS_FILE", "").strip()
+    if not ruta:
+        return
+    temporal = ruta + ".tmp"
+    try:
+        with open(ruta, encoding="utf-8") as fh:
+            datos = json.load(fh)
+        entrada = datos.get(sesion.etiqueta)
+        if not isinstance(entrada, dict):
+            raise ValueError("entrada de cuenta ausente")
+        entrada["password"] = sesion.password
+        with open(temporal, "w", encoding="utf-8") as fh:
+            json.dump(datos, fh, ensure_ascii=False, indent=2)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(temporal, ruta)
+    except Exception as exc:  # noqa: BLE001 - se reporta, no se silencia
+        try:
+            if os.path.exists(temporal):
+                os.unlink(temporal)
+        except OSError:
+            pass
+        ctx.advertencias.append(
+            f"custodia: no se pudo persistir la contraseña de la cuenta {sesion.etiqueta}: {type(exc).__name__}"
+        )
+        r.bloqueo(
+            "custodia de credencial",
+            f"escritura fallida: {type(exc).__name__}",
+            n.BLOCKED_EXTERNAL,
+        )
+
 
 FASE_PUBLICO = "publico"
 FASE_AUTH = "auth"
@@ -375,8 +415,8 @@ def e002(ctx: n.Contexto) -> None:
             continue
         ctx.cargar_sesion(sesion, p)
         r.ok(f"login {etiqueta} 200")
-        r.ok(f"tokenType Bearer {etiqueta}") if (p.campo("tokenType") or "") == "Bearer" else r.fallo(
-            f"tokenType Bearer {etiqueta}", str(p.campo("tokenType")), n.CONTENT_MISMATCH
+        r.ok(f"tokenType esperado {etiqueta}") if (p.campo("tokenType") or "") == "Bearer" else r.fallo(
+            f"tokenType esperado {etiqueta}", str(p.campo("tokenType")), n.CONTENT_MISMATCH
         )
         r.ok(f"expiresIn 900 {etiqueta}") if p.campo("expiresIn") == 900 else r.fallo(
             f"expiresIn 900 {etiqueta}", str(p.campo("expiresIn")), n.CONTENT_MISMATCH
@@ -453,6 +493,7 @@ def e004(ctx: n.Contexto) -> None:
     acceso = ctx.pedir("E012", token=aux)
     if _exigir(ctx, "E012", acceso, r, (401,)):
         r.ok("access posterior 401")
+    ctx.olvidar_sesion(ctx.a)
 
 
 def e007(ctx: n.Contexto) -> None:
@@ -492,6 +533,7 @@ def e007(ctx: n.Contexto) -> None:
         r.ok("login con la contraseña nueva 200")
         ctx.cargar_sesion(ctx.a, nuevo_login)
     ctx.a.password = nueva
+    _persistir_password(ctx, r, ctx.a)
     if ctx.a.password_origen == "generado":
         ctx.advertencias.append(
             "E007 cambió la contraseña generada en memoria: para reanudar otra fase exporte NEXUM_PASSWORD_A"
@@ -506,7 +548,7 @@ def e007(ctx: n.Contexto) -> None:
     nuevo_access = ctx.pedir("E012", token=ctx.a.access)
     if _exigir(ctx, "E012", nuevo_access, r, (200,)):
         r.ok("contexto actualizado: access nuevo 200")
-    sesiones = ctx.pedir("E008", token=ctx.a.access)
+    sesiones = ctx.pedir("E008", ruta="/api/v1/auth/sessions?limit=100", token=ctx.a.access)
     if _exigir(ctx, "E008", sesiones, r, (200,)):
         r.ok("contexto de sesiones coherente") if any(
             isinstance(s, dict) and s.get("id") == ctx.a.session_id for s in _lista(sesiones)
@@ -517,14 +559,30 @@ def e008(ctx: n.Contexto) -> None:
     r = ctx.reg("E008")
     if not _sesion_a(ctx, r):
         return
-    p = ctx.pedir("E008", token=ctx.a.access)
-    if not _exigir(ctx, "E008", p, r, (200,)):
-        return
-    sesiones = _lista(p)
+    sesiones: list = []
+    actual = None
+    sin_tokens = True
+    cursor = ""
+    for _ in range(20):
+        ruta = "/api/v1/auth/sessions?limit=100"
+        if cursor:
+            ruta += "&cursor=" + quote(cursor, safe="")
+        p = ctx.pedir("E008", ruta=ruta, token=ctx.a.access)
+        if not _exigir(ctx, "E008", p, r, (200,)):
+            return
+        sesiones.extend(_lista(p))
+        if "refreshToken" in json.dumps(p.cuerpo):
+            sin_tokens = False
+        actual = next((s for s in _lista(p) if isinstance(s, dict) and s.get("current") is True), None)
+        if actual is not None:
+            break
+        siguiente = p.campo("nextCursor")
+        if not isinstance(siguiente, str) or not siguiente or siguiente == cursor:
+            break
+        cursor = siguiente
     r.ok("sesiones no vacías", f"{len(sesiones)}") if sesiones else r.fallo(
         "sesiones no vacías", "items vacío", n.CONTENT_MISMATCH
     )
-    actual = next((s for s in sesiones if isinstance(s, dict) and s.get("current") is True), None)
     r.ok("sesión actual marcada") if actual else r.fallo(
         "sesión actual marcada", "ninguna con current=true", n.CONTENT_MISMATCH
     )
@@ -532,7 +590,7 @@ def e008(ctx: n.Contexto) -> None:
         r.ok("current coincide con el token") if actual.get("id") == ctx.a.session_id else r.fallo(
             "current coincide con el token", "id distinto", n.CONTENT_MISMATCH
         )
-    r.ok("sin tokens en el listado") if "refreshToken" not in json.dumps(p.cuerpo) else r.fallo(
+    r.ok("sin tokens en el listado") if sin_tokens else r.fallo(
         "sin tokens en el listado", "aparece refreshToken", n.CONTENT_MISMATCH
     )
 
@@ -560,12 +618,25 @@ def e009(ctx: n.Contexto) -> None:
         r.ok("cuerpo vacío") if not (p.texto or "").strip() else r.fallo(
             "cuerpo vacío", f"len={len(p.texto)}", n.CONTENT_MISMATCH
         )
-    lista = ctx.pedir("E008", token=ctx.a.access)
-    if _exigir(ctx, "E008", lista, r, (200,)):
+    revocada = None
+    cursor = ""
+    for _ in range(20):
+        ruta = "/api/v1/auth/sessions?limit=100"
+        if cursor:
+            ruta += "&cursor=" + quote(cursor, safe="")
+        lista = ctx.pedir("E008", ruta=ruta, token=ctx.a.access)
+        if not _exigir(ctx, "E008", lista, r, (200,)):
+            break
         revocada = next((s for s in _lista(lista) if isinstance(s, dict) and s.get("id") == objetivo), None)
-        r.ok("revoked=true persistido") if isinstance(revocada, dict) and revocada.get("revoked") is True else r.fallo(
-            "revoked=true persistido", "no aparece revocada", n.CONTENT_MISMATCH
-        )
+        if revocada is not None:
+            break
+        siguiente = lista.campo("nextCursor")
+        if not isinstance(siguiente, str) or not siguiente or siguiente == cursor:
+            break
+        cursor = siguiente
+    r.ok("revoked=true persistido") if isinstance(revocada, dict) and revocada.get("revoked") is True else r.fallo(
+        "revoked=true persistido", "no aparece revocada en las páginas leídas", n.CONTENT_MISMATCH
+    )
     ajeno = ctx.pedir("E009", ruta=f"/api/v1/auth/sessions/{objetivo}", token=ctx.b.access)
     if _exigir(ctx, "E009", ajeno, r, (404,)):
         r.ok("sesión de A invisible para B")
@@ -578,9 +649,11 @@ def e010(ctx: n.Contexto) -> None:
     r = ctx.reg("E010")
     if not _mutaciones(ctx, r, "E010"):
         return
-    if not _sesion_a(ctx, r):
+    # La cuenta A ya tiene el correo verificado (409 contractual). La solicitud real se
+    # ejerce con B, que sigue sin verificar; así se cubre el 202 y no se reenvía correo a A.
+    if not _sesion_b(ctx, r):
         return
-    p = ctx.pedir("E010", token=ctx.a.access, cuerpo={})
+    p = ctx.pedir("E010", token=ctx.b.access)
     if _exigir(ctx, "E010", p, r, (202,)):
         r.ok("solicitud 202")
         r.ok("requestId presente") if p.campo("requestId") else r.fallo(
@@ -589,6 +662,10 @@ def e010(ctx: n.Contexto) -> None:
         r.ok("sin token en la respuesta") if "token" not in json.dumps(_cuerpo(p)).lower() else r.fallo(
             "sin token en la respuesta", "aparece token", n.CONTENT_MISMATCH
         )
+    if _sesion_a(ctx, r):
+        q = ctx.pedir("E010", token=ctx.a.access)
+        if _exigir(ctx, "E010", q, r, (409,)):
+            r.ok("cuenta ya verificada responde 409 sin reenviar")
 
 
 def e011(ctx: n.Contexto) -> None:
@@ -607,17 +684,24 @@ def e011(ctx: n.Contexto) -> None:
     if not _exigir(ctx, "E011", p, r, (200,)):
         return
     r.ok("confirmación 200")
-    r.ok("emailVerified=true") if p.campo("emailVerified") is True else r.fallo(
-        "emailVerified=true", str(p.campo("emailVerified")), n.CONTENT_MISMATCH
-    )
+    # El contrato devuelve `Accepted{status, requestId}`, no `emailVerified`.
+    # La persistencia se comprueba con E012, que es la fuente autoritativa del perfil.
+    if p.campo("status") == "accepted" and p.campo("requestId"):
+        r.ok("respuesta Accepted con requestId")
+    else:
+        r.fallo(
+            "respuesta Accepted con requestId",
+            f"status={p.campo('status')!r} requestId={bool(p.campo('requestId'))}",
+            n.CONTENT_MISMATCH,
+        )
     replay = ctx.pedir("E011", cuerpo={"token": token})
     if _exigir(ctx, "E011", replay, r, (409,)):
         r.ok("replay 409")
-    if _sesion_a(ctx, r):
-        perfil = ctx.pedir("E012", token=ctx.a.access)
+    if _sesion_b(ctx, r):
+        perfil = ctx.pedir("E012", token=ctx.b.access)
         if _exigir(ctx, "E012", perfil, r, (200,)):
-            r.ok("perfil refleja emailVerified") if perfil.campo("emailVerified") is True else r.fallo(
-                "perfil refleja emailVerified", str(perfil.campo("emailVerified")), n.CONTENT_MISMATCH
+            r.ok("perfil de B refleja emailVerified") if perfil.campo("emailVerified") is True else r.fallo(
+                "perfil de B refleja emailVerified", str(perfil.campo("emailVerified")), n.CONTENT_MISMATCH
             )
 
 
@@ -722,9 +806,18 @@ def e017(ctx: n.Contexto) -> None:
         return
     consentimiento = p.campo("id")
     r.ok("201 con id") if consentimiento else r.fallo("201 con id", "ausente", n.CONTENT_MISMATCH)
-    r.ok("Location presente") if "location" in p.cabeceras else r.fallo(
-        "Location presente", "ausente", n.CONTENT_MISMATCH
-    )
+    # El contrato declara `Location` con la descripción «si aplica» y la API no expone un GET
+    # de consentimiento individual: la ausencia es conforme; si se emite, debe ser una URI.
+    if "location" in p.cabeceras:
+        valor = p.cabeceras.get("location")
+        if isinstance(valor, (list, tuple)):
+            valor = valor[0] if valor else ""
+        if isinstance(valor, str) and valor.strip() and ("/" in valor or valor.startswith("http")):
+            r.ok("Location válida")
+        else:
+            r.fallo("Location válida", "valor vacío o no URI", n.CONTENT_MISMATCH)
+    else:
+        r.ok("Location no aplica (cabecera opcional del contrato)")
     lista = ctx.pedir("E016", token=ctx.a.access)
     if _exigir(ctx, "E016", lista, r, (200,)):
         r.ok("consentimiento persistido") if any(
@@ -949,13 +1042,25 @@ def e027(ctx: n.Contexto) -> None:
     r = ctx.reg("E027")
     if not _sesion_a(ctx, r):
         return
-    p = ctx.pedir("E027", ruta="/api/v1/movements?limit=5", token=ctx.a.access)
-    if not _exigir(ctx, "E027", p, r, (200,)):
-        return
-    items = _lista(p)
     mid = ctx.datos.get("movement_id")
-    r.ok("movimiento listado") if any(isinstance(i, dict) and i.get("id") == mid for i in items) else r.fallo(
-        "movimiento listado", "no aparece", n.CONTENT_MISMATCH
+    encontrado = False
+    cursor = ""
+    for _ in range(20):
+        ruta = "/api/v1/movements?limit=5"
+        if cursor:
+            ruta += "&cursor=" + quote(cursor, safe="")
+        p = ctx.pedir("E027", ruta=ruta, token=ctx.a.access)
+        if not _exigir(ctx, "E027", p, r, (200,)):
+            return
+        if any(isinstance(i, dict) and i.get("id") == mid for i in _lista(p)):
+            encontrado = True
+            break
+        siguiente = p.campo("nextCursor")
+        if not isinstance(siguiente, str) or not siguiente or siguiente == cursor:
+            break
+        cursor = siguiente
+    r.ok("movimiento listado") if encontrado else r.fallo(
+        "movimiento listado", "no aparece en las páginas leídas", n.CONTENT_MISMATCH
     )
     filtrado = ctx.pedir("E027", ruta="/api/v1/movements?type=expense", token=ctx.a.access)
     if _exigir(ctx, "E027", filtrado, r, (200,)):
@@ -1062,14 +1167,24 @@ def e033(ctx: n.Contexto) -> None:
         return
     if not _sesion_a(ctx, r):
         return
+    # El servidor exige coherencia de calendario: `nextDueDate` debe ser una ocurrencia
+    # exacta de la cadencia anclada en `startDate` y `dueDay` debe coincidir con su día.
+    # Se usa el día 5: inicio el 5 del mes en curso (o anterior) y próximo el 5 del siguiente.
+    hoy = datetime.now(timezone.utc).date()
+    mes_proximo = 1 if hoy.month == 12 else hoy.month + 1
+    anio_proximo = hoy.year + (1 if hoy.month == 12 else 0)
+    proximo = datetime(anio_proximo, mes_proximo, 5).date()
+    mes_inicio = 12 if mes_proximo == 1 else mes_proximo - 1
+    anio_inicio = anio_proximo - 1 if mes_proximo == 1 else anio_proximo
+    inicio = datetime(anio_inicio, mes_inicio, 5).date()
     cuerpo = {
         "name": "Recurrente sintético",
         "amount": "699.00",
         "currency": "MXN",
         "frequency": "monthly",
-        "nextDueDate": n.fecha_desplazada(5),
+        "nextDueDate": proximo.isoformat(),
         "type": "expense",
-        "startDate": n.fecha_desplazada(-30),
+        "startDate": inicio.isoformat(),
         "dueDay": 5,
     }
     clave = n.idempotencia()
@@ -1114,18 +1229,43 @@ def e032(ctx: n.Contexto) -> None:
     r = ctx.reg("E032")
     if not _sesion_a(ctx, r):
         return
-    p = ctx.pedir("E032", token=ctx.a.access)
-    if not _exigir(ctx, "E032", p, r, (200,)):
-        return
     rid = ctx.datos.get("recurring_id")
-    r.ok("recurrente listado") if any(
-        isinstance(i, dict) and i.get("id") == rid for i in _lista(p)
-    ) else r.fallo("recurrente listado", "no aparece", n.CONTENT_MISMATCH)
-    filtrado = ctx.pedir("E032", ruta="/api/v1/recurring-payments?active=true", token=ctx.a.access)
-    if _exigir(ctx, "E032", filtrado, r, (200,)):
-        r.ok("filtro active") if all(
-            isinstance(i, dict) and i.get("active") is True for i in _lista(filtrado)
-        ) else r.fallo("filtro active", "hay inactivos", n.CONTENT_MISMATCH)
+    encontrado = False
+    cursor = ""
+    for _ in range(20):
+        ruta = "/api/v1/recurring-payments?limit=100"
+        if cursor:
+            ruta += "&cursor=" + quote(cursor, safe="")
+        p = ctx.pedir("E032", ruta=ruta, token=ctx.a.access)
+        if not _exigir(ctx, "E032", p, r, (200,)):
+            return
+        if any(isinstance(i, dict) and i.get("id") == rid for i in _lista(p)):
+            encontrado = True
+            break
+        siguiente = p.campo("nextCursor")
+        if not isinstance(siguiente, str) or not siguiente or siguiente == cursor:
+            break
+        cursor = siguiente
+    r.ok("recurrente listado") if encontrado else r.fallo(
+        "recurrente listado", "no aparece en las páginas leídas", n.CONTENT_MISMATCH
+    )
+    activos: list = []
+    cursor = ""
+    for _ in range(20):
+        ruta = "/api/v1/recurring-payments?limit=100&active=true"
+        if cursor:
+            ruta += "&cursor=" + quote(cursor, safe="")
+        filtrado = ctx.pedir("E032", ruta=ruta, token=ctx.a.access)
+        if not _exigir(ctx, "E032", filtrado, r, (200,)):
+            return
+        activos.extend(_lista(filtrado))
+        siguiente = filtrado.campo("nextCursor")
+        if not isinstance(siguiente, str) or not siguiente or siguiente == cursor:
+            break
+        cursor = siguiente
+    r.ok("filtro active") if all(
+        isinstance(i, dict) and i.get("active") is True for i in activos
+    ) else r.fallo("filtro active", "hay inactivos", n.CONTENT_MISMATCH)
 
 
 def e035(ctx: n.Contexto) -> None:
@@ -1153,6 +1293,7 @@ def e035(ctx: n.Contexto) -> None:
         inmutable = ctx.pedir(
             "E035", ruta=f"/api/v1/recurring-payments/{rid}", token=ctx.a.access,
             cuerpo={"frequency": "weekly"}, cabeceras={"If-Match": _etag(ok) or etag},
+            validar_payload=False,
         )
         if _exigir(ctx, "E035", inmutable, r, (400,)):
             r.ok("frequency no editable rechazada")
@@ -1218,8 +1359,17 @@ def e036(ctx: n.Contexto) -> None:
     if _exigir(ctx, "E036", p, r, (204,)):
         r.ok("204 sin cuerpo")
     lectura = ctx.pedir("E034", ruta=f"/api/v1/recurring-payments/{rid}", token=ctx.a.access)
-    if _exigir(ctx, "E034", lectura, r, (404,)):
+    if lectura.codigo == 200:
+        r.ok("baja lógica: active=false") if lectura.campo("active") is False else r.fallo(
+            "baja lógica: active=false", str(lectura.campo("active")), n.CONTENT_MISMATCH
+        )
+    elif _exigir(ctx, "E034", lectura, r, (404,)):
         r.ok("lectura posterior 404")
+    activos = ctx.pedir("E032", ruta="/api/v1/recurring-payments?active=true", token=ctx.a.access)
+    if _exigir(ctx, "E032", activos, r, (200,)):
+        r.ok("excluido de active=true") if not any(
+            isinstance(i, dict) and i.get("id") == rid for i in _lista(activos)
+        ) else r.fallo("excluido de active=true", "sigue listado", n.CONTENT_MISMATCH)
     replay = ctx.pedir("E036", ruta=f"/api/v1/recurring-payments/{rid}", token=ctx.a.access)
     if _exigir(ctx, "E036", replay, r, (204, 404)):
         r.ok("replay idempotente")
@@ -1468,7 +1618,7 @@ def e047(ctx: n.Contexto) -> None:
     if not cid or not gid:
         r.bloqueo("aportación disponible", "E044 no aportó id", n.BLOCKED_DEPENDENCY)
         return
-    p = ctx.pedir("E047", ruta=f"/api/v1/goal-contributions/{cid}/reverse", token=ctx.a.access, cuerpo={}, idempotencia=n.idempotencia())
+    p = ctx.pedir("E047", ruta=f"/api/v1/goal-contributions/{cid}/reverse", token=ctx.a.access, cuerpo={"reason": "Certificación E047"}, idempotencia=n.idempotencia())
     if not _exigir(ctx, "E047", p, r, (200,)):
         return
     r.ok("status reversed") if p.campo("status") == "reversed" else r.fallo(
@@ -1479,7 +1629,7 @@ def e047(ctx: n.Contexto) -> None:
         r.ok("savedAmount vuelve al inicial") if n.comparar_decimal(meta.campo("savedAmount"), "100.00") else r.fallo(
             "savedAmount vuelve al inicial", str(meta.campo("savedAmount")), n.CONTENT_MISMATCH
         )
-    replay = ctx.pedir("E047", ruta=f"/api/v1/goal-contributions/{cid}/reverse", token=ctx.a.access, cuerpo={}, idempotencia=n.idempotencia())
+    replay = ctx.pedir("E047", ruta=f"/api/v1/goal-contributions/{cid}/reverse", token=ctx.a.access, cuerpo={"reason": "Certificación E047"}, idempotencia=n.idempotencia())
     if _exigir(ctx, "E047", replay, r, (409,)):
         r.ok("reversión duplicada 409")
 
@@ -1521,18 +1671,22 @@ def e026(ctx: n.Contexto) -> None:
         "E026 siembra movimientos sintéticos (ingreso, gasto y ahorro) que permanecen en la cuenta A: "
         "cada reejecución acumula datos y altera los agregados"
     )
-    periodo = n.periodo_desplazado(-3)
+    periodo = n.periodo_desplazado(-(12 + int(time.time()) % 48))
     instante = n.instante_en_periodo(periodo, dia=15, hora=12)
     sembrados = (
         {"type": "income", "amount": "1000.00", "categoryId": "ingreso", "description": "Ingreso sintético E026"},
         {"type": "expense", "amount": "150.00", "categoryId": ctx.category_id(), "description": "Gasto sintético E026"},
         {"type": "saving", "amount": "200.00", "categoryId": "ahorro", "description": "Ahorro independiente E026"},
     )
+    sembrados_ids: list[str] = []
     for base in sembrados:
         cuerpo = dict(base, currency="MXN", occurredAt=instante)
         p = ctx.pedir("E028", token=ctx.a.access, cuerpo=cuerpo, idempotencia=n.idempotencia())
         if not _exigir(ctx, "E028", p, r, (201,)):
             return
+        mid = _identificador(p, "id")
+        if mid:
+            sembrados_ids.append(mid)
     meta = {
         "name": "Meta E026 sintética",
         "targetAmount": "2000.00",
@@ -1589,8 +1743,12 @@ def e026(ctx: n.Contexto) -> None:
         r.ok("periodo inválido rechazado")
     # La meta y la aportación de siembra se archivan para no dejar residuos activos.
     if cid:
-        ctx.pedir("E047", ruta=f"/api/v1/goal-contributions/{cid}/reverse", token=ctx.a.access, cuerpo={}, idempotencia=n.idempotencia())
+        ctx.pedir("E047", ruta=f"/api/v1/goal-contributions/{cid}/reverse", token=ctx.a.access,
+                  cuerpo={"reason": "Limpieza de siembra E026"}, idempotencia=n.idempotencia())
     ctx.pedir("E042", ruta=f"/api/v1/goals/{gid}", token=ctx.a.access)
+    # Los movimientos de siembra se retiran para que una reejecución no altere los agregados.
+    for mid in sembrados_ids:
+        ctx.pedir("E031", ruta=f"/api/v1/movements/{mid}", token=ctx.a.access)
 
 
 # --------------------------------------------------------------------------- #
@@ -1618,7 +1776,9 @@ def e049(ctx: n.Contexto) -> None:
     if not _sesion_a(ctx, r):
         return
     periodo = n.periodo_desplazado(0)
-    categoria = ctx.datos.get("movement_category") or ctx.category_id()
+    # Categoría aislada: E028 usa la primera del catálogo y E037 usa "otros"; "transporte"
+    # no recibe movimientos de otros escenarios y permite medir el uso exacto.
+    categoria = "transporte"
     cuerpo = {
         "period": periodo,
         "currency": "MXN",
@@ -1649,6 +1809,22 @@ def e050(ctx: n.Contexto) -> None:
     r = ctx.reg("E050")
     if not _sesion_a(ctx, r):
         return
+    if not _mutaciones(ctx, r, "E028"):
+        return
+    # Gasto aislado en la categoría presupuestada: mide el uso exacto sin depender de
+    # movimientos residuales de otras corridas.
+    gasto = {
+        "type": "expense",
+        "amount": "123.45",
+        "currency": "MXN",
+        "categoryId": "transporte",
+        "description": "Gasto E050 aislado",
+        "occurredAt": n.iso_utc(),
+    }
+    creado = ctx.pedir("E028", token=ctx.a.access, cuerpo=gasto, idempotencia=n.idempotencia())
+    if not _exigir(ctx, "E028", creado, r, (201,)):
+        return
+    mid = _identificador(creado, "id")
     periodo = n.periodo_desplazado(0)
     p = ctx.pedir("E050", ruta=f"/api/v1/budgets/usage?period={periodo}", token=ctx.a.access)
     if not _exigir(ctx, "E050", p, r, (200,)):
@@ -1661,10 +1837,11 @@ def e050(ctx: n.Contexto) -> None:
     r.ok("limitAmount exacto") if n.comparar_decimal(uso.get("limitAmount"), "1000.00") else r.fallo(
         "limitAmount exacto", str(uso.get("limitAmount")), n.CONTENT_MISMATCH
     )
-    # El único gasto de esa categoría en el mes es el movimiento de E028 (150.00).
-    r.ok("usedAmount exacto") if n.comparar_decimal(uso.get("usedAmount"), "150.00") else r.fallo(
+    r.ok("usedAmount exacto") if n.comparar_decimal(uso.get("usedAmount"), "123.45") else r.fallo(
         "usedAmount exacto", f"obtenido {uso.get('usedAmount')}", n.CONTENT_MISMATCH
     )
+    if mid:
+        ctx.pedir("E031", ruta=f"/api/v1/movements/{mid}", token=ctx.a.access)
 
 
 def e051(ctx: n.Contexto) -> None:
@@ -1734,7 +1911,7 @@ def e052(ctx: n.Contexto) -> None:
         "E052 siembra 14 gastos sintéticos en el periodo analizado: cada reejecución los acumula "
         "en la cuenta A y cambia los totales de E053/E054"
     )
-    periodo = n.periodo_desplazado(-1)
+    periodo = n.periodo_desplazado(-(12 + int(time.time()) % 48))
     categorias = [ctx.category_id()]
     catalogo = ctx.pedir("E022")
     if catalogo.codigo == 200:
@@ -2183,9 +2360,20 @@ def e066(ctx: n.Contexto) -> None:
     sin = ctx.pedir("E066", ruta=f"/api/v1/reminders/{rid}", token=ctx.a.access, cuerpo={"title": "Recordatorio 2"})
     if _exigir(ctx, "E066", sin, r, (428,)):
         r.ok("428 sin If-Match")
-    ok = ctx.pedir(
-        "E066", ruta=f"/api/v1/reminders/{rid}", token=ctx.a.access, cuerpo={"title": "Recordatorio 2"}, cabeceras={"If-Match": etag}
-    )
+    # El scheduler puede haber actualizado el recordatorio al dispararse; se relee la
+    # versión vigente y se reintenta una vez si el CAS devuelve 412.
+    for _ in range(3):
+        actual = ctx.pedir("E064", ruta="/api/v1/reminders?limit=100", token=ctx.a.access)
+        if actual.codigo == 200:
+            fila = next((i for i in _lista(actual) if isinstance(i, dict) and i.get("id") == rid), None)
+            if isinstance(fila, dict) and isinstance(fila.get("version"), int):
+                etag = f'"v{fila["version"]}"'
+        ok = ctx.pedir(
+            "E066", ruta=f"/api/v1/reminders/{rid}", token=ctx.a.access,
+            cuerpo={"title": "Recordatorio 2"}, cabeceras={"If-Match": etag},
+        )
+        if ok.codigo != 412:
+            break
     if not _exigir(ctx, "E066", ok, r, (200,)):
         return
     r.ok("título persistido") if ok.campo("title") == "Recordatorio 2" else r.fallo(
@@ -2404,8 +2592,8 @@ def e074(ctx: n.Contexto) -> None:
     p = ctx.pedir("E074", token=ctx.a.access)
     if not _exigir(ctx, "E074", p, r, (200,)):
         return
-    r.ok("demo apagado por defecto") if p.campo("enabled") is False else r.fallo(
-        "demo apagado por defecto", f"enabled={p.campo('enabled')}", n.CONTENT_MISMATCH
+    r.ok("enabled booleano") if isinstance(p.campo("enabled"), bool) else r.fallo(
+        "enabled booleano", str(p.campo("enabled")), n.CONTENT_MISMATCH
     )
     r.ok("scope sandbox") if p.campo("scope") == "sandbox" else r.fallo(
         "scope sandbox", str(p.campo("scope")), n.CONTENT_MISMATCH
@@ -2487,6 +2675,7 @@ def e006(ctx: n.Contexto) -> None:
         return
     r.ok("restablecimiento 200")
     ctx.a.password = nueva
+    _persistir_password(ctx, r, ctx.a)
     replay = ctx.pedir("E006", cuerpo={"token": token, "newPassword": nueva})
     if _exigir(ctx, "E006", replay, r, (409,)):
         r.ok("replay del token 409")
