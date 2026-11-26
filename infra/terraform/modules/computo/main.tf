@@ -149,8 +149,12 @@ resource "aws_autoscaling_group" "backend" {
   health_check_grace_period = var.health_check_grace_period
 
   launch_template {
-    id      = aws_launch_template.backend.id
-    version = "$Latest"
+    id = aws_launch_template.backend.id
+    # Se fija a la version creada por ESTE apply, no a "$Latest": un plan generado
+    # con variables de release obsoletas no puede hacer que las instancias nuevas
+    # arranquen con una version anterior solo por ser la ultima publicada. Si el
+    # Launch Template no cambia, la version es estable y el plan no muestra drift.
+    version = aws_launch_template.backend.latest_version
   }
 
   # AWS equilibra por zona, pero no garantiza una instancia por AZ si falta

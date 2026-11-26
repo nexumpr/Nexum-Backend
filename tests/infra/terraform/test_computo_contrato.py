@@ -106,6 +106,15 @@ class AutoScalingGroup(unittest.TestCase):
     def test_proteccion_scale_in(self) -> None:
         self.assertIn("protect_from_scale_in = true", self.main)
 
+    def test_version_del_lt_proviene_del_mismo_apply(self) -> None:
+        """No usar "$Latest": un plan con variables obsoletas publicaria un LT anterior
+        y las instancias nuevas arrancarian con un release viejo. La version debe ser la
+        que crea este mismo apply."""
+        bloque = self.main.split('resource "aws_autoscaling_group" "backend" {', 1)[1]
+        bloque = bloque.split("launch_template {", 1)[1].split("}", 1)[0]
+        self.assertNotIn('"$Latest"', bloque)
+        self.assertIn("version = aws_launch_template.backend.latest_version", bloque)
+
 
 class Bootstrap(unittest.TestCase):
     """Cadena completa: binario + unidad + config + arranque, con fallo explicito."""
