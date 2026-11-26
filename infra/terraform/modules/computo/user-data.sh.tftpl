@@ -14,6 +14,7 @@
 # Sin secretos en este archivo: los valores reales llegan en /etc/nexum/backend.env
 # durante la ventana autorizada (ver RFC-004).
 set -euo pipefail
+umask 077
 
 BINARIO_URI="${artefacto_uri}"
 BINARIO_SHA="${artefacto_sha}"
@@ -92,6 +93,8 @@ import json
 import os
 import re
 import sys
+
+os.umask(0o077)
 
 origen, destino, usuario = sys.argv[1], sys.argv[2], sys.argv[3]
 
