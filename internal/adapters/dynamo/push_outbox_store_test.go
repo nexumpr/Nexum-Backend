@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
+	appNotifications "github.com/nexumpr/Nexum-Backend/internal/application/notifications"
 	"github.com/nexumpr/Nexum-Backend/internal/application/pushoutbox"
 )
 
@@ -763,6 +764,11 @@ func TestOUTBOXIdempotenciaYBandejaE061(t *testing.T) {
 	}
 	if boolAttribute(bandeja.Item["isRead"]) {
 		t.Fatal("la notificación nueva debe estar no leída")
+	}
+	// El caller pasó "REMINDER" (el valor histórico del scheduler). La bandeja sólo
+	// admite el enum contractual, así que se persiste normalizado a `system`.
+	if got := stringAttribute(bandeja.Item["type"]); got != string(appNotifications.TypeSystem) {
+		t.Fatalf("type bandeja=%q, esperado %q", got, appNotifications.TypeSystem)
 	}
 }
 

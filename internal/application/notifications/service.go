@@ -81,6 +81,31 @@ func ParseType(raw string) (Type, bool) {
 	}
 }
 
+// LegacyTypeReminder es el `type` con el que el scheduler escribió los avisos de
+// recordatorio antes de alinearse con el enum contractual. No pertenece al enum
+// de OpenAPI (`budget|goal|recurring|streak|system`), por lo que se normaliza al
+// leer y nunca se vuelve a escribir.
+const LegacyTypeReminder Type = "reminder"
+
+// CanonicalType traduce un `type` persistido al enum contractual. Un valor
+// desconocido se devuelve sin cambios: el contrato no lo emite y no se inventa
+// una categoría para él.
+func CanonicalType(raw Type) Type {
+	if raw == LegacyTypeReminder {
+		return TypeSystem
+	}
+	return raw
+}
+
+// TypeFilterAliases devuelve los valores persistidos que un filtro contractual
+// debe incluir además del canónico. Sólo `system` absorbe un alias histórico.
+func TypeFilterAliases(t Type) []Type {
+	if t == TypeSystem {
+		return []Type{LegacyTypeReminder}
+	}
+	return nil
+}
+
 // Notification es la entidad leída de la tabla única. Sólo se materializa a
 // partir de items reales: el servicio nunca genera notificaciones sintéticas.
 type Notification struct {

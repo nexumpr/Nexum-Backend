@@ -362,6 +362,12 @@ func TestSchedulerReclamaEncolaYCompletaUnico(t *testing.T) {
 	if solicitud.UserID != schedUsuario || solicitud.Type != TipoNotificacionRecordatorio {
 		t.Fatalf("solicitud inesperada: %+v", solicitud)
 	}
+	// El enum de E061 es budget|goal|recurring|streak|system. Un recordatorio
+	// genérico no tiene categoría propia en el SDD: se clasifica como system y el
+	// scheduler no puede volver a emitir el literal histórico `reminder`.
+	if TipoNotificacionRecordatorio != "system" {
+		t.Fatalf("type del recordatorio=%q, el contrato sólo admite system", TipoNotificacionRecordatorio)
+	}
 	if solicitud.Title != "Pagar la luz" || !strings.Contains(solicitud.Message, "Pagar la luz") {
 		t.Fatalf("título/mensaje inesperados: %+v", solicitud)
 	}

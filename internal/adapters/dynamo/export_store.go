@@ -810,7 +810,10 @@ func (s *ExportStore) PreferenciasNotificacion(ctx context.Context, userID strin
 }
 
 func exportNotificationRow(item map[string]types.AttributeValue, userID string) (appExport.NotificationRow, error) {
-	if entidad := stringAttribute(item["entityType"]); entidad != "NOTIFICATION" {
+	// El worker escribió `USER_NOTIFICATION` antes de unificar la constante con el
+	// lector; E020 debe exportar esos avisos ya entregados igual que E061 los lista.
+	if entidad := stringAttribute(item["entityType"]); entidad != NotificationEntityType &&
+		entidad != legacyNotificationEntityType {
 		return appExport.NotificationRow{}, appExport.ErrInconsistent
 	}
 	if titular := stringAttribute(item["userId"]); titular != "" && titular != userID {

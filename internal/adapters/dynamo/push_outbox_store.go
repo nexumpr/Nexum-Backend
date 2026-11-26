@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
+	appNotifications "github.com/nexumpr/Nexum-Backend/internal/application/notifications"
 	"github.com/nexumpr/Nexum-Backend/internal/application/pushoutbox"
 	domainDeletion "github.com/nexumpr/Nexum-Backend/internal/domain/deletion"
 	domainDynamo "github.com/nexumpr/Nexum-Backend/internal/domain/dynamo"
@@ -950,7 +951,7 @@ func (s *PushOutboxStore) GuardarBandeja(ctx context.Context, bandeja pushoutbox
 			"id":         stringAttr(bandeja.ID),
 			"title":      stringAttr(bandeja.Title),
 			"message":    stringAttr(bandeja.Message),
-			"type":       stringAttr(bandeja.Type),
+			"type":       stringAttr(canonicalTrayType(bandeja.Type)),
 			"isRead":     boolAttr(false),
 			"createdAt":  stringAttr(creado.UTC().Format(time.RFC3339Nano)),
 		},
@@ -964,6 +965,18 @@ func (s *PushOutboxStore) GuardarBandeja(ctx context.Context, bandeja pushoutbox
 		return nil
 	}
 	return ErrOutboxNoDisponible
+}
+
+// canonicalTrayType normaliza el `type` que se persiste en la bandeja. El enum
+// contractual es budget|goal|recurring|streak|system; el scheduler escribió
+// `reminder` antes de alinearse y E061 no puede filtrarlo. Sólo se traduce ese
+// alias; cualquier otro valor se conserva tal cual para no inventar categorías.
+func canonicalTrayType(raw string) string {
+	limpio := strings.TrimSpace(raw)
+	if strings.EqualFold(limpio, string(appNotifications.LegacyTypeReminder)) {
+		return string(appNotifications.TypeSystem)
+	}
+	return limpio
 }
 
 func pushOutboxDesdeItem(item map[string]types.AttributeValue) pushoutbox.Registro {

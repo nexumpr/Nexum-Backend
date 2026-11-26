@@ -177,7 +177,21 @@ func (s *NotificationsStore) queryNotifications(
 	if tipo != "" {
 		nombres["#type"] = "type"
 		valores[":type"] = stringAttr(string(tipo))
-		filtros = append(filtros, "#type = :type")
+		expresion := "#type = :type"
+		if alias := appNotifications.TypeFilterAliases(tipo); len(alias) > 0 {
+			// El filtro `system` debe alcanzar los avisos históricos escritos como
+			// `reminder`. Se resuelve en la FilterExpression para que el filtro se
+			// aplique antes de paginar y no después de recortar la página. Los alias
+			// se declaran uno a uno: un nombre dinámico no aporta y complica la lectura.
+			partes := []string{"#type = :type"}
+			for i, valor := range alias {
+				nombres[typeAliasName(i)] = "type"
+				valores[typeAliasValue(i)] = stringAttr(string(valor))
+				partes = append(partes, typeAliasName(i)+" = "+typeAliasValue(i))
+			}
+			expresion = "(" + strings.Join(partes, " OR ") + ")"
+		}
+		filtros = append(filtros, expresion)
 	}
 
 	entrada := &dynamodb.QueryInput{
@@ -195,6 +209,23 @@ func (s *NotificationsStore) queryNotifications(
 		entrada.Limit = aws.Int32(limiteConsultaNotificaciones(limit))
 	}
 	return s.client.Query(ctx, entrada)
+}
+
+// typeAliasName y typeAliasValue devuelven los marcadores de un alias de `type`.
+// El conjunto es cerrado (hoy sólo `reminder` para `system`): no hace falta
+// generarlos en tiempo de ejecución.
+func typeAliasName(i int) string {
+	if i == 0 {
+		return "#typeAlias0"
+	}
+	return "#typeAlias1"
+}
+
+func typeAliasValue(i int) string {
+	if i == 0 {
+		return ":typeAlias0"
+	}
+	return ":typeAlias1"
 }
 
 // limiteConsultaNotificaciones acota el `Limit` de DynamoDB al rango contractual
@@ -888,7 +919,7 @@ func notificationFromItem(item map[string]types.AttributeValue) *appNotification
 		ID:             id,
 		Title:          stringAttribute(item["title"]),
 		Message:        stringAttribute(item["message"]),
-		Type:           appNotifications.Type(stringAttribute(item["type"])),
+		Type:           appNotifications.CanonicalType(appNotifications.Type(stringAttribute(item["type"]))),
 		IsRead:         boolAttribute(item["isRead"]),
 		CreatedAt:      creado.UTC(),
 		DeliveryStatus: stringAttribute(item["deliveryStatus"]),
