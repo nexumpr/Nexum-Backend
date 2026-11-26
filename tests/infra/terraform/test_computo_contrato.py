@@ -176,6 +176,8 @@ class Bootstrap(unittest.TestCase):
         self.assertIn("json.loads(credencial_fcm)", self.userdata)
         self.assertIn("if clave in claves_fcm:", self.userdata)
         self.assertIn("continue", self.userdata)
+        self.assertIn("umask 077", self.userdata)
+        self.assertIn("os.umask(0o077)", self.userdata)
         self.assertIn("set -euo pipefail", self.userdata)
 
     def test_verifica_herramientas_de_la_ami(self) -> None:

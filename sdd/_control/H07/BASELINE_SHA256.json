@@ -176,7 +176,7 @@
   "infra/terraform/modules/balanceo/variables.tf": "f3431cc74308e28425a1a9ff9552bf0d44147e58b53ba0ba2d4e11426fbfb875",
   "infra/terraform/modules/computo/main.tf": "0eb09ec571ffa5c2b3a95a435537e2efc3544152ac459ff965d8be9db8304a1d",
   "infra/terraform/modules/computo/outputs.tf": "9b3b535c7efe9a62013d2da043e543df18d4059940889500dee997b5165c25b2",
-  "infra/terraform/modules/computo/user-data.sh.tftpl": "cd4ecf5f18e29dda7de35831b7576733562d3206615298d517d7ff594c0459f3",
+  "infra/terraform/modules/computo/user-data.sh.tftpl": "619e419f536f1ffb7d9d2f899946c8c45b4bb059b0e7d70ed6de02db90bd8c17",
   "infra/terraform/modules/computo/variables.tf": "28fa8bd5b4c3143da3f4b97fb1e3facad6b9eb857a251eb0f9b868c6a1574359",
   "infra/terraform/modules/dynamodb/main.tf": "617afe6a5905be4afa24a16f65402a899ec4bf1609a3781b79fcd5a708540132",
   "infra/terraform/modules/dynamodb/outputs.tf": "18a63dbc4f9148af380a87309be250f847d7cf2dbdb2a5dac27a9335a359530f",
