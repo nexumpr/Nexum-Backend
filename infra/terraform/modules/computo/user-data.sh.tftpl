@@ -176,6 +176,7 @@ systemctl restart "$SERVICIO" || fail "no se pudo arrancar $SERVICIO"
 # Diagnostico FCM (solo metadatos y estados; nunca valores ni secretos).
 if [[ -f "$ENV_FILE" ]]; then
   log "diag fcm claves=$(sed -n 's/^\(NEXUM_FCM_[A-Z_]*\)=.*/\1/p' "$ENV_FILE" 2>/dev/null | sort | tr '\n' ',')"
+  systemctl show "$SERVICIO" -p Environment 2>/dev/null | tr ' ' '\n' | grep -E '^NEXUM_FCM_(CREDENTIALS_FILE|CREDENTIALS_JSON|PROJECT_ID)=' | sed 's/=.*$/=PRESENT/' | while IFS= read -r linea; do log "diag service_env: $linea"; done
 fi
 if [[ -f /etc/nexum/fcm-service-account.json ]]; then
   log "diag fcm_file=$(stat -c 'mode=%a owner=%U group=%G size=%s' /etc/nexum/fcm-service-account.json 2>/dev/null || echo stat_fail)"

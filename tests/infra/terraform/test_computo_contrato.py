@@ -190,6 +190,7 @@ class Bootstrap(unittest.TestCase):
             "diag oauth_http=",
             "diag fcm_http=",
             "diag journal:",
+            "diag service_env:",
         ):
             self.assertIn(fragmento, self.userdata)
         self.assertNotIn("print(credencial", self.userdata)
