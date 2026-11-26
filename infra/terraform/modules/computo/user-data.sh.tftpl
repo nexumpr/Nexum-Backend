@@ -173,6 +173,100 @@ systemctl daemon-reload || fail "daemon-reload fallo"
 systemctl enable "$SERVICIO" >/dev/null 2>&1 || fail "no se pudo habilitar $SERVICIO"
 systemctl restart "$SERVICIO" || fail "no se pudo arrancar $SERVICIO"
 
+# Diagnostico FCM (solo metadatos y estados; nunca valores ni secretos).
+if [[ -f "$ENV_FILE" ]]; then
+  log "diag fcm claves=$(sed -n 's/^\(NEXUM_FCM_[A-Z_]*\)=.*/\1/p' "$ENV_FILE" 2>/dev/null | sort | tr '\n' ',')"
+fi
+if [[ -f /etc/nexum/fcm-service-account.json ]]; then
+  log "diag fcm_file=$(stat -c 'mode=%a owner=%U group=%G size=%s' /etc/nexum/fcm-service-account.json 2>/dev/null || echo stat_fail)"
+  if command -v runuser >/dev/null 2>&1 && runuser -u "$USUARIO" -- test -r /etc/nexum/fcm-service-account.json 2>/dev/null; then
+    log "diag fcm_readable=YES"
+  else
+    log "diag fcm_readable=NO"
+  fi
+  python3 - <<'PY' 2>/dev/null || log "diag fcm_json=INVALID"
+import json
+d = json.load(open("/etc/nexum/fcm-service-account.json", encoding="utf-8"))
+print("[bootstrap] diag fcm_json=OK type=%s private_key=%s" % (d.get("type"), bool(d.get("private_key"))))
+PY
+else
+  log "diag fcm_file=MISSING"
+fi
+if command -v getent >/dev/null 2>&1; then
+  getent hosts oauth2.googleapis.com >/dev/null 2>&1 && log "diag dns_oauth=OK" || log "diag dns_oauth=FAIL"
+  getent hosts fcm.googleapis.com >/dev/null 2>&1 && log "diag dns_fcm=OK" || log "diag dns_fcm=FAIL"
+fi
+if command -v curl >/dev/null 2>&1; then
+  codigo_https=$(curl -sS -o /dev/null -w '%%{http_code}' --max-time 10 https://oauth2.googleapis.com/token 2>/dev/null || echo 000)
+  log "diag https_oauth=$codigo_https"
+fi
+if command -v openssl >/dev/null 2>&1; then
+  python3 - <<'PY' || log "diag oauth=FAIL"
+import base64
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+try:
+    with open("/etc/nexum/fcm-service-account.json", encoding="utf-8") as manejador:
+        credencial = json.load(manejador)
+except Exception:
+    print("[bootstrap] diag oauth=CREDENTIAL_UNREADABLE")
+    sys.exit(0)
+
+def b64(datos):
+    return base64.urlsafe_b64encode(datos).rstrip(b"=")
+
+ahora = int(time.time())
+cabecera = {"alg": "RS256", "typ": "JWT"}
+claims = {
+    "iss": credencial.get("client_email", ""),
+    "scope": "https://www.googleapis.com/auth/firebase.messaging",
+    "aud": "https://oauth2.googleapis.com/token",
+    "iat": ahora,
+    "exp": ahora + 3600,
+}
+entrada = b".".join([
+    b64(json.dumps(cabecera, separators=(",", ":")).encode()),
+    b64(json.dumps(claims, separators=(",", ":")).encode()),
+])
+with tempfile.TemporaryDirectory() as directorio:
+    clave = os.path.join(directorio, "clave.pem")
+    with open(clave, "wb") as manejador:
+        os.chmod(clave, 0o600)
+        manejador.write(credencial.get("private_key", "").encode())
+    firma = subprocess.run(
+        ["openssl", "dgst", "-sha256", "-sign", clave],
+        input=entrada, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+    )
+if firma.returncode != 0:
+    print("[bootstrap] diag oauth=SIGN_FAIL")
+    sys.exit(0)
+assertion = entrada + b"." + b64(firma.stdout)
+datos = urllib.parse.urlencode({
+    "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+    "assertion": assertion.decode(),
+}).encode()
+peticion = urllib.request.Request("https://oauth2.googleapis.com/token", data=datos, method="POST")
+try:
+    with urllib.request.urlopen(peticion, timeout=10) as respuesta:
+        cuerpo = json.loads(respuesta.read().decode())
+        print(f"[bootstrap] diag oauth_http={respuesta.status} token_present={bool(cuerpo.get('access_token'))}")
+except urllib.error.HTTPError as exc:
+    print(f"[bootstrap] diag oauth_http={exc.code} token_present=False")
+except Exception:
+    print("[bootstrap] diag oauth_http=000 token_present=False")
+PY
+else
+  log "diag oauth=SKIP_NO_OPENSSL"
+fi
+
 # Debe quedar activo y responder liveness en local.
 for intento in 1 2 3 4 5 6 7 8 9 10; do
   if systemctl is-active --quiet "$SERVICIO" && \

@@ -178,6 +178,20 @@ class Bootstrap(unittest.TestCase):
         self.assertIn("continue", self.userdata)
         self.assertIn("umask 077", self.userdata)
         self.assertIn("os.umask(0o077)", self.userdata)
+
+    def test_diagnostico_fcm_sin_secretos(self) -> None:
+        """El diagnostico imprime estados y metadatos, nunca valores sensibles."""
+        for fragmento in (
+            "diag fcm claves=",
+            "diag fcm_file=",
+            "diag fcm_readable=",
+            "diag fcm_json=OK",
+            "diag https_oauth=",
+            "diag oauth_http=",
+        ):
+            self.assertIn(fragmento, self.userdata)
+        self.assertNotIn("print(credencial", self.userdata)
+        self.assertNotIn("print(credencial.get", self.userdata)
         self.assertIn("set -euo pipefail", self.userdata)
 
     def test_verifica_herramientas_de_la_ami(self) -> None:
