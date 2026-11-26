@@ -2546,3 +2546,14 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - Regresión: el doble de DynamoDB rechaza combinar `begins_with` con un rango (como el servicio real) y `TestE027StoreFiltrosYLimites` cubre `from`/`to`.
 - Sin cambios de contrato, claves ni índices; no se modificó DynamoDB ni IAM.
 
+
+### Cierre técnico H08E — v0.21.4+5bef784b2d1c y certificación backend (2026-11-26)
+
+- **Release productiva:** `v0.21.4+5bef784b2d1c`; commit productivo `5bef784b2d1cc26739e8e9ae29e8499416dd46c9`; binario ARM64 23 469 437 B SHA-256 `79058a64c200c8d30d13fe2ac736fb04f8448b9323b3a643c1a02aa3c9f27f50`; unidad `6fa4d5fb…05cc`; S3 `releases/v0.21.4+5bef784b2d1c/` con `If-None-Match`, SSE AES256 y checksums coincidentes.
+- **Infraestructura:** LT **v26**; refresh `e480dcae-2ed1-4783-b060-c13b1d05b1c7` Successful 100 %; ASG **2/2/2**; `i-02d1f8db9b94377fd` (us-east-2a) e `i-091a5ca823fabf00e` (us-east-2b) en LT 26, `InService`/`Healthy` y protegidas; **multi-AZ recuperado**; dos targets `healthy`; health live/ready **200**. Sin cambios en AMI, bundle v3, NAT, DynamoDB, Redis, ALB ni CloudFront.
+- **Defecto real corregido (E063, PR #160):** `ClaimReadAll` reconstruía la SK desde `createdAt` (epoch en segundos) y perdía los nanosegundos de `REQ#<RFC3339Nano>#<requestId>`; `attribute_exists(PK)` fallaba y el worker lo interpretaba como «otro nodo lo tomó». Ahora el instante se deriva de la SK. Verificado en AWS: `QUEUE#READALL` pasó de **8 trabajos pendientes** a **0**, y `READALL#a45e32ac-…` quedó `completed` con `processedCount=5`.
+- **Certificación backend:** 74/75 PASS. E063 certificado en v0.21.4 (`unreadCount` inicial 1, 202 + `requestId`, transición durable a 0, aislamiento B). E065→E061 certificado (recordatorio → scheduler → outbox → bandeja). E010: dos **202 en ~0,3 s** y recepción confirmada por el responsable en la cuenta B. E061/E062/E020 con notificaciones históricas y legacy. E007 422, E027 RFC3339, E059 201 y E060 204/204.
+- **Pendientes declarados:** E015 `CONTENT_MISMATCH` (aviso v2 vigente por decisión del responsable; v3 requiere aprobación legal independiente) y dos escenarios de aceptación Android (recepción física de push y exclusión efectiva del dispositivo revocado) que no se certifican con tokens sintéticos. FAIL=0, CONTRACT_MISMATCH=0, BLOCKED_DEPENDENCY=0, NOT_RUN backend=0.
+- **Limpieza:** `dist/cert-evidence/credenciales.json`, `dist/cert-evidence/acceso-autenticado.json` y `C:\Nexum-Custodia\H08E-CERT-20261125\acceso-autenticado.json` verificados como **inexistentes**. `opencode.json` conserva la configuración local previa (no versionada) sin excepciones temporales de publicación. Credenciales vigentes de custodia intactas.
+
+
