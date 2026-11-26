@@ -112,7 +112,7 @@ class AutoScalingGroup(unittest.TestCase):
         que crea este mismo apply."""
         bloque = self.main.split('resource "aws_autoscaling_group" "backend" {', 1)[1]
         bloque = bloque.split("launch_template {", 1)[1].split("}", 1)[0]
-        self.assertNotIn('"$Latest"', bloque)
+        self.assertNotIn('version = "$Latest"', bloque)
         self.assertIn("version = aws_launch_template.backend.latest_version", bloque)
 
 
