@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -366,4 +368,61 @@ func TestFCMCredencialArchivoAcotado(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestFCMOutboxArrancaSinCredencialEnModoDegradado fija el arranque real de
+// cmd/server: sin credencial FCM el worker NO se omite, se inicia sin emisor.
+// Sin esto, Disponible() no serviria de nada y los trabajos quedarian pendientes
+// con cero intentos para siempre.
+func TestFCMOutboxArrancaSinCredencialEnModoDegradado(t *testing.T) {
+	for _, nombre := range []string{
+		"NEXUM_FCM_PROJECT_ID", "FIREBASE_PROJECT_ID",
+		"NEXUM_FCM_CREDENTIALS_JSON", "FCM_SERVICE_ACCOUNT_JSON",
+		"NEXUM_FCM_CREDENTIALS_FILE", "GOOGLE_APPLICATION_CREDENTIALS",
+	} {
+		t.Setenv(nombre, "")
+	}
+	claveB64 := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x2a}, 32))
+	sellador, err := cryptoAdapter.NuevoSealer(claveB64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &fcmDispositivosFake{items: make(map[string]map[string]types.AttributeValue)}
+	deps := &dependenciasOleada4{
+		Dynamo:     fake,
+		Tabla:      fcmTestTabla,
+		PushSealer: sellador,
+		Logger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	cerrar, modo, err := iniciarOutboxPushOleada4(context.Background(), deps, deps.Logger)
+	if err != nil {
+		t.Fatalf("sin credencial FCM el worker debe arrancar en modo degradado: %v", err)
+	}
+	if cerrar == nil {
+		t.Fatal("se esperaba funcion de cierre")
+	}
+	defer cerrar()
+	if modo != "sin-emisor" {
+		t.Fatalf("modo esperado sin-emisor, obtenido %q", modo)
+	}
+}
+
+// TestFCMWorkerSinEmisorArrancaSinSellador cubre el caso mas degradado: sin
+// emisor y sin sellador el worker sigue procesando el outbox (los trabajos
+// quedan TOKENS_NO_DISPONIBLES) en lugar de no arrancar o provocar un panic.
+func TestFCMWorkerSinEmisorArrancaSinSellador(t *testing.T) {
+	fake := &fcmDispositivosFake{items: make(map[string]map[string]types.AttributeValue)}
+	deps := &dependenciasOleada4{
+		Dynamo: fake,
+		Tabla:  fcmTestTabla,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	cerrar, err := iniciarFCMWorkerSinEmisorOleada4(context.Background(), deps)
+	if err != nil {
+		t.Fatalf("el worker degradado debe arrancar sin sellador: %v", err)
+	}
+	if cerrar == nil {
+		t.Fatal("se esperaba funcion de cierre")
+	}
+	cerrar()
 }

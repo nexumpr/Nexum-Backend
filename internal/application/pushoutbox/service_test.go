@@ -713,3 +713,51 @@ func TestPUSHNotificationIDNoEsSHA1(t *testing.T) {
 		t.Fatalf("el ID coincide con el patron de UUID v5: %q", id)
 	}
 }
+
+// El worker debe operar aunque falte el emisor FCM: un trabajo sin dispositivos se
+// cierra como revocado (SIN_DISPOSITIVOS) en vez de quedar pendiente con cero intentos.
+func TestPUSHWorkerSinEmisorCierraTrabajoSinDispositivos(t *testing.T) {
+	store := nuevoStoreFalso()
+	tokens := &tokensFalsos{porUsuario: map[string][]TokenDestino{}}
+	servicio := nuevoServicio(t, store, nil, &prefsFalsas{valor: preferencias(true, "America/Mexico_City", nil)}, tokens, &bandejaFalsa{})
+	if !servicio.Disponible() {
+		t.Fatal("el worker debe estar disponible solo con el store del outbox")
+	}
+	id := encolarPrueba(t, servicio, "u-sin-fcm", "evt-sin-fcm")
+	servicio.Ciclo(context.Background())
+
+	registro := store.estado(id)
+	if registro.NotificationID == "" {
+		t.Fatalf("no se encontro el trabajo %q", id)
+	}
+	if registro.Status != EstadoRevocado || registro.UltimaClase != ClaseSinDispositivos {
+		t.Fatalf("se esperaba revocado/SIN_DISPOSITIVOS, obtenido estado=%s clase=%q", registro.Status, registro.UltimaClase)
+	}
+	if registro.Attempts != 1 {
+		t.Fatalf("el trabajo debio reclamarse una vez, intentos=%d", registro.Attempts)
+	}
+}
+
+// Con un dispositivo registrado pero sin emisor FCM, el trabajo no se pierde ni provoca
+// un panic: queda reprogramado con CONFIG_FCM para reintentarse cuando la configuracion
+// este disponible.
+func TestPUSHWorkerSinEmisorConDispositivoReprogramaConfigFCM(t *testing.T) {
+	store := nuevoStoreFalso()
+	tokens := &tokensFalsos{porUsuario: map[string][]TokenDestino{
+		"u-con-fcm": {{ID: "dev-1", Valor: "token-valido"}},
+	}}
+	servicio := nuevoServicio(t, store, nil, &prefsFalsas{valor: preferencias(true, "America/Mexico_City", nil)}, tokens, &bandejaFalsa{})
+	id := encolarPrueba(t, servicio, "u-con-fcm", "evt-con-fcm")
+	servicio.Ciclo(context.Background())
+
+	registro := store.estado(id)
+	if registro.NotificationID == "" {
+		t.Fatalf("no se encontro el trabajo %q", id)
+	}
+	if registro.Status != EstadoFallido || registro.UltimaClase != ClaseConfigFCM {
+		t.Fatalf("se esperaba fallido/CONFIG_FCM, obtenido estado=%s clase=%q", registro.Status, registro.UltimaClase)
+	}
+	if registro.Attempts < 1 {
+		t.Fatalf("el trabajo debio reclamarse, intentos=%d", registro.Attempts)
+	}
+}

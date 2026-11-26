@@ -144,6 +144,40 @@ func iniciarFCMWorkerOleada4(ctx context.Context, d *dependenciasOleada4, cfg pu
 	return iniciarFCMWorkerOleada4Con(ctx, d, cfg, nil, nil)
 }
 
+// iniciarFCMWorkerSinEmisorOleada4 arranca el outbox sin emisor FCM. El worker
+// sigue procesando: cierra SIN_DISPOSITIVOS los trabajos sin destino y
+// reprograma CONFIG_FCM los que si lo tienen. Es el modo degradado que evita
+// que un fallo de configuracion deje trabajos pendientes para siempre.
+func iniciarFCMWorkerSinEmisorOleada4(ctx context.Context, d *dependenciasOleada4) (func(), error) {
+	return iniciarWorkerOutboxOleada4(ctx, d, nil, nil, nil)
+}
+
+// iniciarOutboxPushOleada4 arranca el outbox con emisor FCM si la configuracion
+// es valida y, si no lo es, en modo degradado sin emisor. En ambos casos el
+// outbox se procesa; el modo se devuelve para registrarlo sin secretos.
+func iniciarOutboxPushOleada4(ctx context.Context, d *dependenciasOleada4, logger *slog.Logger) (func(), string, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	cfg, errCfg := configuracionFCMOleada4DesdeEntorno()
+	if errCfg == nil {
+		cerrar, errInicio := iniciarFCMWorkerOleada4(ctx, d, cfg)
+		if errInicio == nil {
+			return cerrar, "http-v1-oauth2-jwt-rs256", nil
+		}
+		logger.WarnContext(ctx, "FCM Oleada 4: emisor no disponible; worker en modo degradado",
+			slog.String("clase", "FCM_WORKER_NO_INICIADO"))
+	} else {
+		logger.WarnContext(ctx, "FCM Oleada 4: credencial no inyectada; worker en modo degradado",
+			slog.String("clase", "FCM_CREDENCIAL_AUSENTE"))
+	}
+	cerrar, errDegradado := iniciarFCMWorkerSinEmisorOleada4(ctx, d)
+	if errDegradado != nil {
+		return nil, "", errDegradado
+	}
+	return cerrar, "sin-emisor", nil
+}
+
 // iniciarFCMWorkerOleada4Con permite al responsable inyectar la fuente de
 // tokens y/u otra bandeja E061 sin modificar este archivo.
 func iniciarFCMWorkerOleada4Con(
@@ -153,11 +187,33 @@ func iniciarFCMWorkerOleada4Con(
 	fuente pushoutbox.TokenSource,
 	bandeja pushoutbox.NotificationSink,
 ) (func(), error) {
+	return iniciarWorkerOutboxOleada4(ctx, d, &cfg, fuente, bandeja)
+}
+
+// iniciarWorkerOutboxOleada4 es la construccion comun. cfg nil significa modo
+// degradado sin emisor: no se intenta ningun envio y tampoco se provoca un panic.
+func iniciarWorkerOutboxOleada4(
+	ctx context.Context,
+	d *dependenciasOleada4,
+	cfg *push.Config,
+	fuente pushoutbox.TokenSource,
+	bandeja pushoutbox.NotificationSink,
+) (func(), error) {
 	if ctx == nil {
 		return nil, errors.New("FCM Oleada 4: contexto nulo")
 	}
-	if err := cfg.Validar(); err != nil {
-		return nil, err
+	var emisor push.Emisor
+	modo := "sin-emisor"
+	if cfg != nil {
+		if err := cfg.Validar(); err != nil {
+			return nil, err
+		}
+		clienteFCM, err := push.NewClient(*cfg)
+		if err != nil {
+			return nil, err
+		}
+		emisor = clienteFCM
+		modo = "http-v1-oauth2-jwt-rs256"
 	}
 	if d == nil || d.Dynamo == nil || strings.TrimSpace(d.Tabla) == "" {
 		return nil, errors.New("FCM Oleada 4: DynamoDB o tabla no configurados; worker no iniciado")
@@ -167,10 +223,6 @@ func iniciarFCMWorkerOleada4Con(
 		return nil, errors.New("FCM Oleada 4: el cliente DynamoDB no expone Query/GetItem/PutItem/UpdateItem")
 	}
 
-	emisor, err := push.NewClient(cfg)
-	if err != nil {
-		return nil, err
-	}
 	logger := d.Logger
 	if logger == nil {
 		logger = slog.Default()
@@ -193,9 +245,16 @@ func iniciarFCMWorkerOleada4Con(
 	abridor, okAbrir := d.PushSealer.(pushoutbox.TokenAbridor)
 	if fuente == nil {
 		if !okAbrir || abridor == nil {
-			return nil, errors.New("FCM Oleada 4: PushSealer debe exponer Abrir([]byte,string)(string,error) o inyecte una fuente de tokens")
+			if cfg != nil {
+				return nil, errors.New("FCM Oleada 4: PushSealer debe exponer Abrir([]byte,string)(string,error) o inyecte una fuente de tokens")
+			}
+			// Modo degradado sin emisor y sin sellador: el worker sigue procesando
+			// para que los trabajos no queden pendientes para siempre.
+			logger.WarnContext(ctx, "FCM Oleada 4: sin sellador de tokens; los trabajos quedaran TOKENS_NO_DISPONIBLES",
+				slog.String("clase", "PUSH_SELLER_NO_DISPONIBLE"))
+		} else {
+			fuente = nuevaFuenteTokensDynamo(cliente, d.Tabla, abridor, logger)
 		}
-		fuente = nuevaFuenteTokensDynamo(cliente, d.Tabla, abridor, logger)
 	}
 	if bandeja == nil {
 		bandeja = store
@@ -208,7 +267,7 @@ func iniciarFCMWorkerOleada4Con(
 	go servicio.Run(ctxWorker)
 
 	logger.InfoContext(ctx, "FCM Oleada 4: worker iniciado",
-		slog.String("modo", "http-v1-oauth2-jwt-rs256"),
+		slog.String("modo", modo),
 		slog.String("outbox", "OUTBOX#GLOBAL/DUE#"),
 	)
 	var cerrado bool
