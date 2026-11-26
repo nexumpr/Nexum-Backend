@@ -40,15 +40,26 @@ var (
 // EmailVerificationTokenTTL es la vigencia del token de un solo uso (30 minutos).
 const EmailVerificationTokenTTL = 30 * time.Minute
 
-// EmailVerificationSendTimeout acota la llamada sincrona a SES. Sin este limite, una
-// latencia excepcional del proveedor puede superar el idle timeout del balanceador y
-// devolver un 502 ajeno al contrato; con el, el fallo se traduce a 503.
+// EmailVerificationSendTimeout acota la llamada sincrona contra SES.
 //
-// 12 s mantiene la respuesta por debajo del WriteTimeout HTTP (15 s) y del timeout de
-// origen de CloudFront (30 s) sin cortar envios legitimos: en AWS se midieron envios de
-// verificacion que superaban 8 s y devolvian 503 aunque SES aceptaba el mensaje. El tope
-// sigue siendo finito para no exponer la peticion a una espera indefinida.
-const EmailVerificationSendTimeout = 12 * time.Second
+// No se amplia por encima de este valor ni se reintenta el envio: un timeout deja el
+// resultado en duda (SES pudo aceptar el mensaje sin devolver respuesta) y repetirlo
+// duplicaria el correo. 10 s deja margen suficiente para autenticacion, DynamoDB,
+// Redis y serializacion dentro del WriteTimeout HTTP de 15 s y del timeout de origen
+// de CloudFront (30 s).
+const EmailVerificationSendTimeout = 10 * time.Second
+
+// Clases de fallo del envio. El adaptador SES las devuelve envueltas para que el
+// servicio registre una clase estable sin exponer mensajes del proveedor. Ninguna
+// cambia la respuesta HTTP: el contrato solo distingue exito (202) del resto (503).
+var (
+	// ErrEnvioAmbiguo: no se sabe si el proveedor acepto el mensaje (timeout, corte).
+	ErrEnvioAmbiguo = errors.New("envio de verificacion con resultado ambiguo")
+	// ErrEnvioDefinitivo: el proveedor rechazo el mensaje (permiso, remitente, validacion).
+	ErrEnvioDefinitivo = errors.New("envio de verificacion rechazado")
+	// ErrEnvioTransitorio: cuota o indisponibilidad temporal del proveedor.
+	ErrEnvioTransitorio = errors.New("envio de verificacion temporalmente no disponible")
+)
 
 // EmailVerificationProfile es el perfil minimo necesario para E010 y E011.
 //
@@ -156,6 +167,28 @@ func (s *EmailVerificationRequestService) Disponible() bool {
 // Secuencia: cuota por usuario → perfil con consistencia fuerte → estado ACTIVE → rechazo si
 // ya esta verificado → token CSPRNG de 32 bytes (base64url, 43 caracteres) → persistencia con
 // solo el SHA-256 → envio SES. El token en claro no se registra en logs ni se devuelve.
+// claseEnvioVerificacion devuelve una etiqueta estable para el log. No altera la
+// respuesta: el contrato solo distingue 202 del resto. Se apoya en los centinelas que
+// el adaptador SES envuelve, de modo que la capa de aplicacion no depende del SDK.
+func claseEnvioVerificacion(ctx context.Context, err error) string {
+	if ctx.Err() != nil {
+		return "cancelado_por_cliente"
+	}
+	switch {
+	case errors.Is(err, ErrEnvioAmbiguo), errors.Is(err, context.DeadlineExceeded):
+		// No se reintenta: el proveedor pudo aceptar el mensaje.
+		return "ambiguo_sin_respuesta"
+	case errors.Is(err, ErrEnvioTransitorio):
+		return "transitorio_cuota"
+	case errors.Is(err, ErrEnvioDefinitivo):
+		return "definitivo_rechazo"
+	case errors.Is(err, context.Canceled):
+		return "cancelado"
+	default:
+		return "desconocido"
+	}
+}
+
 func (s *EmailVerificationRequestService) Solicitar(ctx context.Context, userID string) error {
 	if !s.Disponible() {
 		return ErrEmailVerificationNoDisponible
@@ -221,12 +254,16 @@ func (s *EmailVerificationRequestService) Solicitar(ctx context.Context, userID 
 		limite = EmailVerificationSendTimeout
 	}
 	envioCtx, cancelarEnvio := context.WithTimeout(ctx, limite)
-	defer cancelarEnvio()
-	if _, err := s.correo.EnviarVerificacion(envioCtx, destino, token, ahora.Add(s.ttl)); err != nil {
-		// El item persistido caduca por TTL y no verifica nada: no se responde 202 sin envio.
+	_, errEnvio := s.correo.EnviarVerificacion(envioCtx, destino, token, ahora.Add(s.ttl))
+	cancelarEnvio()
+	if errEnvio != nil {
+		// NO se reintenta: un timeout deja el resultado en duda (el proveedor pudo
+		// aceptar el mensaje sin devolver respuesta) y reenviar duplicaria el correo o
+		// produciria dos codigos validos. El token persistido sigue vigente, de modo que
+		// si SES acepto el mensaje el codigo entregado funciona.
 		if s.logger != nil {
 			s.logger.ErrorContext(ctx, "verificacion de correo: fallo de envio",
-				slog.String("error_class", "ses_send_failed"))
+				slog.String("error_class", claseEnvioVerificacion(ctx, errEnvio)))
 		}
 		return ErrEmailVerificationEnvio
 	}
