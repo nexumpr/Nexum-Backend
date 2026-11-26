@@ -50,6 +50,7 @@ import (
 	"strings"
 	"time"
 
+	appNotifications "github.com/nexumpr/Nexum-Backend/internal/application/notifications"
 	"github.com/nexumpr/Nexum-Backend/internal/application/pushoutbox"
 )
 
@@ -69,8 +70,11 @@ const (
 	DefaultSchedulerMaxAttempts = 5
 
 	// TipoNotificacionRecordatorio es el `type` del trabajo del outbox y de la
-	// entrada E061. Es una constante, no contiene datos del titular.
-	TipoNotificacionRecordatorio = "reminder"
+	// entrada E061. El enum contractual es budget|goal|recurring|streak|system y
+	// el SDD no define una categoría propia para un recordatorio genérico: se
+	// clasifica como `system`. Antes era el literal `reminder`, fuera del enum, y
+	// E061 no podía filtrarlo. Es una constante, no contiene datos del titular.
+	TipoNotificacionRecordatorio = string(appNotifications.TypeSystem)
 
 	// marcaEventoRecordatorio precede al eventID determinista.
 	marcaEventoRecordatorio = "reminder:"

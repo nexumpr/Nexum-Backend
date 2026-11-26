@@ -19,6 +19,7 @@ import (
 	_ "time/tzdata" // base IANA embebida: evita depender del SO y del paquete HTTP
 
 	appPrefs "github.com/nexumpr/Nexum-Backend/internal/application/notificationprefs"
+	appNotifications "github.com/nexumpr/Nexum-Backend/internal/application/notifications"
 	"github.com/nexumpr/Nexum-Backend/internal/infrastructure/push"
 	"github.com/nexumpr/Nexum-Backend/pkg/uuidv8"
 )
@@ -357,7 +358,12 @@ func (s *Service) procesar(ctx context.Context, registro Registro, ahora time.Ti
 	}
 	if err := s.bandeja.GuardarBandeja(ctx, RegistroBandeja{
 		UserID: registro.UserID, ID: registro.NotificationID, Title: registro.Title,
-		Message: registro.Message, Type: registro.Type, CreatedAt: ahora,
+		Message: registro.Message,
+		// Un trabajo persistido antes de alinear el enum puede llevar `reminder`.
+		// La bandeja sólo admite el enum contractual, así que se normaliza aquí,
+		// en el punto de escritura, y no se pospone al lector.
+		Type:      string(appNotifications.CanonicalType(appNotifications.Type(registro.Type))),
+		CreatedAt: ahora,
 	}); err != nil {
 		_ = s.store.Reprogramar(ctx, registro.ID, registro.Attempts, ClaseBandejaNoDisponible, ahora.Add(5*time.Minute), ahora)
 		return false
