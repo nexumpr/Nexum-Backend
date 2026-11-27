@@ -63,7 +63,7 @@
   "herramientas/tests/test_clasificar_contratos_e005.py": "fa6b8039d0744a9d1a552f05991c8b6b8061077cf17af8c1188b293200dd82c6",
   "herramientas/tests/test_cobertura_dominio.py": "827bd816030f3abd8423b77fabdbdab48760ff147ebc1a18a18eea40a3041bc9",
   "herramientas/tests/test_dast_y_gosec.py": "d95cef9c4ebc9c20c7a81a9f5d8b6b2af5a58e480d765a06bfde8a4c208a9f61",
-  "herramientas/tests/test_gitleaks_config.py": "54c47ee1a978565e50b89320079cb8d7a862b309dea538321049d30ff0518c2c",
+  "herramientas/tests/test_gitleaks_config.py": "ab619cc25ab4d1467deda71553d220f31fd9303b8071ea1a68a6cc69949780b2",
   "herramientas/tests/test_h08_permissions.py": "04eee5bdfeffe27040ed42db2d9fe4aebc47597a547d1027b88ff8c0e1ed57f9",
   "herramientas/tests/test_iac_devsecops.py": "36b6453691e0c03c0a20bc4adaeb2e0151dbf33a7faaec0375a7b67266ceb193",
   "herramientas/tests/test_integridad_sdd.py": "c396d1d11bb5c86f05a06058b3ea2265d96e68107151432e10e7bcd26fa87ab9",
