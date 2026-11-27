@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -122,7 +123,7 @@ func TestRegisterRechazaCadenaNoConfiable(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", nil)
 	req.RemoteAddr = "198.51.100.9:5555"
 	req.Header.Set("X-Forwarded-For", "203.0.113.7")
-	req.Header.Set("Idempotency-Key", "0123456789abcdef")
+	req.Header.Set("Idempotency-Key", strings.Repeat("h09", 6))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
