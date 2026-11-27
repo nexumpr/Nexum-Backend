@@ -84,7 +84,8 @@ func TestLimitarPorIPResponde429(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 	peticion := httptest.NewRequest(http.MethodGet, "/api/v1/catalogs/categories", nil)
-	peticion.Header.Set("X-Forwarded-For", "203.0.113.10")
+	peticion.RemoteAddr = "10.42.1.10:443"
+	peticion.Header.Set("X-Forwarded-For", "203.0.113.10, 130.176.10.20")
 	rec := httptest.NewRecorder()
 	handler(rec, peticion)
 	if rec.Code != http.StatusTooManyRequests {
@@ -100,7 +101,8 @@ func TestLimitarPorIPFailOpen(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 	peticion := httptest.NewRequest(http.MethodGet, "/api/v1/catalogs/categories", nil)
-	peticion.Header.Set("X-Forwarded-For", "203.0.113.10")
+	peticion.RemoteAddr = "10.42.1.10:443"
+	peticion.Header.Set("X-Forwarded-For", "203.0.113.10, 130.176.10.20")
 	rec := httptest.NewRecorder()
 	handler(rec, peticion)
 	if rec.Code != http.StatusOK {

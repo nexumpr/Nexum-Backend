@@ -46,6 +46,8 @@ func newSecurityHandler(t *testing.T, store appIdentity.RegisterStore, logger *s
 
 func securityRequest(body, key string) *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(body))
+	req.RemoteAddr = "10.42.1.10:443"
+	req.Header.Set("X-Forwarded-For", "203.0.113.10, 130.176.10.20")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", key)
 	req.Header.Set("x-request-id", "security-e001")
