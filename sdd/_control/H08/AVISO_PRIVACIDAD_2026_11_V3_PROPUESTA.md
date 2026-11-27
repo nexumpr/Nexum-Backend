@@ -227,3 +227,19 @@ despliegue ni modificación de otros endpoints.
 - `sdd/_control/H08/GATE_H08E_REGULARIZACION_OLEADAS_4_5.md` §5 (la aprobación legal de E015 queda excluida)
 - `internal/application/privacy/notice.go`, `aviso_2026_11_v2.txt`
 - `dist/deuda/aviso_2026_11_v3.txt` (artefacto canónico)
+
+---
+
+## Reconciliación de trazabilidad H09-1 (2026-11-27)
+
+Verificación de solo lectura. **No** aprueba, publica ni modifica el texto legal.
+
+| Artefacto | Bytes | SHA-256 | Estado |
+|---|---:|---|---|
+| `internal/application/privacy/aviso_2026_11_v3.txt` | 8 123 | `E925596ADFF1B3EBB9A17064D44F5F6B84BFBDFB874396CD51EFC6C0AC3F8D83` | Único preservado en Git; borrador **superado** por esta propuesta; no publicable |
+| `dist/deuda/aviso_2026_11_v3.txt` | 13 662 (declarado) | `1CEC4609FF2F3FC052D3DEB29271BA8AAED322D1EC97AE9757E222CC8C0563B9` (declarado) | **NO EXISTE** en el repositorio ni en `dist/`; no materializado |
+
+- La búsqueda de `1CEC4609…` en el árbol no devuelve ningún archivo: es un **hash declarado sin artefacto**.
+- La afirmación de este documento de que sustituye al borrador de 8 123 bytes es correcta; por tanto **no** debe reutilizarse `E925…` como si fuera la v3 propuesta.
+- Consecuencia: la frase de aprobación propuesta **no puede ejercerse** hasta que el texto de 13 662 bytes se materialice, se versione y su SHA-256 se recalcule desde el archivo real. Cualquier Gate legal previo a eso sería inválido.
+- `memoria.md` conserva `E925…` porque documenta el borrador histórico; no se altera esa referencia.

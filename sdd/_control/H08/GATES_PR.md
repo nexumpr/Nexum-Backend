@@ -3,20 +3,28 @@
 | Campo | Valor |
 |---|---|
 | Spec | `sdd/02-infraestructura/I-080-ci-backend` (INF-080-02, INF-080-03, INF-080-05) |
-| Estado de branch protection | **BLOQUEADO_PLAN_GITHUB** — verificado por lectura el 2026-11-08: HTTP 403 «Upgrade to GitHub Pro or make this repository public» |
-| Repositorio | Privado (`nexumpr/Nexum-Backend`, `private`) |
+| Estado de branch protection | **ACTIVA** — verificada por API el 2026-11-27 (`strict=true`, 13 checks, 1 revisor) |
+| Repositorio | Público (`nexumpr/Nexum-Backend`, `visibility=public`, RFC-009) |
 | Workflow | `.github/workflows/go-backend.yml` |
 
 ## 0. Verificación real de capacidades (solo lectura)
 
-`gh api repos/nexumpr/Nexum-Backend/branches/main/protection` devuelve **HTTP 403**:
-«Upgrade to GitHub Pro or make this repository public to enable this feature».
+`gh api repos/nexumpr/Nexum-Backend/branches/main/protection` devuelve **HTTP 200** con:
 
-Consecuencia: en el plan actual **no es posible configurar branch protection ni required status checks**.
-No se declara protección activa, no se cambia de plan y no se genera ningún cargo. Los checks de CI sí
-funcionan y se exigen por revisión humana y por el proceso de merge autorizado. El procedimiento de
-activación queda preparado para cuando exista un plan que lo permita o una decisión humana de
-visibilidad/plan.
+- `required_status_checks.strict = true` y **13 contextos** (los doce jobs del grafo RFC-008 más `validar`);
+- `required_pull_request_reviews.required_approving_review_count = 1`;
+- `allow_force_pushes = false` y `allow_deletions = false`;
+- `enforce_admins = false`, `required_signatures = false`, `required_linear_history = false` y
+  `required_conversation_resolution = false`;
+- **sin rulesets** (`/rulesets` devuelve `[]`) y **sin environments** (`aws-deploy` no existe).
+
+Historia: el 2026-11-08 la API devolvía HTTP 403 en repositorio privado. La publicación del repositorio
+(RFC-009) eliminó esa limitación de plan. La protección se configura y se verifica; no se declara nada
+que la API no devuelva.
+
+**Propuesta pendiente de aprobación (no aplicada):** crear un ruleset que impida el bypass de
+administradores (`enforce_admins` equivalente) y exigir resolución de conversaciones. No se modifica
+ningún setting de GitHub sin autorización específica.
 
 ## 1. Checks requeridos
 
@@ -32,7 +40,11 @@ Estos son los nombres exactos que deben quedar como *required status checks* en 
 El check `validar` del workflow documental (`SDD documental (sin AWS ni despliegue)`) se mantiene como
 requisito adicional cuando la rama lo exija.
 
-## 2. Configuración deseada (no aplicada)
+## 2. Configuración aplicada y propuesta pendiente
+
+La configuración vigente es la verificada en §0 (13 checks, `strict=true`, 1 revisor,
+force-push y borrado deshabilitados). El JSON siguiente se conserva como referencia
+histórica de la solicitud original de I-080; **no** describe el estado actual.
 
 ```json
 {
@@ -113,15 +125,16 @@ Los checks exigidos para el merge son los doce del grafo vigente:
 | PR Quality Gate | `quality-gate` |
 | Hardening Report | `hardening-report` |
 | CI Success | `ci-success` |
+| validar (SDD documental) | `sdd-validacion.yml` |
 
 `quality-gate` acepta `skipped` unicamente si el perfil de cambios lo justifica y lo
 registra; cualquier `failure`, `cancelled`, resultado ausente o artefacto exigido no
 publicado bloquea. `ci-success` es el unico nodo que declara el resultado final.
 
-**La proteccion de ramas sigue `BLOQUEADO_PLAN_GITHUB`** (HTTP 403 en repositorio
-privado con el plan actual): estos checks se exigen por el propio pipeline y por la
-revision humana del merge autorizado, no por una regla de GitHub. No se declara
-proteccion activa ni se cambia de plan.
+**La proteccion de ramas esta ACTIVA** desde la publicacion del repositorio: `strict=true`,
+13 checks y una revision. `enforce_admins=false` permite que un administrador omita la
+proteccion; mientras no se apruebe un ruleset equivalente, el merge sigue exigiendo
+autorizacion humana vinculada a PR + SHA40 y la prohibicion expresa de `--admin`/bypass.
 
 La excepcion temporal de WAF (RFC-006, AWS-0011) mantiene su vigencia y su verificacion
 automatica dentro del job `iac`; ninguna otra excepcion esta autorizada.

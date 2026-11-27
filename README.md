@@ -1,27 +1,53 @@
-# Nexum-Backend — SDD rector y arranque H08-A
+# Nexum-Backend — estado vigente H09-1
 
-Proyecto privado `nexumpr/Nexum-Backend`. SDD completo (12 arquitectura, 16 infraestructura, 75 endpoints) publicado; 103 specs, 412 documentos base, OpenAPI 3.1. Las 75 operaciones constituyen baseline extensible por RFC; las siete opcionales no son obligaciones automáticas.
+Backend Go de Nexum (finanzas personales). Repositorio público `nexumpr/Nexum-Backend`; SDD completo con 103 especificaciones (12 arquitectura, 16 infraestructura, 75 endpoints) y contrato OpenAPI 3.1 de 75 operaciones.
 
-## Estado único
-Leer `sdd/_control/H07/ESTADO_Y_GATES.md` y `sdd/_control/H08/CONTRATO_INICIO_H08A.md`. H03/H04 aprobados; H05 documental condicionado; H06/H07 ratificados mediante comando humano H08-A; H08-A **local solamente** (A-000 primero). Si no se ha ejecutado aprobación del instalador y CI no está verde, este repositorio NO autoriza implementación.
+## Estado operativo (2026-11-27)
 
-## Tres bloques SDD
+| Elemento | Valor |
+|---|---|
+| `main` | `1d5778dec3f5276bcc8f7e6a5979044a83418682` |
+| Release productiva | `v0.21.4+5bef784b2d1c` |
+| Cómputo | ASG `2/2/2`, Launch Template v26, `us-east-2a` + `us-east-2b` |
+| Entrada | CloudFront HTTPS → VPC Origin → ALB interno HTTP:80 → 2 EC2 Go:8080 |
+| Datos | DynamoDB `NEXUM_CORE_H08I` (SSE KMS) + Redis OSS `cache.t4g.micro` con TLS y RBAC |
+| Certificación funcional | **74/75 PASS**; E015 pendiente de aprobación legal |
+| Plan AWS | FREE/ACTIVE; sin cargos personales; créditos y vigencia se verifican en cada Gate |
+| Gobierno | H08E cerrado; H09-1 en curso; H09-2..H09-4 no autorizadas |
+
+La certificación funcional es independiente de la madurez DevSecOps. Los estados `LOCAL`, `MERGED` y `PRODUCTIVO` se registran por separado y nunca se extrapolan entre sí.
+
+## Bloques SDD
+
 - `sdd/01-arquitectura-general/` A-000..A-110
 - `sdd/02-infraestructura/` I-000..I-150
 - `sdd/03-endpoints/` E001..E075
-- `sdd/_control/H07`, `sdd/_control/H08`: auditoría, Gates y RFC, **no son cuarta carpeta de especificaciones**.
+- `sdd/_control/H07` y `sdd/_control/H08`: auditoría, Gates, RFC y matrices; **no** son una cuarta carpeta de especificaciones.
 
-## Documentación y validación
-`constitution.md` > `AGENTS.md` > `memoria.md`; 8 agentes/9 skills en `.opencode`, config v2 en `opencode.json`, manifiesto SHA-256 H07, workflow documental GitHub Actions. Validación:
+## Validación local
+
 ```powershell
-py -3.13 herramientas/validar_sdd_integral.py
-py -3.13 -m unittest discover -s herramientas/tests -v
+py -3 herramientas/validar_sdd_integral.py --check-git
+py -3 sdd/03-endpoints/herramientas/validar_h06.py
+py -3 -m unittest discover -s herramientas/tests
+py -3 -m unittest discover -s tests/infra/terraform
+go build ./...; go vet ./...; go test ./... -count=1
 ```
 
-## Primera implementación (OpenCode)
-Usar nueva sesión OpenCode v2, `nexum-orchestrator`, ver `sdd/_control/H08/PRIMERA_TAREA_OPENCODE_A000.md`. Pedir plan A-000 sin acciones y solicitar aprobación humana antes de crear archivos. **No usar agentes en main**, preparar ramas y PR. Permisos shell/edit son ASK, AWS/GitHub mutante DENY.
+El CI ejecuta doce jobs más `validar`: formato/vet/build/pruebas, análisis estático, secretos, IaC, contratos, SBOM, Semgrep, integración, quality gate, hardening report y éxito final. `main` exige `strict=true`, 13 checks y una revisión; force-push y borrado están deshabilitados.
 
-## Futuro obligatorio sin autorización anticipada
-Terraform IaC automatizará desde creación hasta suspensión de auxiliares, 2 nodos Go simultáneos, DynamoDB, Redis OSS compartido real, balanceo CloudFront/ALB, IAM/OIDC, HTTPS, DevSecOps, CI/CD, observabilidad, respaldo y recuperación. Antes de cualquier `apply` se exigen precios, saldo/créditos y 0 MXN personales; no actualizar cuenta Free a Paid. Mobile no condiciona Gates Backend; podrá pedir E076+ mediante RFC.
+## Límites y bloqueos vigentes
 
-**No confundir:** CI documental verde ≠ Go compilado ≠ HTTP verificado ≠ AWS desplegada. Comparación independiente con PDF docente y maqueta Android aún no está acreditada y se registra como riesgo hasta disponer de fuentes.
+- `E015` sirve `2026-11-v2`; la propuesta `2026-11-v3` **no está aprobada ni publicada** y su artefacto de 13 662 bytes no está preservado en Git.
+- CloudFront con certificado por defecto impone TLSv1; no se declara TLS 1.2.
+- WAF ausente; la excepción `RFC-006` vence el **2026-12-02**.
+- Observabilidad: log group definido con retención 7 días, pero **sin ingesta** (`storedBytes=0`) y alarmas sin acciones (`RFC-007` inexistente).
+- Redis y NAT operan en una sola AZ: hay punto único de fallo declarado.
+- Sin environment `aws-deploy`, sin OIDC y sin CD ejecutado; el despliegue es asistido y requiere Gate por SHA de plan.
+- Sin tags ni GitHub Releases; el identificador de release es la convención `vX.Y.Z+<sha12>` del prefijo S3.
+
+## Reglas de trabajo
+
+`constitution.md` > `AGENTS.md` > `memoria.md`. Ningún `apply`, despliegue, merge, rotación de secretos o gasto se ejecuta sin autorización humana específica. No se usa Docker ni WSL. Mobile, Play Store y landing quedan fuera del alcance del Backend.
+
+**No confundir:** CI documental verde ≠ Go compilado ≠ HTTP verificado ≠ AWS desplegado. Toda afirmación de producción exige evidencia HTTP/AWS de la release exacta.
