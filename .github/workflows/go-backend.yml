@@ -336,6 +336,18 @@ jobs:
       - name: Contratos de publicacion y compatibilidad I-150
         run: python3 -m unittest discover -s tests/infra/publicacion
 
+      - name: Contrato del CD manual I-090
+        run: python3 -m unittest discover -s tests/infra/cd
+
+      - name: Contrato del arnes de certificacion 75 endpoints
+        run: python3 -m unittest discover -s tests/infra/certificacion
+
+      - name: Contrato DevSecOps y escaneres IaC
+        run: python3 -m unittest discover -s tests/infra/devsecops
+
+      - name: Contrato de la unidad systemd endurecida
+        run: python3 -m unittest discover -s tests/infra/systemd
+
   contratos:
     name: Contratos OpenAPI y herramientas
     needs: detectar
