@@ -2575,6 +2575,10 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **PR #163 (`feat/h09-90-cloud-gobierno`, HEAD `9a2b762…`):** Terraform preparado con `dynamodb_proteccion_borrado=true` y ARN determinista del log group para el rol runtime (sin ciclo IAM→observabilidad→balanceo→computo); 550 pruebas Terraform y `fmt` PASS. Documento `H09_90_PREPARACION.md` con RFC-007 (SNS+CMK), análisis WAF/TLS, ruleset/tags/CD propuestos, estado DAST (`ZAP=BLOCKED_TOOLING`, suite adversarial ejecutada) y lecturas AWS necesarias.
 - **FinOps:** créditos **121.623752 USD** (2026-11-27T17:30Z), consumo medido **3.90 USD/día**; 23 días ≈89.70 USD, saldo ≈31.92 USD y reserva de 25 USD con ≈6.92 USD de holgura. Umbral para conservar la reserva: 4.20 USD/día.
 - **Rúbrica:** 69 productivo; **70** al fusionar #162 (Pruebas 7→8). Preparar Terraform/documentación **no otorga puntos**; 85–90 exige ejecutar los Gates de observabilidad, protección de datos, WAF/TLS y CD.
-- **Estados:** `H09_90_LOCAL=PASS`; `PR_163_CI=PENDIENTE`; `AWS_NOT_RUN`; `GITHUB_SETTINGS_NOT_CHANGED`; `MERGE=NO_AUTORIZADO`.
+- **Gobierno ejecutado (2026-11-28):** tag anotado **`v0.21.4+5bef784b2d1c`** sobre `5bef784b2d1cc26739e8e9ae29e8499416dd46c9` y **GitHub Release** con binario (23 469 437 B, SHA-256 `79058a64…7f50`), unidad systemd, `binario.sha256` y SBOM. Ruleset **`main-protegida-h09` (id 28272257)** activo: `bypass_actors=[]`, `current_user_can_bypass=never`, 13 checks, 1 revisor, conversaciones resueltas, `strict=true`, merge/squash/rebase permitidos, sin linear history. Se conserva la protección clásica.
+- **Terraform:** `init -backend=false` y `validate` PASS; plan exacto pendiente de variables de custodia y Gate por SHA.
+- **Lecturas AWS:** bloqueadas por la política local (`describe-load-balancer-attributes`, `describe-continuous-backups`, `s3api get-bucket-*`). Comandos exactos en `H09_90_PREPARACION.md`; no se ampliaron permisos.
+- **PR #162:** nuevo HEAD `9ea8b22cabd6623ccfef6f593a9087843b87e0a8` tras eliminar la confianza en `CloudFront-Viewer-Address` y normalizar IPv4 mapeada.
+- **Estados:** `H09_90_LOCAL=PASS`; `GITHUB_RULESET=ACTIVE`; `TAG_RELEASE=CREATED`; `AWS_NOT_RUN`; `MERGE=NO_AUTORIZADO`.
 
 
