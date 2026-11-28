@@ -328,3 +328,14 @@ E015 permanece **CONTENT_MISMATCH**: el aviso v2 sigue vigente por decisión del
 
 Las verificaciones de Android (recepción real de push con token auténtico y ausencia de entrega tras revocar) no son endpoints adicionales: son escenarios de aceptación de E059/E060 que requieren dispositivo físico y no se certifican con tokens sintéticos.
 
+## Actualización H09-1 (2026-11-27) — vigencia sin reescribir el histórico
+
+- **Base de gobierno actual:** `main` `1d5778dec3f5276bcc8f7e6a5979044a83418682`; release `v0.21.4+5bef784b2d1c`; Launch Template v26; ASG 2/2/2; AZ `us-east-2a` y `us-east-2b`.
+- **Resultado vigente:** **74/75 PASS backend**. `E015` sigue `CONTENT_MISMATCH`; no se declara 75/75.
+- **Secciones históricas:** toda fila que cita `v0.21.2`, `v0.21.1` o `v0.21.0` conserva su valor histórico y **no** se extrapola a `v0.21.4`. La evidencia de la release actual se limita a las verificaciones registradas tras el despliegue de `v0.21.4`.
+- **E072/E073:** contrato `Health` conforme y respuesta real **200** el 2026-11-27 (`status=ok`, `service=nexum-backend`, `timestamp`). El hallazgo previo `CONTRACT_BLOCKED` queda cerrado.
+- **E031:** se conserva el tombstone aprobado (204 idempotente, puntero conservado, exclusión del movimiento en agregados y listados).
+- **E051:** se conserva **sin caché de respuesta** (lectura consistente de DynamoDB; RFC-022 D-W3-07).
+- **E015:** la reconciliación de hashes se registra en `H09_1_RECONCILIACION.md`; no se aprueba ni publica `v3`.
+- Esta actualización es **documental**: no repite los 75 escenarios ni modifica código, contrato o AWS.
+

@@ -80,7 +80,8 @@ func e006Handler(store *e006Store, limiter nexumhttp.PasswordResetConfirmLimiter
 func e006Peticion(cuerpo string) *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password/reset", bytes.NewBufferString(cuerpo))
 	req.Header.Set("Content-Type", "application/json")
-	req.RemoteAddr = "203.0.113.10:4321"
+	req.RemoteAddr = "10.42.1.10:443"
+	req.Header.Set("X-Forwarded-For", "203.0.113.10, 130.176.10.20")
 	return req
 }
 

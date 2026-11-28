@@ -93,7 +93,8 @@ func TestE070FAQLimitaPorIP(t *testing.T) {
 		nexumhttp.LimitarPorIP(limitadorFalso{permitido: false, retryAfter: 42 * time.Second}, "public_content", handler.ServeHTTP))
 
 	peticion := httptest.NewRequest(http.MethodGet, "/api/v1/help/faq", nil)
-	peticion.Header.Set("X-Forwarded-For", "203.0.113.10")
+	peticion.RemoteAddr = "10.42.1.10:443"
+	peticion.Header.Set("X-Forwarded-For", "203.0.113.10, 130.176.10.20")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, peticion)
 

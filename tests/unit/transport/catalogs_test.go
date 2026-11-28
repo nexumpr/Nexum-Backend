@@ -37,7 +37,8 @@ func (l *e022Cuota) Allow(_ context.Context, clase, _ string) (bool, time.Durati
 // política de IP efectiva.
 func e022Peticion() *http.Request {
 	peticion := httptest.NewRequest(http.MethodGet, e022Ruta, nil)
-	peticion.Header.Set("X-Forwarded-For", "203.0.113.10")
+	peticion.RemoteAddr = "10.42.1.10:443"
+	peticion.Header.Set("X-Forwarded-For", "203.0.113.10, 130.176.10.20")
 	return peticion
 }
 
