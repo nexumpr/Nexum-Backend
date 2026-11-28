@@ -222,9 +222,9 @@ variable "dynamodb_pitr_habilitado" {
 }
 
 variable "dynamodb_proteccion_borrado" {
-  description = "Deletion protection; desactivada en h08i para permitir teardown autorizado"
+  description = "Deletion protection activa (H09-90). Un teardown autorizado exige ponerla en false con Gate explicito."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "dynamodb_habilitar_gsi2" {
