@@ -237,9 +237,9 @@ Verificación de solo lectura. **No** aprueba, publica ni modifica el texto lega
 | Artefacto | Bytes | SHA-256 | Estado |
 |---|---:|---|---|
 | `internal/application/privacy/aviso_2026_11_v3.txt` | 8 123 | `E925596ADFF1B3EBB9A17064D44F5F6B84BFBDFB874396CD51EFC6C0AC3F8D83` | Único preservado en Git; borrador **superado** por esta propuesta; no publicable |
-| `dist/deuda/aviso_2026_11_v3.txt` | 13 662 (declarado) | `1CEC4609FF2F3FC052D3DEB29271BA8AAED322D1EC97AE9757E222CC8C0563B9` (declarado) | **NO EXISTE** en el repositorio ni en `dist/`; no materializado |
+| `internal/application/privacy/aviso_2026_11_v3.txt` | **13 662** | **`1CEC4609FF2F3FC052D3DEB29271BA8AAED322D1EC97AE9757E222CC8C0563B9`** | **RECUPERADO** del bloque §2 y versionado; no publicado |
 
-- La búsqueda de `1CEC4609…` en el árbol no devuelve ningún archivo: es un **hash declarado sin artefacto**.
-- La afirmación de este documento de que sustituye al borrador de 8 123 bytes es correcta; por tanto **no** debe reutilizarse `E925…` como si fuera la v3 propuesta.
-- Consecuencia: la frase de aprobación propuesta **no puede ejercerse** hasta que el texto de 13 662 bytes se materialice, se versione y su SHA-256 se recalcule desde el archivo real. Cualquier Gate legal previo a eso sería inválido.
-- `memoria.md` conserva `E925…` porque documenta el borrador histórico; no se altera esa referencia.
+- **Recuperación verificada (2026-11-27):** el bloque `text` de la sección 2 se extrajo con LF y UTF-8 sin BOM; el resultado mide **13 662 bytes** y su SHA-256 coincide **exactamente** con `1CEC…63B9`. No se inventó texto ni se afirmó una recuperación no comprobada. Una prueba Go (`TestAvisoV3Integridad`) fija tamaño y hash en CI.
+- La afirmación de este documento de que sustituye al borrador de 8 123 bytes es correcta; `E925…` queda como borrador histórico superado y no se reutiliza.
+- **Sigue pendiente únicamente la aprobación legal independiente.** El artefacto ya existe y es verificable; la frase de aprobación puede ejercerse sobre el hash real, pero **no se activa ni publica** hasta el Gate humano.
+- `memoria.md` conserva `E925…` como referencia histórica y registra la recuperación de `1CEC…`.

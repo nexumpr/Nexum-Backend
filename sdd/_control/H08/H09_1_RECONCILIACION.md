@@ -86,7 +86,7 @@ Propuestas (no aplicadas; requieren autorización humana):
 
 ## 5. Reconciliaciones documentales
 
-- **E015:** el hash `1CEC…` corresponde a un texto de 13 662 bytes declarado en `dist/deuda/`, que **no existe**; el único preservado es `E925…` (8 123 bytes), superado y no publicable. No se aprueba ni publica v3.
+- **E015:** el texto íntegro se recuperó del bloque §2 de la propuesta preservada: **13 662 bytes** y SHA-256 `1CEC…63B9` coinciden exactamente. Se versionó en `internal/application/privacy/aviso_2026_11_v3.txt` con prueba de integridad. Sigue **sin aprobación legal ni publicación**; `E925…` es el borrador histórico superado.
 - **E072/E073:** contrato `Health` conforme; GET real 200 el 2026-11-27 con `status=ok`, `service` y `timestamp`. Se cierra el hallazgo `CONTRACT_BLOCKED`.
 - **E031:** se conserva el tombstone aprobado (204 idempotente, puntero conservado, exclusión en agregados).
 - **E051:** se conserva sin caché de respuesta (lectura consistente; RFC-022 D-W3-07).
