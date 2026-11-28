@@ -526,12 +526,16 @@ class EscaneoIaCReal(unittest.TestCase):
 
 
 class DocumentosDeGobierno(unittest.TestCase):
-    def test_gates_pr_declara_checks_y_estado_bloqueado(self) -> None:
+    def test_gates_pr_declara_checks_y_estado_activo(self) -> None:
         texto = _leer(GATES)
         for nombre in JOBS.values():
             self.assertIn(nombre, texto, nombre)
-        self.assertIn("BLOQUEADO_PLAN_GITHUB", texto)
-        self.assertIn("HTTP 403", texto)
+        # Estado vigente verificado por API el 2026-11-27 (RFC-009 publico el repositorio).
+        self.assertIn("**ACTIVA**", texto)
+        self.assertIn("HTTP 200", texto)
+        self.assertIn("13 contextos", texto)
+        self.assertIn("strict=true", texto)
+        self.assertIn("enforce_admins = false", texto)
         self.assertIn("allow_force_pushes", texto)
         self.assertIn('"allow_force_pushes": false', texto)
         self.assertIn("required_approving_review_count", texto)

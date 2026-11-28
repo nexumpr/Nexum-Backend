@@ -227,3 +227,19 @@ despliegue ni modificación de otros endpoints.
 - `sdd/_control/H08/GATE_H08E_REGULARIZACION_OLEADAS_4_5.md` §5 (la aprobación legal de E015 queda excluida)
 - `internal/application/privacy/notice.go`, `aviso_2026_11_v2.txt`
 - `dist/deuda/aviso_2026_11_v3.txt` (artefacto canónico)
+
+---
+
+## Reconciliación de trazabilidad H09-1 (2026-11-27)
+
+Verificación de solo lectura. **No** aprueba, publica ni modifica el texto legal.
+
+| Artefacto | Bytes | SHA-256 | Estado |
+|---|---:|---|---|
+| `internal/application/privacy/aviso_2026_11_v3.txt` | 8 123 | `E925596ADFF1B3EBB9A17064D44F5F6B84BFBDFB874396CD51EFC6C0AC3F8D83` | Único preservado en Git; borrador **superado** por esta propuesta; no publicable |
+| `internal/application/privacy/aviso_2026_11_v3.txt` | **13 662** | **`1CEC4609FF2F3FC052D3DEB29271BA8AAED322D1EC97AE9757E222CC8C0563B9`** | **RECUPERADO** del bloque §2 y versionado; no publicado |
+
+- **Recuperación verificada (2026-11-27):** el bloque `text` de la sección 2 se extrajo con LF y UTF-8 sin BOM; el resultado mide **13 662 bytes** y su SHA-256 coincide **exactamente** con `1CEC…63B9`. No se inventó texto ni se afirmó una recuperación no comprobada. Una prueba Go (`TestAvisoV3Integridad`) fija tamaño y hash en CI.
+- La afirmación de este documento de que sustituye al borrador de 8 123 bytes es correcta; `E925…` queda como borrador histórico superado y no se reutiliza.
+- **Sigue pendiente únicamente la aprobación legal independiente.** El artefacto ya existe y es verificable; la frase de aprobación puede ejercerse sobre el hash real, pero **no se activa ni publica** hasta el Gate humano.
+- `memoria.md` conserva `E925…` como referencia histórica y registra la recuperación de `1CEC…`.

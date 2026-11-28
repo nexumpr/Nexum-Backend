@@ -93,7 +93,8 @@ func ev011Handler(store *ev011Store, limiter nexumhttp.EmailVerificationConfirmL
 func ev011Peticion(cuerpo string) *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/email-verification/confirm", strings.NewReader(cuerpo))
 	req.Header.Set("Content-Type", "application/json")
-	req.RemoteAddr = "203.0.113.10:4321"
+	req.RemoteAddr = "10.42.1.10:443"
+	req.Header.Set("X-Forwarded-For", "203.0.113.10, 130.176.10.20")
 	return req
 }
 

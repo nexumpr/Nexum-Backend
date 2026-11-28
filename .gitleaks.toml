@@ -134,6 +134,17 @@ paths = ['''^tests/unit/application/movements_test\.go$''']
 regexTarget = "line"
 regexes = ['''^\s*\w+\.IdempotencyKey\s*=\s*"otra-clave-sintetica-de-prueba-0002"\s*$''']
 
+# H09-1 (2026-11-27): el commit intermedio de la rama incluyo el literal sintetico
+# `0123456789abcdef` como Idempotency-Key en la prueba de la cadena de proxies. El arbol
+# actual ya no lo usa (se calcula en tiempo de ejecucion), pero el historial no se reescribe.
+# La excepcion exige archivo y linea exactos; cualquier otro valor u otra ruta se detectan.
+[[rules.allowlists]]
+description = "Idempotency-Key sintetica de la prueba XFF de H09-1 (literal fijo historico, no credencial)"
+condition = "AND"
+paths = ['''^internal/transport/http/clientip_test\.go$''']
+regexTarget = "line"
+regexes = ['''^\s*req\.Header\.Set\("Idempotency-Key",\s*"0123456789abcdef"\)\s*$''']
+
 # Oleada 2 (2026-11-18): tres falsos positivos de la linea C (commit 475d7b0).
 # Son literales fijos de prueba (una Idempotency-Key uuid y dos secretos de cursor
 # sinteticos) que no autentican contra ningun servicio. Excepcion minima: archivo

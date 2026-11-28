@@ -30,14 +30,19 @@ func TestClientIPPolicy(t *testing.T) {
 		remote    string
 		esperado  string
 	}{
-		{"un solo salto (CloudFront sustituye)", "203.0.113.7", "10.42.1.10:443", "203.0.113.7"},
+		{"un solo salto con peer privado se rechaza", "203.0.113.7", "10.42.1.10:443", ""},
+		{"loopback con un salto", "203.0.113.7", "127.0.0.1:5000", "203.0.113.7"},
 		{"cadena con prefijo falsificado", "1.2.3.4, 203.0.113.7, 130.176.10.20", "10.42.1.10:443", "203.0.113.7"},
 		{"dos saltos sin spoof", "203.0.113.7, 130.176.10.20", "10.42.1.10:443", "203.0.113.7"},
 		{"ipv6 del visor", "2001:db8::1, 130.176.10.20", "10.42.1.10:443", "2001:db8::1"},
 		{"ipv4 mapeada en ipv6", "::ffff:203.0.113.7, 130.176.10.20", "10.42.1.10:443", "203.0.113.7"},
-		{"cadena vacia usa el peer", "", "198.51.100.9:5555", "198.51.100.9"},
-		{"cadena malformada rechazada", "no-es-ip, 130.176.10.20", "198.51.100.9:5555", ""},
-		{"cadena demasiado larga", strings.Repeat("203.0.113.7,", 40), "198.51.100.9:5555", ""},
+		{"cadena vacia con peer privado se rechaza", "", "10.42.1.10:443", ""},
+		{"cadena vacia con peer publico se rechaza", "", "198.51.100.9:5555", ""},
+		{"cadena malformada rechazada", "no-es-ip, 130.176.10.20", "10.42.1.10:443", ""},
+		{"elemento vacio rechazado", "203.0.113.7, , 130.176.10.20", "10.42.1.10:443", ""},
+		{"cadena demasiado larga", strings.Repeat("203.0.113.7,", 40), "10.42.1.10:443", ""},
+		{"ultimo salto privado vpc origin", "203.0.113.7, 10.42.0.55", "10.42.1.10:443", "203.0.113.7"},
+		{"peer publico con cadena se rechaza", "203.0.113.7, 130.176.10.20", "198.51.100.9:5555", ""},
 	}
 	for _, caso := range casos {
 		t.Run(caso.nombre, func(t *testing.T) {

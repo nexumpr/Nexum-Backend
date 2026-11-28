@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -110,7 +109,17 @@ func (h *RegisterHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeRegisterError(w, r, http.StatusServiceUnavailable, "DEPENDENCY_UNAVAILABLE", "servicio no disponible", nil)
 		return
 	}
-	allowed, retryAfter, err := h.limiter.Allow(r.Context(), "auth_register", registerClientIP(r))
+	// La cuota se aplica sobre la IP del visor verificada por la cadena de proxies.
+	// Una cadena no verificable se rechaza: usar el peer (ALB) agruparía a todos los
+	// clientes bajo la misma cuota y permitiría agotarla con una sola fuente.
+	ipVerificada, okIP := clientIPFromTrustedChain(r)
+	if !okIP {
+		writeRegisterError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "solicitud no completada", []httputil.ErrorDetail{
+			{Field: "X-Forwarded-For", Reason: "untrusted_proxy_chain"},
+		})
+		return
+	}
+	allowed, retryAfter, err := h.limiter.Allow(r.Context(), "auth_register", ipVerificada)
 	if err != nil {
 		h.logger.ErrorContext(r.Context(), "registro rechazado: fallo del rate limiter",
 			slog.String("error_class", "rate_limiter_unavailable"),
@@ -298,25 +307,6 @@ func (h *RegisterHandler) writeServiceError(w http.ResponseWriter, r *http.Reque
 func hasJSONContentType(r *http.Request) bool {
 	value := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
 	return strings.HasPrefix(value, "application/json")
-}
-
-func registerClientIP(r *http.Request) string {
-	// D2: CloudFront -> VPC Origin -> ALB interno. El ALB no es accesible desde
-	// Internet; X-Forwarded-For lo fija el proxy de confianza. Se toma el primer salto.
-	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); forwarded != "" {
-		part := strings.TrimSpace(strings.Split(forwarded, ",")[0])
-		if part != "" {
-			return part
-		}
-	}
-	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
-	if err == nil && host != "" {
-		return host
-	}
-	if remote := strings.TrimSpace(r.RemoteAddr); remote != "" {
-		return remote
-	}
-	return "unknown"
 }
 
 func retryAfterHeader(wait time.Duration) string {
