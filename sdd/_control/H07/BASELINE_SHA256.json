@@ -218,7 +218,7 @@
   "infra/terraform/operacion/inventario.json": "a3facdc1b42795d47ab3fe82f0e533188f026af60d703c714e53745e4a02d11a",
   "infra/terraform/policies/terraform-state-access.json.tftpl": "e666d80aaadbd2c2f4af414e20ab22d09f27848f570ef7079cbab2bde01629aa",
   "infra/terraform/respaldo/inventario_backup.json": "e2b6a6f2306e2a4f9c65c2225c3cfbf480b637a7d64d2eb548477b5dd67327ee",
-  "memoria.md": "15b482dd7d9a7a03b13ea958765c9bc363ac05c98f9057f473bf642897cdf539",
+  "memoria.md": "e3279d09ff4ac48a26e3341bb23192ad9e559244d9d8028bd4c55a48f64cb39a",
   "ml/artifact.go": "601a5c585710155362fc90d0c3dff07ed3da5c05559153522035f0400307e9a4",
   "ml/datos_sinteticos_v1.json": "8d2bf29691a08eee6a1cd1230ad81b8454712424721e5e3e21bb9e9bd99918fd",
   "ml/entrenar_kmeans.py": "12f1ab3358c7029ccf05157d61b9a42512f5e1d834c28ebe28417e9040b1256d",
