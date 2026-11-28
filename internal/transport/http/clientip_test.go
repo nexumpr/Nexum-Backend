@@ -30,6 +30,8 @@ func TestClientIPFromTrustedChain(t *testing.T) {
 		{"ipv6 visor", "10.42.1.10:443", "2001:db8::1, 130.176.10.20", "2001:db8::1", true},
 		{"ipv6 borde", "10.42.1.10:443", "203.0.113.7, 2600:9000::1", "203.0.113.7", true},
 		{"ipv4 mapeada", "10.42.1.10:443", "::ffff:203.0.113.7, 130.176.10.20", "203.0.113.7", true},
+		{"visor privado mapeado se rechaza", "10.42.1.10:443", "::ffff:10.0.0.5, 10.42.0.55", "", false},
+		{"ultimo salto privado mapeado vpc origin", "10.42.1.10:443", "203.0.113.7, ::ffff:10.42.0.55", "203.0.113.7", true},
 		{"peer privado distinto", "172.16.5.9:443", "203.0.113.7, 130.176.10.20", "203.0.113.7", true},
 
 		// Un solo salto con peer privado no corresponde a la topología completa.
@@ -112,37 +114,25 @@ func itoa(n int) string {
 	return string(buf[i:])
 }
 
-// TestCloudFrontViewerAddress verifica la fuente preferente: la cabecera que CloudFront
-// sobrescribe. Un valor inválido o un visor privado se rechazan; nunca se degrada a XFF.
-func TestCloudFrontViewerAddress(t *testing.T) {
-	casos := []struct {
-		nombre   string
-		remote   string
-		viewer   string
-		forward  string
-		esperado string
-		ok       bool
-	}{
-		{"visor ipv4 con puerto", "10.42.1.10:443", "198.51.100.9:1234", "", "198.51.100.9", true},
-		{"visor ipv6 con puerto", "10.42.1.10:443", "[2001:db8::9]:443", "", "2001:db8::9", true},
-		{"prevalece sobre xff falsificado", "10.42.1.10:443", "198.51.100.9:1", "1.2.3.4, 203.0.113.7, 130.176.10.20", "198.51.100.9", true},
-		{"formato invalido se rechaza", "10.42.1.10:443", "no-es-ip", "203.0.113.7, 10.42.0.55", "", false},
-		{"visor privado se rechaza", "10.42.1.10:443", "10.42.0.99:1234", "", "", false},
-		{"peer publico se rechaza", "198.51.100.20:443", "198.51.100.9:1", "", "", false},
+// TestViewerAddressNoSeConfia demuestra que una cabecera CloudFront-Viewer-Address
+// enviada por el cliente no se usa: Managed-AllViewer no garantiza que CloudFront la
+// genere y sobrescriba. La IP sale exclusivamente de la posición de XFF.
+func TestViewerAddressNoSeConfia(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "10.42.1.10:443"
+	req.Header.Set("CloudFront-Viewer-Address", "198.51.100.99:1234")
+	req.Header.Set("X-Forwarded-For", "203.0.113.7, 10.42.0.55")
+	ip, ok := clientIPFromTrustedChain(req)
+	if !ok || ip != "203.0.113.7" {
+		t.Fatalf("debe ignorar Viewer-Address y usar XFF; obtenido (%q,%v)", ip, ok)
 	}
-	for _, caso := range casos {
-		t.Run(caso.nombre, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.RemoteAddr = caso.remote
-			req.Header.Set("CloudFront-Viewer-Address", caso.viewer)
-			if caso.forward != "" {
-				req.Header.Set("X-Forwarded-For", caso.forward)
-			}
-			ip, ok := clientIPFromTrustedChain(req)
-			if ok != caso.ok || ip != caso.esperado {
-				t.Fatalf("esperado (%q,%v), obtenido (%q,%v)", caso.esperado, caso.ok, ip, ok)
-			}
-		})
+
+	// Sin XFF no se degrada a la cabecera del visor ni al peer ALB.
+	sinCadena := httptest.NewRequest(http.MethodGet, "/", nil)
+	sinCadena.RemoteAddr = "10.42.1.10:443"
+	sinCadena.Header.Set("CloudFront-Viewer-Address", "198.51.100.99:1234")
+	if _, ok := clientIPFromTrustedChain(sinCadena); ok {
+		t.Fatal("sin XFF no debe aceptarse la cabecera del visor ni el peer privado")
 	}
 }
 
