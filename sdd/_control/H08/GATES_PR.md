@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Spec | `sdd/02-infraestructura/I-080-ci-backend` (INF-080-02, INF-080-03, INF-080-05) |
-| Estado de branch protection | **ACTIVA** — verificada por API el 2026-11-27 (`strict=true`, 13 checks, 1 revisor) |
+| Estado de branch protection | **ACTIVA** — verificada por API el 2026-11-28 (`strict=true`, 13 checks, **0 revisiones obligatorias**, ruleset `main-protegida-h09` id `28272257`) |
 | Repositorio | Público (`nexumpr/Nexum-Backend`, `visibility=public`, RFC-009) |
 | Workflow | `.github/workflows/go-backend.yml` |
 
@@ -12,7 +12,8 @@
 `gh api repos/nexumpr/Nexum-Backend/branches/main/protection` devuelve **HTTP 200** con:
 
 - `required_status_checks.strict = true` y **13 contextos** (los doce jobs del grafo RFC-008 más `validar`);
-- `required_pull_request_reviews.required_approving_review_count = 1`;
+- `required_pull_request_reviews` **eliminado** de la protección clásica (decisión `APRUEBO_MODIFICAR_REVISIONES_OBLIGATORIAS_MAIN_A_CERO`);
+- ruleset `main-protegida-h09` (id `28272257`): `required_approving_review_count=0`, `require_extra_approval_for_unattributed_changes=false`, `bypass_actors=[]`, `current_user_can_bypass=never`, conversaciones resueltas, 13 checks, `strict=true`, merge/squash/rebase;
 - `allow_force_pushes = false` y `allow_deletions = false`;
 - `enforce_admins = false`, `required_signatures = false`, `required_linear_history = false` y
   `required_conversation_resolution = false`;
@@ -131,10 +132,14 @@ Los checks exigidos para el merge son los doce del grafo vigente:
 registra; cualquier `failure`, `cancelled`, resultado ausente o artefacto exigido no
 publicado bloquea. `ci-success` es el unico nodo que declara el resultado final.
 
-**La proteccion de ramas esta ACTIVA** desde la publicacion del repositorio: `strict=true`,
-13 checks y una revision. `enforce_admins=false` permite que un administrador omita la
-proteccion; mientras no se apruebe un ruleset equivalente, el merge sigue exigiendo
-autorizacion humana vinculada a PR + SHA40 y la prohibicion expresa de `--admin`/bypass.
+**La proteccion de ramas esta ACTIVA** con gobierno unipersonal autorizado: `strict=true`,
+13 checks, **0 revisiones obligatorias**, `bypass_actors=[]` y `current_user_can_bypass=never`.
+Se conservan force-push y borrado bloqueados, conversaciones resueltas y Gate humano por PR +
+SHA40. **Limitacion declarada:** se elimina la separacion autor/aprobador; se compensa con CI
+obligatorio, ruleset sin bypass, tag/Release verificables y Gates humanos por SHA.
+
+**Release trazable:** tag anotado `v0.21.4+5bef784b2d1c` sobre `5bef784b2d1c` y GitHub Release
+con binario (SHA-256 `79058a64…7f50`), unidad systemd, `binario.sha256` y SBOM.
 
 La excepcion temporal de WAF (RFC-006, AWS-0011) mantiene su vigencia y su verificacion
 automatica dentro del job `iac`; ninguna otra excepcion esta autorizada.

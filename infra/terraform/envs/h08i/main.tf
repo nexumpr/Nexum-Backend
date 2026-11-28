@@ -314,6 +314,18 @@ module "secretos" {
   gestor_objetos_arn = module.identidades.secretos_gestor_iac_arn
 }
 
+locals {
+  # I-110 crea el log group con un nombre determinista. El ARN se construye aquí sin
+  # referenciar el módulo de observabilidad para evitar el ciclo
+  # IAM -> observabilidad -> balanceo -> computo -> IAM.
+  log_group_backend_name = "/nexum/${var.entorno}/backend"
+  iam_log_group_arns = length(var.iam_cloudwatch_log_group_arns) > 0 ? var.iam_cloudwatch_log_group_arns : (
+    var.desplegar_aplicacion ? [
+      "arn:aws:logs:${var.region}:${data.aws_caller_identity.actual.account_id}:log-group:${local.log_group_backend_name}"
+    ] : []
+  )
+}
+
 module "iam" {
   source = "../../modules/iam"
 
@@ -335,7 +347,7 @@ module "iam" {
   # lista queda vacía y el rol runtime no obtiene acceso a artefactos todavía.
   artifact_object_arns      = var.iam_artifact_object_arns
   secretos_object_arns      = [module.secretos.secrets_prefix_arn]
-  cloudwatch_log_group_arns = var.iam_cloudwatch_log_group_arns
+  cloudwatch_log_group_arns = local.iam_log_group_arns
 
   # Provider OIDC existente, environment y SCP no se verifican ni mutan en I-060.
   github_oidc_provider_arn    = var.iam_github_oidc_provider_arn
