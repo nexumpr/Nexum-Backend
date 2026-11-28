@@ -13,37 +13,41 @@ const maxForwardedHops = 16
 // ClientIPPolicy documenta la política aplicada para obtener la IP efectiva de los
 // endpoints de identidad (E001, E002, E003, E005, E006, E011).
 //
-// Topología real del proyecto (Terraform I-030):
+// Topología real (Terraform I-010/I-030, verificada el 2026-11-27):
 //
-//	cliente -> CloudFront (origin request policy Managed-AllViewer) -> ALB interno -> EC2
+//	cliente -> CloudFront (origin request policy Managed-AllViewer)
+//	       -> VPC Origin (ENI administrada por CloudFront en subred privada)
+//	       -> ALB interno HTTP:80 (SG solo desde el prefijo CloudFront)
+//	       -> EC2 Go:8080 (SG solo desde el SG del ALB)
 //
-// Con Managed-AllViewer, CloudFront reenvía las cabeceras del visor y **añade** la IP del
-// visor al final de `X-Forwarded-For`; después el ALB añade la IP del salto que vio
-// (la del borde de CloudFront). El resultado en el backend es:
+// Con Managed-AllViewer, CloudFront añade `CloudFront-Viewer-Address` (IP y puerto del
+// visor) y appende la IP del visor al final de `X-Forwarded-For`. Después, el ALB
+// appende la IP del salto que vio. En una VPC Origin ese salto es la **ENI privada** de
+// CloudFront, no una IP pública del borde; por eso el último elemento de XFF puede ser
+// privado y no se exige que sea público.
 //
-//	[valores enviados por el cliente..., ip-del-visor, ip-del-borde-cloudfront]
+// Fuentes, en orden:
+//  1. `CloudFront-Viewer-Address`: la genera CloudFront y sobrescribe cualquier valor
+//     enviado por el visor. Es la fuente preferente cuando el peer es el proxy interno.
+//  2. `X-Forwarded-For`: el último elemento lo añade el ALB (no controlable por el
+//     cliente) y el penúltimo lo añade CloudFront con la IP del visor. El primer
+//     elemento y los anteriores son controlables y nunca se usan.
+//  3. Sin cabeceras: solo se acepta un peer loopback (desarrollo local). Un peer
+//     privado sin cadena se rechaza porque las peticiones de identidad deben pasar por
+//     la cadena completa; un peer público nunca es el proxy de confianza.
 //
-// El primer elemento es controlable por el cliente y **no** es de confianza. Tampoco se
-// acepta el penúltimo salto de forma ciega: la política exige que la petición provenga
-// realmente del proxy interno y que la cadena tenga la forma que produce esa topología.
+// Reglas de seguridad:
+//   - El peer inmediato debe ser loopback o privado (ALB dentro de la VPC).
+//   - Se rechazan cabeceras XFF duplicadas (ambigüedad de parseo).
+//   - La cadena debe ser íntegra (≤16 saltos, sin vacíos, zonas ni valores inválidos).
+//   - Con peer privado se exigen al menos dos elementos: el último es el salto que vio
+//     el ALB (público o privado, pero unicast) y el penúltimo es el visor.
+//   - La IP elegida debe ser unicast, no especificada y no multicast.
 //
-// Reglas (fail-closed cuando la cadena no es verificable):
-//  1. El peer inmediato (`RemoteAddr`) debe ser loopback o una dirección privada
-//     (RFC1918/ULA). El ALB interno conecta desde la VPC; un peer público no puede
-//     ser el proxy de confianza.
-//  2. Sin `X-Forwarded-For`, solo se acepta un peer loopback o privado (desarrollo
-//     local o llamada interna). Un peer público sin cadena se rechaza.
-//  3. Con `X-Forwarded-For`: la lista debe ser íntegramente parseable (máximo 16 saltos),
-//     sin elementos vacíos, zonas ni direcciones inválidas.
-//  4. Si el peer es loopback (pruebas o proxy local que no añade salto), se toma el
-//     último elemento. Si el peer es privado (ALB), se exigen al menos dos elementos:
-//     el último lo escribió el ALB y debe ser una dirección pública del borde de
-//     CloudFront; el penúltimo es la IP del visor escrita por CloudFront.
-//  5. La IP elegida debe ser unicast y no especificada ni multicast.
-//
-// Esta política no usa rangos de AWS codificados a mano y no hace DNS inverso. Una
-// validación criptográfica del origen (cabecera secreta de CloudFront) requeriría un
-// cambio de infraestructura y se registra como mejora futura, no como control actual.
+// No se codifican rangos de AWS ni IP efímeras: la confianza se deriva de la topología
+// (SG del ALB restringido al prefijo CloudFront y SG del backend restringido al ALB) y
+// del orden de appends que documenta AWS. Una validación criptográfica del origen
+// (cabecera secreta de CloudFront) requeriría Terraform y un Gate de despliegue.
 func clientIPFromTrustedChain(r *http.Request) (string, bool) {
 	if r == nil {
 		return "", false
@@ -54,16 +58,37 @@ func clientIPFromTrustedChain(r *http.Request) (string, bool) {
 		return "", false
 	}
 
-	forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-For"))
+	// Fuente preferente: cabecera generada por CloudFront. Si está presente pero es
+	// inválida, se rechaza en lugar de degradar silenciosamente a XFF.
+	if viewerHeader := strings.TrimSpace(r.Header.Get("CloudFront-Viewer-Address")); viewerHeader != "" {
+		if !isTrustedProxyPeer(peer) {
+			return "", false
+		}
+		viewer, ok := parseViewerAddress(viewerHeader)
+		if !ok || !isPublicViewer(viewer) {
+			return "", false
+		}
+		return normalizarIP(viewer), true
+	}
+
+	values := r.Header.Values("X-Forwarded-For")
+	if len(values) > 1 {
+		// Varias cabeceras XFF permiten interpretaciones divergentes entre proxies.
+		return "", false
+	}
+	forwarded := ""
+	if len(values) == 1 {
+		forwarded = strings.TrimSpace(values[0])
+	}
+
 	if forwarded == "" {
-		// Sin cadena de proxies: solo un peer local o interno es aceptable.
-		if isTrustedProxyPeer(peer) {
+		if peer.IsLoopback() {
 			return normalizarIP(peer), true
 		}
+		// Un peer interno sin cadena no acredita el paso por CloudFront.
 		return "", false
 	}
 
-	// La cadena solo se evalúa si el peer inmediato es el proxy de confianza.
 	if !isTrustedProxyPeer(peer) {
 		return "", false
 	}
@@ -73,8 +98,7 @@ func clientIPFromTrustedChain(r *http.Request) (string, bool) {
 		return "", false
 	}
 
-	// Peer loopback: proxy local que puede no añadir un salto. Se acepta el último
-	// elemento, que es el cliente inmediato.
+	// Peer loopback: proxy local que puede no añadir un salto.
 	if peer.IsLoopback() {
 		elegida := addrs[len(addrs)-1]
 		if !isUsableClientAddr(elegida) {
@@ -83,20 +107,18 @@ func clientIPFromTrustedChain(r *http.Request) (string, bool) {
 		return normalizarIP(elegida), true
 	}
 
-	// Peer privado (ALB interno): la topología CloudFront -> ALB -> EC2 exige al menos
-	// dos entradas: la del visor (añadida por CloudFront) y la del borde (añadida por
-	// ALB). Un único valor indicaría que la petición no pasó por la cadena completa.
+	// Peer privado (ALB): se exige la cadena completa visor + salto visto por ALB.
 	if len(addrs) < 2 {
 		return "", false
 	}
 
-	borde := addrs[len(addrs)-1]
-	if !isPublicUnicast(borde) {
+	saltoALB := addrs[len(addrs)-1]
+	if !isUnicastHop(saltoALB) {
 		return "", false
 	}
 
 	visor := addrs[len(addrs)-2]
-	if !isUsableClientAddr(visor) {
+	if !isPublicViewer(visor) {
 		return "", false
 	}
 	return normalizarIP(visor), true
@@ -113,6 +135,23 @@ func peerAddr(remoteAddr string) (netip.Addr, bool) {
 		return netip.Addr{}, false
 	}
 	return valor, true
+}
+
+// parseViewerAddress acepta el formato de CloudFront-Viewer-Address: `IP:puerto`,
+// `[IPv6]:puerto` o, de forma tolerante, solo la IP.
+func parseViewerAddress(valor string) (netip.Addr, bool) {
+	if addrPort, err := netip.ParseAddrPort(valor); err == nil {
+		return addrPort.Addr(), true
+	}
+	if addr, err := netip.ParseAddr(valor); err == nil && addr.Zone() == "" {
+		return addr, true
+	}
+	if strings.HasPrefix(valor, "[") && strings.HasSuffix(valor, "]") {
+		if addr, err := netip.ParseAddr(strings.Trim(valor, "[]")); err == nil && addr.Zone() == "" {
+			return addr, true
+		}
+	}
+	return netip.Addr{}, false
 }
 
 // parseForwardedFor parsea la lista completa y rechaza cualquier elemento inválido o
@@ -150,20 +189,26 @@ func isTrustedProxyPeer(direccion netip.Addr) bool {
 	return direccion.IsLoopback() || direccion.IsPrivate()
 }
 
-// isPublicUnicast valida la IP del borde de CloudFront añadida por el ALB: debe ser
-// pública, unicast y no reservada para usos locales.
-func isPublicUnicast(direccion netip.Addr) bool {
+// isUnicastHop valida el salto añadido por el ALB. Con VPC Origin es la ENI privada de
+// CloudFront; con un origen público sería una IP del borde. En ambos casos debe ser una
+// dirección unicast y no reservada para usos locales.
+func isUnicastHop(direccion netip.Addr) bool {
 	if !direccion.IsValid() || !direccion.IsGlobalUnicast() {
 		return false
 	}
-	if direccion.IsPrivate() || direccion.IsLoopback() || direccion.IsLinkLocalUnicast() ||
-		direccion.IsLinkLocalMulticast() || direccion.IsMulticast() || direccion.IsUnspecified() {
-		return false
-	}
-	return true
+	return !direccion.IsLoopback() && !direccion.IsLinkLocalUnicast() &&
+		!direccion.IsLinkLocalMulticast() && !direccion.IsMulticast() && !direccion.IsUnspecified()
 }
 
-// isUsableClientAddr descarta direcciones que no identifican a un cliente.
+// isPublicViewer valida la IP del visor: CloudFront la obtiene de una conexión de
+// Internet, por lo que debe ser pública (no RFC1918/ULA). Se usa tanto para la cabecera
+// CloudFront-Viewer-Address como para el penúltimo salto de XFF.
+func isPublicViewer(direccion netip.Addr) bool {
+	return isUnicastHop(direccion) && !direccion.IsPrivate()
+}
+
+// isUsableClientAddr descarta direcciones que no identifican a un cliente. Se usa solo
+// en el camino loopback (pruebas o proxy local), donde una IP privada es legítima.
 func isUsableClientAddr(direccion netip.Addr) bool {
 	if !direccion.IsValid() || !direccion.IsGlobalUnicast() {
 		return false

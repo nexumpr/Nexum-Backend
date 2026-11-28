@@ -8,20 +8,37 @@
 
 **Defecto corregido:** `register_handler.go` tomaba el **primer** elemento de `X-Forwarded-For`, controlable por el cliente. Un atacante podía rotar la cabecera y evadir la cuota de registro de 5/15 min.
 
-**Política vigente (`internal/transport/http/clientip.go`):**
+**Política vigente (`internal/transport/http/clientip.go`), corregida para VPC Origins:**
 
-1. El peer inmediato (`RemoteAddr`) debe ser loopback o privado (ALB en la VPC). Un peer público se rechaza.
-2. Sin `X-Forwarded-For`, solo se acepta un peer loopback o privado.
-3. La cadena debe ser parseable al 100 %: máximo 16 saltos, sin elementos vacíos, zonas ni direcciones inválidas.
-4. Con peer privado se exigen **al menos dos** elementos: el último lo añade el ALB y debe ser público (borde de CloudFront); el penúltimo es la IP del visor añadida por CloudFront.
-5. Con peer loopback se acepta el último elemento (pruebas o proxy local).
+> **Corrección P0 (2026-11-27).** La primera versión exigía que el último salto XFF fuera
+> público. Es incorrecto con CloudFront VPC Origins: el ALB ve la **ENI privada** que
+> CloudFront crea en la subred privada, no una IP pública del borde. Exigir un último
+> salto público habría rechazado todas las peticiones de identidad en producción.
+
+1. **Fuente primaria:** `CloudFront-Viewer-Address`. CloudFront la genera y sobrescribe
+   cualquier valor del visor. Se acepta `IP:puerto`, `[IPv6]:puerto` o IP sola; el visor
+   debe ser público y unicast. Un valor inválido se rechaza, sin degradar a XFF.
+2. **Fallback XFF:** con peer loopback/privado, cadena íntegra (≤16, sin vacíos ni zonas),
+   **al menos dos** elementos. El último lo añade el ALB y puede ser **público o privado**
+   (ENI de VPC Origin); el penúltimo es el visor añadido por CloudFront y debe ser público.
+3. **Cabeceras XFF duplicadas** se rechazan: permiten interpretaciones divergentes.
+4. Sin cabeceras: solo se acepta peer loopback (desarrollo local). Un peer privado sin
+   cadena no acredita el paso por CloudFront y se rechaza.
+5. El peer inmediato debe ser loopback o privado. Un peer público nunca es el proxy.
 6. La IP elegida debe ser unicast, no especificada y no multicast.
+
+**Topología verificada (lectura AWS, 2026-11-27):** `OriginRequestPolicyId` =
+`216adef6-5c7f-47e4-b989-5492eafa07d3` (**Managed-AllViewer**); SG del ALB `sg-04a7e3fae5f47fbf8`
+solo admite TCP:80 desde el prefijo CloudFront `pl-b6a144df`; SG del backend
+`sg-05c4632e1bf06f891` solo admite TCP:8080 desde el SG del ALB; Redis solo desde el backend.
+El ALB usa el modo XFF por defecto (**append**) y no se declara otro modo en Terraform. No se
+codifican rangos ni IP efímeras.
 
 **Montaje:** E001, E002, E003, E005, E006, E011 y los catálogos públicos usan la misma función. E001 responde **400 `INVALID_REQUEST`** (`untrusted_proxy_chain`) cuando la cadena no es verificable, antes de invocar el limitador; Redis sigue siendo la autoridad compartida de cuotas y un fallo de Redis mantiene el 503 fail-closed en autenticación.
 
 **Lo que esta corrección no hace:** no valida criptográficamente el origen. Una cabecera secreta de CloudFront requeriría Terraform y un Gate de despliegue; queda como mejora futura, no como control actual.
 
-**Pruebas añadidas:** cadena con prefijo falsificado, elemento vacío, cadena malformada, más de 16 saltos, IPv4/IPv6, IPv4 mapeada, último salto privado, peer público, peer privado sin cadena, loopback, concurrencia (128 goroutines) y rechazo de E001 sin invocar el limitador.
+**Pruebas añadidas:** prefijo falsificado, elemento vacío, cadena malformada, más de 16 saltos, IPv4/IPv6, IPv4 mapeada, **último salto privado (VPC Origin)**, último salto público, peer público, peer privado sin cadena, loopback, **`CloudFront-Viewer-Address` prevaleciendo sobre XFF**, visor privado rechazado, **XFF duplicado rechazado**, concurrencia (128 goroutines) y rechazo de E001 sin invocar el limitador.
 
 **Limitadores locales:** `middleware.NewRateLimiter` y `cache.NewRateLimiter` solo se usan en pruebas; producción usa `cacheinfra.NewAuthRateLimiter` sobre Redis. No se eliminan porque son utilidades de prueba.
 
