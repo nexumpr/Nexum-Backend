@@ -20,26 +20,30 @@ const maxForwardedHops = 16
 //	       -> ALB interno HTTP:80 (SG solo desde el prefijo CloudFront)
 //	       -> EC2 Go:8080 (SG solo desde el SG del ALB)
 //
-// Con Managed-AllViewer, CloudFront añade `CloudFront-Viewer-Address` (IP y puerto del
-// visor) y appende la IP del visor al final de `X-Forwarded-For`. Después, el ALB
-// appende la IP del salto que vio. En una VPC Origin ese salto es la **ENI privada** de
-// CloudFront, no una IP pública del borde; por eso el último elemento de XFF puede ser
-// privado y no se exige que sea público.
+// Con Managed-AllViewer, CloudFront appende la IP del visor al final de
+// `X-Forwarded-For`. Después, el ALB appende la IP del salto que vio. En una VPC Origin
+// ese salto es la **ENI privada** de CloudFront, no una IP pública del borde; por eso el
+// último elemento de XFF puede ser privado y no se exige que sea público.
 //
-// Fuentes, en orden:
-//  1. `CloudFront-Viewer-Address`: la genera CloudFront y sobrescribe cualquier valor
-//     enviado por el visor. Es la fuente preferente cuando el peer es el proxy interno.
-//  2. `X-Forwarded-For`: el último elemento lo añade el ALB (no controlable por el
-//     cliente) y el penúltimo lo añade CloudFront con la IP del visor. El primer
-//     elemento y los anteriores son controlables y nunca se usan.
-//  3. Sin cabeceras: solo se acepta un peer loopback (desarrollo local). Un peer
-//     privado sin cadena se rechaza porque las peticiones de identidad deben pasar por
-//     la cadena completa; un peer público nunca es el proxy de confianza.
+// **No se confía en `CloudFront-Viewer-Address`.** Managed-AllViewer reenvía cabeceras
+// del visor y no garantiza que esa cabecera sea generada y sobrescrita por CloudFront;
+// un cliente podría enviarla. Solo se usa la posición de XFF que añaden CloudFront y el
+// ALB, protegida por la topología (ALB solo desde el prefijo CloudFront y backend solo
+// desde el ALB).
+//
+// Fuente única: `X-Forwarded-For`.
+//   - El último elemento lo añade el ALB (no controlable por el cliente).
+//   - El penúltimo lo añade CloudFront con la IP del visor.
+//   - El primer elemento y los anteriores son controlables y nunca se usan.
+//   - Sin XFF: solo se acepta un peer loopback (desarrollo local). Un peer privado sin
+//     cadena se rechaza; un peer público nunca es el proxy de confianza.
 //
 // Reglas de seguridad:
 //   - El peer inmediato debe ser loopback o privado (ALB dentro de la VPC).
 //   - Se rechazan cabeceras XFF duplicadas (ambigüedad de parseo).
 //   - La cadena debe ser íntegra (≤16 saltos, sin vacíos, zonas ni valores inválidos).
+//   - IPv4 mapeada en IPv6 (`::ffff:a.b.c.d`) se normaliza **antes** de validar; de lo
+//     contrario una dirección privada mapeada podría superar el filtro de “público”.
 //   - Con peer privado se exigen al menos dos elementos: el último es el salto que vio
 //     el ALB (público o privado, pero unicast) y el penúltimo es el visor.
 //   - La IP elegida debe ser unicast, no especificada y no multicast.
@@ -56,19 +60,6 @@ func clientIPFromTrustedChain(r *http.Request) (string, bool) {
 	peer, ok := peerAddr(r.RemoteAddr)
 	if !ok {
 		return "", false
-	}
-
-	// Fuente preferente: cabecera generada por CloudFront. Si está presente pero es
-	// inválida, se rechaza en lugar de degradar silenciosamente a XFF.
-	if viewerHeader := strings.TrimSpace(r.Header.Get("CloudFront-Viewer-Address")); viewerHeader != "" {
-		if !isTrustedProxyPeer(peer) {
-			return "", false
-		}
-		viewer, ok := parseViewerAddress(viewerHeader)
-		if !ok || !isPublicViewer(viewer) {
-			return "", false
-		}
-		return normalizarIP(viewer), true
 	}
 
 	values := r.Header.Values("X-Forwarded-For")
@@ -137,25 +128,9 @@ func peerAddr(remoteAddr string) (netip.Addr, bool) {
 	return valor, true
 }
 
-// parseViewerAddress acepta el formato de CloudFront-Viewer-Address: `IP:puerto`,
-// `[IPv6]:puerto` o, de forma tolerante, solo la IP.
-func parseViewerAddress(valor string) (netip.Addr, bool) {
-	if addrPort, err := netip.ParseAddrPort(valor); err == nil {
-		return addrPort.Addr(), true
-	}
-	if addr, err := netip.ParseAddr(valor); err == nil && addr.Zone() == "" {
-		return addr, true
-	}
-	if strings.HasPrefix(valor, "[") && strings.HasSuffix(valor, "]") {
-		if addr, err := netip.ParseAddr(strings.Trim(valor, "[]")); err == nil && addr.Zone() == "" {
-			return addr, true
-		}
-	}
-	return netip.Addr{}, false
-}
-
 // parseForwardedFor parsea la lista completa y rechaza cualquier elemento inválido o
-// vacío: una cadena ambigua no se interpreta a medias.
+// vacío: una cadena ambigua no se interpreta a medias. Normaliza IPv4 mapeada en IPv6
+// antes de que el llamador aplique los filtros de addressing.
 func parseForwardedFor(cadena string) ([]netip.Addr, bool) {
 	partes := strings.Split(cadena, ",")
 	if len(partes) == 0 || len(partes) > maxForwardedHops {
@@ -172,7 +147,7 @@ func parseForwardedFor(cadena string) ([]netip.Addr, bool) {
 		if err != nil || direccion.Zone() != "" {
 			return nil, false
 		}
-		direcciones = append(direcciones, direccion)
+		direcciones = append(direcciones, direccion.Unmap())
 	}
 	if len(direcciones) == 0 {
 		return nil, false

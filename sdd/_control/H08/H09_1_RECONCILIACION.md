@@ -15,17 +15,18 @@
 > CloudFront crea en la subred privada, no una IP pública del borde. Exigir un último
 > salto público habría rechazado todas las peticiones de identidad en producción.
 
-1. **Fuente primaria:** `CloudFront-Viewer-Address`. CloudFront la genera y sobrescribe
-   cualquier valor del visor. Se acepta `IP:puerto`, `[IPv6]:puerto` o IP sola; el visor
-   debe ser público y unicast. Un valor inválido se rechaza, sin degradar a XFF.
-2. **Fallback XFF:** con peer loopback/privado, cadena íntegra (≤16, sin vacíos ni zonas),
+1. **`CloudFront-Viewer-Address` no se usa.** Managed-AllViewer no garantiza que CloudFront
+   la genere y sobrescriba; un cliente podría enviarla. Se ignora por completo.
+2. **Fuente única XFF:** con peer loopback/privado, cadena íntegra (≤16, sin vacíos ni zonas),
    **al menos dos** elementos. El último lo añade el ALB y puede ser **público o privado**
    (ENI de VPC Origin); el penúltimo es el visor añadido por CloudFront y debe ser público.
-3. **Cabeceras XFF duplicadas** se rechazan: permiten interpretaciones divergentes.
-4. Sin cabeceras: solo se acepta peer loopback (desarrollo local). Un peer privado sin
-   cadena no acredita el paso por CloudFront y se rechaza.
-5. El peer inmediato debe ser loopback o privado. Un peer público nunca es el proxy.
-6. La IP elegida debe ser unicast, no especificada y no multicast.
+3. **IPv4 mapeada en IPv6 se normaliza antes de validar** (`::ffff:a.b.c.d` → IPv4), para que
+   una dirección privada mapeada no supere el filtro de “público”.
+4. **Cabeceras XFF duplicadas** se rechazan: permiten interpretaciones divergentes.
+5. Sin XFF: solo se acepta peer loopback (desarrollo local). Un peer privado sin cadena se
+   rechaza; la cabecera del visor tampoco se usa como sustituto.
+6. El peer inmediato debe ser loopback o privado. Un peer público nunca es el proxy.
+7. La IP elegida debe ser unicast, no especificada y no multicast.
 
 **Topología verificada (lectura AWS, 2026-11-27):** `OriginRequestPolicyId` =
 `216adef6-5c7f-47e4-b989-5492eafa07d3` (**Managed-AllViewer**); SG del ALB `sg-04a7e3fae5f47fbf8`
