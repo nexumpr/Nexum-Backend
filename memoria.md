@@ -2581,7 +2581,11 @@ Rama de integracion `chore/h08e-oleada2-integracion`; Gate `GATE_H08E_OLEADA_2` 
 - **Terraform:** `init -backend=false` y `validate` PASS; plan exacto pendiente de variables de custodia y Gate por SHA.
 - **Lecturas AWS:** bloqueadas por la política local (`describe-load-balancer-attributes`, `describe-continuous-backups`, `s3api get-bucket-*`). Comandos exactos en `H09_90_PREPARACION.md`; no se ampliaron permisos.
 - **PR #162:** nuevo HEAD `9ea8b22cabd6623ccfef6f593a9087843b87e0a8` tras eliminar la confianza en `CloudFront-Viewer-Address` y normalizar IPv4 mapeada.
-- **Estados:** `H09_90_LOCAL=PASS`; `GITHUB_RULESET=ACTIVE`; `TAG_RELEASE=CREATED`; `AWS_NOT_RUN`; `MERGE=NO_AUTORIZADO`.
+- **Plan y apply reales (2026-11-28):** plan acotado `C:\Nexum-Custodia\H09-90-20261128\h09-90.tfplan`, SHA-256 **`0F2D6790F639589DF596AD6D8905419F436C995541E8E3EE9222DD2638887D45`**, 186 185 B, `applyable=true`, **0 add / 1 change / 0 destroy**. Apply autorizado con el SHA verificado: **0 added, 1 changed, 0 destroyed**; `aws dynamodb describe-table` confirma **`DeletionProtection=true`** y 1 432 ítems. El objetivo IAM de logs resultó **no-op** (la política ya estaba en estado). Sin reemplazos, sin destrucciones y coste 0.
+- **PR #162:** **MERGED** con HEAD `9ea8b22cabd6623ccfef6f593a9087843b87e0a8`; merge y `main` **`dda1011e250d471c224f287728d3d5f193dc7855`**. 13/13 checks PASS; E015 recuperado y XFF sin `CloudFront-Viewer-Address`.
+- **Gobierno unipersonal:** ruleset `main-protegida-h09` con **0 revisiones obligatorias**, `require_extra_approval_for_unattributed_changes=false`, `bypass_actors=[]`, 13 checks, `strict=true`, conversaciones resueltas; protección clásica sin revisión obligatoria. Limitación declarada: se elimina la separación autor/aprobador y se compensa con CI obligatorio, ruleset sin bypass y Gate humano por SHA.
+- **Rúbrica:** 69 base → **CI/CD/gobierno 7** (ruleset sin bypass + tag/Release) → **Pruebas 8** al fusionar #162 → **Protección de datos 8** por deletion protection efectiva = **73/100** máximo acreditable actual. PITR/S3 siguen sin verificar; observabilidad, WAF/TLS, DAST y E015 legal permanecen bloqueados.
+- **Estados:** `H09_90_LOCAL=PASS`; `GITHUB_RULESET=ACTIVE`; `TAG_RELEASE=CREATED`; `DYNAMODB_DELETION_PROTECTION=APPLIED`; `AWS_APPLY=1_CHANGE`; `MERGE_PR_162=MERGED`; `MERGE_PR_163=PENDIENTE`.
 
 
 
